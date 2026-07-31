@@ -1,0 +1,129 @@
+<?php
+namespace App\Http\Controllers\Api\Core;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Core\StoreLabelRequest;
+use App\Http\Requests\Core\UpdateLabelRequest;
+use App\Models\Core\Label;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+class LabelController extends Controller
+{
+    public function index(): JsonResponse
+    {
+        $labels = Label::query()
+            ->with('parent:id,name')
+            ->withCount(['children', 'artists', 'releases'])
+            ->latest()
+            ->paginate(20);
+
+        return response()->json([
+            'success' => true,
+            'data' => $labels,
+        ]);
+    }
+
+    public function store(StoreLabelRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+
+        if (
+            $data['label_type'] === 'sub_label'
+            && empty($data['parent_label_id'])
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A parent label is required for a sub-label.',
+            ], 422);
+        }
+
+        if ($data['label_type'] === 'label') {
+            $data['parent_label_id'] = null;
+        }
+
+        $label = DB::transaction(function () use ($data): Label {
+            return Label::create([
+                ...$data,
+                'public_id' => (string) Str::ulid(),
+                'slug' => $this->generateUniqueSlug($data['name']),
+                'minimum_withdrawal_amount' =>
+                    $data['minimum_withdrawal_amount'] ?? 5000,
+                'created_by' => auth()->id(),
+                'updated_by' => auth()->id(),
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Label created successfully.',
+            'data' => $label->load('parent:id,name'),
+        ], 201);
+    }
+
+    public function show(Label $label): JsonResponse
+    {
+        $label->load([
+            'parent:id,name',
+            'children',
+        ])->loadCount([
+            'artists',
+            'releases',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $label,
+        ]);
+    }
+
+    private function generateUniqueSlug(string $name): string
+    {
+        $baseSlug = Str::slug($name);
+        $slug = $baseSlug;
+        $counter = 1;
+
+        while (
+            Label::withTrashed()
+                ->where('slug', $slug)
+                ->exists()
+        ) {
+            $slug = "{$baseSlug}-{$counter}";
+            $counter++;
+        }
+
+        return $slug;
+    }
+
+public function update(UpdateLabelRequest $request, Label $label): JsonResponse
+{
+    $data = $request->validated();
+
+    if (
+        isset($data['label_type']) &&
+        $data['label_type'] === 'sub_label' &&
+        empty($data['parent_label_id'])
+    ) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Parent label is required for a sub-label.',
+        ], 422);
+    }
+
+    if (
+        isset($data['label_type']) &&
+        $data['label_type'] === 'label'
+    ) {
+        $data['parent_label_id'] = null;
+    }
+
+    $data['updated_by'] = auth()->id();
+
+    $label->update($data);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Label updated successfully.',
+        'data' => $label->fresh(),
+    ]);
+}
+
