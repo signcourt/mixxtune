@@ -1,0 +1,40 @@
+{
+  "core": [
+    "users",
+    "roles",
+    "permissions",
+    "role_permissions",
+    "user_roles",
+    "panel_settings"
+  ],
+  "catalogue": [
+    "labels",
+    "artists",
+    "releases",
+    "tracks",
+    "contributors",
+    "track_contributors",
+    "track_splits",
+    "distribution_stores",
+    "release_store_deliveries",
+    "release_status_logs",
+    "isrc_codes",
+    "upc_codes"
+  ],
+  "finance": [
+    "royalty_reports",
+    "royalty_report_lines",
+    "wallets",
+    "wallet_transactions",
+    "withdrawals",
+    "statements",
+    "invoices"
+  ],
+  "operations": [
+    "kyc_submissions",
+    "support_tickets",
+    "support_ticket_messages",
+    "notifications",
+    "audit_logs"
+  ]
+}

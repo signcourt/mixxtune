@@ -1,0 +1,232 @@
+{
+  "version": "2.0.0",
+  "generated_at": "2026-07-31T19:06:22.560405+00:00",
+  "modules": [
+    {
+      "name": "Core",
+      "priority": 1,
+      "shared": true,
+      "dependencies": [],
+      "status": "installed"
+    },
+    {
+      "name": "Users",
+      "priority": 2,
+      "shared": true,
+      "dependencies": [
+        "Core"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Roles",
+      "priority": 3,
+      "shared": true,
+      "dependencies": [
+        "Core",
+        "Users"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Labels",
+      "priority": 4,
+      "shared": true,
+      "dependencies": [
+        "Users",
+        "Roles"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Artists",
+      "priority": 5,
+      "shared": true,
+      "dependencies": [
+        "Users",
+        "Roles",
+        "Labels"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Releases",
+      "priority": 6,
+      "shared": true,
+      "dependencies": [
+        "Artists",
+        "Labels"
+      ],
+      "status": "in_progress"
+    },
+    {
+      "name": "Tracks",
+      "priority": 7,
+      "shared": true,
+      "dependencies": [
+        "Releases"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Contributors",
+      "priority": 8,
+      "shared": true,
+      "dependencies": [
+        "Tracks"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Stores",
+      "priority": 9,
+      "shared": true,
+      "dependencies": [
+        "Releases"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Catalogue",
+      "priority": 10,
+      "shared": true,
+      "dependencies": [
+        "Releases",
+        "Tracks"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "ISRC",
+      "priority": 11,
+      "shared": true,
+      "dependencies": [
+        "Tracks"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "UPC",
+      "priority": 12,
+      "shared": true,
+      "dependencies": [
+        "Releases"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Delivery",
+      "priority": 13,
+      "shared": true,
+      "dependencies": [
+        "Releases",
+        "Tracks",
+        "Stores"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Takedowns",
+      "priority": 14,
+      "shared": true,
+      "dependencies": [
+        "Delivery"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Reports",
+      "priority": 15,
+      "shared": true,
+      "dependencies": [
+        "Catalogue"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Royalties",
+      "priority": 16,
+      "shared": true,
+      "dependencies": [
+        "Reports"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Wallet",
+      "priority": 17,
+      "shared": true,
+      "dependencies": [
+        "Royalties"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Withdrawals",
+      "priority": 18,
+      "shared": true,
+      "dependencies": [
+        "Wallet",
+        "KYC"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Statements",
+      "priority": 19,
+      "shared": true,
+      "dependencies": [
+        "Wallet",
+        "Royalties"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Invoices",
+      "priority": 20,
+      "shared": true,
+      "dependencies": [
+        "Wallet",
+        "Statements"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "KYC",
+      "priority": 21,
+      "shared": true,
+      "dependencies": [
+        "Users"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Support",
+      "priority": 22,
+      "shared": true,
+      "dependencies": [
+        "Users"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Notifications",
+      "priority": 23,
+      "shared": true,
+      "dependencies": [
+        "Users"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "Settings",
+      "priority": 24,
+      "shared": true,
+      "dependencies": [
+        "Core",
+        "Roles"
+      ],
+      "status": "planned"
+    }
+  ]
+}

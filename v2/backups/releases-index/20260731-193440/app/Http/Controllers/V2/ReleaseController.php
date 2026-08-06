@@ -1,0 +1,1207 @@
+<?php
+
+namespace App\Http\Controllers\V2;
+
+use App\Http\Controllers\Controller;
+use App\Models\Core\Artist;
+use App\Models\Core\Label;
+use App\Models\Distribution\Release;
+use App\Models\DistributionStore;
+use App\Services\V2\PermissionService;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class ReleaseController extends Controller
+{
+    public function create(
+        Request $request,
+        PermissionService $permissions
+    ): Response {
+        $permissions->authorize(
+            $request->user(),
+            'releases.create'
+        );
+
+        $context = $this->formContext(
+            $request,
+            $permissions
+        );
+
+        return Inertia::render(
+            'V2/Releases/Create',
+            [
+                ...$context,
+                'release' => null,
+                'title' => 'Create Release',
+            ]
+        );
+    }
+
+    public function store(
+        Request $request,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $permissions->authorize(
+            $request->user(),
+            'releases.create'
+        );
+
+        $validated = $this->validateDraft($request);
+
+        [$artist, $label] = $this->resolveOwnership(
+            $request,
+            $permissions,
+            $validated
+        );
+
+        $artworkPath = null;
+
+        if ($request->hasFile('artwork')) {
+            $artworkPath = $request
+                ->file('artwork')
+                ->store(
+                    'releases/artwork',
+                    'public'
+                );
+        }
+
+        $release = DB::transaction(function () use (
+            $request,
+            $validated,
+            $artist,
+            $label,
+            $artworkPath
+        ) {
+            return Release::query()->create([
+                'public_id' => (string) Str::ulid(),
+                'catalog_number' =>
+                    $validated['catalog_number'],
+
+                'artist_id' => $artist->id,
+                'label_id' => $label?->id,
+
+                'release_type' =>
+                    $validated['release_type'],
+
+                'title' => $validated['title'],
+
+                'primary_artist_name' =>
+                    $artist->stage_name
+                    ?: $artist->legal_name,
+
+                'featuring_artist_name' =>
+                    $validated[
+                        'featuring_artist_name'
+                    ] ?? null,
+
+                'language' =>
+                    $validated['language'] ?? null,
+
+                'primary_genre' =>
+                    $validated[
+                        'primary_genre'
+                    ] ?? null,
+
+                'sub_genre' =>
+                    $validated['sub_genre'] ?? null,
+
+                'upc' =>
+                    $validated['upc'] ?? null,
+
+                'original_release_date' =>
+                    $validated[
+                        'original_release_date'
+                    ] ?? null,
+
+                'digital_release_date' =>
+                    $validated[
+                        'digital_release_date'
+                    ] ?? null,
+
+                'copyright_owner' =>
+                    $validated[
+                        'copyright_owner'
+                    ] ?? null,
+
+                'copyright_year' =>
+                    $validated[
+                        'copyright_year'
+                    ] ?? null,
+
+                'phonographic_owner' =>
+                    $validated[
+                        'phonographic_owner'
+                    ] ?? null,
+
+                'phonographic_year' =>
+                    $validated[
+                        'phonographic_year'
+                    ] ?? null,
+
+                'artwork_path' => $artworkPath,
+
+                'status' => 'draft',
+                'wizard_step' => 1,
+                'completion_percentage' => 20,
+
+                'created_by' =>
+                    $request->user()->id,
+
+                'updated_by' =>
+                    $request->user()->id,
+            ]);
+        });
+
+        return redirect()
+            ->route(
+                'v2.releases.edit',
+                $release
+            )
+            ->with(
+                'success',
+                "Draft '{$release->title}' created."
+            );
+    }
+
+    public function edit(
+        Request $request,
+        Release $release,
+        PermissionService $permissions
+    ): Response {
+        $permissions->authorize(
+            $request->user(),
+            'releases.update'
+        );
+
+        $this->authorizeRelease(
+            $request,
+            $release,
+            $permissions
+        );
+
+        abort_unless(
+            in_array(
+                $release->status,
+                [
+                    'draft',
+                    'changes_requested',
+                    'rejected',
+                ],
+                true
+            ),
+            403,
+            'This release is locked for editing.'
+        );
+
+        $release->load([
+            'tracks' => function ($query) {
+                $query
+                    ->orderBy('disc_number')
+                    ->orderBy('track_number')
+                    ->orderBy('id');
+            },
+        ]);
+
+        $context = $this->formContext(
+            $request,
+            $permissions
+        );
+
+        return Inertia::render(
+            'V2/Releases/Create',
+            [
+                ...$context,
+                'release' => $release,
+                'title' => 'Edit Release',
+            ]
+        );
+    }
+
+    public function update(
+        Request $request,
+        Release $release,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $permissions->authorize(
+            $request->user(),
+            'releases.update'
+        );
+
+        $this->authorizeRelease(
+            $request,
+            $release,
+            $permissions
+        );
+
+        abort_unless(
+            in_array(
+                $release->status,
+                [
+                    'draft',
+                    'changes_requested',
+                    'rejected',
+                ],
+                true
+            ),
+            403,
+            'This release is locked for editing.'
+        );
+
+        $validated = $this->validateDraft($request);
+
+        [$artist, $label] = $this->resolveOwnership(
+            $request,
+            $permissions,
+            $validated,
+            $release
+        );
+
+        if ($request->hasFile('artwork')) {
+            if ($release->artwork_path) {
+                Storage::disk('public')->delete(
+                    $release->artwork_path
+                );
+            }
+
+            $validated['artwork_path'] = $request
+                ->file('artwork')
+                ->store(
+                    'releases/artwork',
+                    'public'
+                );
+        }
+
+        unset($validated['artwork']);
+
+        $release->update([
+            'catalog_number' =>
+                $validated['catalog_number'],
+
+            'artist_id' => $artist->id,
+            'label_id' => $label?->id,
+
+            'release_type' =>
+                $validated['release_type'],
+
+            'title' => $validated['title'],
+
+            'primary_artist_name' =>
+                $artist->stage_name
+                ?: $artist->legal_name,
+
+            'featuring_artist_name' =>
+                $validated[
+                    'featuring_artist_name'
+                ] ?? null,
+
+            'language' =>
+                $validated['language'] ?? null,
+
+            'primary_genre' =>
+                $validated['primary_genre'] ?? null,
+
+            'sub_genre' =>
+                $validated['sub_genre'] ?? null,
+
+            'upc' =>
+                $validated['upc'] ?? null,
+
+            'original_release_date' =>
+                $validated[
+                    'original_release_date'
+                ] ?? null,
+
+            'digital_release_date' =>
+                $validated[
+                    'digital_release_date'
+                ] ?? null,
+
+            'copyright_owner' =>
+                $validated[
+                    'copyright_owner'
+                ] ?? null,
+
+            'copyright_year' =>
+                $validated[
+                    'copyright_year'
+                ] ?? null,
+
+            'phonographic_owner' =>
+                $validated[
+                    'phonographic_owner'
+                ] ?? null,
+
+            'phonographic_year' =>
+                $validated[
+                    'phonographic_year'
+                ] ?? null,
+
+            'artwork_path' =>
+                $validated['artwork_path']
+                ?? $release->artwork_path,
+
+            'status' =>
+                $release->status === 'rejected'
+                    ? 'draft'
+                    : $release->status,
+
+            'wizard_step' => max(
+                1,
+                min(
+                    4,
+                    (int) (
+                        $validated['wizard_step']
+                        ?? $release->wizard_step
+                        ?? 1
+                    )
+                )
+            ),
+
+            'completion_percentage' => max(
+                20,
+                min(
+                    100,
+                    (int) (
+                        $validated[
+                            'completion_percentage'
+                        ]
+                        ?? $release
+                            ->completion_percentage
+                        ?? 20
+                    )
+                )
+            ),
+
+            'rejection_reason' => null,
+            'rejected_at' => null,
+            'rejected_by' => null,
+
+            'updated_by' =>
+                $request->user()->id,
+        ]);
+
+        return back()->with(
+            'success',
+            'Draft updated successfully.'
+        );
+    }
+
+
+    public function saveDistribution(
+        Request $request,
+        Release $release,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $permissions->authorize(
+            $request->user(),
+            'releases.update'
+        );
+
+        $this->authorizeRelease(
+            $request,
+            $release,
+            $permissions
+        );
+
+        abort_unless(
+            in_array(
+                $release->status,
+                [
+                    'draft',
+                    'changes_requested',
+                    'rejected',
+                ],
+                true
+            ),
+            403,
+            'This release is locked for editing.'
+        );
+
+        $validated = $request->validate([
+            'stores' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'stores.*' => [
+                'required',
+                'integer',
+                'distinct',
+                'exists:distribution_stores,id',
+            ],
+
+            'worldwide' => [
+                'required',
+                'boolean',
+            ],
+
+            'territories' => [
+                'nullable',
+                'array',
+            ],
+
+            'territories.*' => [
+                'string',
+                'size:2',
+            ],
+
+            'release_timezone' => [
+                'required',
+                'string',
+                'max:100',
+            ],
+
+            'pre_order' => [
+                'required',
+                'boolean',
+            ],
+        ]);
+
+        if (
+            !$validated['worldwide']
+            && empty(
+                $validated['territories']
+            )
+        ) {
+            return back()->withErrors([
+                'territories' =>
+                    'Select at least one territory or enable Worldwide.',
+            ]);
+        }
+
+        $activeStoreIds =
+            DistributionStore::query()
+                ->where('is_active', true)
+                ->whereIn(
+                    'id',
+                    $validated['stores']
+                )
+                ->pluck('id')
+                ->map(
+                    fn ($id) => (int) $id
+                )
+                ->values()
+                ->all();
+
+        if (
+            count($activeStoreIds)
+            !== count(
+                $validated['stores']
+            )
+        ) {
+            return back()->withErrors([
+                'stores' =>
+                    'One or more selected stores are inactive or invalid.',
+            ]);
+        }
+
+        $release->update([
+            'stores' =>
+                $activeStoreIds,
+
+            'worldwide' =>
+                (bool) $validated[
+                    'worldwide'
+                ],
+
+            'territories' =>
+                $validated['worldwide']
+                    ? []
+                    : array_values(
+                        array_unique(
+                            array_map(
+                                'strtoupper',
+                                $validated[
+                                    'territories'
+                                ] ?? []
+                            )
+                        )
+                    ),
+
+            'release_timezone' =>
+                $validated[
+                    'release_timezone'
+                ],
+
+            'pre_order' =>
+                (bool) $validated[
+                    'pre_order'
+                ],
+
+            'wizard_step' => max(
+                3,
+                (int) $release
+                    ->wizard_step
+            ),
+
+            'completion_percentage' =>
+                max(
+                    75,
+                    (int) $release
+                        ->completion_percentage
+                ),
+
+            'updated_by' =>
+                $request->user()->id,
+        ]);
+
+        return back()->with(
+            'success',
+            'Stores and distribution settings saved successfully.'
+        );
+    }
+
+
+    public function submitForReview(
+        Request $request,
+        Release $release,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $permissions->authorize(
+            $request->user(),
+            'releases.submit'
+        );
+
+        $this->authorizeRelease(
+            $request,
+            $release,
+            $permissions
+        );
+
+        abort_unless(
+            in_array(
+                $release->status,
+                [
+                    'draft',
+                    'changes_requested',
+                    'rejected',
+                ],
+                true
+            ),
+            403,
+            'This release has already been submitted.'
+        );
+
+        $release->load('tracks');
+
+        $errors = [];
+
+        if (!$release->title) {
+            $errors['title'] =
+                'Release title is required.';
+        }
+
+        if (!$release->primary_artist_name) {
+            $errors['artist'] =
+                'Primary artist is required.';
+        }
+
+        if (!$release->label_id) {
+            $errors['label'] =
+                'Label is required.';
+        }
+
+        if (!$release->catalog_number) {
+            $errors['catalog_number'] =
+                'Catalogue number is required.';
+        }
+
+        if (!$release->digital_release_date) {
+            $errors['digital_release_date'] =
+                'Digital release date is required.';
+        }
+
+        if (!$release->artwork_path) {
+            $errors['artwork'] =
+                'Cover artwork is required.';
+        }
+
+        if ($release->tracks->isEmpty()) {
+            $errors['tracks'] =
+                'Add at least one track.';
+        }
+
+        foreach (
+            $release->tracks as $index => $track
+        ) {
+            $number = $index + 1;
+
+            if (!$track->title) {
+                $errors[
+                    "track_{$track->id}_title"
+                ] =
+                    "Track {$number} title is missing.";
+            }
+
+            if (!$track->audio_path) {
+                $errors[
+                    "track_{$track->id}_audio"
+                ] =
+                    "Track {$number} WAV file is missing.";
+            }
+        }
+
+        $stores = is_array($release->stores)
+            ? array_values(
+                array_unique(
+                    array_map(
+                        'intval',
+                        $release->stores
+                    )
+                )
+            )
+            : [];
+
+        if (empty($stores)) {
+            $errors['stores'] =
+                'Select at least one distribution store.';
+        }
+
+        if (
+            !$release->worldwide &&
+            empty($release->territories)
+        ) {
+            $errors['territories'] =
+                'Select at least one territory or enable Worldwide.';
+        }
+
+        if (!empty($errors)) {
+            return back()->withErrors($errors);
+        }
+
+        $oldStatus = $release->status;
+
+        DB::transaction(function () use (
+            $request,
+            $release,
+            $oldStatus
+        ) {
+            $release->update([
+                'status' => 'submitted',
+                'wizard_step' => 4,
+                'completion_percentage' => 100,
+                'submitted_at' => now(),
+                'review_notes' => null,
+                'rejection_reason' => null,
+                'rejected_at' => null,
+                'rejected_by' => null,
+                'updated_by' =>
+                    $request->user()->id,
+            ]);
+
+            if (
+                Schema::hasTable(
+                    'release_status_logs'
+                )
+            ) {
+                DB::table(
+                    'release_status_logs'
+                )->insert([
+                    'public_id' =>
+                        (string) Str::ulid(),
+
+                    'release_id' =>
+                        $release->id,
+
+                    'old_status' =>
+                        $oldStatus,
+
+                    'new_status' =>
+                        'submitted',
+
+                    'action' =>
+                        'submitted_for_review',
+
+                    'remarks' =>
+                        'Submitted for review through V2.',
+
+                    'ip_address' =>
+                        $request->ip(),
+
+                    'user_agent' =>
+                        $request->userAgent(),
+
+                    'changed_by' =>
+                        $request->user()->id,
+
+                    'created_at' =>
+                        now(),
+
+                    'updated_at' =>
+                        now(),
+                ]);
+            }
+        });
+
+        return redirect()
+            ->route('v2.dashboard')
+            ->with(
+                'success',
+                "Release '{$release->title}' submitted for review."
+            );
+    }
+
+    private function validateDraft(
+        Request $request
+    ): array {
+        return $request->validate([
+            'title' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'release_type' => [
+                'required',
+                'in:single,ep,album',
+            ],
+
+            'artist_id' => [
+                'nullable',
+                'integer',
+                'exists:artists,id',
+            ],
+
+            'label_id' => [
+                'nullable',
+                'integer',
+                'exists:labels,id',
+            ],
+
+            'featuring_artist_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'catalog_number' => [
+                'required',
+                'string',
+                'max:100',
+            ],
+
+            'upc' => [
+                'nullable',
+                'string',
+                'max:20',
+            ],
+
+            'language' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'primary_genre' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'sub_genre' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'original_release_date' => [
+                'nullable',
+                'date',
+            ],
+
+            'digital_release_date' => [
+                'required',
+                'date',
+            ],
+
+            'copyright_owner' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'copyright_year' => [
+                'nullable',
+                'integer',
+                'min:1900',
+                'max:2100',
+            ],
+
+            'phonographic_owner' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'phonographic_year' => [
+                'nullable',
+                'integer',
+                'min:1900',
+                'max:2100',
+            ],
+
+            'artwork' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png',
+                'max:20480',
+            ],
+
+            'wizard_step' => [
+                'nullable',
+                'integer',
+                'min:1',
+                'max:4',
+            ],
+
+            'completion_percentage' => [
+                'nullable',
+                'integer',
+                'min:0',
+                'max:100',
+            ],
+        ]);
+    }
+
+    private function resolveOwnership(
+        Request $request,
+        PermissionService $permissions,
+        array $validated,
+        ?Release $release = null
+    ): array {
+        $role = $permissions->role(
+            $request->user()
+        );
+
+        if ($role === 'artist') {
+            $artist = Artist::query()
+                ->where(
+                    'user_id',
+                    $request->user()->id
+                )
+                ->whereNull('deleted_at')
+                ->firstOrFail();
+
+            $label = $artist->label_id
+                ? Label::query()->find(
+                    $artist->label_id
+                )
+                : null;
+
+            return [$artist, $label];
+        }
+
+        if ($role === 'label') {
+            $label = Label::query()
+                ->where(
+                    'user_id',
+                    $request->user()->id
+                )
+                ->whereNull('deleted_at')
+                ->firstOrFail();
+
+            $artistId =
+                $validated['artist_id']
+                ?? $release?->artist_id;
+
+            abort_unless(
+                $artistId,
+                422,
+                'Select an artist.'
+            );
+
+            $artist = Artist::query()
+                ->where('id', $artistId)
+                ->where(
+                    'label_id',
+                    $label->id
+                )
+                ->whereNull('deleted_at')
+                ->firstOrFail();
+
+            return [$artist, $label];
+        }
+
+        $artistId =
+            $validated['artist_id']
+            ?? $release?->artist_id;
+
+        abort_unless(
+            $artistId,
+            422,
+            'Select an artist.'
+        );
+
+        $artist = Artist::query()
+            ->where('id', $artistId)
+            ->whereNull('deleted_at')
+            ->firstOrFail();
+
+        $labelId =
+            $validated['label_id']
+            ?? $artist->label_id
+            ?? $release?->label_id;
+
+        $label = $labelId
+            ? Label::query()->findOrFail(
+                $labelId
+            )
+            : null;
+
+        if (
+            $role === 'admin'
+            && Schema::hasColumn(
+                'artists',
+                'assigned_admin_id'
+            )
+        ) {
+            abort_unless(
+                (int) $artist->assigned_admin_id
+                    === (int) $request->user()->id,
+                403,
+                'This artist is not assigned to you.'
+            );
+        }
+
+        return [$artist, $label];
+    }
+
+    private function authorizeRelease(
+        Request $request,
+        Release $release,
+        PermissionService $permissions
+    ): void {
+        $role = $permissions->role(
+            $request->user()
+        );
+
+        if ($role === 'super_admin') {
+            return;
+        }
+
+        if ($role === 'artist') {
+            $artist = Artist::query()
+                ->where(
+                    'user_id',
+                    $request->user()->id
+                )
+                ->whereNull('deleted_at')
+                ->firstOrFail();
+
+            abort_unless(
+                (int) $release->artist_id
+                    === (int) $artist->id,
+                403,
+                'You cannot manage this release.'
+            );
+
+            return;
+        }
+
+        if ($role === 'label') {
+            $label = Label::query()
+                ->where(
+                    'user_id',
+                    $request->user()->id
+                )
+                ->whereNull('deleted_at')
+                ->firstOrFail();
+
+            abort_unless(
+                (int) $release->label_id
+                    === (int) $label->id,
+                403,
+                'You cannot manage this release.'
+            );
+
+            return;
+        }
+
+        if (
+            $role === 'admin'
+            && Schema::hasColumn(
+                'artists',
+                'assigned_admin_id'
+            )
+        ) {
+            $artist = Artist::query()->find(
+                $release->artist_id
+            );
+
+            abort_unless(
+                $artist
+                && (int) $artist->assigned_admin_id
+                    === (int) $request->user()->id,
+                403,
+                'This release is not assigned to you.'
+            );
+        }
+    }
+
+    private function formContext(
+        Request $request,
+        PermissionService $permissions
+    ): array {
+        $role = $permissions->role(
+            $request->user()
+        );
+
+        $artist = null;
+        $label = null;
+        $availableArtists = collect();
+        $availableLabels = collect();
+
+        if ($role === 'artist') {
+            $artist = Artist::query()
+                ->where(
+                    'user_id',
+                    $request->user()->id
+                )
+                ->whereNull('deleted_at')
+                ->first();
+
+            if ($artist?->label_id) {
+                $label = Label::query()->find(
+                    $artist->label_id
+                );
+            }
+        }
+
+        if ($role === 'label') {
+            $label = Label::query()
+                ->where(
+                    'user_id',
+                    $request->user()->id
+                )
+                ->whereNull('deleted_at')
+                ->first();
+
+            if ($label) {
+                $availableArtists = Artist::query()
+                    ->where(
+                        'label_id',
+                        $label->id
+                    )
+                    ->whereNull('deleted_at')
+                    ->orderBy('stage_name')
+                    ->get([
+                        'id',
+                        'stage_name',
+                        'legal_name',
+                        'label_id',
+                    ]);
+            }
+        }
+
+        if (
+            in_array(
+                $role,
+                ['admin', 'super_admin'],
+                true
+            )
+        ) {
+            $artistsQuery = Artist::query()
+                ->whereNull('deleted_at');
+
+            if (
+                $role === 'admin'
+                && Schema::hasColumn(
+                    'artists',
+                    'assigned_admin_id'
+                )
+            ) {
+                $artistsQuery->where(
+                    'assigned_admin_id',
+                    $request->user()->id
+                );
+            }
+
+            $availableArtists = $artistsQuery
+                ->orderBy('stage_name')
+                ->get([
+                    'id',
+                    'stage_name',
+                    'legal_name',
+                    'label_id',
+                ]);
+
+            $labelsQuery = Label::query()
+                ->whereNull('deleted_at');
+
+            if (
+                $role === 'admin'
+                && Schema::hasColumn(
+                    'labels',
+                    'assigned_admin_id'
+                )
+            ) {
+                $labelsQuery->where(
+                    'assigned_admin_id',
+                    $request->user()->id
+                );
+            }
+
+            $availableLabels = $labelsQuery
+                ->orderBy('name')
+                ->get([
+                    'id',
+                    'name',
+                ]);
+        }
+
+        return [
+            'role' => $role,
+
+            'permissions' =>
+                $permissions->permissions(
+                    $request->user()
+                ),
+
+            'artist' => $artist
+                ? [
+                    'id' => $artist->id,
+                    'stage_name' =>
+                        $artist->stage_name,
+                    'legal_name' =>
+                        $artist->legal_name,
+                    'label_id' =>
+                        $artist->label_id,
+                ]
+                : null,
+
+            'label' => $label
+                ? [
+                    'id' => $label->id,
+                    'name' => $label->name,
+                ]
+                : null,
+
+            'availableArtists' =>
+                $availableArtists,
+
+            'availableLabels' =>
+                $availableLabels,
+
+            'distributionStores' =>
+                DistributionStore::query()
+                    ->where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get([
+                        'id',
+                        'name',
+                        'slug',
+                        'logo_path',
+                        'default_selected',
+                    ]),
+        ];
+    }
+}
