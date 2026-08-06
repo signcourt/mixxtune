@@ -1,0 +1,401 @@
+/* ================================================================
+   MIXX TUNE RELEASE WIZARD V3
+   Reference-style vertical wizard shell
+   ================================================================ */
+
+.mixx-v3-release-shell {
+    display: grid;
+    min-height: calc(100vh - 112px);
+    grid-template-columns: 290px minmax(0, 1fr);
+    gap: 18px;
+    align-items: stretch;
+}
+
+.mixx-v3-sidebar {
+    position: sticky;
+    top: 18px;
+    align-self: start;
+    min-height: calc(100vh - 150px);
+    overflow: hidden;
+    border: 1px solid #ddd6fe;
+    border-radius: 26px;
+    background:
+        linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #faf9ff 55%,
+            #f7f5ff 100%
+        );
+    box-shadow:
+        0 22px 60px rgba(76, 29, 149, 0.08);
+}
+
+.mixx-v3-mascot-stage {
+    position: relative;
+    display: flex;
+    min-height: 290px;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-bottom: 1px solid #ede9fe;
+    background:
+        radial-gradient(
+            circle at 50% 42%,
+            rgba(196, 181, 253, 0.42),
+            transparent 62%
+        );
+}
+
+.mixx-v3-mascot-glow {
+    position: absolute;
+    width: 220px;
+    height: 220px;
+    border-radius: 999px;
+    background:
+        radial-gradient(
+            circle,
+            rgba(139, 92, 246, 0.22),
+            transparent 68%
+        );
+    filter: blur(8px);
+    animation: mixx-v3-glow 3.4s ease-in-out infinite;
+}
+
+.mixx-v3-mascot-placeholder {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    width: 205px;
+    min-height: 215px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed rgba(124, 58, 237, 0.28);
+    border-radius: 38% 38% 28% 28%;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255, 255, 255, 0.98),
+            rgba(237, 233, 254, 0.92)
+        );
+    box-shadow:
+        0 28px 55px rgba(76, 29, 149, 0.16);
+    transform-origin: 50% 100%;
+    animation:
+        mixx-v3-character-enter 520ms
+            cubic-bezier(0.22, 1, 0.36, 1)
+            both,
+        mixx-v3-character-idle 3.2s 520ms
+            ease-in-out infinite;
+}
+
+.mixx-v3-mascot-icon {
+    font-size: 58px;
+    line-height: 1;
+    filter:
+        drop-shadow(
+            0 10px 18px rgba(91, 33, 182, 0.18)
+        );
+}
+
+.mixx-v3-mascot-placeholder-title {
+    margin-top: 18px;
+    color: #111827;
+    font-size: 17px;
+    font-weight: 900;
+}
+
+.mixx-v3-mascot-placeholder-text {
+    margin-top: 5px;
+    color: #7c3aed;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.mixx-v3-music-notes {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    color: #7c3aed;
+    font-weight: 900;
+}
+
+.mixx-v3-music-notes span {
+    position: absolute;
+    opacity: 0;
+    animation: mixx-v3-note 2.6s ease-in-out infinite;
+}
+
+.mixx-v3-music-notes span:nth-child(1) {
+    top: 55px;
+    right: 42px;
+}
+
+.mixx-v3-music-notes span:nth-child(2) {
+    top: 96px;
+    right: 24px;
+    animation-delay: 0.8s;
+}
+
+.mixx-v3-music-notes span:nth-child(3) {
+    top: 45px;
+    left: 34px;
+    animation-delay: 1.5s;
+}
+
+.mixx-v3-step-navigation {
+    padding: 18px 14px 24px;
+}
+
+.mixx-v3-step-wrap {
+    position: relative;
+}
+
+.mixx-v3-step-line {
+    position: absolute;
+    top: -17px;
+    left: 25px;
+    width: 2px;
+    height: 20px;
+    border-left: 2px dotted #d8d4e8;
+}
+
+.mixx-v3-step-line-active {
+    border-color: #8b5cf6;
+}
+
+.mixx-v3-step-button {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    width: 100%;
+    min-height: 84px;
+    align-items: center;
+    gap: 14px;
+    border: 1px solid transparent;
+    border-radius: 18px;
+    padding: 12px;
+    text-align: left;
+    transition:
+        border-color 180ms ease,
+        background 180ms ease,
+        box-shadow 180ms ease,
+        transform 180ms ease;
+}
+
+.mixx-v3-step-button:not(:disabled):hover {
+    border-color: #ddd6fe;
+    background: rgba(245, 243, 255, 0.72);
+    transform: translateX(2px);
+}
+
+.mixx-v3-step-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+}
+
+.mixx-v3-step-active {
+    border-color: #a78bfa;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(245, 243, 255, 0.98),
+            rgba(237, 233, 254, 0.88)
+        );
+    box-shadow:
+        0 14px 30px rgba(91, 33, 182, 0.1);
+}
+
+.mixx-v3-step-number {
+    display: flex;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #d8d4e8;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #64748b;
+    font-size: 15px;
+    font-weight: 900;
+}
+
+.mixx-v3-step-active .mixx-v3-step-number {
+    border-color: transparent;
+    background:
+        linear-gradient(
+            135deg,
+            #7c3aed,
+            #4f46e5
+        );
+    color: #ffffff;
+    box-shadow:
+        0 9px 22px rgba(124, 58, 237, 0.28);
+}
+
+.mixx-v3-step-complete .mixx-v3-step-number {
+    border-color: #8b5cf6;
+    background: #f5f3ff;
+    color: #6d28d9;
+}
+
+.mixx-v3-step-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.mixx-v3-step-copy strong {
+    color: #334155;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.mixx-v3-step-active .mixx-v3-step-copy strong {
+    color: #6d28d9;
+}
+
+.mixx-v3-step-copy small {
+    margin-top: 5px;
+    color: #94a3b8;
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.mixx-v3-main {
+    min-width: 0;
+}
+
+.mixx-v3-main > .mixx-mascot-stage,
+.mixx-v3-main .mixx-mascot-card {
+    display: none !important;
+}
+
+@keyframes mixx-v3-character-enter {
+    from {
+        opacity: 0;
+        transform:
+            translateY(28px)
+            scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform:
+            translateY(0)
+            scale(1);
+    }
+}
+
+@keyframes mixx-v3-character-idle {
+    0%,
+    100% {
+        transform:
+            translateY(0)
+            rotate(-0.5deg);
+    }
+
+    50% {
+        transform:
+            translateY(-8px)
+            rotate(1deg);
+    }
+}
+
+@keyframes mixx-v3-note {
+    0% {
+        opacity: 0;
+        transform:
+            translateY(18px)
+            scale(0.65);
+    }
+
+    40% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+        transform:
+            translateY(-34px)
+            scale(1.16);
+    }
+}
+
+@keyframes mixx-v3-glow {
+    0%,
+    100% {
+        transform: scale(0.95);
+        opacity: 0.65;
+    }
+
+    50% {
+        transform: scale(1.08);
+        opacity: 1;
+    }
+}
+
+@media (max-width: 1279px) {
+    .mixx-v3-release-shell {
+        grid-template-columns: 235px minmax(0, 1fr);
+    }
+
+    .mixx-v3-mascot-stage {
+        min-height: 230px;
+    }
+
+    .mixx-v3-mascot-placeholder {
+        width: 165px;
+        min-height: 175px;
+    }
+
+    .mixx-v3-mascot-icon {
+        font-size: 45px;
+    }
+}
+
+@media (max-width: 1023px) {
+    .mixx-v3-release-shell {
+        display: block;
+    }
+
+    .mixx-v3-sidebar {
+        position: relative;
+        top: auto;
+        min-height: 0;
+        margin-bottom: 18px;
+    }
+
+    .mixx-v3-mascot-stage {
+        display: none;
+    }
+
+    .mixx-v3-step-navigation {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(110px, 1fr));
+        gap: 8px;
+        overflow-x: auto;
+        padding: 12px;
+    }
+
+    .mixx-v3-step-line {
+        display: none;
+    }
+
+    .mixx-v3-step-button {
+        min-height: 74px;
+        gap: 8px;
+        padding: 9px;
+    }
+
+    .mixx-v3-step-number {
+        width: 32px;
+        height: 32px;
+    }
+
+    .mixx-v3-step-copy small {
+        display: none;
+    }
+}

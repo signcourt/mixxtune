@@ -1,28 +1,17 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::table('releases', function (Blueprint $table) {
-            //
-        });
+        // Already merged into
+        // 2026_07_27_101822_create_releases_table.php
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::table('releases', function (Blueprint $table) {
-            //
-        });
+        //
     }
 };

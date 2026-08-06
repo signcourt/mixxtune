@@ -4,15 +4,15 @@ namespace App\Models\Distribution;
 
 use App\Models\Core\Artist;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
 
 class Contributor extends Model
 {
-    use HasFactory, SoftDeletes;
+    use SoftDeletes;
 
     protected $fillable = [
         'public_id',
@@ -38,37 +38,54 @@ class Contributor extends Model
         return [
             'can_receive_splits' => 'boolean',
             'has_dashboard_access' => 'boolean',
-            'deleted_at' => 'datetime',
         ];
-    }
-
-    protected static function booted(): void
-    {
-        static::creating(function (Contributor $contributor): void {
-            $contributor->public_id ??= (string) Str::ulid();
-            $contributor->status ??= 'active';
-            $contributor->can_receive_splits ??= true;
-            $contributor->has_dashboard_access ??= false;
-        });
-    }
-
-    public function artist(): BelongsTo
-    {
-        return $this->belongsTo(Artist::class);
     }
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(
+            User::class
+        );
     }
 
-    public function creator(): BelongsTo
+    public function artist(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(
+            Artist::class
+        );
     }
 
-    public function updater(): BelongsTo
+    public function tracks(): BelongsToMany
     {
-        return $this->belongsTo(User::class, 'updated_by');
+        return $this->belongsToMany(
+            Track::class,
+            'track_contributors'
+        )
+            ->withPivot([
+                'public_id',
+                'role',
+                'credited_name',
+                'is_primary',
+                'is_featured',
+                'display_order',
+                'metadata',
+                'created_by',
+                'updated_by',
+            ])
+            ->withTimestamps();
+    }
+
+    public function contributorCredits(): HasMany
+    {
+        return $this->hasMany(
+            TrackContributor::class
+        );
+    }
+
+    public function splits(): HasMany
+    {
+        return $this->hasMany(
+            TrackSplit::class
+        );
     }
 }

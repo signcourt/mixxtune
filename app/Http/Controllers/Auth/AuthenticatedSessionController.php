@@ -35,14 +35,32 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
-        if ($user->role === 'admin') {
-            return redirect()->intended(
-                route('admin.dashboard', absolute: false)
-            );
-        }
+        $role = strtolower(
+            trim(
+                (string) $user->role
+            )
+        );
 
-        return redirect()->intended(
-            route('artist.dashboard', absolute: false)
+        $destination = match ($role) {
+            'super_admin' =>
+                '/super-admin/dashboard',
+
+            'admin' =>
+                '/admin/dashboard',
+
+            'label' =>
+                '/label/dashboard',
+
+            default =>
+                '/artist/dashboard',
+        };
+
+        $request->session()->forget(
+            'url.intended'
+        );
+
+        return redirect()->to(
+            $destination
         );
     }
 

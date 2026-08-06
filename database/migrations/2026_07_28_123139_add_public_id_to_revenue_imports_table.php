@@ -29,17 +29,40 @@ return new class extends Migration
                     ]);
             });
 
-        $indexes = collect(
-            DB::select("SHOW INDEX FROM revenue_imports")
-        )->pluck('Key_name');
+        if (
+            DB::connection()->getDriverName() === 'mysql'
+        ) {
+            $indexes = collect(
+                DB::select(
+                    "SHOW INDEX FROM revenue_imports"
+                )
+            )->pluck('Key_name');
 
-        if (!$indexes->contains('revenue_imports_public_id_unique')) {
-            Schema::table('revenue_imports', function (Blueprint $table) {
-                $table->unique(
-                    'public_id',
+            if (
+                !$indexes->contains(
                     'revenue_imports_public_id_unique'
+                )
+            ) {
+                Schema::table(
+                    'revenue_imports',
+                    function (Blueprint $table) {
+                        $table->unique(
+                            'public_id',
+                            'revenue_imports_public_id_unique'
+                        );
+                    }
                 );
-            });
+            }
+        } else {
+            Schema::table(
+                'revenue_imports',
+                function (Blueprint $table) {
+                    $table->unique(
+                        'public_id',
+                        'revenue_imports_public_id_unique'
+                    );
+                }
+            );
         }
     }
 

@@ -30,6 +30,25 @@ return new class extends Migration
             $table->string('primary_artist_name');
             $table->string('featuring_artist_name')->nullable();
 
+            $table->json('primary_artists')->nullable();
+            $table->json('featuring_artists')->nullable();
+
+            $table->json('stores')->nullable();
+            $table->json('excluded_store_ids')->nullable();
+            $table->json('territories')->nullable();
+
+            $table->boolean('worldwide')->default(true);
+
+            $table->string(
+                'release_timezone',
+                100
+            )->default('Asia/Kolkata');
+
+            $table->boolean('pre_order')->default(false);
+
+            $table->text('review_notes')->nullable();
+            $table->text('rejection_reason')->nullable();
+
             $table->string('language', 100)->nullable();
             $table->string('primary_genre', 100)->nullable();
             $table->string('sub_genre', 100)->nullable();
