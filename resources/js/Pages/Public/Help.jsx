@@ -46,6 +46,42 @@ export default function Help() {
 
                 <meta
                     name="description"
+                    content="Get help with Mixx Tune accounts, releases, distribution, reporting, royalties, catalogue management and support."
+                />
+
+                <link
+                    rel="canonical"
+                    href="https://www.mixxtune.com/help"
+                />
+
+                <meta
+                    property="og:title"
+                    content="Help Center — Mixx Tune"
+                />
+
+                <meta
+                    property="og:description"
+                    content="Get help with Mixx Tune accounts, releases, distribution, reporting, royalties, catalogue management and support."
+                />
+
+                <meta
+                    property="og:type"
+                    content="website"
+                />
+
+                <meta
+                    property="og:url"
+                    content="https://www.mixxtune.com/help"
+                />
+
+                <meta
+                    name="twitter:card"
+                    content="summary_large_image"
+                />
+                <title>Help Center — Mixx Tune</title>
+
+                <meta
+                    name="description"
                     content="Mixx Tune Help Center for releases, distribution, analytics, royalties, wallets and account support."
                 />
             </Head>

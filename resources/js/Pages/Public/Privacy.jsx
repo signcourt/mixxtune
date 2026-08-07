@@ -6,6 +6,42 @@ export default function Privacy() {
         <>
             <Head>
                 <title>Privacy Policy — Mixx Tune</title>
+
+                <meta
+                    name="description"
+                    content="Read the Mixx Tune privacy policy and learn how platform and account information is handled."
+                />
+
+                <link
+                    rel="canonical"
+                    href="https://www.mixxtune.com/privacy"
+                />
+
+                <meta
+                    property="og:title"
+                    content="Privacy Policy — Mixx Tune"
+                />
+
+                <meta
+                    property="og:description"
+                    content="Read the Mixx Tune privacy policy and learn how platform and account information is handled."
+                />
+
+                <meta
+                    property="og:type"
+                    content="website"
+                />
+
+                <meta
+                    property="og:url"
+                    content="https://www.mixxtune.com/privacy"
+                />
+
+                <meta
+                    name="twitter:card"
+                    content="summary_large_image"
+                />
+                <title>Privacy Policy — Mixx Tune</title>
                 <meta
                     name="description"
                     content="Read the Mixx Tune Privacy Policy and learn how account, catalogue and platform information is handled."

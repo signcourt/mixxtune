@@ -4,7 +4,44 @@ import PublicLayout from '@/Public/PublicLayout';
 export default function Contact() {
     return (
         <>
-            <Head title="Contact — Mixx Tune" />
+            <Head>
+                <title>Contact Mixx Tune — Artist & Label Support</title>
+
+                <meta
+                    name="description"
+                    content="Contact Mixx Tune for music distribution, artist, label, catalogue, reporting and account support."
+                />
+
+                <link
+                    rel="canonical"
+                    href="https://www.mixxtune.com/contact"
+                />
+
+                <meta
+                    property="og:title"
+                    content="Contact Mixx Tune — Artist & Label Support"
+                />
+
+                <meta
+                    property="og:description"
+                    content="Contact Mixx Tune for music distribution, artist, label, catalogue, reporting and account support."
+                />
+
+                <meta
+                    property="og:type"
+                    content="website"
+                />
+
+                <meta
+                    property="og:url"
+                    content="https://www.mixxtune.com/contact"
+                />
+
+                <meta
+                    name="twitter:card"
+                    content="summary_large_image"
+                />
+            </Head>
 
             <PublicLayout
                 title="Talk to Mixx Tune"

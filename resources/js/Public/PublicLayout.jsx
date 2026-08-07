@@ -1,4 +1,15 @@
-import { Link } from '@inertiajs/react';
+import {
+    Link,
+} from '@inertiajs/react';
+
+import {
+    Menu,
+    X,
+} from 'lucide-react';
+
+import {
+    useState,
+} from 'react';
 
 const nav = [
     ['Home', '/'],
@@ -15,7 +26,7 @@ function Logo() {
             href="/"
             className="flex items-center gap-3"
         >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-500 to-orange-400 text-xl font-black text-white shadow-lg shadow-violet-500/20">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 text-lg font-black text-white shadow-lg shadow-violet-500/20">
                 M
             </div>
 
@@ -37,6 +48,9 @@ export default function PublicLayout({
     title,
     subtitle,
 }) {
+    const [menuOpen, setMenuOpen] =
+        useState(false);
+
     return (
         <div className="min-h-screen bg-white text-slate-900">
             <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
@@ -55,22 +69,78 @@ export default function PublicLayout({
                         ))}
                     </nav>
 
-                    <div className="flex items-center gap-2">
+                    <div className="hidden items-center gap-2 lg:flex">
                         <Link
                             href="/login"
-                            className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
+                            className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
                         >
                             Log in
                         </Link>
 
                         <Link
                             href="/register"
-                            className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-700"
+                            className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-black text-white transition hover:bg-violet-700"
                         >
                             Get Started
                         </Link>
                     </div>
+
+                    <button
+                        type="button"
+                        aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                        aria-expanded={menuOpen}
+                        aria-controls="shared-mobile-public-navigation"
+                        onClick={() =>
+                            setMenuOpen(
+                                (value) => !value
+                            )
+                        }
+                        className="rounded-xl border border-slate-200 p-2.5 text-slate-900 lg:hidden"
+                    >
+                        {menuOpen ? (
+                            <X size={21} />
+                        ) : (
+                            <Menu size={21} />
+                        )}
+                    </button>
                 </div>
+
+                {menuOpen && (
+                    <div
+                        id="shared-mobile-public-navigation"
+                        className="border-t border-slate-200 bg-white px-5 py-5 lg:hidden"
+                    >
+                        <div className="space-y-1">
+                            {nav.map(
+                                ([label, href]) => (
+                                    <Link
+                                        key={href}
+                                        href={href}
+                                        className="block rounded-xl px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                                    >
+                                        {label}
+                                    </Link>
+                                )
+                            )}
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                            <Link
+                                href="/login"
+                                className="rounded-xl border border-slate-200 px-4 py-3 text-center font-bold text-slate-900"
+                            >
+                                Log in
+                            </Link>
+
+                            <Link
+                                href="/register"
+                                className="rounded-xl bg-slate-950 px-4 py-3 text-center font-black text-white"
+                            >
+                                Get Started
+                            </Link>
+                        </div>
+                    </div>
+                )}
             </header>
 
             {(title || subtitle) && (
@@ -79,6 +149,8 @@ export default function PublicLayout({
                     <div className="absolute -right-20 bottom-0 h-72 w-72 rounded-full bg-fuchsia-500/20 blur-3xl" />
 
                     <div className="relative mx-auto max-w-5xl px-5 text-center sm:px-6 lg:px-8">
+                        <div className="mx-auto mb-5 h-1.5 w-16 rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-orange-400" />
+
                         <h1 className="text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
                             {title}
                         </h1>
@@ -94,22 +166,30 @@ export default function PublicLayout({
 
             <main>{children}</main>
 
-            <footer className="border-t border-slate-200 bg-slate-950 text-slate-300">
+            <footer className="border-t border-slate-200 bg-slate-950 text-slate-400">
                 <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-6 md:grid-cols-4 lg:px-8">
                     <div className="md:col-span-2">
-                        <div className="text-xl font-black text-white">
-                            MIXX TUNE
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 font-black text-white">
+                                M
+                            </div>
+
+                            <div className="font-black text-white">
+                                MIXX TUNE
+                            </div>
                         </div>
 
-                        <p className="mt-4 max-w-md text-sm leading-7 text-slate-400">
-                            Music distribution, catalogue management,
-                            analytics and royalty operations for artists
-                            and labels.
+                        <p className="mt-4 max-w-md text-sm leading-7">
+                            Music distribution,
+                            catalogue management,
+                            analytics and royalty
+                            operations for artists and
+                            labels.
                         </p>
                     </div>
 
                     <div>
-                        <div className="font-bold text-white">
+                        <div className="font-black text-white">
                             Platform
                         </div>
 
@@ -145,7 +225,7 @@ export default function PublicLayout({
                     </div>
 
                     <div>
-                        <div className="font-bold text-white">
+                        <div className="font-black text-white">
                             Support
                         </div>
 
@@ -181,8 +261,9 @@ export default function PublicLayout({
                     </div>
                 </div>
 
-                <div className="border-t border-white/10 py-6 text-center text-xs text-slate-500">
-                    © {new Date().getFullYear()} Mixx Tune. All rights reserved.
+                <div className="border-t border-white/10 px-5 py-6 text-center text-xs text-slate-500">
+                    © {new Date().getFullYear()}{' '}
+                    Mixx Tune. All rights reserved.
                 </div>
             </footer>
         </div>
