@@ -363,10 +363,7 @@ Route::domain('admin.mixxtune.com')->group(function () {
 
 
         Route::get('/labels', function () {
-            return Inertia::render('Admin/Placeholders/ModulePage', [
-                'title' => 'Labels',
-                'description' => 'Create and manage record labels.',
-            ]);
+            return redirect()->route('v2.admin.labels.index');
         })->name('admin.labels.index');
 Route::get(
             '/isrc-upc',
