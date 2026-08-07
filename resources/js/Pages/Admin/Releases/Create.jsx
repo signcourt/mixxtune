@@ -1,19 +1,12 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
 
-const steps = [
-    { id: 1, label: 'Release Details' },
-    { id: 2, label: 'Tracks' },
-    { id: 3, label: 'Stores & Distribution' },
-    { id: 4, label: 'Review & Publish' },
-];
 
 const fieldClass =
     'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100';
 
 export default function Create({ artists = [], labels = [] }) {
-    const [currentStep, setCurrentStep] = useState(1);
     const [artworkPreview, setArtworkPreview] = useState(null);
 
     const {
@@ -73,35 +66,11 @@ export default function Create({ artists = [], labels = [] }) {
         setArtworkPreview(URL.createObjectURL(file));
     };
 
-    const saveDraft = () => {
+    const createDraft = () => {
         post('/releases', {
             forceFormData: true,
             preserveScroll: true,
         });
-    };
-
-    const nextStep = () => {
-        if (currentStep === 1) {
-            transform((formData) => ({
-                ...formData,
-                wizard_step: 2,
-                completion_percentage: 50,
-                status: 'draft',
-            }));
-
-            post('/releases', {
-                forceFormData: true,
-                preserveScroll: true,
-            });
-
-            return;
-        }
-
-        setCurrentStep((step) => Math.min(step + 1, 4));
-    };
-
-    const previousStep = () => {
-        setCurrentStep((step) => Math.max(step - 1, 1));
     };
 
     return (
@@ -115,7 +84,7 @@ export default function Create({ artists = [], labels = [] }) {
                             Create Release
                         </h1>
                         <p className="mt-1 text-sm text-slate-500">
-                            Add release details, tracks, stores and submit for review.
+                            Create the release draft first. Tracks, distribution and review continue on the next screen.
                         </p>
                     </div>
 
@@ -129,48 +98,33 @@ export default function Create({ artists = [], labels = [] }) {
 
                         <button
                             type="button"
-                            onClick={saveDraft}
+                            onClick={createDraft}
                             disabled={processing}
                             className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-50"
                         >
-                            {processing ? 'Saving...' : 'Save as Draft'}
+                            {processing ? 'Creating...' : 'Create Draft & Continue'}
                         </button>
                     </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="grid grid-cols-1 border-b border-slate-200 px-6 py-5 md:grid-cols-4">
-                        {steps.map((step) => (
-                            <div
-                                key={step.id}
-                                className="relative flex items-center gap-3 py-2"
-                            >
-                                <div
-                                    className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${
-                                        currentStep === step.id
-                                            ? 'bg-violet-600 text-white'
-                                            : currentStep > step.id
-                                              ? 'bg-emerald-100 text-emerald-700'
-                                              : 'bg-slate-100 text-slate-500'
-                                    }`}
-                                >
-                                    {currentStep > step.id ? '✓' : step.id}
-                                </div>
-
-                                <span
-                                    className={`text-sm font-semibold ${
-                                        currentStep === step.id
-                                            ? 'text-slate-900'
-                                            : 'text-slate-500'
-                                    }`}
-                                >
-                                    {step.label}
-                                </span>
+                    <div className="border-b border-slate-200 px-6 py-5">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-600 text-sm font-semibold text-white">
+                                1
                             </div>
-                        ))}
+                            <div>
+                                <div className="text-sm font-semibold text-slate-900">
+                                    Release Details
+                                </div>
+                                <div className="mt-0.5 text-xs text-slate-500">
+                                    Save the draft to continue with tracks, stores and review.
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    {currentStep === 1 && (
+                    {(
                         <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1fr)_360px]">
                             <div className="space-y-6">
                                 <div>
@@ -479,55 +433,6 @@ export default function Create({ artists = [], labels = [] }) {
                             </div>
                         </div>
                     )}
-
-                    {currentStep === 2 && (
-                        <PlaceholderStep
-                            title="Tracks"
-                            text="Track creation, audio upload, contributors, ISRC and royalty splits will be added here."
-                        />
-                    )}
-
-                    {currentStep === 3 && (
-                        <PlaceholderStep
-                            title="Stores & Distribution"
-                            text="Select DSPs, countries, release territories and delivery options here."
-                        />
-                    )}
-
-                    {currentStep === 4 && (
-                        <PlaceholderStep
-                            title="Review & Publish"
-                            text="Review metadata, tracks and stores before submitting the release."
-                        />
-                    )}
-
-                    <div className="flex items-center justify-between border-t border-slate-200 px-6 py-5">
-                        <button
-                            type="button"
-                            onClick={previousStep}
-                            disabled={currentStep === 1}
-                            className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            Back
-                        </button>
-
-                        {currentStep < 4 ? (
-                            <button
-                                type="button"
-                                onClick={nextStep}
-                                className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white hover:bg-violet-700"
-                            >
-                                Next →
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
-                            >
-                                Submit for Review
-                            </button>
-                        )}
-                    </div>
                 </div>
             </div>
         </AdminLayout>
@@ -562,16 +467,3 @@ function PreviewRow({ label, value }) {
     );
 }
 
-function PlaceholderStep({ title, text }) {
-    return (
-        <div className="px-6 py-20 text-center">
-            <div className="text-4xl">♫</div>
-            <h2 className="mt-4 text-xl font-semibold text-slate-900">
-                {title}
-            </h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
-                {text}
-            </p>
-        </div>
-    );
-}
