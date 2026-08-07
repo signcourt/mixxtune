@@ -2,6 +2,8 @@
 
 namespace App\Services\V2;
 
+use Illuminate\Support\Facades\DB;
+
 use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\Distribution\Release;
