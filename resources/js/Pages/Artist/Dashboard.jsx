@@ -1,4 +1,5 @@
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { DashboardLinkCards } from '@/V2/Shared/Dashboard/Widgets';
 import {
     ArtistActivitySection,
     DashboardAnalyticsSection,
@@ -36,69 +37,6 @@ const money = (value, currency = 'INR') =>
 
 const number = (value) =>
     Number(value ?? 0).toLocaleString('en-IN');
-
-const formatDate = (value) => {
-    if (!value) return '—';
-
-    return new Intl.DateTimeFormat('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    }).format(new Date(value));
-};
-
-const statusStyles = {
-    draft: 'bg-slate-100 text-slate-700',
-    submitted: 'bg-blue-100 text-blue-700',
-    approved: 'bg-emerald-100 text-emerald-700',
-    processing: 'bg-amber-100 text-amber-700',
-    delivered: 'bg-violet-100 text-violet-700',
-    live: 'bg-green-100 text-green-700',
-    rejected: 'bg-rose-100 text-rose-700',
-    failed: 'bg-red-100 text-red-700',
-    pending: 'bg-amber-100 text-amber-700',
-    paid: 'bg-emerald-100 text-emerald-700',
-};
-
-function StatusBadge({ status = 'draft' }) {
-    const normalized = String(status).toLowerCase();
-
-    return (
-        <span
-            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize ${
-                statusStyles[normalized] ??
-                'bg-slate-100 text-slate-700'
-            }`}
-        >
-            {normalized.replaceAll('_', ' ')}
-        </span>
-    );
-}
-
-function EmptyState({
-    icon: Icon,
-    title,
-    description,
-    action = null,
-}) {
-    return (
-        <div className="flex min-h-56 flex-col items-center justify-center px-6 py-10 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
-                <Icon size={26} />
-            </div>
-
-            <h4 className="mt-4 font-bold text-slate-900">
-                {title}
-            </h4>
-
-            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                {description}
-            </p>
-
-            {action}
-        </div>
-    );
-}
 
 export default function Dashboard({
     artist = {},
@@ -184,6 +122,27 @@ export default function Dashboard({
         },
     ];
 
+    const dashboardLinks = [
+        {
+            title: 'Catalogue',
+            description: 'Browse your releases, tracks and catalogue metadata.',
+            href: '/artist/catalogue',
+            icon: Music2,
+        },
+        {
+            title: 'Reports',
+            description: 'View streaming, platform and territory performance.',
+            href: '/artist/reports',
+            icon: TrendingUp,
+        },
+        {
+            title: 'Statements',
+            description: 'Review royalty statements and payment history.',
+            href: '/artist/statements',
+            icon: FileAudio,
+        },
+    ];
+
     return (
         <PanelLayout
             role="artist"
@@ -222,64 +181,11 @@ export default function Dashboard({
                 currency={currency}
             />
 
-            <section className="mt-6 grid gap-5 md:grid-cols-3">
-                {[
-                    {
-                        icon: Headphones,
-                        title: 'Catalogue',
-                        description:
-                            'Manage all releases and tracks.',
-                        href: '/artist/catalogue',
-                    },
-                    {
-                        icon: TrendingUp,
-                        title: 'Reports',
-                        description:
-                            'Review performance and earnings.',
-                        href: '/artist/reports',
-                    },
-                    {
-                        icon: FileAudio,
-                        title: 'Statements',
-                        description:
-                            'Access royalty statements.',
-                        href: '/artist/statements',
-                    },
-                ].map(
-                    ({
-                        icon: Icon,
-                        title,
-                        description,
-                        href,
-                    }) => (
-                        <Link
-                            key={title}
-                            href={href}
-                            className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-violet-200 hover:shadow-lg"
-                        >
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
-                                <Icon size={22} />
-                            </div>
-
-                            <h3 className="mt-5 text-lg font-black text-slate-950">
-                                {title}
-                            </h3>
-
-                            <p className="mt-2 text-sm leading-6 text-slate-500">
-                                {description}
-                            </p>
-
-                            <div className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-violet-700">
-                                Open
-                                <ArrowRight
-                                    size={16}
-                                    className="transition group-hover:translate-x-1"
-                                />
-                            </div>
-                        </Link>
-                    )
-                )}
-            </section>
+            <div className="mt-6">
+                <DashboardLinkCards
+                    items={dashboardLinks}
+                />
+            </div>
         </PanelLayout>
     );
 }
