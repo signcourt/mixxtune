@@ -447,15 +447,19 @@ class ReleaseReviewWorkflowTest extends TestCase
             );
 
         $response
-            ->assertOk()
-            ->assertJsonPath(
-                'message',
+            ->assertRedirect(route('v2.admin.release-reviews.index'))
+            ->assertSessionHas(
+                'success',
                 'Release approved successfully.'
-            )
-            ->assertJsonPath(
-                'release.status',
-                'approved'
             );
+
+        $release->refresh();
+
+        $this->assertSame(
+            'approved',
+            $release->status
+        );
+
 
         $release->refresh();
 
@@ -513,15 +517,19 @@ class ReleaseReviewWorkflowTest extends TestCase
             );
 
         $response
-            ->assertOk()
-            ->assertJsonPath(
-                'message',
+            ->assertRedirect(route('v2.admin.release-reviews.index'))
+            ->assertSessionHas(
+                'success',
                 'Release rejected successfully.'
-            )
-            ->assertJsonPath(
-                'release.status',
-                'rejected'
             );
+
+        $release->refresh();
+
+        $this->assertSame(
+            'rejected',
+            $release->status
+        );
+
 
         $release->refresh();
 
@@ -611,15 +619,19 @@ class ReleaseReviewWorkflowTest extends TestCase
             );
 
         $response
-            ->assertOk()
-            ->assertJsonPath(
-                'message',
+            ->assertRedirect(route('v2.admin.release-reviews.index'))
+            ->assertSessionHas(
+                'success',
                 'Changes requested successfully.'
-            )
-            ->assertJsonPath(
-                'release.status',
-                'changes_requested'
             );
+
+        $release->refresh();
+
+        $this->assertSame(
+            'changes_requested',
+            $release->status
+        );
+
 
         $release->refresh();
 
@@ -670,7 +682,13 @@ class ReleaseReviewWorkflowTest extends TestCase
                         'Approved for distribution.',
                 ]
             )
-            ->assertOk();
+            ->assertRedirect(
+                route('v2.admin.release-reviews.index')
+            )
+            ->assertSessionHas(
+                'success',
+                'Release approved successfully.'
+            );
 
         $release->refresh();
 
@@ -687,15 +705,19 @@ class ReleaseReviewWorkflowTest extends TestCase
             );
 
         $response
-            ->assertOk()
-            ->assertJsonPath(
-                'message',
+            ->assertRedirect(route('v2.admin.release-reviews.index'))
+            ->assertSessionHas(
+                'success',
                 'Release processing started.'
-            )
-            ->assertJsonPath(
-                'release.status',
-                'processing'
             );
+
+        $release->refresh();
+
+        $this->assertSame(
+            'processing',
+            $release->status
+        );
+
 
         $release->refresh();
 

@@ -10,11 +10,12 @@ use App\Services\V2\AdminReleaseReviewService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReleaseAccessService;
 use App\Services\V2\ReleaseValidationService;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ReleaseReviewController extends Controller
 {
@@ -349,7 +350,7 @@ class ReleaseReviewController extends Controller
         Request $request,
         Release $release,
         AdminReleaseReviewService $reviews
-    ): JsonResponse {
+    ): RedirectResponse {
         $validated = $request->validate([
             'remarks' => [
                 'nullable',
@@ -364,19 +365,19 @@ class ReleaseReviewController extends Controller
             $validated['remarks'] ?? null
         );
 
-        return response()->json([
-            'message' =>
-                'Release approved successfully.',
-
-            'release' => $release,
-        ]);
+        return redirect()
+            ->route('v2.admin.release-reviews.index')
+            ->with(
+                'success',
+                'Release approved successfully.'
+            );
     }
 
     public function reject(
         Request $request,
         Release $release,
         AdminReleaseReviewService $reviews
-    ): JsonResponse {
+    ): RedirectResponse {
         $validated = $request->validate([
             'reason' => [
                 'required',
@@ -392,19 +393,19 @@ class ReleaseReviewController extends Controller
             $validated['reason']
         );
 
-        return response()->json([
-            'message' =>
-                'Release rejected successfully.',
-
-            'release' => $release,
-        ]);
+        return redirect()
+            ->route('v2.admin.release-reviews.index')
+            ->with(
+                'success',
+                'Release rejected successfully.'
+            );
     }
 
     public function requestChanges(
         Request $request,
         Release $release,
         AdminReleaseReviewService $reviews
-    ): JsonResponse {
+    ): RedirectResponse {
         $validated = $request->validate([
             'notes' => [
                 'required',
@@ -420,19 +421,19 @@ class ReleaseReviewController extends Controller
             $validated['notes']
         );
 
-        return response()->json([
-            'message' =>
-                'Changes requested successfully.',
-
-            'release' => $release,
-        ]);
+        return redirect()
+            ->route('v2.admin.release-reviews.index')
+            ->with(
+                'success',
+                'Changes requested successfully.'
+            );
     }
 
     public function startProcessing(
         Request $request,
         Release $release,
         AdminReleaseReviewService $reviews
-    ): JsonResponse {
+    ): RedirectResponse {
         $validated = $request->validate([
             'remarks' => [
                 'nullable',
@@ -447,11 +448,11 @@ class ReleaseReviewController extends Controller
             $validated['remarks'] ?? null
         );
 
-        return response()->json([
-            'message' =>
-                'Release processing started.',
-
-            'release' => $release,
-        ]);
+        return redirect()
+            ->route('v2.admin.release-reviews.index')
+            ->with(
+                'success',
+                'Release processing started.'
+            );
     }
 }

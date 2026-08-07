@@ -12,13 +12,16 @@ export default function Show({
     const [notes, setNotes] = useState('');
     const [processing, setProcessing] = useState(false);
 
+
+
     const action = (endpoint, payload = {}) => {
         setProcessing(true);
 
         router.post(endpoint, payload, {
-            preserveScroll: true,
-            onFinish: () =>
-                setProcessing(false),
+            preserveScroll: false,
+            onFinish: () => {
+                setProcessing(false);
+            },
         });
     };
 
@@ -190,6 +193,14 @@ export default function Show({
                                         }
                                     />
                                 )}
+
+                                {notes.trim().length < 3 &&
+                                    (availableActions.request_changes ||
+                                        availableActions.reject) && (
+                                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                                            Enter at least 3 characters in Review Remarks to enable Request Changes or Reject Release.
+                                        </p>
+                                    )}
 
                                 {availableActions.request_changes && (
                                     <ActionButton

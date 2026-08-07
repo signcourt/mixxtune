@@ -153,7 +153,7 @@ export default function Dashboard({
         {
             label: 'Review Queue',
             description: 'Approve or reject releases',
-            href: '/admin/release-reviews',
+            href: '/v2/admin/release-reviews',
             icon: ShieldCheck,
         },
         {
@@ -181,7 +181,7 @@ export default function Dashboard({
             title: 'Release Reviews',
             description:
                 'Review submitted releases and approval workflow.',
-            href: '/admin/release-reviews',
+            href: '/v2/admin/release-reviews',
             icon: ShieldCheck,
         },
         {
@@ -220,7 +220,7 @@ export default function Dashboard({
                 }
                 primaryAction={{
                     label: 'Review Queue',
-                    href: '/admin/release-reviews',
+                    href: '/v2/admin/release-reviews',
                 }}
                 secondaryAction={{
                     label: 'Import Revenue',
