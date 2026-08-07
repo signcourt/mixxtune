@@ -17,6 +17,7 @@ class Label extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'user_id',
         'parent_label_id',
         'label_type',
         'public_id',

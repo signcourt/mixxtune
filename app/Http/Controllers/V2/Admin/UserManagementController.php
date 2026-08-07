@@ -557,105 +557,204 @@ class UserManagementController extends Controller
 
                 /*
                  * Every label login requires a linked labels row.
+                 *
+                 * Prefer an existing orphan label before creating
+                 * a new label record.
                  */
                 if (
                     $validated['role'] ===
                     'label'
                 ) {
 
-                    $slugBase = Str::slug(
-                        $validated['name']
-                    );
+                    $normalizedEmail =
+                        strtolower(
+                            trim(
+                                $validated['email']
+                            )
+                        );
 
-                    if ($slugBase === '') {
-                        $slugBase = 'label';
+                    /*
+                     * Email is the strongest ownership match.
+                     */
+                    $label =
+                        Label::query()
+                            ->whereRaw(
+                                'LOWER(email) = ?',
+                                [$normalizedEmail]
+                            )
+                            ->first();
+
+                    /*
+                     * Never take ownership away from another user.
+                     */
+                    if (
+                        $label
+                        && $label->user_id
+                        && (int) $label->user_id
+                            !== (int) $user->id
+                    ) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'email' => [
+                                'A label with this email is already linked to another user.',
+                            ],
+                        ]);
                     }
 
-                    $slug =
-                        $slugBase.'-'.$user->id;
+                    /*
+                     * Legacy labels can exist without an email link.
+                     * Reuse an exact-name orphan only.
+                     */
+                    if (! $label) {
+                        $orphanLabels =
+                            Label::query()
+                                ->whereNull(
+                                    'user_id'
+                                )
+                                ->whereRaw(
+                                    'LOWER(name) = ?',
+                                    [
+                                        strtolower(
+                                            trim(
+                                                $validated['name']
+                                            )
+                                        ),
+                                    ]
+                                )
+                                ->get();
 
-                    while (
-                        Label::withTrashed()
-                            ->where('slug',$slug)
-                            ->exists()
-                    ) {
+                        if (
+                            $orphanLabels->count() > 1
+                        ) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'name' => [
+                                    'Multiple unlinked labels with this name exist. Link the correct label manually before creating this user.',
+                                ],
+                            ]);
+                        }
+
+                        $label =
+                            $orphanLabels
+                                ->first();
+                    }
+
+                    /*
+                     * Reuse the orphan label when found.
+                     */
+                    if ($label) {
+
+                        $label->forceFill([
+                            'user_id' =>
+                                $user->id,
+
+                            'email' =>
+                                $label->email
+                                ?: $normalizedEmail,
+
+                            'phone' =>
+                                $label->phone
+                                ?: (
+                                    $validated['phone']
+                                    ?? null
+                                ),
+
+                            'updated_by' =>
+                                $request->user()->id,
+                        ]);
+
+                        $label->save();
+
+                    } else {
+
+                        $slugBase =
+                            Str::slug(
+                                $validated['name']
+                            );
+
+                        if ($slugBase === '') {
+                            $slugBase = 'label';
+                        }
 
                         $slug =
                             $slugBase
                             .'-'
-                            .$user->id
-                            .'-'
-                            .Str::lower(
-                                Str::random(5)
-                            );
+                            .$user->id;
+
+                        while (
+                            Label::withTrashed()
+                                ->where(
+                                    'slug',
+                                    $slug
+                                )
+                                ->exists()
+                        ) {
+                            $slug =
+                                $slugBase
+                                .'-'
+                                .$user->id
+                                .'-'
+                                .Str::lower(
+                                    Str::random(5)
+                                );
+                        }
+
+                        do {
+                            $publicId =
+                                'LBL-'
+                                .Str::upper(
+                                    Str::random(12)
+                                );
+                        } while (
+                            Label::withTrashed()
+                                ->where(
+                                    'public_id',
+                                    $publicId
+                                )
+                                ->exists()
+                        );
+
+                        Label::create([
+                            'user_id' =>
+                                $user->id,
+
+                            'public_id' =>
+                                $publicId,
+
+                            'name' =>
+                                $validated['name'],
+
+                            'legal_name' =>
+                                $validated['name'],
+
+                            'slug' =>
+                                $slug,
+
+                            'email' =>
+                                $normalizedEmail,
+
+                            'phone' =>
+                                $validated['phone']
+                                ?? null,
+
+                            'country' =>
+                                $validated['country']
+                                ?? 'India',
+
+                            'timezone' =>
+                                'Asia/Kolkata',
+
+                            'currency' =>
+                                'INR',
+
+                            'status' =>
+                                'active',
+
+                            'created_by' =>
+                                $request->user()->id,
+
+                            'updated_by' =>
+                                $request->user()->id,
+                        ]);
                     }
-
-                    do {
-
-                        $publicId =
-                            'LBL-'
-                            .Str::upper(
-                                Str::random(12)
-                            );
-
-                    } while (
-
-                        Label::withTrashed()
-                            ->where(
-                                'public_id',
-                                $publicId
-                            )
-                            ->exists()
-
-                    );
-
-                    Label::create([
-
-                        'user_id' =>
-                            $user->id,
-
-                        'public_id' =>
-                            $publicId,
-
-                        'name' =>
-                            $validated['name'],
-
-                        'legal_name' =>
-                            $validated['name'],
-
-                        'slug' =>
-                            $slug,
-
-                        'email' =>
-                            strtolower(
-                                $validated['email']
-                            ),
-
-                        'phone' =>
-                            $validated['phone']
-                            ?? null,
-
-                        'country' =>
-                            $validated['country']
-                            ?? 'India',
-
-                        'timezone' =>
-                            'Asia/Kolkata',
-
-                        'currency' =>
-                            'INR',
-
-                        'status' =>
-                            'active',
-
-                        'created_by' =>
-                            $request->user()->id,
-
-                        'updated_by' =>
-                            $request->user()->id,
-
-                    ]);
-
                 }
 
 
