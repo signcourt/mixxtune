@@ -24,7 +24,44 @@ const features = [
 export default function Distribution() {
     return (
         <>
-            <Head title="Music Distribution — Mixx Tune" />
+            <Head>
+                <title>Music Distribution — Mixx Tune</title>
+
+                <meta
+                    name="description"
+                    content="Distribute your music worldwide with Mixx Tune and manage stores, territories, releases and delivery workflows."
+                />
+
+                <link
+                    rel="canonical"
+                    href="https://www.mixxtune.com/distribution"
+                />
+
+                <meta
+                    property="og:title"
+                    content="Music Distribution — Mixx Tune"
+                />
+
+                <meta
+                    property="og:description"
+                    content="Distribute your music worldwide with Mixx Tune and manage stores, territories, releases and delivery workflows."
+                />
+
+                <meta
+                    property="og:type"
+                    content="website"
+                />
+
+                <meta
+                    property="og:url"
+                    content="https://www.mixxtune.com/distribution"
+                />
+
+                <meta
+                    name="twitter:card"
+                    content="summary_large_image"
+                />
+            </Head>
 
             <PublicLayout
                 title="Distribute your music worldwide"

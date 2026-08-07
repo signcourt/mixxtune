@@ -4,7 +4,44 @@ import PublicLayout from '@/Public/PublicLayout';
 export default function About() {
     return (
         <>
-            <Head title="About — Mixx Tune" />
+            <Head>
+                <title>About Mixx Tune — Music Distribution Platform</title>
+
+                <meta
+                    name="description"
+                    content="Learn about Mixx Tune, a music distribution, catalogue management, analytics and royalty operations platform for artists and labels."
+                />
+
+                <link
+                    rel="canonical"
+                    href="https://www.mixxtune.com/about"
+                />
+
+                <meta
+                    property="og:title"
+                    content="About Mixx Tune — Music Distribution Platform"
+                />
+
+                <meta
+                    property="og:description"
+                    content="Learn about Mixx Tune, a music distribution, catalogue management, analytics and royalty operations platform for artists and labels."
+                />
+
+                <meta
+                    property="og:type"
+                    content="website"
+                />
+
+                <meta
+                    property="og:url"
+                    content="https://www.mixxtune.com/about"
+                />
+
+                <meta
+                    name="twitter:card"
+                    content="summary_large_image"
+                />
+            </Head>
 
             <PublicLayout
                 title="Built for modern music businesses"
