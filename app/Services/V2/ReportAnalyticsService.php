@@ -9,6 +9,11 @@ use Illuminate\Support\Facades\DB;
 
 class ReportAnalyticsService
 {
+    public function __construct(
+        private readonly AdminAssignmentService $assignments
+    ) {
+    }
+
     public function scopedQuery(
         User $user,
         PermissionService $permissions
@@ -59,17 +64,45 @@ class ReportAnalyticsService
         }
 
         if ($role === 'admin') {
-            $artistIds = DB::table('artists')
-                ->where(
-                    'assigned_admin_id',
-                    $user->id
-                )
-                ->whereNull('deleted_at')
-                ->pluck('id');
+            $artistIds =
+                $this->assignments->artistIds($user);
 
-            return $query->whereIn(
-                'artist_id',
-                $artistIds
+            $labelIds =
+                $this->assignments->labelIds($user);
+
+            if (
+                $artistIds->isEmpty()
+                && $labelIds->isEmpty()
+            ) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->where(
+                function ($builder) use (
+                    $artistIds,
+                    $labelIds
+                ) {
+                    if ($artistIds->isNotEmpty()) {
+                        $builder->whereIn(
+                            'artist_id',
+                            $artistIds
+                        );
+                    }
+
+                    if ($labelIds->isNotEmpty()) {
+                        if ($artistIds->isNotEmpty()) {
+                            $builder->orWhereIn(
+                                'label_id',
+                                $labelIds
+                            );
+                        } else {
+                            $builder->whereIn(
+                                'label_id',
+                                $labelIds
+                            );
+                        }
+                    }
+                }
             );
         }
 

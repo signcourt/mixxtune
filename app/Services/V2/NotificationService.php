@@ -13,6 +13,11 @@ use Illuminate\Support\Str;
 
 class NotificationService
 {
+    public function __construct(
+        private readonly AdminAssignmentService $assignments
+    ) {
+    }
+
     public function send(
         User $user,
         string $type,
@@ -348,33 +353,59 @@ class NotificationService
                 ]
             );
 
-        if (
-            Schema::hasColumn(
-                'artists',
-                'assigned_admin_id'
-            )
-        ) {
-            $artist = Artist::query()
-                ->find(
-                    $release->artist_id
-                );
+        $adminIds = collect();
 
-            if (
-                $artist
-                && $artist->assigned_admin_id
-            ) {
-                $query->where(function ($builder) use ($artist) {
+        if ($release->artist_id) {
+            $adminIds = $adminIds->merge(
+                DB::table(
+                    'admin_artist_assignments'
+                )
+                    ->where(
+                        'artist_id',
+                        $release->artist_id
+                    )
+                    ->pluck('user_id')
+            );
+        }
+
+        if ($release->label_id) {
+            $adminIds = $adminIds->merge(
+                DB::table(
+                    'admin_label_assignments'
+                )
+                    ->where(
+                        'label_id',
+                        $release->label_id
+                    )
+                    ->pluck('user_id')
+            );
+        }
+
+        $adminIds = $adminIds
+            ->unique()
+            ->values();
+
+        if ($adminIds->isNotEmpty()) {
+            $query->where(
+                function ($builder) use (
+                    $adminIds
+                ) {
                     $builder
                         ->where(
                             'role',
                             'super_admin'
                         )
-                        ->orWhere(
+                        ->orWhereIn(
                             'id',
-                            $artist->assigned_admin_id
+                            $adminIds
                         );
-                });
-            }
+                }
+            );
+        } else {
+            $query->where(
+                'role',
+                'super_admin'
+            );
         }
 
         $this->sendToUsers(

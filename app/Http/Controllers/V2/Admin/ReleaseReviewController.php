@@ -5,6 +5,7 @@ namespace App\Http\Controllers\V2\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Core\Artist;
 use App\Models\Distribution\Release;
+use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\AdminReleaseReviewService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReleaseAccessService;
@@ -14,14 +15,14 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class ReleaseReviewController extends Controller
 {
     public function index(
         Request $request,
         AdminReleaseReviewService $reviews,
-        PermissionService $permissions
+        PermissionService $permissions,
+        AdminAssignmentService $assignments
     ): Response {
         $reviews->authorizeReviewer(
             $request->user()
@@ -58,24 +59,54 @@ class ReleaseReviewController extends Controller
             ->whereNull('deleted_at')
             ->withCount('tracks');
 
-        if (
-            $role === 'admin'
-            && Schema::hasColumn(
-                'artists',
-                'assigned_admin_id'
-            )
-        ) {
-            $artistIds = Artist::query()
-                ->where(
-                    'assigned_admin_id',
-                    $request->user()->id
-                )
-                ->pluck('id');
+        $artistIds = collect();
+        $labelIds = collect();
 
-            $query->whereIn(
-                'artist_id',
-                $artistIds
-            );
+        if ($role === 'admin') {
+            $artistIds =
+                $assignments->artistIds(
+                    $request->user()
+                );
+
+            $labelIds =
+                $assignments->labelIds(
+                    $request->user()
+                );
+
+            if (
+                $artistIds->isEmpty()
+                && $labelIds->isEmpty()
+            ) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(
+                    function ($builder) use (
+                        $artistIds,
+                        $labelIds
+                    ) {
+                        if ($artistIds->isNotEmpty()) {
+                            $builder->whereIn(
+                                'artist_id',
+                                $artistIds
+                            );
+                        }
+
+                        if ($labelIds->isNotEmpty()) {
+                            if ($artistIds->isNotEmpty()) {
+                                $builder->orWhereIn(
+                                    'label_id',
+                                    $labelIds
+                                );
+                            } else {
+                                $builder->whereIn(
+                                    'label_id',
+                                    $labelIds
+                                );
+                            }
+                        }
+                    }
+                );
+            }
         }
 
         if ($filters['status'] !== '') {
@@ -134,14 +165,41 @@ class ReleaseReviewController extends Controller
         $countsQuery = Release::query()
             ->whereNull('deleted_at');
 
-        if (
-            $role === 'admin'
-            && isset($artistIds)
-        ) {
-            $countsQuery->whereIn(
-                'artist_id',
-                $artistIds
-            );
+        if ($role === 'admin') {
+            if (
+                $artistIds->isEmpty()
+                && $labelIds->isEmpty()
+            ) {
+                $countsQuery->whereRaw('1 = 0');
+            } else {
+                $countsQuery->where(
+                    function ($builder) use (
+                        $artistIds,
+                        $labelIds
+                    ) {
+                        if ($artistIds->isNotEmpty()) {
+                            $builder->whereIn(
+                                'artist_id',
+                                $artistIds
+                            );
+                        }
+
+                        if ($labelIds->isNotEmpty()) {
+                            if ($artistIds->isNotEmpty()) {
+                                $builder->orWhereIn(
+                                    'label_id',
+                                    $labelIds
+                                );
+                            } else {
+                                $builder->whereIn(
+                                    'label_id',
+                                    $labelIds
+                                );
+                            }
+                        }
+                    }
+                );
+            }
         }
 
         $counts = [

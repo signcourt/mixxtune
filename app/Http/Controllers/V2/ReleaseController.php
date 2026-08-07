@@ -7,6 +7,7 @@ use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\Distribution\Release;
 use App\Models\DistributionStore;
+use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReleaseWorkflowService;
 use App\Services\V2\ReleaseValidationService;
@@ -96,25 +97,61 @@ class ReleaseController extends Controller
                 : $query->whereRaw('1 = 0');
         }
 
-        if (
-            $role === 'admin'
-            && Schema::hasColumn(
-                'artists',
-                'assigned_admin_id'
-            )
-        ) {
-            $assignedArtistIds =
-                Artist::query()
-                    ->where(
-                        'assigned_admin_id',
-                        $request->user()->id
-                    )
-                    ->pluck('id');
-
-            $query->whereIn(
-                'artist_id',
-                $assignedArtistIds
+        if ($role === 'admin') {
+            $assignments = app(
+                AdminAssignmentService::class
             );
+
+            $assignedArtistIds =
+                $assignments->artistIds(
+                    $request->user()
+                );
+
+            $assignedLabelIds =
+                $assignments->labelIds(
+                    $request->user()
+                );
+
+            if (
+                $assignedArtistIds->isEmpty()
+                && $assignedLabelIds->isEmpty()
+            ) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(
+                    function ($builder) use (
+                        $assignedArtistIds,
+                        $assignedLabelIds
+                    ) {
+                        if (
+                            $assignedArtistIds->isNotEmpty()
+                        ) {
+                            $builder->whereIn(
+                                'artist_id',
+                                $assignedArtistIds
+                            );
+                        }
+
+                        if (
+                            $assignedLabelIds->isNotEmpty()
+                        ) {
+                            if (
+                                $assignedArtistIds->isNotEmpty()
+                            ) {
+                                $builder->orWhereIn(
+                                    'label_id',
+                                    $assignedLabelIds
+                                );
+                            } else {
+                                $builder->whereIn(
+                                    'label_id',
+                                    $assignedLabelIds
+                                );
+                            }
+                        }
+                    }
+                );
+            }
         }
 
         $scopedQuery = clone $query;
@@ -1303,18 +1340,21 @@ class ReleaseController extends Controller
             )
             : null;
 
-        if (
-            $role === 'admin'
-            && Schema::hasColumn(
-                'artists',
-                'assigned_admin_id'
-            )
-        ) {
+        if ($role === 'admin') {
+            $assignments = app(
+                AdminAssignmentService::class
+            );
+
             abort_unless(
-                (int) $artist->assigned_admin_id
-                    === (int) $request->user()->id,
+                $assignments->canAccessRelease(
+                    $request->user(),
+                    (int) $artist->id,
+                    $label
+                        ? (int) $label->id
+                        : null
+                ),
                 403,
-                'This artist is not assigned to you.'
+                'This artist or label is not assigned to you.'
             );
         }
 
@@ -1372,21 +1412,16 @@ class ReleaseController extends Controller
             return;
         }
 
-        if (
-            $role === 'admin'
-            && Schema::hasColumn(
-                'artists',
-                'assigned_admin_id'
-            )
-        ) {
-            $artist = Artist::query()->find(
-                $release->artist_id
+        if ($role === 'admin') {
+            $access = app(
+                ReleaseAccessService::class
             );
 
             abort_unless(
-                $artist
-                && (int) $artist->assigned_admin_id
-                    === (int) $request->user()->id,
+                $access->canAccess(
+                    $request->user(),
+                    $release
+                ),
                 403,
                 'This release is not assigned to you.'
             );
@@ -1468,17 +1503,63 @@ class ReleaseController extends Controller
             $artistsQuery = Artist::query()
                 ->whereNull('deleted_at');
 
-            if (
-                $role === 'admin'
-                && Schema::hasColumn(
-                    'artists',
-                    'assigned_admin_id'
-                )
-            ) {
-                $artistsQuery->where(
-                    'assigned_admin_id',
-                    $request->user()->id
+            if ($role === 'admin') {
+                $assignments = app(
+                    AdminAssignmentService::class
                 );
+
+                $assignedArtistIds =
+                    $assignments->artistIds(
+                        $request->user()
+                    );
+
+                $assignedLabelIds =
+                    $assignments->labelIds(
+                        $request->user()
+                    );
+
+                if (
+                    $assignedArtistIds->isEmpty()
+                    && $assignedLabelIds->isEmpty()
+                ) {
+                    $artistsQuery->whereRaw(
+                        '1 = 0'
+                    );
+                } else {
+                    $artistsQuery->where(
+                        function ($builder) use (
+                            $assignedArtistIds,
+                            $assignedLabelIds
+                        ) {
+                            if (
+                                $assignedArtistIds->isNotEmpty()
+                            ) {
+                                $builder->whereIn(
+                                    'id',
+                                    $assignedArtistIds
+                                );
+                            }
+
+                            if (
+                                $assignedLabelIds->isNotEmpty()
+                            ) {
+                                if (
+                                    $assignedArtistIds->isNotEmpty()
+                                ) {
+                                    $builder->orWhereIn(
+                                        'label_id',
+                                        $assignedLabelIds
+                                    );
+                                } else {
+                                    $builder->whereIn(
+                                        'label_id',
+                                        $assignedLabelIds
+                                    );
+                                }
+                            }
+                        }
+                    );
+                }
             }
 
             $availableArtists = $artistsQuery
@@ -1493,17 +1574,30 @@ class ReleaseController extends Controller
             $labelsQuery = Label::query()
                 ->whereNull('deleted_at');
 
-            if (
-                $role === 'admin'
-                && Schema::hasColumn(
-                    'labels',
-                    'assigned_admin_id'
-                )
-            ) {
-                $labelsQuery->where(
-                    'assigned_admin_id',
-                    $request->user()->id
-                );
+            if ($role === 'admin') {
+                if (!isset($assignments)) {
+                    $assignments = app(
+                        AdminAssignmentService::class
+                    );
+                }
+
+                if (!isset($assignedLabelIds)) {
+                    $assignedLabelIds =
+                        $assignments->labelIds(
+                            $request->user()
+                        );
+                }
+
+                if ($assignedLabelIds->isEmpty()) {
+                    $labelsQuery->whereRaw(
+                        '1 = 0'
+                    );
+                } else {
+                    $labelsQuery->whereIn(
+                        'id',
+                        $assignedLabelIds
+                    );
+                }
             }
 
             $availableLabels = $labelsQuery

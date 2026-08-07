@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V2\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Distribution\Release;
+use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\AudioValidationService;
 use App\Services\V2\DeliveryWorkflowService;
 use App\Services\V2\IsrcService;
@@ -14,7 +15,6 @@ use App\Services\V2\UpcService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -23,7 +23,8 @@ class ProcessingController extends Controller
 {
     public function index(
         Request $request,
-        PermissionService $permissions
+        PermissionService $permissions,
+        AdminAssignmentService $assignments
     ): Response {
         $user = $request->user();
 
@@ -72,25 +73,50 @@ class ProcessingController extends Controller
                 ]
             );
 
-        if (
-            $role === 'admin'
-            && Schema::hasColumn(
-                'artists',
-                'assigned_admin_id'
-            )
-        ) {
-            $artistIds = DB::table('artists')
-                ->where(
-                    'assigned_admin_id',
-                    $user->id
-                )
-                ->whereNull('deleted_at')
-                ->pluck('id');
+        $artistIds = collect();
+        $labelIds = collect();
 
-            $query->whereIn(
-                'artist_id',
-                $artistIds
-            );
+        if ($role === 'admin') {
+            $artistIds =
+                $assignments->artistIds($user);
+
+            $labelIds =
+                $assignments->labelIds($user);
+
+            if (
+                $artistIds->isEmpty()
+                && $labelIds->isEmpty()
+            ) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(
+                    function ($builder) use (
+                        $artistIds,
+                        $labelIds
+                    ) {
+                        if ($artistIds->isNotEmpty()) {
+                            $builder->whereIn(
+                                'artist_id',
+                                $artistIds
+                            );
+                        }
+
+                        if ($labelIds->isNotEmpty()) {
+                            if ($artistIds->isNotEmpty()) {
+                                $builder->orWhereIn(
+                                    'label_id',
+                                    $labelIds
+                                );
+                            } else {
+                                $builder->whereIn(
+                                    'label_id',
+                                    $labelIds
+                                );
+                            }
+                        }
+                    }
+                );
+            }
         }
 
         if ($status !== '') {
@@ -130,6 +156,43 @@ class ProcessingController extends Controller
 
         $countQuery = Release::query()
             ->whereNull('deleted_at');
+
+        if ($role === 'admin') {
+            if (
+                $artistIds->isEmpty()
+                && $labelIds->isEmpty()
+            ) {
+                $countQuery->whereRaw('1 = 0');
+            } else {
+                $countQuery->where(
+                    function ($builder) use (
+                        $artistIds,
+                        $labelIds
+                    ) {
+                        if ($artistIds->isNotEmpty()) {
+                            $builder->whereIn(
+                                'artist_id',
+                                $artistIds
+                            );
+                        }
+
+                        if ($labelIds->isNotEmpty()) {
+                            if ($artistIds->isNotEmpty()) {
+                                $builder->orWhereIn(
+                                    'label_id',
+                                    $labelIds
+                                );
+                            } else {
+                                $builder->whereIn(
+                                    'label_id',
+                                    $labelIds
+                                );
+                            }
+                        }
+                    }
+                );
+            }
+        }
 
         return Inertia::render(
             'V2/Admin/Processing/Index',

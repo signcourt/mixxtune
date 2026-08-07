@@ -7,13 +7,13 @@ use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\Distribution\Release;
 use App\Models\Distribution\Track;
+use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReleaseAccessService;
 use App\Services\V2\AudioValidationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -498,24 +498,21 @@ class ReleaseTrackController extends Controller
             return;
         }
 
-        if (
-            $role === 'admin'
-            && Schema::hasColumn(
-                'artists',
-                'assigned_admin_id'
-            )
-        ) {
-            $artist = Artist::query()->find(
-                $release->artist_id
+        if ($role === 'admin') {
+            $assignments = app(
+                AdminAssignmentService::class
             );
 
             abort_unless(
-                $artist
-                && (int) $artist
-                    ->assigned_admin_id
-                    === (int) $request
-                        ->user()
-                        ->id,
+                $assignments->canAccessRelease(
+                    $request->user(),
+                    $release->artist_id
+                        ? (int) $release->artist_id
+                        : null,
+                    $release->label_id
+                        ? (int) $release->label_id
+                        : null
+                ),
                 403,
                 'This release is not assigned to you.'
             );

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V2;
 
 use App\Http\Controllers\Controller;
 use App\Models\Finance\RoyaltyStatement;
+use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\PermissionService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -126,17 +127,54 @@ class StatementController extends Controller
         }
 
         if ($role === 'admin') {
-            $artistIds = DB::table('artists')
-                ->where(
-                    'assigned_admin_id',
-                    $request->user()->id
-                )
-                ->pluck('id');
-
-            $query->whereIn(
-                'artist_id',
-                $artistIds
+            $assignments = app(
+                AdminAssignmentService::class
             );
+
+            $artistIds =
+                $assignments->artistIds(
+                    $request->user()
+                );
+
+            $labelIds =
+                $assignments->labelIds(
+                    $request->user()
+                );
+
+            if (
+                $artistIds->isEmpty()
+                && $labelIds->isEmpty()
+            ) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(
+                    function ($builder) use (
+                        $artistIds,
+                        $labelIds
+                    ) {
+                        if ($artistIds->isNotEmpty()) {
+                            $builder->whereIn(
+                                'artist_id',
+                                $artistIds
+                            );
+                        }
+
+                        if ($labelIds->isNotEmpty()) {
+                            if ($artistIds->isNotEmpty()) {
+                                $builder->orWhereIn(
+                                    'label_id',
+                                    $labelIds
+                                );
+                            } else {
+                                $builder->whereIn(
+                                    'label_id',
+                                    $labelIds
+                                );
+                            }
+                        }
+                    }
+                );
+            }
         }
     }
 }

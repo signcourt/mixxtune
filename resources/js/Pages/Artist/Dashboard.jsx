@@ -156,6 +156,7 @@ function EmptyState({
 export default function Dashboard({
     artist = {},
     stats = {},
+    analytics = {},
     recentReleases = [],
     recentTransactions = [],
     recentWithdrawals = [],
@@ -317,6 +318,384 @@ export default function Dashboard({
                     />
                 ))}
             </section>
+
+            <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">
+                            Performance Analytics
+                        </p>
+
+                        <h3 className="mt-2 text-xl font-black text-slate-950">
+                            Streams & Earnings
+                        </h3>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                            Real reporting data mapped to your artist account.
+                        </p>
+                    </div>
+
+                    <Link
+                        href="/artist/reports"
+                        className="inline-flex items-center gap-2 text-sm font-bold text-violet-700"
+                    >
+                        Full Reports
+                        <ArrowRight size={16} />
+                    </Link>
+                </div>
+
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    {[
+                        {
+                            title: "Total Streams",
+                            value: number(
+                                analytics?.summary?.total_streams
+                            ),
+                            note: `${Number(
+                                analytics?.summary
+                                    ?.stream_growth_percent || 0
+                            ).toFixed(1)}% monthly growth`,
+                        },
+                        {
+                            title: "Total Earnings",
+                            value: money(
+                                analytics?.summary?.total_earnings,
+                                analytics?.summary?.currency ||
+                                    currency
+                            ),
+                            note: `${Number(
+                                analytics?.summary
+                                    ?.earning_growth_percent || 0
+                            ).toFixed(1)}% monthly growth`,
+                        },
+                        {
+                            title: "Reported Tracks",
+                            value: number(
+                                analytics?.summary?.unique_tracks
+                            ),
+                            note: "Tracks with mapped reports",
+                        },
+                        {
+                            title: "Active Platforms",
+                            value: number(
+                                analytics?.summary
+                                    ?.active_platforms
+                            ),
+                            note: "DSPs with reporting activity",
+                        },
+                    ].map((item) => (
+                        <div
+                            key={item.title}
+                            className="rounded-2xl bg-slate-50 p-5"
+                        >
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                                {item.title}
+                            </p>
+
+                            <p className="mt-2 text-2xl font-black text-slate-950">
+                                {item.value}
+                            </p>
+
+                            <p className="mt-2 text-xs font-semibold text-slate-500">
+                                {item.note}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+
+                {analytics?.has_data ? (
+                    <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+                        <div className="rounded-2xl border border-slate-200 p-5">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h4 className="font-black text-slate-950">
+                                        Monthly Streams
+                                    </h4>
+
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        Last reported months
+                                    </p>
+                                </div>
+
+                                <TrendingUp
+                                    size={20}
+                                    className="text-violet-700"
+                                />
+                            </div>
+
+                            <div className="mt-6 flex h-44 items-end gap-2">
+                                {(analytics?.monthly || []).map(
+                                    (item) => {
+                                        const max = Math.max(
+                                            1,
+                                            ...(analytics?.monthly ||
+                                                []).map((row) =>
+                                                Number(
+                                                    row.streams ||
+                                                        0
+                                                )
+                                            )
+                                        );
+
+                                        const height =
+                                            Math.max(
+                                                7,
+                                                (Number(
+                                                    item.streams ||
+                                                        0
+                                                ) /
+                                                    max) *
+                                                    100
+                                            );
+
+                                        return (
+                                            <div
+                                                key={item.month}
+                                                className="flex min-w-0 flex-1 flex-col items-center justify-end gap-2"
+                                            >
+                                                <div
+                                                    className="w-full rounded-t-lg bg-gradient-to-t from-violet-700 to-fuchsia-400"
+                                                    style={{
+                                                        height: `${height}%`,
+                                                    }}
+                                                    title={`${number(
+                                                        item.streams
+                                                    )} streams`}
+                                                />
+
+                                                <span className="max-w-full truncate text-[10px] font-bold text-slate-400">
+                                                    {String(
+                                                        item.month ||
+                                                            ""
+                                                    ).slice(
+                                                        0,
+                                                        7
+                                                    )}
+                                                </span>
+                                            </div>
+                                        );
+                                    }
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 p-5">
+                            <h4 className="font-black text-slate-950">
+                                Top Platforms
+                            </h4>
+
+                            <p className="mt-1 text-xs text-slate-500">
+                                Ranked by streams
+                            </p>
+
+                            <div className="mt-5 space-y-4">
+                                {(
+                                    analytics?.top_platforms || []
+                                ).map(
+                                    (platform, index) => (
+                                        <div
+                                            key={`${platform.name}-${index}`}
+                                            className="flex items-center justify-between gap-4"
+                                        >
+                                            <span className="truncate text-sm font-bold text-slate-700">
+                                                {platform.name ||
+                                                    "Unknown DSP"}
+                                            </span>
+
+                                            <span className="text-sm font-black text-slate-950">
+                                                {number(
+                                                    platform.streams
+                                                )}
+                                            </span>
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                        <TrendingUp
+                            size={26}
+                            className="mx-auto text-slate-400"
+                        />
+
+                        <p className="mt-3 font-black text-slate-900">
+                            No reporting analytics yet
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                            Charts will populate automatically
+                            after mapped reports are imported.
+                        </p>
+                    </div>
+                )}
+            </section>
+
+
+            {analytics?.has_data && (
+                <section className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_1fr]">
+                    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+                            <div>
+                                <h3 className="text-lg font-black text-slate-950">
+                                    Top Performing Tracks
+                                </h3>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Highest streamed tracks from mapped reports
+                                </p>
+                            </div>
+
+                            <Link
+                                href="/artist/reports"
+                                className="text-sm font-bold text-violet-700"
+                            >
+                                Full Report
+                            </Link>
+                        </div>
+
+                        <div className="divide-y divide-slate-100">
+                            {(analytics?.top_tracks || []).map(
+                                (track, index) => (
+                                    <div
+                                        key={`${track.track_id || track.isrc || index}`}
+                                        className="flex items-center gap-4 px-6 py-4"
+                                    >
+                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 font-black text-violet-700">
+                                            {index + 1}
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate font-bold text-slate-900">
+                                                {track.title ||
+                                                    "Untitled Track"}
+                                            </p>
+
+                                            <p className="mt-1 truncate text-xs text-slate-500">
+                                                {track.isrc ||
+                                                    "ISRC not available"}
+                                            </p>
+                                        </div>
+
+                                        <div className="text-right">
+                                            <p className="font-black text-slate-950">
+                                                {number(track.streams)}
+                                            </p>
+
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                streams
+                                            </p>
+                                        </div>
+
+                                        <div className="hidden min-w-[100px] text-right sm:block">
+                                            <p className="font-bold text-emerald-600">
+                                                {money(
+                                                    track.earnings,
+                                                    analytics?.summary?.currency ||
+                                                        currency
+                                                )}
+                                            </p>
+
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                earnings
+                                            </p>
+                                        </div>
+                                    </div>
+                                )
+                            )}
+
+                            {(analytics?.top_tracks || []).length === 0 && (
+                                <div className="px-6 py-10 text-center text-sm text-slate-500">
+                                    No track analytics available.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                        <div className="border-b border-slate-200 px-6 py-5">
+                            <h3 className="text-lg font-black text-slate-950">
+                                Top Countries
+                            </h3>
+
+                            <p className="mt-1 text-sm text-slate-500">
+                                Listener activity by territory
+                            </p>
+                        </div>
+
+                        <div className="p-6">
+                            <div className="space-y-5">
+                                {(analytics?.top_countries || []).map(
+                                    (country, index) => {
+                                        const max = Math.max(
+                                            1,
+                                            ...(analytics?.top_countries ||
+                                                []).map((item) =>
+                                                Number(
+                                                    item.streams || 0
+                                                )
+                                            )
+                                        );
+
+                                        const width = Math.max(
+                                            4,
+                                            (Number(
+                                                country.streams || 0
+                                            ) /
+                                                max) *
+                                                100
+                                        );
+
+                                        return (
+                                            <div
+                                                key={`${country.country_code}-${index}`}
+                                            >
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="font-bold text-slate-700">
+                                                        {country.country_code ||
+                                                            "Unknown"}
+                                                    </span>
+
+                                                    <span className="text-sm font-black text-slate-950">
+                                                        {number(
+                                                            country.streams
+                                                        )}
+                                                    </span>
+                                                </div>
+
+                                                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                                                    <div
+                                                        className="h-full rounded-full bg-violet-600"
+                                                        style={{
+                                                            width: `${width}%`,
+                                                        }}
+                                                    />
+                                                </div>
+
+                                                <div className="mt-1 text-right text-xs font-semibold text-emerald-600">
+                                                    {money(
+                                                        country.earnings,
+                                                        analytics?.summary?.currency ||
+                                                            currency
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                )}
+
+                                {(analytics?.top_countries || []).length ===
+                                    0 && (
+                                    <div className="py-8 text-center text-sm text-slate-500">
+                                        No country analytics available.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
 
             <section className="mt-6 grid gap-6 xl:grid-cols-[1.55fr_1fr]">
                 <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">

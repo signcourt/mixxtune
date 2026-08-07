@@ -359,6 +359,13 @@ const adminNavigation = (
             permission: 'reports.view',
         },
         {
+            id: 'revenue-imports',
+            label: 'Revenue Imports',
+            icon: icons.reports,
+            href: '/admin/reports/imports',
+            permission: 'reports.view',
+        },
+        {
             id: 'wallet',
             label: 'Wallet',
             icon: icons.wallet,

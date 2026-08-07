@@ -1216,6 +1216,20 @@ Route::middleware([
                 );
             })->name('reports.index');
 
+
+            Route::get('/reports/imports', function () {
+                return redirect()->route(
+                    'v2.admin.reports.imports.index'
+                );
+            })->name('reports.imports');
+
+            Route::post(
+                '/reports/imports',
+                [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'store']
+            )->name('reports.imports.store');
+
+
+
             Route::get('/royalties', function () {
                 return redirect()->route(
                     'v2.admin.royalties.index'
@@ -1318,6 +1332,92 @@ Route::middleware([
             })->name('settings.index');
         });
 });
+
+
+/*
+|--------------------------------------------------------------------------
+| Mixx Tune Public Marketing Pages
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/distribution', function () {
+    return \Inertia\Inertia::render(
+        'Public/Distribution'
+    );
+})->name('public.marketing.distribution');
+
+Route::get('/pricing', function () {
+    return \Inertia\Inertia::render(
+        'Public/Pricing'
+    );
+})->name('public.marketing.pricing');
+
+Route::get('/about', function () {
+    return \Inertia\Inertia::render(
+        'Public/About'
+    );
+})->name('public.marketing.about');
+
+Route::get('/contact', function () {
+    return \Inertia\Inertia::render(
+        'Public/Contact'
+    );
+})->name('public.marketing.contact');
+
+
+Route::get('/help', function () {
+    return \Inertia\Inertia::render(
+        'Public/Help'
+    );
+})->name('public.marketing.help');
+
+Route::get('/privacy', function () {
+    return \Inertia\Inertia::render(
+        'Public/Privacy'
+    );
+})->name('public.marketing.privacy');
+
+Route::get('/terms', function () {
+    return \Inertia\Inertia::render(
+        'Public/Terms'
+    );
+})->name('public.marketing.terms');
+
+
+Route::get('/sitemap.xml', function () {
+    $urls = [
+        '/',
+        '/distribution',
+        '/pricing',
+        '/about',
+        '/contact',
+        '/help',
+        '/privacy',
+        '/terms',
+    ];
+
+    $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+        . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+
+    foreach ($urls as $url) {
+        $xml .= '<url>'
+            . '<loc>'
+            . e('https://www.mixxtune.com' . $url)
+            . '</loc>'
+            . '</url>';
+    }
+
+    $xml .= '</urlset>';
+
+    return response(
+        $xml,
+        200,
+        [
+            'Content-Type' =>
+                'application/xml',
+        ]
+    );
+})->name('public.sitemap');
 
 /* End Mixx Tune Single-Domain Panel Routes */
 

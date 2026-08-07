@@ -15,6 +15,11 @@ use Throwable;
 
 class CatalogueService
 {
+    public function __construct(
+        private readonly AdminAssignmentService $assignments
+    ) {
+    }
+
     private const VISIBLE_STATUSES = [
         'approved',
         'processing',
@@ -362,24 +367,46 @@ class CatalogueService
                 : $query->whereRaw('1 = 0');
         }
 
-        if (
-            $role === 'admin'
-            && Schema::hasColumn(
-                'artists',
-                'assigned_admin_id'
-            )
-        ) {
-            $artistIds = DB::table('artists')
-                ->where(
-                    'assigned_admin_id',
-                    $user->id
-                )
-                ->whereNull('deleted_at')
-                ->pluck('id');
+        if ($role === 'admin') {
+            $artistIds =
+                $this->assignments->artistIds($user);
 
-            return $query->whereIn(
-                'artist_id',
-                $artistIds
+            $labelIds =
+                $this->assignments->labelIds($user);
+
+            if (
+                $artistIds->isEmpty()
+                && $labelIds->isEmpty()
+            ) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->where(
+                function ($builder) use (
+                    $artistIds,
+                    $labelIds
+                ) {
+                    if ($artistIds->isNotEmpty()) {
+                        $builder->whereIn(
+                            'artist_id',
+                            $artistIds
+                        );
+                    }
+
+                    if ($labelIds->isNotEmpty()) {
+                        if ($artistIds->isNotEmpty()) {
+                            $builder->orWhereIn(
+                                'label_id',
+                                $labelIds
+                            );
+                        } else {
+                            $builder->whereIn(
+                                'label_id',
+                                $labelIds
+                            );
+                        }
+                    }
+                }
             );
         }
 

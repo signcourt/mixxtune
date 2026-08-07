@@ -3,14 +3,17 @@
 namespace App\Http\Controllers\Artist;
 
 use App\Http\Controllers\Controller;
+use App\Services\Analytics\ArtistDashboardAnalyticsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
-    {
+    public function index(
+        Request $request,
+        ArtistDashboardAnalyticsService $analyticsService
+    ) {
         $user = $request->user();
 
         $artist = DB::table('artists')
@@ -100,6 +103,15 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        $currency = $wallet->currency
+            ?? $artist->currency
+            ?? 'INR';
+
+        $analytics = $analyticsService->build(
+            (int) $artist->id,
+            (string) $currency
+        );
+
         return Inertia::render('Artist/Dashboard', [
             'artist' => [
                 'id' => $artist->id,
@@ -121,11 +133,10 @@ class DashboardController extends Controller
                     $wallet->pending_balance ?? 0
                 ),
                 'pending_withdrawals' => $pendingWithdrawals,
-                'currency' => $wallet->currency
-                    ?? $artist->currency
-                    ?? 'INR',
+                'currency' => $currency,
             ],
 
+            'analytics' => $analytics,
             'recentReleases' => $recentReleases,
             'recentTransactions' => $recentTransactions,
             'recentWithdrawals' => $recentWithdrawals,

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V2\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Finance\RoyaltyStatement;
+use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\RoyaltyService;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +17,8 @@ class FinanceController extends Controller
 {
     public function index(
         Request $request,
-        PermissionService $permissions
+        PermissionService $permissions,
+        AdminAssignmentService $assignments
     ): Response {
         $role = $permissions->role(
             $request->user()
@@ -75,19 +77,50 @@ class FinanceController extends Controller
             );
 
         if ($role === 'admin') {
-            $query->where(function ($builder) use (
-                $request
+            $artistIds =
+                $assignments->artistIds(
+                    $request->user()
+                );
+
+            $labelIds =
+                $assignments->labelIds(
+                    $request->user()
+                );
+
+            if (
+                $artistIds->isEmpty()
+                && $labelIds->isEmpty()
             ) {
-                $builder
-                    ->where(
-                        'artists.assigned_admin_id',
-                        $request->user()->id
-                    )
-                    ->orWhere(
-                        'labels.assigned_admin_id',
-                        $request->user()->id
-                    );
-            });
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(
+                    function ($builder) use (
+                        $artistIds,
+                        $labelIds
+                    ) {
+                        if ($artistIds->isNotEmpty()) {
+                            $builder->whereIn(
+                                'statements.artist_id',
+                                $artistIds
+                            );
+                        }
+
+                        if ($labelIds->isNotEmpty()) {
+                            if ($artistIds->isNotEmpty()) {
+                                $builder->orWhereIn(
+                                    'statements.label_id',
+                                    $labelIds
+                                );
+                            } else {
+                                $builder->whereIn(
+                                    'statements.label_id',
+                                    $labelIds
+                                );
+                            }
+                        }
+                    }
+                );
+            }
         }
 
         if ($filters['search'] !== '') {

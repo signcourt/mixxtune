@@ -6,12 +6,12 @@ use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\Distribution\Release;
 use App\Models\User;
-use Illuminate\Support\Facades\Schema;
 
 class ReleaseAccessService
 {
     public function __construct(
-        private readonly PermissionService $permissions
+        private readonly PermissionService $permissions,
+        private readonly AdminAssignmentService $assignments
     ) {
     }
 
@@ -144,34 +144,14 @@ class ReleaseAccessService
         User $user,
         Release $release
     ): bool {
-        if (
-            Schema::hasColumn(
-                'artists',
-                'assigned_admin_id'
-            )
-        ) {
-            $artist = Artist::query()
-                ->find($release->artist_id);
-
-            return $artist
-                && (int) $artist->assigned_admin_id
-                    === (int) $user->id;
-        }
-
-        if (
-            Schema::hasColumn(
-                'labels',
-                'assigned_admin_id'
-            )
-        ) {
-            $label = Label::query()
-                ->find($release->label_id);
-
-            return $label
-                && (int) $label->assigned_admin_id
-                    === (int) $user->id;
-        }
-
-        return false;
+        return $this->assignments->canAccessRelease(
+            $user,
+            $release->artist_id
+                ? (int) $release->artist_id
+                : null,
+            $release->label_id
+                ? (int) $release->label_id
+                : null
+        );
     }
 }
