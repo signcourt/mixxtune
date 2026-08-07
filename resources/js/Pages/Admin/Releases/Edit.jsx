@@ -515,17 +515,3 @@ function Field({ label, required = false, error, children }) {
         </div>
     );
 }
-
-function PlaceholderStep({ title, text }) {
-    return (
-        <div className="px-6 py-20 text-center">
-            <div className="text-4xl">♫</div>
-            <h2 className="mt-4 text-xl font-semibold text-slate-900">
-                {title}
-            </h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
-                {text}
-            </p>
-        </div>
-    );
-}
