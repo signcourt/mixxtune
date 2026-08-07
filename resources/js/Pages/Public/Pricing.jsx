@@ -34,7 +34,44 @@ const plans = [
 export default function Pricing() {
     return (
         <>
-            <Head title="Pricing — Mixx Tune" />
+            <Head>
+                <title>Pricing — Mixx Tune Music Distribution</title>
+
+                <meta
+                    name="description"
+                    content="Explore Mixx Tune pricing for artists and labels using music distribution, catalogue management, analytics and royalty tools."
+                />
+
+                <link
+                    rel="canonical"
+                    href="https://www.mixxtune.com/pricing"
+                />
+
+                <meta
+                    property="og:title"
+                    content="Pricing — Mixx Tune Music Distribution"
+                />
+
+                <meta
+                    property="og:description"
+                    content="Explore Mixx Tune pricing for artists and labels using music distribution, catalogue management, analytics and royalty tools."
+                />
+
+                <meta
+                    property="og:type"
+                    content="website"
+                />
+
+                <meta
+                    property="og:url"
+                    content="https://www.mixxtune.com/pricing"
+                />
+
+                <meta
+                    name="twitter:card"
+                    content="summary_large_image"
+                />
+            </Head>
 
             <PublicLayout
                 title="Simple plans for artists and labels"

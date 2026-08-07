@@ -6,6 +6,42 @@ export default function Terms() {
         <>
             <Head>
                 <title>Terms of Service — Mixx Tune</title>
+
+                <meta
+                    name="description"
+                    content="Read the Mixx Tune terms of service for use of the platform, distribution tools and account services."
+                />
+
+                <link
+                    rel="canonical"
+                    href="https://www.mixxtune.com/terms"
+                />
+
+                <meta
+                    property="og:title"
+                    content="Terms of Service — Mixx Tune"
+                />
+
+                <meta
+                    property="og:description"
+                    content="Read the Mixx Tune terms of service for use of the platform, distribution tools and account services."
+                />
+
+                <meta
+                    property="og:type"
+                    content="website"
+                />
+
+                <meta
+                    property="og:url"
+                    content="https://www.mixxtune.com/terms"
+                />
+
+                <meta
+                    name="twitter:card"
+                    content="summary_large_image"
+                />
+                <title>Terms of Service — Mixx Tune</title>
                 <meta
                     name="description"
                     content="Review the terms governing use of the Mixx Tune music distribution and catalogue management platform."
