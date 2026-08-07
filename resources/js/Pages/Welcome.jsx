@@ -1,5 +1,28 @@
-import { Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import {
+    Head,
+    Link,
+} from '@inertiajs/react';
+
+import {
+    ArrowRight,
+    BarChart3,
+    CheckCircle2,
+    ChevronRight,
+    Globe2,
+    Headphones,
+    Layers3,
+    Menu,
+    Music2,
+    Play,
+    ShieldCheck,
+    Sparkles,
+    WalletCards,
+    X,
+} from 'lucide-react';
+
+import {
+    useState,
+} from 'react';
 
 const stores = [
     'Spotify',
@@ -7,278 +30,236 @@ const stores = [
     'YouTube Music',
     'Amazon Music',
     'JioSaavn',
-    'Gaana',
-    'Instagram',
-    'Facebook',
+    'Deezer',
+    'TIDAL',
+    'TikTok',
+];
+
+const stats = [
+    {
+        value: '150+',
+        label: 'Stores & platforms',
+    },
+    {
+        value: '190+',
+        label: 'Countries & territories',
+    },
+    {
+        value: '24/7',
+        label: 'Catalogue access',
+    },
+    {
+        value: '1',
+        label: 'Connected platform',
+    },
 ];
 
 const features = [
     {
-        number: '01',
+        icon: Globe2,
         title: 'Worldwide Distribution',
-        description:
-            'Deliver your music to leading streaming platforms and digital stores across the world.',
+        text:
+            'Deliver music to major streaming and download platforms through one professional workflow.',
     },
     {
-        number: '02',
-        title: 'Royalty Analytics',
-        description:
-            'Understand streams, earnings, stores, countries and track performance from one dashboard.',
+        icon: BarChart3,
+        title: 'Analytics & Reports',
+        text:
+            'Track streams, stores, countries and earnings through clear operational reporting.',
     },
     {
-        number: '03',
-        title: 'Fast Release Workflow',
-        description:
-            'Create releases, upload WAV files, add artwork and submit your music through a guided process.',
+        icon: WalletCards,
+        title: 'Royalties & Wallet',
+        text:
+            'Manage statements, balances and withdrawals from a connected finance workflow.',
     },
     {
-        number: '04',
-        title: 'Artist & Label Panels',
-        description:
-            'Dedicated workspaces for independent artists, labels, administrators and internal teams.',
+        icon: Layers3,
+        title: 'Catalogue Management',
+        text:
+            'Keep artists, releases, tracks, identifiers and ownership information organised.',
     },
     {
-        number: '05',
-        title: 'Transparent Wallet',
-        description:
-            'Review statements, available balance, withdrawals, invoices and payment history clearly.',
+        icon: ShieldCheck,
+        title: 'Rights-Aware Workflow',
+        text:
+            'Structured metadata, review, delivery and access controls for professional operations.',
     },
     {
-        number: '06',
-        title: 'Professional Support',
-        description:
-            'Get structured support for releases, metadata, royalties, deliveries and account operations.',
+        icon: Headphones,
+        title: 'Built for Artists & Labels',
+        text:
+            'One platform for independent artists, labels and internal administration teams.',
     },
 ];
 
 const steps = [
     {
-        step: '01',
-        title: 'Create your account',
-        text: 'Register as an artist or label and complete your profile.',
+        number: '01',
+        title: 'Create your release',
+        text:
+            'Add release metadata, artists, artwork and release date.',
     },
     {
-        step: '02',
-        title: 'Upload your release',
-        text: 'Add release details, WAV tracks, artwork and contributors.',
+        number: '02',
+        title: 'Upload your tracks',
+        text:
+            'Add WAV masters, track metadata, contributors and identifiers.',
     },
     {
-        step: '03',
-        title: 'Choose stores',
-        text: 'Select platforms, territories and the planned release date.',
+        number: '03',
+        title: 'Choose stores & territories',
+        text:
+            'Select distribution destinations and release territories.',
     },
     {
-        step: '04',
-        title: 'Track performance',
-        text: 'View delivery progress, analytics, royalties and statements.',
+        number: '04',
+        title: 'Review & submit',
+        text:
+            'Validate the release and send it into the distribution workflow.',
     },
 ];
 
 const faqs = [
     {
-        question: 'Which audio format is accepted?',
-        answer:
-            'Mixx Tune accepts high-quality WAV audio files for music distribution.',
+        q: 'Who can use Mixx Tune?',
+        a:
+            'Mixx Tune is designed for independent artists, labels and music businesses that need distribution, catalogue management, reporting and royalty workflows.',
     },
     {
-        question: 'Can labels manage multiple artists?',
-        answer:
-            'Yes. Label accounts can manage artists, releases, catalogue, reports, royalties and team workflows.',
+        q: 'Can labels manage multiple artists?',
+        a:
+            'Yes. Label accounts are designed to manage multiple artists, releases and catalogue operations from one panel.',
     },
     {
-        question: 'Where can I view my earnings?',
-        answer:
-            'Your dashboard provides royalty reports, statements, wallet balance, invoices and withdrawal history.',
+        q: 'Can I track delivery status?',
+        a:
+            'Yes. Releases can move through review, processing, delivery and live states with store-level operational visibility.',
     },
     {
-        question: 'Can I distribute music worldwide?',
-        answer:
-            'Yes. You can choose worldwide distribution or configure release territories according to your requirements.',
+        q: 'Does Mixx Tune include analytics?',
+        a:
+            'Yes. Reporting can include streams, earnings, platforms, countries and top-performing catalogue data where reporting data is available.',
     },
 ];
 
-function LogoMark() {
-    return (
-        <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-500 to-orange-400 shadow-lg shadow-violet-500/25">
-                <span className="text-xl font-black text-white">M</span>
-            </div>
+export default function Welcome({
+    auth = {},
+}) {
+    const [menuOpen, setMenuOpen] =
+        useState(false);
 
-            <div>
-                <div className="text-xl font-black tracking-tight text-slate-950">
-                    MIXX TUNE
-                </div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-violet-600">
-                    Music Distribution
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function ArrowIcon() {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            className="h-5 w-5"
-            aria-hidden="true"
-        >
-            <path
-                d="M5 12h14M13 6l6 6-6 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
-}
-
-function CheckIcon() {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            className="h-5 w-5"
-            aria-hidden="true"
-        >
-            <path
-                d="m5 12 4 4L19 6"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
-}
-
-function MenuIcon({ open }) {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            className="h-6 w-6"
-            aria-hidden="true"
-        >
-            {open ? (
-                <>
-                    <path
-                        d="M6 6l12 12"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                    />
-                    <path
-                        d="M18 6 6 18"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                    />
-                </>
-            ) : (
-                <>
-                    <path
-                        d="M4 7h16"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                    />
-                    <path
-                        d="M4 12h16"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                    />
-                    <path
-                        d="M4 17h16"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                    />
-                </>
-            )}
-        </svg>
-    );
-}
-
-export default function Welcome({ auth }) {
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [openFaq, setOpenFaq] = useState(0);
+    const [openFaq, setOpenFaq] =
+        useState(0);
 
     return (
         <>
             <Head>
-                <title>Mixx Tune — Music Distribution for Artists & Labels</title>
+                <title>
+                    Mixx Tune — Music Distribution for
+                    Artists & Labels
+                </title>
+
                 <meta
                     name="description"
-                    content="Distribute music worldwide, manage releases, analyse streams and track royalties with Mixx Tune."
+                    content="Distribute music worldwide, manage your catalogue, track analytics and handle royalties through Mixx Tune."
                 />
+
+                <link
+                    rel="canonical"
+                    href="https://www.mixxtune.com/"
+                />
+
                 <meta
-                    name="keywords"
-                    content="music distribution, digital music distribution, artist dashboard, label dashboard, royalties, Mixx Tune"
+                    property="og:title"
+                    content="Mixx Tune — Music Distribution for Artists & Labels"
+                />
+
+                <meta
+                    property="og:description"
+                    content="Worldwide music distribution, catalogue management, analytics and royalty operations in one platform."
+                />
+
+                <meta
+                    property="og:type"
+                    content="website"
+                />
+
+                <meta
+                    property="og:url"
+                    content="https://www.mixxtune.com/"
+                />
+
+                <meta
+                    name="twitter:card"
+                    content="summary_large_image"
                 />
             </Head>
 
-            <div className="min-h-screen overflow-x-hidden bg-white text-slate-900">
-                <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+            <div className="min-h-screen overflow-x-hidden bg-white text-slate-950">
+                <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-slate-950/85 backdrop-blur-xl">
                     <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
-                        <a href="#home" aria-label="Mixx Tune home">
-                            <LogoMark />
-                        </a>
+                        <Link
+                            href="/"
+                            className="flex items-center gap-3"
+                        >
+                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 text-lg font-black text-white shadow-lg shadow-violet-500/30">
+                                M
+                            </div>
+
+                            <div>
+                                <div className="text-lg font-black tracking-tight text-white">
+                                    MIXX TUNE
+                                </div>
+
+                                <div className="text-[9px] font-bold uppercase tracking-[0.28em] text-violet-300">
+                                    Music Distribution
+                                </div>
+                            </div>
+                        </Link>
 
                         <nav className="hidden items-center gap-8 lg:flex">
-                            <a
-                                href="#features"
-                                className="text-sm font-semibold text-slate-600 transition hover:text-violet-600"
-                            >
-                                Features
-                            </a>
-                            <a
-                                href="#how-it-works"
-                                className="text-sm font-semibold text-slate-600 transition hover:text-violet-600"
-                            >
-                                How It Works
-                            </a>
-                            <a
-                                href="#analytics"
-                                className="text-sm font-semibold text-slate-600 transition hover:text-violet-600"
-                            >
-                                Analytics
-                            </a>
-                            <a
-                                href="#faq"
-                                className="text-sm font-semibold text-slate-600 transition hover:text-violet-600"
-                            >
-                                FAQ
-                            </a>
+                            {[
+                                ['Features', '#features'],
+                                ['How it Works', '#workflow'],
+                                ['Analytics', '#analytics'],
+                                ['Distribution', '/distribution'],
+                                ['Pricing', '/pricing'],
+                            ].map(
+                                ([label, href]) => (
+                                    <a
+                                        key={href}
+                                        href={href}
+                                        className="text-sm font-semibold text-slate-300 transition hover:text-white"
+                                    >
+                                        {label}
+                                    </a>
+                                )
+                            )}
                         </nav>
 
-                        <div className="hidden items-center gap-3 lg:flex">
+                        <div className="hidden items-center gap-2 lg:flex">
                             {auth?.user ? (
                                 <Link
                                     href="/dashboard"
-                                    className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-700"
+                                    className="rounded-xl bg-white px-5 py-2.5 text-sm font-black text-slate-950"
                                 >
-                                    Open Dashboard
-                                    <ArrowIcon />
+                                    Dashboard
                                 </Link>
                             ) : (
                                 <>
                                     <Link
                                         href="/login"
-                                        className="rounded-xl px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
+                                        className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-300 hover:bg-white/10 hover:text-white"
                                     >
                                         Log in
                                     </Link>
 
                                     <Link
                                         href="/register"
-                                        className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-violet-700"
+                                        className="rounded-xl bg-white px-5 py-2.5 text-sm font-black text-slate-950 transition hover:bg-violet-100"
                                     >
                                         Get Started
-                                        <ArrowIcon />
                                     </Link>
                                 </>
                             )}
@@ -287,340 +268,491 @@ export default function Welcome({ auth }) {
                         <button
                             type="button"
                             onClick={() =>
-                                setMobileMenuOpen((current) => !current)
+                                setMenuOpen(
+                                    (value) => !value
+                                )
                             }
-                            className="rounded-xl border border-slate-200 p-2.5 text-slate-700 lg:hidden"
-                            aria-label="Toggle navigation"
+                            className="rounded-xl border border-white/10 p-2.5 text-white lg:hidden"
                         >
-                            <MenuIcon open={mobileMenuOpen} />
+                            {menuOpen ? (
+                                <X size={21} />
+                            ) : (
+                                <Menu size={21} />
+                            )}
                         </button>
                     </div>
 
-                    {mobileMenuOpen && (
-                        <div className="border-t border-slate-200 bg-white px-5 py-5 lg:hidden">
-                            <div className="mx-auto flex max-w-7xl flex-col gap-2">
+                    {menuOpen && (
+                        <div className="border-t border-white/10 bg-slate-950 px-5 py-5 lg:hidden">
+                            <div className="space-y-1">
                                 {[
                                     ['Features', '#features'],
-                                    ['How It Works', '#how-it-works'],
+                                    ['How it Works', '#workflow'],
                                     ['Analytics', '#analytics'],
-                                    ['FAQ', '#faq'],
-                                ].map(([label, href]) => (
-                                    <a
-                                        key={label}
-                                        href={href}
-                                        onClick={() =>
-                                            setMobileMenuOpen(false)
-                                        }
-                                        className="rounded-xl px-4 py-3 font-semibold text-slate-700 hover:bg-slate-100"
-                                    >
-                                        {label}
-                                    </a>
-                                ))}
+                                    ['Distribution', '/distribution'],
+                                    ['Pricing', '/pricing'],
+                                    ['About', '/about'],
+                                ].map(
+                                    ([label, href]) => (
+                                        <a
+                                            key={href}
+                                            href={href}
+                                            className="block rounded-xl px-4 py-3 font-semibold text-slate-300 hover:bg-white/10 hover:text-white"
+                                        >
+                                            {label}
+                                        </a>
+                                    )
+                                )}
+                            </div>
 
-                                <div className="mt-3 grid grid-cols-2 gap-3">
-                                    <Link
-                                        href="/login"
-                                        className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-bold"
-                                    >
-                                        Log in
-                                    </Link>
-                                    <Link
-                                        href="/register"
-                                        className="rounded-xl bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white"
-                                    >
-                                        Get Started
-                                    </Link>
-                                </div>
+                            <div className="mt-4 grid grid-cols-2 gap-2">
+                                <Link
+                                    href="/login"
+                                    className="rounded-xl border border-white/10 px-4 py-3 text-center font-bold text-white"
+                                >
+                                    Log in
+                                </Link>
+
+                                <Link
+                                    href="/register"
+                                    className="rounded-xl bg-white px-4 py-3 text-center font-black text-slate-950"
+                                >
+                                    Get Started
+                                </Link>
                             </div>
                         </div>
                     )}
                 </header>
 
                 <main>
-                    <section
-                        id="home"
-                        className="relative overflow-hidden bg-slate-950 pb-24 pt-32 sm:pb-32 sm:pt-40"
-                    >
+                    <section className="relative overflow-hidden bg-slate-950 pb-24 pt-36 text-white sm:pb-32 sm:pt-44">
                         <div className="absolute inset-0">
-                            <div className="absolute -left-32 top-10 h-96 w-96 rounded-full bg-violet-600/30 blur-3xl" />
-                            <div className="absolute -right-32 top-32 h-96 w-96 rounded-full bg-fuchsia-500/20 blur-3xl" />
-                            <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-orange-400/10 blur-3xl" />
+                            <div className="absolute -left-40 top-10 h-[32rem] w-[32rem] rounded-full bg-violet-600/30 blur-[110px]" />
+                            <div className="absolute right-[-10rem] top-40 h-[28rem] w-[28rem] rounded-full bg-fuchsia-500/20 blur-[110px]" />
+                            <div className="absolute bottom-[-12rem] left-1/3 h-[24rem] w-[24rem] rounded-full bg-cyan-500/10 blur-[110px]" />
                         </div>
 
-                        <div className="relative mx-auto grid max-w-7xl items-center gap-16 px-5 sm:px-6 lg:grid-cols-[1.05fr_.95fr] lg:px-8">
+                        <div className="absolute inset-0 opacity-[0.07]">
+                            <div
+                                className="h-full w-full"
+                                style={{
+                                    backgroundImage:
+                                        'linear-gradient(rgba(255,255,255,.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.25) 1px, transparent 1px)',
+                                    backgroundSize:
+                                        '54px 54px',
+                                }}
+                            />
+                        </div>
+
+                        <div className="relative mx-auto grid max-w-7xl gap-16 px-5 sm:px-6 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:px-8">
                             <div>
-                                <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-violet-200 backdrop-blur">
-                                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                                    Built for independent music
+                                <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-400/10 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-violet-200">
+                                    <Sparkles size={14} />
+                                    Built for modern music
+                                    businesses
                                 </div>
 
-                                <h1 className="max-w-4xl text-5xl font-black leading-[1.03] tracking-[-0.045em] text-white sm:text-6xl lg:text-7xl">
+                                <h1 className="mt-7 max-w-4xl text-5xl font-black leading-[0.98] tracking-[-0.045em] sm:text-6xl lg:text-7xl">
                                     Your music.
-                                    <span className="block bg-gradient-to-r from-violet-400 via-fuchsia-400 to-orange-300 bg-clip-text text-transparent">
+                                    <span className="block bg-gradient-to-r from-violet-300 via-fuchsia-300 to-orange-200 bg-clip-text text-transparent">
                                         Everywhere it belongs.
                                     </span>
                                 </h1>
 
                                 <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
-                                    Distribute releases worldwide, manage your
-                                    catalogue, understand performance and
-                                    collect royalties from one professional
-                                    platform.
+                                    Distribute releases,
+                                    manage your catalogue,
+                                    track performance and
+                                    operate royalties through
+                                    one connected platform.
                                 </p>
 
-                                <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+                                <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                                     <Link
                                         href="/register"
-                                        className="inline-flex items-center justify-center gap-3 rounded-2xl bg-white px-7 py-4 text-base font-black text-slate-950 shadow-2xl shadow-white/10 transition hover:-translate-y-1 hover:bg-violet-100"
+                                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-sm font-black text-slate-950 shadow-xl shadow-black/20 transition hover:-translate-y-0.5"
                                     >
-                                        Start Distributing
-                                        <ArrowIcon />
+                                        Start distributing
+                                        <ArrowRight
+                                            size={17}
+                                        />
                                     </Link>
 
                                     <a
-                                        href="#how-it-works"
-                                        className="inline-flex items-center justify-center rounded-2xl border border-white/20 bg-white/5 px-7 py-4 text-base font-bold text-white backdrop-blur transition hover:bg-white/10"
+                                        href="#workflow"
+                                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-6 py-4 text-sm font-black text-white backdrop-blur transition hover:bg-white/10"
                                     >
-                                        See How It Works
+                                        <Play
+                                            size={16}
+                                            fill="currentColor"
+                                        />
+                                        See how it works
                                     </a>
                                 </div>
 
-                                <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm font-semibold text-slate-300">
+                                <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-400">
                                     {[
-                                        'Artist & label accounts',
-                                        'Worldwide stores',
-                                        'Royalty reporting',
+                                        'Artists',
+                                        'Labels',
+                                        'Catalogue teams',
                                     ].map((item) => (
-                                        <div
+                                        <span
                                             key={item}
-                                            className="flex items-center gap-2"
+                                            className="inline-flex items-center gap-2"
                                         >
-                                            <span className="text-emerald-400">
-                                                <CheckIcon />
-                                            </span>
+                                            <CheckCircle2
+                                                size={16}
+                                                className="text-emerald-400"
+                                            />
                                             {item}
-                                        </div>
+                                        </span>
                                     ))}
                                 </div>
                             </div>
 
                             <div className="relative">
-                                <div className="absolute -inset-8 rounded-[3rem] bg-gradient-to-br from-violet-600/30 to-fuchsia-500/10 blur-2xl" />
+                                <div className="absolute -inset-8 rounded-[3rem] bg-gradient-to-br from-violet-500/20 to-fuchsia-500/10 blur-2xl" />
 
-                                <div className="relative rounded-[2rem] border border-white/15 bg-white/10 p-4 shadow-2xl backdrop-blur-xl">
-                                    <div className="rounded-[1.5rem] bg-white p-5 sm:p-7">
+                                <div className="relative rounded-[2rem] border border-white/10 bg-white/[0.07] p-4 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-6">
+                                    <div className="rounded-[1.5rem] border border-white/10 bg-slate-900/90 p-5">
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                                                    Monthly performance
-                                                </p>
-                                                <h2 className="mt-2 text-2xl font-black text-slate-950">
+                                                <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                                                     Artist Overview
-                                                </h2>
+                                                </div>
+
+                                                <div className="mt-1 text-lg font-black">
+                                                    Performance
+                                                </div>
                                             </div>
 
-                                            <div className="rounded-2xl bg-violet-100 px-3 py-2 text-xs font-black text-violet-700">
-                                                LIVE
+                                            <div className="rounded-xl bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-300">
+                                                Live
                                             </div>
                                         </div>
 
-                                        <div className="mt-7 grid grid-cols-3 gap-3">
+                                        <div className="mt-6 grid grid-cols-3 gap-3">
                                             {[
-                                                ['Streams', '2.4M', '+18.6%'],
-                                                ['Revenue', '₹4.8L', '+12.4%'],
-                                                ['Listeners', '684K', '+22.1%'],
-                                            ].map(([label, value, growth]) => (
-                                                <div
-                                                    key={label}
-                                                    className="rounded-2xl bg-slate-50 p-4"
-                                                >
-                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                        {label}
-                                                    </p>
-                                                    <p className="mt-2 text-lg font-black text-slate-950 sm:text-xl">
-                                                        {value}
-                                                    </p>
-                                                    <p className="mt-1 text-xs font-bold text-emerald-600">
-                                                        {growth}
-                                                    </p>
-                                                </div>
-                                            ))}
+                                                [
+                                                    'Streams',
+                                                    '2.4M',
+                                                ],
+                                                [
+                                                    'Revenue',
+                                                    '₹8.6L',
+                                                ],
+                                                [
+                                                    'Releases',
+                                                    '42',
+                                                ],
+                                            ].map(
+                                                ([
+                                                    label,
+                                                    value,
+                                                ]) => (
+                                                    <div
+                                                        key={
+                                                            label
+                                                        }
+                                                        className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                                                    >
+                                                        <div className="text-xs text-slate-500">
+                                                            {
+                                                                label
+                                                            }
+                                                        </div>
+
+                                                        <div className="mt-2 text-xl font-black">
+                                                            {
+                                                                value
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                )
+                                            )}
                                         </div>
 
-                                        <div className="mt-7 rounded-2xl bg-slate-950 p-5">
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                                                        Performance
-                                                    </p>
-                                                    <p className="mt-1 text-sm font-bold text-white">
-                                                        Last 7 months
-                                                    </p>
-                                                </div>
-
-                                                <p className="text-sm font-black text-emerald-400">
-                                                    +24.8%
-                                                </p>
-                                            </div>
-
-                                            <div className="mt-8 flex h-40 items-end gap-3">
-                                                {[38, 54, 47, 67, 74, 86, 100].map(
-                                                    (height, index) => (
+                                        <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                                            <div className="flex h-44 items-end gap-2">
+                                                {[
+                                                    32,
+                                                    48,
+                                                    38,
+                                                    63,
+                                                    56,
+                                                    78,
+                                                    69,
+                                                    92,
+                                                    84,
+                                                    100,
+                                                    88,
+                                                    112,
+                                                ].map(
+                                                    (
+                                                        height,
+                                                        index
+                                                    ) => (
                                                         <div
-                                                            key={index}
-                                                            className="flex flex-1 items-end"
+                                                            key={
+                                                                index
+                                                            }
+                                                            className="flex-1 rounded-t-lg bg-gradient-to-t from-violet-600 to-fuchsia-400"
                                                             style={{
-                                                                height: '100%',
+                                                                height: `${height}px`,
+                                                                opacity:
+                                                                    0.45 +
+                                                                    index *
+                                                                        0.04,
                                                             }}
-                                                        >
-                                                            <div
-                                                                className="w-full rounded-t-lg bg-gradient-to-t from-violet-700 to-fuchsia-400"
-                                                                style={{
-                                                                    height: `${height}%`,
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    ),
+                                                        />
+                                                    )
                                                 )}
                                             </div>
-                                        </div>
 
-                                        <div className="mt-5 flex items-center justify-between rounded-2xl border border-slate-200 p-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-100 text-lg">
-                                                    ♪
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-black text-slate-950">
-                                                        Latest release
-                                                    </p>
-                                                    <p className="text-xs font-semibold text-slate-500">
-                                                        Delivered to 24 stores
-                                                    </p>
-                                                </div>
+                                            <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+                                                <span>
+                                                    Revenue trend
+                                                </span>
+                                                <span className="font-bold text-emerald-300">
+                                                    +18.4%
+                                                </span>
                                             </div>
-
-                                            <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-black text-emerald-700">
-                                                Live
-                                            </span>
                                         </div>
+
+                                        <div className="mt-5 grid grid-cols-2 gap-3">
+                                            {[
+                                                [
+                                                    'Top Platform',
+                                                    'Spotify',
+                                                ],
+                                                [
+                                                    'Top Country',
+                                                    'India',
+                                                ],
+                                            ].map(
+                                                ([
+                                                    label,
+                                                    value,
+                                                ]) => (
+                                                    <div
+                                                        key={
+                                                            label
+                                                        }
+                                                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                                                    >
+                                                        <div className="text-xs text-slate-500">
+                                                            {
+                                                                label
+                                                            }
+                                                        </div>
+
+                                                        <div className="mt-1 font-black">
+                                                            {
+                                                                value
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="absolute -left-6 top-16 hidden rounded-2xl border border-white/10 bg-white/10 p-4 shadow-xl backdrop-blur-xl sm:block">
+                                    <Music2
+                                        size={20}
+                                        className="text-violet-200"
+                                    />
+                                    <div className="mt-2 text-xs font-black">
+                                        Release Live
+                                    </div>
+                                </div>
+
+                                <div className="absolute -right-6 bottom-20 hidden rounded-2xl border border-white/10 bg-white/10 p-4 shadow-xl backdrop-blur-xl sm:block">
+                                    <BarChart3
+                                        size={20}
+                                        className="text-emerald-300"
+                                    />
+                                    <div className="mt-2 text-xs font-black">
+                                        Analytics Ready
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    <section className="border-b border-slate-200 bg-white py-8">
+                    <section className="border-b border-slate-200 bg-white py-9">
                         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
-                            <p className="text-center text-xs font-black uppercase tracking-[0.25em] text-slate-400">
-                                Distribute to leading music platforms
+                            <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-slate-400">
+                                Distribute to leading
+                                digital music platforms
                             </p>
 
-                            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-                                {stores.map((store) => (
-                                    <div
-                                        key={store}
-                                        className="flex min-h-16 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 text-center text-sm font-black text-slate-700 transition hover:-translate-y-1 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
-                                    >
-                                        {store}
-                                    </div>
-                                ))}
+                            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+                                {stores.map(
+                                    (store) => (
+                                        <div
+                                            key={store}
+                                            className="flex min-h-16 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-center text-sm font-black text-slate-700 transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-white hover:shadow-sm"
+                                        >
+                                            {store}
+                                        </div>
+                                    )
+                                )}
                             </div>
+                        </div>
+                    </section>
+
+                    <section className="bg-slate-50 py-14">
+                        <div className="mx-auto grid max-w-7xl gap-4 px-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
+                            {stats.map(
+                                (stat) => (
+                                    <div
+                                        key={stat.label}
+                                        className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm"
+                                    >
+                                        <div className="text-4xl font-black tracking-tight text-slate-950">
+                                            {stat.value}
+                                        </div>
+
+                                        <div className="mt-2 text-sm font-semibold text-slate-500">
+                                            {stat.label}
+                                        </div>
+                                    </div>
+                                )
+                            )}
                         </div>
                     </section>
 
                     <section
                         id="features"
-                        className="bg-slate-50 py-24 sm:py-32"
+                        className="bg-white py-24 sm:py-32"
                     >
                         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
                             <div className="mx-auto max-w-3xl text-center">
-                                <p className="text-sm font-black uppercase tracking-[0.22em] text-violet-600">
-                                    Complete music infrastructure
-                                </p>
+                                <div className="text-sm font-black uppercase tracking-[0.2em] text-violet-600">
+                                    One connected platform
+                                </div>
+
                                 <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-                                    Everything needed to release and grow
+                                    More than distribution
                                 </h2>
-                                <p className="mt-6 text-lg leading-8 text-slate-600">
-                                    A unified system for distribution,
-                                    catalogue operations, analytics, royalties
-                                    and finance.
+
+                                <p className="mt-5 text-lg leading-8 text-slate-600">
+                                    Mixx Tune combines
+                                    release operations,
+                                    catalogue management,
+                                    analytics and finance
+                                    workflows in one system.
                                 </p>
                             </div>
 
-                            <div className="mt-16 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                                {features.map((feature) => (
-                                    <article
-                                        key={feature.number}
-                                        className="group rounded-[1.75rem] border border-slate-200 bg-white p-7 transition duration-300 hover:-translate-y-2 hover:border-violet-200 hover:shadow-2xl hover:shadow-violet-900/10"
-                                    >
-                                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-sm font-black text-white transition group-hover:bg-violet-600">
-                                            {feature.number}
-                                        </div>
+                            <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                                {features.map(
+                                    (feature) => {
+                                        const Icon =
+                                            feature.icon;
 
-                                        <h3 className="mt-7 text-xl font-black text-slate-950">
-                                            {feature.title}
-                                        </h3>
+                                        return (
+                                            <article
+                                                key={
+                                                    feature.title
+                                                }
+                                                className="group rounded-[1.75rem] border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:border-violet-200 hover:shadow-xl hover:shadow-violet-900/5"
+                                            >
+                                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 transition group-hover:bg-violet-600 group-hover:text-white">
+                                                    <Icon
+                                                        size={
+                                                            22
+                                                        }
+                                                    />
+                                                </div>
 
-                                        <p className="mt-3 leading-7 text-slate-600">
-                                            {feature.description}
-                                        </p>
-                                    </article>
-                                ))}
+                                                <h3 className="mt-6 text-xl font-black text-slate-950">
+                                                    {
+                                                        feature.title
+                                                    }
+                                                </h3>
+
+                                                <p className="mt-3 leading-7 text-slate-600">
+                                                    {
+                                                        feature.text
+                                                    }
+                                                </p>
+                                            </article>
+                                        );
+                                    }
+                                )}
                             </div>
                         </div>
                     </section>
 
                     <section
-                        id="how-it-works"
-                        className="bg-white py-24 sm:py-32"
+                        id="workflow"
+                        className="bg-slate-950 py-24 text-white sm:py-32"
                     >
                         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
-                            <div className="grid gap-14 lg:grid-cols-[.8fr_1.2fr] lg:items-start">
+                            <div className="grid gap-14 lg:grid-cols-[.85fr_1.15fr] lg:items-start">
                                 <div className="lg:sticky lg:top-28">
-                                    <p className="text-sm font-black uppercase tracking-[0.22em] text-violet-600">
+                                    <div className="text-sm font-black uppercase tracking-[0.2em] text-violet-300">
                                         Simple workflow
-                                    </p>
+                                    </div>
 
-                                    <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-                                        From your studio to global listeners
+                                    <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
+                                        From upload to
+                                        distribution
                                     </h2>
 
-                                    <p className="mt-6 max-w-lg text-lg leading-8 text-slate-600">
-                                        A guided release workflow keeps
-                                        metadata, audio, artwork, stores and
-                                        territory organised.
+                                    <p className="mt-5 max-w-xl text-lg leading-8 text-slate-400">
+                                        A guided release
+                                        process keeps
+                                        metadata, audio,
+                                        stores, territories
+                                        and review organised.
                                     </p>
 
                                     <Link
-                                        href="/register"
-                                        className="mt-8 inline-flex items-center gap-3 rounded-2xl bg-violet-600 px-6 py-4 font-black text-white transition hover:bg-slate-950"
+                                        href="/distribution"
+                                        className="mt-8 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-3 font-black text-white hover:bg-white/10"
                                     >
-                                        Create Account
-                                        <ArrowIcon />
+                                        Explore distribution
+                                        <ChevronRight
+                                            size={17}
+                                        />
                                     </Link>
                                 </div>
 
                                 <div className="space-y-4">
-                                    {steps.map((item) => (
-                                        <article
-                                            key={item.step}
-                                            className="flex gap-5 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6 sm:gap-7 sm:p-8"
-                                        >
-                                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-lg font-black text-violet-600 shadow-sm">
-                                                {item.step}
-                                            </div>
+                                    {steps.map(
+                                        (step) => (
+                                            <div
+                                                key={
+                                                    step.number
+                                                }
+                                                className="grid gap-5 rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-6 sm:grid-cols-[72px_1fr] sm:p-7"
+                                            >
+                                                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-lg font-black text-slate-950">
+                                                    {
+                                                        step.number
+                                                    }
+                                                </div>
 
-                                            <div>
-                                                <h3 className="text-xl font-black text-slate-950">
-                                                    {item.title}
-                                                </h3>
-                                                <p className="mt-2 leading-7 text-slate-600">
-                                                    {item.text}
-                                                </p>
+                                                <div>
+                                                    <h3 className="text-xl font-black">
+                                                        {
+                                                            step.title
+                                                        }
+                                                    </h3>
+
+                                                    <p className="mt-2 leading-7 text-slate-400">
+                                                        {
+                                                            step.text
+                                                        }
+                                                    </p>
+                                                </div>
                                             </div>
-                                        </article>
-                                    ))}
+                                        )
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -628,186 +760,229 @@ export default function Welcome({ auth }) {
 
                     <section
                         id="analytics"
-                        className="overflow-hidden bg-slate-950 py-24 text-white sm:py-32"
+                        className="bg-white py-24 sm:py-32"
                     >
-                        <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 sm:px-6 lg:grid-cols-2 lg:px-8">
-                            <div>
-                                <p className="text-sm font-black uppercase tracking-[0.22em] text-fuchsia-400">
-                                    Actionable analytics
-                                </p>
-
-                                <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
-                                    Know exactly how your music performs
-                                </h2>
-
-                                <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">
-                                    Compare streams and revenue by reporting
-                                    month, sale month, store, country, release
-                                    and track.
-                                </p>
-
-                                <div className="mt-9 grid gap-4 sm:grid-cols-2">
-                                    {[
-                                        'Store performance',
-                                        'Country insights',
-                                        'Track growth',
-                                        'Monthly comparison',
-                                        'Revenue analysis',
-                                        'Downloadable reports',
-                                    ].map((item) => (
-                                        <div
-                                            key={item}
-                                            className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-                                        >
-                                            <span className="text-emerald-400">
-                                                <CheckIcon />
-                                            </span>
-                                            <span className="font-bold text-slate-200">
-                                                {item}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5 backdrop-blur sm:p-7">
-                                <div className="grid grid-cols-2 gap-4">
-                                    {[
-                                        ['Total Streams', '18.2M'],
-                                        ['Net Earnings', '₹12.6L'],
-                                        ['Active Tracks', '284'],
-                                        ['Live Releases', '96'],
-                                    ].map(([label, value]) => (
-                                        <div
-                                            key={label}
-                                            className="rounded-2xl bg-white p-5 text-slate-950"
-                                        >
-                                            <p className="text-xs font-black uppercase tracking-wider text-slate-400">
-                                                {label}
-                                            </p>
-                                            <p className="mt-3 text-2xl font-black sm:text-3xl">
-                                                {value}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="mt-4 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 p-6">
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <p className="text-sm font-bold text-violet-100">
-                                                Growth this month
-                                            </p>
-                                            <p className="mt-2 text-4xl font-black">
-                                                +32.8%
-                                            </p>
-                                        </div>
-                                        <div className="rounded-xl bg-white/15 px-3 py-2 text-sm font-black">
-                                            Analytics
-                                        </div>
+                        <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+                            <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+                                <div>
+                                    <div className="text-sm font-black uppercase tracking-[0.2em] text-violet-600">
+                                        Analytics built in
                                     </div>
 
-                                    <div className="mt-9 flex h-28 items-end gap-2">
-                                        {[30, 42, 38, 56, 48, 67, 64, 78, 88, 100].map(
-                                            (height, index) => (
+                                    <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                                        See what your
+                                        catalogue is doing
+                                    </h2>
+
+                                    <p className="mt-5 text-lg leading-8 text-slate-600">
+                                        Understand
+                                        performance across
+                                        reporting periods,
+                                        platforms, countries
+                                        and catalogue.
+                                    </p>
+
+                                    <div className="mt-8 space-y-4">
+                                        {[
+                                            'Streams and earnings',
+                                            'Platform performance',
+                                            'Country performance',
+                                            'Top tracks and catalogue',
+                                        ].map(
+                                            (item) => (
                                                 <div
-                                                    key={index}
-                                                    className="flex-1 rounded-t-md bg-white/80"
-                                                    style={{
-                                                        height: `${height}%`,
-                                                    }}
-                                                />
-                                            ),
+                                                    key={
+                                                        item
+                                                    }
+                                                    className="flex items-center gap-3 font-semibold text-slate-700"
+                                                >
+                                                    <CheckCircle2
+                                                        size={
+                                                            19
+                                                        }
+                                                        className="text-emerald-500"
+                                                    />
+                                                    {item}
+                                                </div>
+                                            )
                                         )}
+                                    </div>
+                                </div>
+
+                                <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-5 shadow-xl shadow-slate-900/5 sm:p-7">
+                                    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-6">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                                    Revenue
+                                                </div>
+
+                                                <div className="mt-2 text-3xl font-black">
+                                                    ₹8,63,240
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-600">
+                                                +18.4%
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-8 flex h-48 items-end gap-2">
+                                            {[
+                                                26,
+                                                36,
+                                                31,
+                                                48,
+                                                44,
+                                                61,
+                                                58,
+                                                73,
+                                                68,
+                                                87,
+                                                79,
+                                                96,
+                                            ].map(
+                                                (
+                                                    height,
+                                                    index
+                                                ) => (
+                                                    <div
+                                                        key={
+                                                            index
+                                                        }
+                                                        className="flex-1 rounded-t-lg bg-gradient-to-t from-violet-600 to-fuchsia-400"
+                                                        style={{
+                                                            height: `${height}%`,
+                                                        }}
+                                                    />
+                                                )
+                                            )}
+                                        </div>
+
+                                        <div className="mt-6 grid grid-cols-2 gap-3">
+                                            <div className="rounded-2xl bg-slate-50 p-4">
+                                                <div className="text-xs text-slate-400">
+                                                    Streams
+                                                </div>
+
+                                                <div className="mt-1 text-lg font-black">
+                                                    2.4M
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-2xl bg-slate-50 p-4">
+                                                <div className="text-xs text-slate-400">
+                                                    Sale Units
+                                                </div>
+
+                                                <div className="mt-1 text-lg font-black">
+                                                    18.2K
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    <section id="faq" className="bg-slate-50 py-24 sm:py-32">
+                    <section className="bg-slate-50 py-24 sm:py-32">
                         <div className="mx-auto max-w-4xl px-5 sm:px-6 lg:px-8">
                             <div className="text-center">
-                                <p className="text-sm font-black uppercase tracking-[0.22em] text-violet-600">
-                                    Frequently asked questions
-                                </p>
-                                <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-                                    Clear answers before you release
+                                <div className="text-sm font-black uppercase tracking-[0.2em] text-violet-600">
+                                    FAQ
+                                </div>
+
+                                <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950">
+                                    Common questions
                                 </h2>
                             </div>
 
-                            <div className="mt-14 space-y-4">
-                                {faqs.map((faq, index) => {
-                                    const isOpen = openFaq === index;
+                            <div className="mt-12 space-y-3">
+                                {faqs.map(
+                                    (item, index) => {
+                                        const open =
+                                            openFaq ===
+                                            index;
 
-                                    return (
-                                        <article
-                                            key={faq.question}
-                                            className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
-                                        >
+                                        return (
                                             <button
+                                                key={
+                                                    item.q
+                                                }
                                                 type="button"
                                                 onClick={() =>
                                                     setOpenFaq(
-                                                        isOpen ? -1 : index,
+                                                        open
+                                                            ? -1
+                                                            : index
                                                     )
                                                 }
-                                                className="flex w-full items-center justify-between gap-5 p-6 text-left"
+                                                className="w-full rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm"
                                             >
-                                                <span className="text-lg font-black text-slate-950">
-                                                    {faq.question}
-                                                </span>
-                                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl font-bold text-violet-600">
-                                                    {isOpen ? '−' : '+'}
-                                                </span>
-                                            </button>
+                                                <div className="flex items-center justify-between gap-5">
+                                                    <span className="font-black text-slate-950">
+                                                        {
+                                                            item.q
+                                                        }
+                                                    </span>
 
-                                            {isOpen && (
-                                                <div className="border-t border-slate-100 px-6 pb-6 pt-5 leading-7 text-slate-600">
-                                                    {faq.answer}
+                                                    <span className="text-xl font-light text-slate-400">
+                                                        {open
+                                                            ? '−'
+                                                            : '+'}
+                                                    </span>
                                                 </div>
-                                            )}
-                                        </article>
-                                    );
-                                })}
+
+                                                {open && (
+                                                    <p className="mt-4 max-w-3xl leading-7 text-slate-600">
+                                                        {
+                                                            item.a
+                                                        }
+                                                    </p>
+                                                )}
+                                            </button>
+                                        );
+                                    }
+                                )}
                             </div>
                         </div>
                     </section>
 
                     <section className="bg-white px-5 py-24 sm:px-6 sm:py-32 lg:px-8">
-                        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2.5rem] bg-slate-950 px-6 py-16 text-center sm:px-12 sm:py-20">
-                            <div className="absolute -left-20 -top-20 h-72 w-72 rounded-full bg-violet-600/40 blur-3xl" />
-                            <div className="absolute -bottom-24 -right-20 h-72 w-72 rounded-full bg-fuchsia-500/30 blur-3xl" />
+                        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] bg-slate-950 px-6 py-16 text-center text-white shadow-2xl sm:px-12 sm:py-20">
+                            <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-violet-600/30 blur-3xl" />
+                            <div className="absolute -right-20 bottom-0 h-72 w-72 rounded-full bg-fuchsia-500/20 blur-3xl" />
 
-                            <div className="relative mx-auto max-w-3xl">
-                                <p className="text-sm font-black uppercase tracking-[0.22em] text-violet-300">
-                                    Ready to release?
-                                </p>
-
-                                <h2 className="mt-5 text-4xl font-black tracking-tight text-white sm:text-5xl">
-                                    Build your music business with Mixx Tune
+                            <div className="relative">
+                                <h2 className="text-4xl font-black tracking-tight sm:text-5xl">
+                                    Ready to move your music
+                                    forward?
                                 </h2>
 
-                                <p className="mt-6 text-lg leading-8 text-slate-300">
-                                    Join a professional distribution ecosystem
-                                    designed for artists, labels and music
-                                    teams.
+                                <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-slate-300">
+                                    Build your catalogue,
+                                    prepare releases and run
+                                    distribution operations
+                                    from one platform.
                                 </p>
 
-                                <div className="mt-9 flex flex-col justify-center gap-4 sm:flex-row">
+                                <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
                                     <Link
                                         href="/register"
-                                        className="inline-flex items-center justify-center gap-3 rounded-2xl bg-white px-7 py-4 font-black text-slate-950 transition hover:bg-violet-100"
+                                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 font-black text-slate-950"
                                     >
-                                        Create Free Account
-                                        <ArrowIcon />
+                                        Create account
+                                        <ArrowRight
+                                            size={17}
+                                        />
                                     </Link>
 
                                     <Link
-                                        href="/login"
-                                        className="rounded-2xl border border-white/20 px-7 py-4 font-black text-white transition hover:bg-white/10"
+                                        href="/contact"
+                                        className="rounded-2xl border border-white/15 bg-white/5 px-6 py-4 font-black text-white"
                                     >
-                                        Sign In
+                                        Contact us
                                     </Link>
                                 </div>
                             </div>
@@ -815,90 +990,104 @@ export default function Welcome({ auth }) {
                     </section>
                 </main>
 
-                <footer className="border-t border-slate-200 bg-white">
-                    <div className="mx-auto max-w-7xl px-5 py-14 sm:px-6 lg:px-8">
-                        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
-                            <div className="lg:col-span-2">
-                                <LogoMark />
-                                <p className="mt-5 max-w-md leading-7 text-slate-600">
-                                    Digital music distribution, catalogue
-                                    management, analytics and royalty
-                                    infrastructure for modern music businesses.
-                                </p>
-                            </div>
+                <footer className="border-t border-slate-200 bg-slate-950 text-slate-400">
+                    <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-6 md:grid-cols-4 lg:px-8">
+                        <div className="md:col-span-2">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 font-black text-white">
+                                    M
+                                </div>
 
-                            <div>
-                                <h3 className="text-sm font-black uppercase tracking-wider text-slate-950">
-                                    Platform
-                                </h3>
-                                <div className="mt-5 space-y-3 text-sm font-semibold text-slate-600">
-                                    <a
-                                        href="#features"
-                                        className="block hover:text-violet-600"
-                                    >
-                                        Features
-                                    </a>
-                                    <a
-                                        href="#analytics"
-                                        className="block hover:text-violet-600"
-                                    >
-                                        Analytics
-                                    </a>
-                                    <Link
-                                        href="/login"
-                                        className="block hover:text-violet-600"
-                                    >
-                                        Login
-                                    </Link>
-                                    <Link
-                                        href="/register"
-                                        className="block hover:text-violet-600"
-                                    >
-                                        Register
-                                    </Link>
+                                <div className="font-black text-white">
+                                    MIXX TUNE
                                 </div>
                             </div>
 
-                            <div>
-                                <h3 className="text-sm font-black uppercase tracking-wider text-slate-950">
-                                    Company
-                                </h3>
-                                <div className="mt-5 space-y-3 text-sm font-semibold text-slate-600">
-                                    <a
-                                        href="#how-it-works"
-                                        className="block hover:text-violet-600"
-                                    >
-                                        How It Works
-                                    </a>
-                                    <a
-                                        href="#faq"
-                                        className="block hover:text-violet-600"
-                                    >
-                                        FAQ
-                                    </a>
-                                    <a
-                                        href="mailto:support@mixxtune.com"
-                                        className="block hover:text-violet-600"
-                                    >
-                                        Support
-                                    </a>
-                                    <a
-                                        href="mailto:support@mixxtune.com"
-                                        className="block hover:text-violet-600"
-                                    >
-                                        Contact
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-12 flex flex-col gap-4 border-t border-slate-200 pt-7 text-sm font-semibold text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                            <p>
-                                © {new Date().getFullYear()} Mixx Tune
-                                Entertainment. All rights reserved.
+                            <p className="mt-4 max-w-md text-sm leading-7">
+                                Music distribution,
+                                catalogue management,
+                                analytics and royalty
+                                operations for artists and
+                                labels.
                             </p>
-                            <p>Music distribution made professional.</p>
                         </div>
+
+                        <div>
+                            <div className="font-black text-white">
+                                Platform
+                            </div>
+
+                            <div className="mt-4 space-y-3 text-sm">
+                                <Link
+                                    href="/distribution"
+                                    className="block hover:text-white"
+                                >
+                                    Distribution
+                                </Link>
+
+                                <Link
+                                    href="/pricing"
+                                    className="block hover:text-white"
+                                >
+                                    Pricing
+                                </Link>
+
+                                <Link
+                                    href="/about"
+                                    className="block hover:text-white"
+                                >
+                                    About
+                                </Link>
+
+                                <Link
+                                    href="/help"
+                                    className="block hover:text-white"
+                                >
+                                    Help Center
+                                </Link>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="font-black text-white">
+                                Support
+                            </div>
+
+                            <div className="mt-4 space-y-3 text-sm">
+                                <Link
+                                    href="/contact"
+                                    className="block hover:text-white"
+                                >
+                                    Contact
+                                </Link>
+
+                                <Link
+                                    href="/privacy"
+                                    className="block hover:text-white"
+                                >
+                                    Privacy
+                                </Link>
+
+                                <Link
+                                    href="/terms"
+                                    className="block hover:text-white"
+                                >
+                                    Terms
+                                </Link>
+
+                                <a
+                                    href="mailto:support@mixxtune.com"
+                                    className="block hover:text-white"
+                                >
+                                    support@mixxtune.com
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="border-t border-white/10 px-5 py-6 text-center text-xs text-slate-500">
+                        © {new Date().getFullYear()}{' '}
+                        Mixx Tune. All rights reserved.
                     </div>
                 </footer>
             </div>
