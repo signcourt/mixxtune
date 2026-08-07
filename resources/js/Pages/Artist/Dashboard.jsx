@@ -1,4 +1,8 @@
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import {
+    DashboardHero,
+    DashboardKpiGrid,
+} from '@/V2/Shared/Dashboard/Sections';
 import { Head, Link } from '@inertiajs/react';
 import {
     ArrowDownRight,
@@ -66,65 +70,6 @@ function StatusBadge({ status = 'draft' }) {
         >
             {normalized.replaceAll('_', ' ')}
         </span>
-    );
-}
-
-function StatCard({
-    title,
-    value,
-    note,
-    icon: Icon,
-    tone = 'violet',
-}) {
-    const tones = {
-        violet: {
-            icon: 'bg-violet-100 text-violet-700',
-            glow: 'from-violet-500/10',
-        },
-        blue: {
-            icon: 'bg-blue-100 text-blue-700',
-            glow: 'from-blue-500/10',
-        },
-        emerald: {
-            icon: 'bg-emerald-100 text-emerald-700',
-            glow: 'from-emerald-500/10',
-        },
-        amber: {
-            icon: 'bg-amber-100 text-amber-700',
-            glow: 'from-amber-500/10',
-        },
-    };
-
-    const style = tones[tone] ?? tones.violet;
-
-    return (
-        <article className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div
-                className={`absolute inset-x-0 top-0 h-24 bg-gradient-to-b ${style.glow} to-transparent`}
-            />
-
-            <div className="relative flex items-start justify-between gap-4">
-                <div>
-                    <p className="text-sm font-semibold text-slate-500">
-                        {title}
-                    </p>
-
-                    <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-                        {value}
-                    </p>
-
-                    <p className="mt-3 text-xs leading-5 text-slate-400">
-                        {note}
-                    </p>
-                </div>
-
-                <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${style.icon}`}
-                >
-                    <Icon size={22} strokeWidth={2.2} />
-                </div>
-            </div>
-        </article>
     );
 }
 
@@ -245,79 +190,21 @@ export default function Dashboard({
         >
             <Head title="Artist Dashboard" />
 
-            <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#090f1d] via-[#111a2e] to-[#22164b] px-6 py-8 text-white shadow-2xl sm:px-8 lg:px-10 lg:py-10">
-                <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-violet-500/20 blur-3xl" />
-                <div className="absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
+            <DashboardHero
+                name={artistName}
+                accountStatus={
+                    artist.account_status ||
+                    'active'
+                }
+                kycStatus={
+                    artist.kyc_status ||
+                    'pending'
+                }
+            />
 
-                <div className="relative flex flex-col justify-between gap-8 xl:flex-row xl:items-center">
-                    <div className="max-w-2xl">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-semibold text-violet-100">
-                            <Sparkles size={14} />
-                            ARTIST OVERVIEW
-                        </div>
-
-                        <h2 className="mt-5 text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
-                            Welcome, {artistName}
-                        </h2>
-
-                        <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
-                            Manage releases, monitor royalties,
-                            track wallet activity and distribute
-                            your music from one professional
-                            workspace.
-                        </p>
-
-                        <div className="mt-6 flex flex-wrap gap-3">
-                            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold capitalize">
-                                <CheckCircle2
-                                    size={14}
-                                    className="text-emerald-300"
-                                />
-                                Account:{' '}
-                                {artist.account_status ||
-                                    'active'}
-                            </span>
-
-                            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold capitalize">
-                                <Landmark
-                                    size={14}
-                                    className="text-blue-300"
-                                />
-                                KYC:{' '}
-                                {artist.kyc_status ||
-                                    'pending'}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col gap-3 sm:flex-row xl:flex-col">
-                        <Link
-                            href="/artist/releases/create"
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3.5 text-sm font-bold text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-50"
-                        >
-                            <Plus size={18} />
-                            Create Release
-                        </Link>
-
-                        <Link
-                            href="/artist/catalogue"
-                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-6 py-3.5 text-sm font-bold text-white transition hover:bg-white/15"
-                        >
-                            View Catalogue
-                            <ArrowRight size={17} />
-                        </Link>
-                    </div>
-                </div>
-            </section>
-
-            <section className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                {cards.map((card) => (
-                    <StatCard
-                        key={card.title}
-                        {...card}
-                    />
-                ))}
-            </section>
+            <DashboardKpiGrid
+                cards={cards}
+            />
 
             <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
