@@ -19,6 +19,7 @@ import {
     DashboardAnalyticsSection,
     DashboardHero,
     DashboardKpiGrid,
+    SuperAdminExecutiveSection,
 } from '@/V2/Shared/Dashboard/Sections';
 import {
     DashboardLinkCards,
@@ -232,6 +233,12 @@ export default function Dashboard({
             <DashboardKpiGrid
                 cards={cards}
             />
+
+            {isSuperAdmin && (
+                <SuperAdminExecutiveSection
+                    stats={stats}
+                />
+            )}
 
             <section className="mt-6">
                 <QuickActionsCard
