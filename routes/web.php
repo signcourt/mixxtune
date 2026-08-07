@@ -1085,7 +1085,7 @@ Route::middleware([
 
             Route::get('/settings', function () {
                 return redirect()->route(
-                    'v2.settings.index'
+                    'profile.edit'
                 );
             })->name('settings.index');
         });
@@ -1159,7 +1159,7 @@ Route::middleware([
 
             Route::get('/settings', function () {
                 return redirect()->route(
-                    'v2.settings.index'
+                    'profile.edit'
                 );
             })->name('settings.index');
         });
