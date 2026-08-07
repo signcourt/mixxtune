@@ -442,6 +442,119 @@ class UserManagementController extends Controller
                             : 0,
                 ]);
 
+                /*
+                 * Every artist login requires a linked artists row.
+                 * Create it in the same transaction as the user so an
+                 * invited artist can open the Artist Dashboard immediately.
+                 */
+                if (
+                    $validated['role'] ===
+                    'artist'
+                ) {
+                    $slugBase = Str::slug(
+                        $validated['name']
+                    );
+
+                    if ($slugBase === '') {
+                        $slugBase = 'artist';
+                    }
+
+                    $slug =
+                        $slugBase.'-'.$user->id;
+
+                    while (
+                        Artist::withTrashed()
+                            ->where(
+                                'slug',
+                                $slug
+                            )
+                            ->exists()
+                    ) {
+                        $slug =
+                            $slugBase
+                            .'-'
+                            .$user->id
+                            .'-'
+                            .Str::lower(
+                                Str::random(5)
+                            );
+                    }
+
+                    do {
+                        $publicId =
+                            'ART-'
+                            .Str::upper(
+                                Str::random(12)
+                            );
+                    } while (
+                        Artist::withTrashed()
+                            ->where(
+                                'public_id',
+                                $publicId
+                            )
+                            ->exists()
+                    );
+
+                    Artist::query()->create([
+                        'public_id' =>
+                            $publicId,
+
+                        'user_id' =>
+                            $user->id,
+
+                        'label_id' =>
+                            null,
+
+                        'stage_name' =>
+                            $validated['name'],
+
+                        'legal_name' =>
+                            $validated['name'],
+
+                        'slug' =>
+                            $slug,
+
+                        'email' =>
+                            strtolower(
+                                $validated['email']
+                            ),
+
+                        'phone' =>
+                            $validated['phone']
+                            ?? null,
+
+                        'country' =>
+                            $validated['country']
+                            ?? 'India',
+
+                        'timezone' =>
+                            'Asia/Kolkata',
+
+                        'currency' =>
+                            'INR',
+
+                        'account_status' =>
+                            $validated[
+                                'account_status'
+                            ],
+
+                        'kyc_status' =>
+                            'pending',
+
+                        'can_receive_splits' =>
+                            true,
+
+                        'can_create_releases' =>
+                            true,
+
+                        'created_by' =>
+                            $request->user()->id,
+
+                        'updated_by' =>
+                            $request->user()->id,
+                    ]);
+                }
+
                 if (
                     $validated['role'] ===
                     'admin'
