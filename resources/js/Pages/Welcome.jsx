@@ -194,6 +194,37 @@ export default function Welcome({
                     name="twitter:card"
                     content="summary_large_image"
                 />
+
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                        __html: JSON.stringify({
+                            "@context": "https://schema.org",
+                            "@type": "Organization",
+                            name: "Mixx Tune",
+                            url: "https://www.mixxtune.com/",
+                            description:
+                                "Music distribution, catalogue management, analytics and royalty operations for artists and labels.",
+                            contactPoint: {
+                                "@type": "ContactPoint",
+                                email: "support@mixxtune.com",
+                                contactType: "customer support",
+                            },
+                        }),
+                    }}
+                />
+
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                        __html: JSON.stringify({
+                            "@context": "https://schema.org",
+                            "@type": "WebSite",
+                            name: "Mixx Tune",
+                            url: "https://www.mixxtune.com/",
+                        }),
+                    }}
+                />
             </Head>
 
             <div className="min-h-screen overflow-x-hidden bg-white text-slate-950">
