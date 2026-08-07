@@ -3,14 +3,11 @@
 namespace App\Models\Distribution;
 
 use App\Models\User;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TrackSplit extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'public_id',
         'track_id',
@@ -37,21 +34,31 @@ class TrackSplit extends Model
 
     public function track(): BelongsTo
     {
-        return $this->belongsTo(Track::class);
+        return $this->belongsTo(
+            Track::class
+        );
     }
 
     public function contributor(): BelongsTo
     {
-        return $this->belongsTo(Contributor::class);
+        return $this->belongsTo(
+            Contributor::class
+        );
     }
 
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(
+            User::class,
+            'created_by'
+        );
     }
 
     public function updater(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'updated_by');
+        return $this->belongsTo(
+            User::class,
+            'updated_by'
+        );
     }
 }

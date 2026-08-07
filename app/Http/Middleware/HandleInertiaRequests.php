@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\V2\PermissionService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -29,6 +30,15 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $permissionService = app(
+            PermissionService::class
+        );
+
+        $permissionData =
+            $permissionService->frontend(
+                $request->user()
+            );
+
         return [
             ...parent::share($request),
 
@@ -36,8 +46,71 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
             ],
+            'impersonation' => fn () => [
+                'active' => $request->session()->has(
+                    'impersonator_user_id'
+                ),
+
+                'impersonator_user_id' =>
+                    $request->session()->get(
+                        'impersonator_user_id'
+                    ),
+
+                'impersonator_name' =>
+                    $request->session()->get(
+                        'impersonator_name'
+                    ),
+
+                'impersonator_email' =>
+                    $request->session()->get(
+                        'impersonator_email'
+                    ),
+
+                'impersonated_user_id' =>
+                    $request->session()->get(
+                        'impersonated_user_id'
+                    ),
+
+                'started_at' =>
+                    $request->session()->get(
+                        'impersonation_started_at'
+                    ),
+            ],
+
+            'role' =>
+                $permissionData['role'],
+
+            'permissions' =>
+                $permissionData[
+                    'permissions'
+                ],
+
+            'panelPermissions' =>
+                $permissionData[
+                    'panelPermissions'
+                ],
+
             'auth' => [
-                'user' => $request->user(),
+                'user' =>
+                    $request->user(),
+
+                'role' =>
+                    $permissionData['role'],
+
+                'permissions' =>
+                    $permissionData[
+                        'permissions'
+                    ],
+
+                'panel_permissions' =>
+                    $permissionData[
+                        'panelPermissions'
+                    ],
+
+                'is_super_admin' =>
+                    $permissionData[
+                        'isSuperAdmin'
+                    ],
             ],
         ];
     }

@@ -11,6 +11,10 @@ return new class extends Migration
         Schema::create('release_store_deliveries', function (Blueprint $table) {
             $table->id();
 
+            $table->string('public_id',40)
+                ->unique();
+
+
             $table->foreignId('release_id')
                 ->constrained('releases')
                 ->cascadeOnDelete();
@@ -27,12 +31,20 @@ return new class extends Migration
             $table->string('store_url', 1000)->nullable();
 
             $table->text('delivery_notes')->nullable();
+            $table->text('delivery_note')->nullable();
+            $table->string('external_reference', 255)->nullable();
             $table->text('error_message')->nullable();
 
             $table->timestamp('delivered_at')->nullable();
             $table->timestamp('live_at')->nullable();
             $table->timestamp('failed_at')->nullable();
             $table->timestamp('takedown_at')->nullable();
+            $table->timestamp('taken_down_at')->nullable();
+
+            $table->foreignId('created_by')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
 
             $table->foreignId('updated_by')
                 ->nullable()

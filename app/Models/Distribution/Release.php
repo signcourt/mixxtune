@@ -33,6 +33,8 @@ class Release extends Model
         'sub_genre',
         'upc',
         'upc_is_auto_generated',
+        'upc_assigned_at',
+        'upc_assigned_by',
         'original_release_date',
         'digital_release_date',
         'copyright_owner',
@@ -60,12 +62,16 @@ class Release extends Model
         'archived_at',
         'created_by',
         'updated_by',
+        'primary_artists',
+        'featuring_artists',
     ];
 
     protected function casts(): array
     {
         return [
             'upc_is_auto_generated' => 'boolean',
+            'upc_assigned_at' => 'datetime',
+            'upc_assigned_by' => 'integer',
             'original_release_date' => 'date',
             'digital_release_date' => 'date',
             'submitted_at' => 'datetime',
@@ -127,4 +133,14 @@ class Release extends Model
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
+
+    protected $casts = [
+        'primary_artists' => 'array',
+        'featuring_artists' => 'array',
+        'stores' => 'array',
+        'territories' => 'array',
+        'worldwide' => 'boolean',
+        'pre_order' => 'boolean',
+    ];
+
 }

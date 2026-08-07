@@ -1,0 +1,148 @@
+
+  GET|HEAD        home.mixxtune.com/ ............................................................................... home › routes/web.php:42
+  GET|HEAD        artist.mixxtune.com/ .................................................................................... routes/web.php:98
+  GET|HEAD        admin.mixxtune.com/ .................................................................................... routes/web.php:196
+  GET|HEAD        admin.mixxtune.com/admin-management ........................ admin.management.index › Admin\AdminManagementController@index
+  POST            admin.mixxtune.com/admin-management ........................ admin.management.store › Admin\AdminManagementController@store
+  DELETE          admin.mixxtune.com/admin-management/{admin} ............ admin.management.destroy › Admin\AdminManagementController@destroy
+  PATCH           admin.mixxtune.com/admin-management/{admin}/toggle-status admin.management.toggle-status › Admin\AdminManagementController…
+  GET|HEAD        api/artists ............................................................................... Api\Core\ArtistController@index
+  POST            api/artists ............................................................................... Api\Core\ArtistController@store
+  GET|HEAD        api/artists/{artist} ....................................................................... Api\Core\ArtistController@show
+  PUT             api/artists/{artist} ..................................................................... Api\Core\ArtistController@update
+  DELETE          api/artists/{artist} .................................................................... Api\Core\ArtistController@destroy
+  POST            api/artists/{artist}/restore ............................................................ Api\Core\ArtistController@restore
+  GET|HEAD        api/contributors ..................................................................... Api\Core\ContributorController@index
+  POST            api/contributors ..................................................................... Api\Core\ContributorController@store
+  GET|HEAD        api/contributors/{contributor} ........................................................ Api\Core\ContributorController@show
+  PUT             api/contributors/{contributor} ...................................................... Api\Core\ContributorController@update
+  DELETE          api/contributors/{contributor} ..................................................... Api\Core\ContributorController@destroy
+  POST            api/contributors/{contributor}/restore ............................................. Api\Core\ContributorController@restore
+  GET|HEAD        api/labels ................................................................................. Api\Core\LabelController@index
+  POST            api/labels ................................................................................. Api\Core\LabelController@store
+  GET|HEAD        api/labels/{label} .......................................................................... Api\Core\LabelController@show
+  PUT             api/labels/{label} ........................................................................ Api\Core\LabelController@update
+  DELETE          api/labels/{label} ....................................................................... Api\Core\LabelController@destroy
+  POST            api/labels/{label}/restore ............................................................... Api\Core\LabelController@restore
+  POST            api/login ........................................................................................ Api\AuthController@login
+  POST            api/logout ...................................................................................... Api\AuthController@logout
+  GET|HEAD        api/me .............................................................................................. Api\AuthController@me
+  GET|HEAD        api/releases ............................................................ releases.index › Api\Core\ReleaseController@index
+  POST            api/releases ............................................................ releases.store › Api\Core\ReleaseController@store
+  GET|HEAD        api/releases/{release} .................................................... releases.show › Api\Core\ReleaseController@show
+  PUT|PATCH       api/releases/{release} ................................................ releases.update › Api\Core\ReleaseController@update
+  DELETE          api/releases/{release} .............................................. releases.destroy › Api\Core\ReleaseController@destroy
+  POST            api/tracks/{track}/splits ..................................................... Api\Distribution\TrackSplitController@store
+  GET|HEAD        admin.mixxtune.com/artists ............................................. admin.artists.index › Admin\ArtistController@index
+  POST            admin.mixxtune.com/artists ............................................. admin.artists.store › Admin\ArtistController@store
+  GET|HEAD        admin.mixxtune.com/artists/create .................................... admin.artists.create › Admin\ArtistController@create
+  PUT|PATCH       admin.mixxtune.com/artists/{artist} .................................. admin.artists.update › Admin\ArtistController@update
+  DELETE          admin.mixxtune.com/artists/{artist} ................................ admin.artists.destroy › Admin\ArtistController@destroy
+  GET|HEAD        admin.mixxtune.com/artists/{artist}/edit ................................. admin.artists.edit › Admin\ArtistController@edit
+  POST            admin.mixxtune.com/artists/{artist}/resend-invitation admin.artists.resend-invitation › Admin\ArtistController@resendInvit…
+  GET|HEAD        admin.mixxtune.com/catalogue ...................................... admin.catalogue.index › Admin\CatalogueController@index
+  GET|HEAD        confirm-password ............................................... password.confirm › Auth\ConfirmablePasswordController@show
+  POST            confirm-password ................................................................. Auth\ConfirmablePasswordController@store
+  GET|HEAD        artist.mixxtune.com/dashboard ......................................... artist.dashboard › Artist\DashboardController@index
+  GET|HEAD        admin.mixxtune.com/dashboard ......................................................... admin.dashboard › routes/web.php:209
+  GET|HEAD        admin.mixxtune.com/delivery-status .................... admin.delivery-status.index › Admin\ReleaseDeliveryController@index
+  PATCH           admin.mixxtune.com/delivery-status/{delivery} ....... admin.delivery-status.update › Admin\ReleaseDeliveryController@update
+  GET|HEAD        admin.mixxtune.com/delivery-status/{release} ............ admin.delivery-status.show › Admin\ReleaseDeliveryController@show
+  PATCH           admin.mixxtune.com/delivery-status/{release}/bulk-update admin.delivery-status.bulk-update › Admin\ReleaseDeliveryControll…
+  POST            admin.mixxtune.com/delivery-status/{release}/sync . admin.delivery-status.sync › Admin\ReleaseDeliveryController@syncStores
+  POST            email/verification-notification .................... verification.send › Auth\EmailVerificationNotificationController@store
+  GET|HEAD        forgot-password ................................................ password.request › Auth\PasswordResetLinkController@create
+  POST            forgot-password ................................................... password.email › Auth\PasswordResetLinkController@store
+  GET|HEAD        artist.mixxtune.com/invitation/{token} ................... artist.invitation.accept › Auth\AcceptArtistInvitationController
+  GET|HEAD        admin.mixxtune.com/invoices .......................................... admin.invoices.index › Admin\InvoiceController@index
+  POST            admin.mixxtune.com/invoices .......................................... admin.invoices.store › Admin\InvoiceController@store
+  GET|HEAD        admin.mixxtune.com/invoices/{id} ....................................... admin.invoices.show › Admin\InvoiceController@show
+  GET|HEAD        admin.mixxtune.com/isrc-upc .......................................... admin.isrc-upc.index › Admin\IsrcUpcController@index
+  POST            admin.mixxtune.com/isrc-upc/generate-isrc ......... admin.isrc-upc.generate-isrc › Admin\IsrcUpcController@bulkGenerateIsrc
+  POST            admin.mixxtune.com/isrc-upc/generate-upc ............ admin.isrc-upc.generate-upc › Admin\IsrcUpcController@bulkGenerateUpc
+  PATCH           admin.mixxtune.com/isrc-upc/releases/{release} ..... admin.isrc-upc.releases.update › Admin\IsrcUpcController@updateRelease
+  PATCH           admin.mixxtune.com/isrc-upc/tracks/{track} ............. admin.isrc-upc.tracks.update › Admin\IsrcUpcController@updateTrack
+  GET|HEAD        admin.mixxtune.com/labels ......................................................... admin.labels.index › routes/web.php:365
+  GET|HEAD        artist.mixxtune.com/login ....................................... artist.login › Auth\AuthenticatedSessionController@create
+  POST            artist.mixxtune.com/login .................................. artist.login.store › Auth\AuthenticatedSessionController@store
+  GET|HEAD        login .................................................................. login › Auth\AuthenticatedSessionController@create
+  POST            login ........................................................................... Auth\AuthenticatedSessionController@store
+  POST            logout ............................................................... logout › Auth\AuthenticatedSessionController@destroy
+  PUT             password ................................................................. password.update › Auth\PasswordController@update
+  GET|HEAD        profile ............................................................................. profile.edit › ProfileController@edit
+  PATCH           profile ......................................................................... profile.update › ProfileController@update
+  DELETE          profile ....................................................................... profile.destroy › ProfileController@destroy
+  GET|HEAD        register .................................................................. register › Auth\RegisteredUserController@create
+  POST            register .............................................................................. Auth\RegisteredUserController@store
+  GET|HEAD        admin.mixxtune.com/release-reviews ....................................... admin.releases.review-queue › routes/web.php:268
+  GET|HEAD        artist.mixxtune.com/releases ....................................... artist.releases.index › Artist\ReleaseController@index
+  POST            artist.mixxtune.com/releases ....................................... artist.releases.store › Artist\ReleaseController@store
+  GET|HEAD        admin.mixxtune.com/releases ..................................................... admin.releases.index › routes/web.php:213
+  POST            admin.mixxtune.com/releases ..................................................... admin.releases.store › routes/web.php:308
+  GET|HEAD        artist.mixxtune.com/releases/create .............................. artist.releases.create › Artist\ReleaseController@create
+  GET|HEAD        admin.mixxtune.com/releases/create ............................................. admin.releases.create › routes/web.php:288
+  PATCH           artist.mixxtune.com/releases/{release} ................ artist.releases.update-draft › Artist\ReleaseController@updateDraft
+  PATCH           admin.mixxtune.com/releases/{release} .......................................... admin.releases.update › routes/web.php:350
+  POST            admin.mixxtune.com/releases/{release}/approve ................................. admin.releases.approve › routes/web.php:837
+  PATCH           artist.mixxtune.com/releases/{release}/distribution artist.releases.distribution.update › Artist\ReleaseController@saveDis…
+  GET|HEAD        admin.mixxtune.com/releases/{release}/download-artwork ............... admin.releases.download-artwork › routes/web.php:227
+  GET|HEAD        artist.mixxtune.com/releases/{release}/edit .......................... artist.releases.edit › Artist\ReleaseController@edit
+  GET|HEAD        admin.mixxtune.com/releases/{release}/edit ....................................... admin.releases.edit › routes/web.php:320
+  POST            admin.mixxtune.com/releases/{release}/reject ................................... admin.releases.reject › routes/web.php:856
+  POST            admin.mixxtune.com/releases/{release}/request-changes ................. admin.releases.request-changes › routes/web.php:881
+  POST            artist.mixxtune.com/releases/{release}/submit ........... artist.releases.submit › Artist\ReleaseController@submitForReview
+  POST            admin.mixxtune.com/releases/{release}/submit ................................... admin.releases.submit › routes/web.php:671
+  POST            artist.mixxtune.com/releases/{release}/tracks ........... artist.release-tracks.store › Artist\ReleaseTrackController@store
+  POST            admin.mixxtune.com/releases/{release}/tracks .............. admin.release-tracks.store › Admin\ReleaseTrackController@store
+  GET|HEAD        admin.mixxtune.com/reports ............................................. admin.reports.index › Admin\ReportController@index
+  GET|HEAD        admin.mixxtune.com/reports/export .................................... admin.reports.export › Admin\ReportController@export
+  GET|HEAD        admin.mixxtune.com/reports/tracks/{isrc} ..................... admin.reports.tracks.show › Admin\ReportController@showTrack
+  POST            reset-password .......................................................... password.store › Auth\NewPasswordController@store
+  GET|HEAD        reset-password/{token} ................................................. password.reset › Auth\NewPasswordController@create
+  GET|HEAD        admin.mixxtune.com/revenue-imports ...................... admin.revenue-imports.index › Admin\RevenueImportController@index
+  POST            admin.mixxtune.com/revenue-imports ...................... admin.revenue-imports.store › Admin\RevenueImportController@store
+  GET|HEAD        admin.mixxtune.com/revenue-imports/{revenueImport} ........ admin.revenue-imports.show › Admin\RevenueImportController@show
+  DELETE          admin.mixxtune.com/revenue-imports/{revenueImport} .. admin.revenue-imports.destroy › Admin\RevenueImportController@destroy
+  POST            admin.mixxtune.com/revenue-imports/{revenueImport}/process admin.revenue-imports.process › Admin\RevenueImportController@p…
+  GET|HEAD        admin.mixxtune.com/revenue-label-mappings .. admin.revenue-label-mappings.index › Admin\RevenueLabelMappingController@index
+  POST            admin.mixxtune.com/revenue-label-mappings/create-label admin.revenue-label-mappings.create-label › Admin\RevenueLabelMappi…
+  PUT             admin.mixxtune.com/revenue-label-mappings/{mapping} admin.revenue-label-mappings.update › Admin\RevenueLabelMappingControl…
+  GET|HEAD        admin.mixxtune.com/royalties ........................................ admin.royalties.index › Admin\RoyaltyController@index
+  GET|HEAD        admin.mixxtune.com/royalties/labels/{label} ............... admin.royalties.labels.show › Admin\RoyaltyController@showLabel
+  GET|HEAD        admin.mixxtune.com/royalties/posting ................... admin.royalty-posting.index › Admin\RoyaltyPostingController@index
+  POST            admin.mixxtune.com/royalties/posting ................... admin.royalty-posting.store › Admin\RoyaltyPostingController@store
+  GET|HEAD        admin.mixxtune.com/royalty-ledgers ...................... admin.royalty-ledgers.index › Admin\RoyaltyLedgerController@index
+  GET|HEAD        admin.mixxtune.com/royalty-ledgers/{id} ................... admin.royalty-ledgers.show › Admin\RoyaltyLedgerController@show
+  POST            admin.mixxtune.com/royalty-ledgers/{id}/approve ..... admin.royalty-ledgers.approve › Admin\RoyaltyLedgerController@approve
+  POST            admin.mixxtune.com/royalty-ledgers/{id}/cancel ........ admin.royalty-ledgers.cancel › Admin\RoyaltyLedgerController@cancel
+  POST            admin.mixxtune.com/royalty-ledgers/{id}/credit-wallet admin.royalty-ledgers.credit-wallet › Admin\RoyaltyLedgerController@…
+  GET|HEAD        sanctum/csrf-cookie ..................................... sanctum.csrf-cookie › Laravel\Sanctum › CsrfCookieController@show
+  GET|HEAD        artist.mixxtune.com/set-password ....................... artist.password.create › Auth\ArtistPasswordSetupController@create
+  POST            artist.mixxtune.com/set-password ......................... artist.password.store › Auth\ArtistPasswordSetupController@store
+  GET|HEAD        admin.mixxtune.com/settings/distribution-stores . admin.distribution-stores.index › Admin\DistributionStoreController@index
+  POST            admin.mixxtune.com/settings/distribution-stores . admin.distribution-stores.store › Admin\DistributionStoreController@store
+  POST            admin.mixxtune.com/settings/distribution-stores/{distributionStore} admin.distribution-stores.update › Admin\DistributionS…
+  DELETE          admin.mixxtune.com/settings/distribution-stores/{distributionStore} admin.distribution-stores.destroy › Admin\Distribution…
+  POST            admin.mixxtune.com/settings/distribution-stores/{distributionStore}/toggle admin.distribution-stores.toggle › Admin\Distri…
+  GET|HEAD        storage/{path} ....... storage.local › vendor/laravel/framework/src/Illuminate/Filesystem/FilesystemServiceProvider.php:111
+  PUT             storage/{path} storage.local.upload › vendor/laravel/framework/src/Illuminate/Filesystem/FilesystemServiceProvider.php:119
+  PATCH           artist.mixxtune.com/tracks/{track} .................... artist.release-tracks.update › Artist\ReleaseTrackController@update
+  DELETE          artist.mixxtune.com/tracks/{track} .................. artist.release-tracks.destroy › Artist\ReleaseTrackController@destroy
+  PATCH           admin.mixxtune.com/tracks/{track} ....................... admin.release-tracks.update › Admin\ReleaseTrackController@update
+  DELETE          admin.mixxtune.com/tracks/{track} ..................... admin.release-tracks.destroy › Admin\ReleaseTrackController@destroy
+  GET|HEAD        artist.mixxtune.com/tracks/{track}/download-audio artist.tracks.download-audio › Artist\ReleaseTrackController@downloadAud…
+  GET|HEAD        admin.mixxtune.com/tracks/{track}/download-audio ......................... admin.tracks.download-audio › routes/web.php:248
+  GET|HEAD        up ............................ vendor/laravel/framework/src/Illuminate/Foundation/Configuration/ApplicationBuilder.php:224
+  GET|HEAD        verify-email ................................................. verification.notice › Auth\EmailVerificationPromptController
+  GET|HEAD        verify-email/{id}/{hash} ................................................. verification.verify › Auth\VerifyEmailController
+  GET|HEAD        artist.mixxtune.com/wallet ............................................ artist.wallet.index › Artist\WalletController@index
+  GET|HEAD        admin.mixxtune.com/wallet ............................................... admin.wallet.index › Admin\WalletController@index
+  GET|HEAD        admin.mixxtune.com/withdrawals ................................. admin.withdrawals.index › Admin\WithdrawalController@index
+  POST            admin.mixxtune.com/withdrawals ................................. admin.withdrawals.store › Admin\WithdrawalController@store
+  POST            admin.mixxtune.com/withdrawals/{id}/approve ................ admin.withdrawals.approve › Admin\WithdrawalController@approve
+  POST            admin.mixxtune.com/withdrawals/{id}/paid ......................... admin.withdrawals.paid › Admin\WithdrawalController@paid
+  POST            admin.mixxtune.com/withdrawals/{id}/processing ....... admin.withdrawals.processing › Admin\WithdrawalController@processing
+  POST            admin.mixxtune.com/withdrawals/{id}/reject ................... admin.withdrawals.reject › Admin\WithdrawalController@reject
+
+                                                                                                                         Showing [144] routes
+

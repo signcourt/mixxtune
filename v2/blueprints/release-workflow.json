@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "statuses": [
+    "draft",
+    "submitted",
+    "changes_requested",
+    "approved",
+    "processing",
+    "delivered",
+    "live",
+    "rejected",
+    "takedown_requested",
+    "taken_down",
+    "archived"
+  ],
+  "editable_statuses": [
+    "draft",
+    "changes_requested",
+    "rejected"
+  ],
+  "final_statuses": [
+    "live",
+    "taken_down",
+    "archived"
+  ]
+}

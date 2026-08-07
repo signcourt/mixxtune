@@ -1,2 +1,10 @@
 User-agent: *
-Disallow:
+Allow: /
+
+Disallow: /admin/
+Disallow: /super-admin/
+Disallow: /artist/
+Disallow: /label/
+Disallow: /v2/
+
+Sitemap: https://www.mixxtune.com/sitemap.xml

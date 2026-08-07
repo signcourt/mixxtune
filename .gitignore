@@ -25,3 +25,35 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local environment backups
+.env.backup*
+.env.before-*
+.env.mail*
+.env.smtp-backup*
+.env.testing.before-*
+
+# Temporary source backups
+*.bak
+*.backup
+*.backup.*
+*.before-*
+*.bak-before-*
+
+# Local repository cleanup archives
+/storage/backups/repository-cleanup-*
+
+# Local development archives
+/*.tar.gz
+/artist-panel-package/
+
+# Runtime report files
+/storage/app/private/reports/imports/
+/storage/app/private/reports/errors/
+
+# Uploaded track audio
+/storage/app/public/tracks/audio/
+
+# Local quarantine directories
+/storage/backups/
+.env.testing

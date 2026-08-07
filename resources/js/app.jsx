@@ -1,5 +1,8 @@
 import '../css/app.css';
 import './bootstrap';
+import './V2/Shared/Releases/V3/releaseWizardV3.css';
+import './V2/Shared/Releases/V4/releaseWizardV4.css';
+import './V2/Shared/Mascot/mascotAnimations.css';
 
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
@@ -19,7 +22,5 @@ createInertiaApp({
 
         root.render(<App {...props} />);
     },
-    progress: {
-        color: '#4B5563',
-    },
+    progress: false,
 });

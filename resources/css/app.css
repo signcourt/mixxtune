@@ -1,3 +1,88 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+html.v2-audio-uploading #nprogress {
+    display: none !important;
+}
+
+/* V2 COMPACT PANEL DENSITY START */
+
+/*
+|--------------------------------------------------------------------------
+| V2 Panel Display Density
+|--------------------------------------------------------------------------
+|
+| Browser zoom remains at 100%.
+| Change --v2-panel-scale to adjust the complete panel size.
+|
+| 0.88 = compact
+| 0.90 = medium compact
+| 1.00 = normal size
+|
+*/
+
+:root {
+    --v2-panel-scale: 0.80;
+}
+
+/* Mobile remains full size for readability. */
+.v2-panel-density {
+    width: 100%;
+    min-height: 100vh;
+}
+
+/* Laptop and desktop compact mode. */
+@media (min-width: 1024px) {
+    .v2-panel-density {
+        zoom: var(--v2-panel-scale);
+        min-height: calc(
+            100vh / var(--v2-panel-scale)
+        );
+    }
+}
+
+/*
+ * Safari fallback and browsers where CSS zoom
+ * is unavailable.
+ */
+@supports not (zoom: 1) {
+    @media (min-width: 1024px) {
+        .v2-panel-density {
+            width: calc(
+                100% / var(--v2-panel-scale)
+            );
+
+            min-height: calc(
+                100vh / var(--v2-panel-scale)
+            );
+
+            transform: scale(
+                var(--v2-panel-scale)
+            );
+
+            transform-origin: top left;
+        }
+    }
+}
+
+/* Compact cards and tables. */
+@media (min-width: 1024px) {
+    .v2-panel-density table th {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+
+    .v2-panel-density table td {
+        padding-top: 0.72rem;
+        padding-bottom: 0.72rem;
+    }
+
+    .v2-panel-density main {
+        padding-top: 1.25rem;
+        padding-bottom: 1.25rem;
+    }
+}
+
+/* V2 COMPACT PANEL DENSITY END */

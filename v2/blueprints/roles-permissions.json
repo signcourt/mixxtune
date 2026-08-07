@@ -1,0 +1,62 @@
+{
+  "super_admin": {
+    "scope": "all",
+    "permissions": [
+      "*"
+    ]
+  },
+  "admin": {
+    "scope": "assigned",
+    "permissions": [
+      "dashboard.view",
+      "releases.view",
+      "releases.create",
+      "releases.update",
+      "releases.review",
+      "releases.approve",
+      "releases.reject",
+      "artists.view",
+      "labels.view",
+      "catalogue.view",
+      "reports.view",
+      "delivery.manage",
+      "support.manage"
+    ]
+  },
+  "label": {
+    "scope": "own_label",
+    "permissions": [
+      "dashboard.view",
+      "releases.view",
+      "releases.create",
+      "releases.update",
+      "releases.submit",
+      "artists.view",
+      "artists.manage",
+      "catalogue.view",
+      "reports.view",
+      "royalties.view",
+      "wallet.view",
+      "withdrawals.create",
+      "support.create",
+      "profile.update"
+    ]
+  },
+  "artist": {
+    "scope": "own_artist",
+    "permissions": [
+      "dashboard.view",
+      "releases.view",
+      "releases.create",
+      "releases.update",
+      "releases.submit",
+      "catalogue.view",
+      "reports.view",
+      "royalties.view",
+      "wallet.view",
+      "withdrawals.create",
+      "support.create",
+      "profile.update"
+    ]
+  }
+}

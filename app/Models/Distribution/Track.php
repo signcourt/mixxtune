@@ -27,6 +27,8 @@ class Track extends Model
         'featuring_artist_name',
         'isrc',
         'isrc_is_auto_generated',
+        'isrc_assigned_at',
+        'isrc_assigned_by',
         'language',
         'genre',
         'sub_genre',
@@ -48,6 +50,19 @@ class Track extends Model
         'status',
         'created_by',
         'updated_by',
+        'audio_metadata',
+        'audio_codec',
+        'audio_sample_rate',
+        'audio_bit_depth',
+        'audio_channels',
+        'audio_channel_layout',
+        'audio_duration_seconds',
+        'audio_peak_db',
+        'audio_mean_volume_db',
+        'audio_silence_start_seconds',
+        'audio_silence_end_seconds',
+        'audio_validated_at',
+        'audio_validated_by',
     ];
 
     protected function casts(): array
@@ -56,6 +71,8 @@ class Track extends Model
             'disc_number' => 'integer',
             'track_number' => 'integer',
             'isrc_is_auto_generated' => 'boolean',
+            'isrc_assigned_at' => 'datetime',
+            'isrc_assigned_by' => 'integer',
             'is_explicit' => 'boolean',
             'is_instrumental' => 'boolean',
             'contains_ai_generated_content' => 'boolean',
@@ -120,4 +137,29 @@ class Track extends Model
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
+
+
+    public function contributorCredits()
+    {
+        return $this->hasMany(
+            TrackContributor::class
+        );
+    }
+
+
+
+    protected $casts = [
+        'audio_validation_errors' => 'array',
+        'audio_metadata' => 'array',
+        'audio_sample_rate' => 'integer',
+        'audio_bit_depth' => 'integer',
+        'audio_channels' => 'integer',
+        'audio_duration_seconds' => 'float',
+        'audio_peak_db' => 'float',
+        'audio_mean_volume_db' => 'float',
+        'audio_silence_start_seconds' => 'float',
+        'audio_silence_end_seconds' => 'float',
+        'audio_validated_at' => 'datetime',
+    ];
+
 }

@@ -4,53 +4,45 @@ namespace App\Models;
 
 use App\Models\Distribution\Release;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ReleaseStoreDelivery extends Model
 {
+
     protected $fillable = [
+        'public_id',
         'release_id',
         'distribution_store_id',
         'status',
-        'store_release_id',
-        'store_url',
-        'delivery_notes',
+        'delivery_note',
         'error_message',
+        'external_reference',
         'delivered_at',
         'live_at',
         'failed_at',
-        'takedown_at',
+        'taken_down_at',
+        'created_by',
         'updated_by',
     ];
 
-    protected function casts(): array
+    protected $casts = [
+        'delivered_at' => 'datetime',
+        'live_at' => 'datetime',
+        'failed_at' => 'datetime',
+        'taken_down_at' => 'datetime',
+    ];
+
+    public function release()
     {
-        return [
-            'delivered_at' => 'datetime',
-            'live_at' => 'datetime',
-            'failed_at' => 'datetime',
-            'takedown_at' => 'datetime',
-        ];
+        return $this->belongsTo(
+            Release::class
+        );
     }
 
-    public function release(): BelongsTo
-    {
-        return $this->belongsTo(Release::class);
-    }
-
-    public function store(): BelongsTo
+    public function store()
     {
         return $this->belongsTo(
             DistributionStore::class,
             'distribution_store_id'
-        );
-    }
-
-    public function updater(): BelongsTo
-    {
-        return $this->belongsTo(
-            User::class,
-            'updated_by'
         );
     }
 }

@@ -17,6 +17,39 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+
+            $table->string(
+                'phone',
+                30
+            )->nullable();
+
+            $table->string(
+                'label_name'
+            )->nullable();
+
+            $table->string(
+                'country',
+                100
+            )->nullable();
+
+            $table->string(
+                'account_status'
+            )->default('active');
+
+            $table->string(
+                'kyc_status'
+            )->default('pending');
+
+            $table->decimal(
+                'wallet_balance',
+                15,
+                2
+            )->default(0);
+
+            $table->timestamp(
+                'last_login_at'
+            )->nullable();
+
             $table->rememberToken();
             $table->timestamps();
         });
