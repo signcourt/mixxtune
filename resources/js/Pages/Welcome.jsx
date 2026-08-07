@@ -298,6 +298,9 @@ export default function Welcome({
 
                         <button
                             type="button"
+                            aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                            aria-expanded={menuOpen}
+                            aria-controls="mobile-public-navigation"
                             onClick={() =>
                                 setMenuOpen(
                                     (value) => !value
@@ -314,7 +317,10 @@ export default function Welcome({
                     </div>
 
                     {menuOpen && (
-                        <div className="border-t border-white/10 bg-slate-950 px-5 py-5 lg:hidden">
+                        <div
+                            id="mobile-public-navigation"
+                            className="border-t border-white/10 bg-slate-950 px-5 py-5 lg:hidden"
+                        >
                             <div className="space-y-1">
                                 {[
                                     ['Features', '#features'],
@@ -997,6 +1003,101 @@ export default function Welcome({
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+
+                    <section className="border-y border-slate-200 bg-white py-24 sm:py-32">
+                        <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+                            <div className="grid gap-12 lg:grid-cols-[.8fr_1.2fr] lg:items-center">
+                                <div>
+                                    <div className="text-sm font-black uppercase tracking-[0.2em] text-violet-600">
+                                        Start your way
+                                    </div>
+
+                                    <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                                        Choose the workflow that fits you
+                                    </h2>
+
+                                    <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">
+                                        Whether you manage your own music or operate
+                                        a growing catalogue, Mixx Tune keeps release
+                                        operations organised in one place.
+                                    </p>
+
+                                    <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                                        <Link
+                                            href="/register"
+                                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-4 text-sm font-black text-white transition hover:bg-violet-700"
+                                        >
+                                            Create an account
+                                            <ArrowRight size={17} />
+                                        </Link>
+
+                                        <Link
+                                            href="/pricing"
+                                            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm font-black text-slate-900 transition hover:border-violet-200 hover:bg-violet-50"
+                                        >
+                                            View pricing
+                                            <ChevronRight size={17} />
+                                        </Link>
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    {[
+                                        {
+                                            title: 'Independent Artist',
+                                            text: 'Create releases, manage tracks, review reporting and handle your catalogue from one account.',
+                                            href: '/register',
+                                            action: 'Start as an artist',
+                                        },
+                                        {
+                                            title: 'Music Label',
+                                            text: 'Organise multiple artists and releases while keeping distribution and reporting workflows centralised.',
+                                            href: '/register',
+                                            action: 'Start as a label',
+                                        },
+                                        {
+                                            title: 'Catalogue Operations',
+                                            text: 'Maintain release metadata, identifiers, contributors, delivery status and catalogue records.',
+                                            href: '/distribution',
+                                            action: 'Explore distribution',
+                                        },
+                                        {
+                                            title: 'Need Assistance?',
+                                            text: 'Use the Help Center or contact the Mixx Tune team when you need account or platform support.',
+                                            href: '/help',
+                                            action: 'Visit Help Center',
+                                        },
+                                    ].map((item) => (
+                                        <article
+                                            key={item.title}
+                                            className="group rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6 transition hover:-translate-y-1 hover:border-violet-200 hover:bg-white hover:shadow-xl hover:shadow-slate-900/5"
+                                        >
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white font-black text-violet-600 shadow-sm">
+                                                <CheckCircle2 size={19} />
+                                            </div>
+
+                                            <h3 className="mt-5 text-xl font-black text-slate-950">
+                                                {item.title}
+                                            </h3>
+
+                                            <p className="mt-3 leading-7 text-slate-600">
+                                                {item.text}
+                                            </p>
+
+                                            <Link
+                                                href={item.href}
+                                                className="mt-5 inline-flex items-center gap-1.5 text-sm font-black text-violet-700"
+                                            >
+                                                {item.action}
+                                                <ChevronRight size={15} />
+                                            </Link>
+                                        </article>
+                                    ))}
                                 </div>
                             </div>
                         </div>

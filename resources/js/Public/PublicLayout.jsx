@@ -87,6 +87,9 @@ export default function PublicLayout({
 
                     <button
                         type="button"
+                        aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                        aria-expanded={menuOpen}
+                        aria-controls="shared-mobile-public-navigation"
                         onClick={() =>
                             setMenuOpen(
                                 (value) => !value
@@ -103,7 +106,10 @@ export default function PublicLayout({
                 </div>
 
                 {menuOpen && (
-                    <div className="border-t border-slate-200 bg-white px-5 py-5 lg:hidden">
+                    <div
+                        id="shared-mobile-public-navigation"
+                        className="border-t border-slate-200 bg-white px-5 py-5 lg:hidden"
+                    >
                         <div className="space-y-1">
                             {nav.map(
                                 ([label, href]) => (
