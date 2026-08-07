@@ -555,6 +555,110 @@ class UserManagementController extends Controller
                     ]);
                 }
 
+                /*
+                 * Every label login requires a linked labels row.
+                 */
+                if (
+                    $validated['role'] ===
+                    'label'
+                ) {
+
+                    $slugBase = Str::slug(
+                        $validated['name']
+                    );
+
+                    if ($slugBase === '') {
+                        $slugBase = 'label';
+                    }
+
+                    $slug =
+                        $slugBase.'-'.$user->id;
+
+                    while (
+                        Label::withTrashed()
+                            ->where('slug',$slug)
+                            ->exists()
+                    ) {
+
+                        $slug =
+                            $slugBase
+                            .'-'
+                            .$user->id
+                            .'-'
+                            .Str::lower(
+                                Str::random(5)
+                            );
+                    }
+
+                    do {
+
+                        $publicId =
+                            'LBL-'
+                            .Str::upper(
+                                Str::random(12)
+                            );
+
+                    } while (
+
+                        Label::withTrashed()
+                            ->where(
+                                'public_id',
+                                $publicId
+                            )
+                            ->exists()
+
+                    );
+
+                    Label::create([
+
+                        'user_id' =>
+                            $user->id,
+
+                        'public_id' =>
+                            $publicId,
+
+                        'name' =>
+                            $validated['name'],
+
+                        'legal_name' =>
+                            $validated['name'],
+
+                        'slug' =>
+                            $slug,
+
+                        'email' =>
+                            strtolower(
+                                $validated['email']
+                            ),
+
+                        'phone' =>
+                            $validated['phone']
+                            ?? null,
+
+                        'country' =>
+                            $validated['country']
+                            ?? 'India',
+
+                        'timezone' =>
+                            'Asia/Kolkata',
+
+                        'currency' =>
+                            'INR',
+
+                        'status' =>
+                            'active',
+
+                        'created_by' =>
+                            $request->user()->id,
+
+                        'updated_by' =>
+                            $request->user()->id,
+
+                    ]);
+
+                }
+
+
                 if (
                     $validated['role'] ===
                     'admin'
