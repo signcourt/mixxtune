@@ -758,6 +758,91 @@ export default function Welcome({
                         </div>
                     </section>
 
+
+                    <section className="bg-slate-950 py-24 text-white sm:py-32">
+                        <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+                            <div className="mx-auto max-w-3xl text-center">
+                                <div className="text-sm font-black uppercase tracking-[0.2em] text-violet-300">
+                                    Built for every stage
+                                </div>
+
+                                <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
+                                    Artists, labels and music teams
+                                </h2>
+
+                                <p className="mt-5 text-lg leading-8 text-slate-400">
+                                    Different users get focused workflows
+                                    without losing control of catalogue,
+                                    reporting and operations.
+                                </p>
+                            </div>
+
+                            <div className="mt-14 grid gap-5 lg:grid-cols-3">
+                                {[
+                                    {
+                                        label: 'Artist',
+                                        title: 'Manage your own releases',
+                                        items: [
+                                            'Create and submit releases',
+                                            'Track catalogue performance',
+                                            'View royalties and wallet',
+                                        ],
+                                    },
+                                    {
+                                        label: 'Label',
+                                        title: 'Manage multiple artists',
+                                        items: [
+                                            'Artist and release management',
+                                            'Centralised reporting',
+                                            'Catalogue operations',
+                                        ],
+                                    },
+                                    {
+                                        label: 'Admin',
+                                        title: 'Operate the distribution business',
+                                        items: [
+                                            'Review and delivery workflows',
+                                            'Finance and reporting controls',
+                                            'User and catalogue administration',
+                                        ],
+                                    },
+                                ].map((card) => (
+                                    <article
+                                        key={card.label}
+                                        className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-7"
+                                    >
+                                        <div className="inline-flex rounded-full bg-violet-400/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.15em] text-violet-300">
+                                            {card.label}
+                                        </div>
+
+                                        <h3 className="mt-5 text-2xl font-black">
+                                            {card.title}
+                                        </h3>
+
+                                        <div className="mt-6 space-y-3">
+                                            {card.items.map(
+                                                (item) => (
+                                                    <div
+                                                        key={item}
+                                                        className="flex items-start gap-3 text-slate-300"
+                                                    >
+                                                        <CheckCircle2
+                                                            size={18}
+                                                            className="mt-0.5 shrink-0 text-emerald-400"
+                                                        />
+                                                        <span>
+                                                            {item}
+                                                        </span>
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
                     <section
                         id="analytics"
                         className="bg-white py-24 sm:py-32"
