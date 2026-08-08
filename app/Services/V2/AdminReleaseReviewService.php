@@ -217,15 +217,22 @@ class AdminReleaseReviewService
     ): Release {
         $this->authorizeReviewer($user);
 
-        $this->access->authorizeView(
-            $user,
-            $release
-        );
-
+        /*
+         * Validate the workflow state before catalogue access.
+         *
+         * Drafts are creator-private, but an Admin/Super Admin attempting
+         * an invalid processing transition should still receive the
+         * workflow-specific 422 response rather than a draft-access 403.
+         */
         abort_unless(
             $release->status === 'approved',
             422,
             'Only approved releases can enter processing.'
+        );
+
+        $this->access->authorizeView(
+            $user,
+            $release
         );
 
         $this->permissions->authorize(

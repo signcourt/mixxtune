@@ -34,6 +34,21 @@ class ReleaseReviewController extends Controller
             $request->user()
         );
 
+        $reviewStatuses = [
+            'submitted',
+            'approved',
+            'changes_requested',
+            'rejected',
+            'processing',
+        ];
+
+        $requestedStatus = trim(
+            (string) $request->input(
+                'status',
+                'submitted'
+            )
+        );
+
         $filters = [
             'search' => trim(
                 (string) $request->input(
@@ -42,12 +57,17 @@ class ReleaseReviewController extends Controller
                 )
             ),
 
-            'status' => trim(
-                (string) $request->input(
-                    'status',
-                    'submitted'
-                )
-            ),
+            /*
+             * Drafts are private workspaces and can never enter
+             * the Admin/Super Admin review queue.
+             */
+            'status' => in_array(
+                $requestedStatus,
+                $reviewStatuses,
+                true
+            )
+                ? $requestedStatus
+                : 'submitted',
 
             'sort' => trim(
                 (string) $request->input(

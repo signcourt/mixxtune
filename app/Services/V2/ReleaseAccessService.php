@@ -90,6 +90,18 @@ class ReleaseAccessService
 
         $role = $this->role($user);
 
+        /*
+         * Drafts are creator-private.
+         *
+         * Run this before the super-admin shortcut so an unpublished
+         * working draft cannot leak into another dashboard or through
+         * a direct release URL.
+         */
+        if ($release->status === 'draft') {
+            return (int) $release->created_by
+                === (int) $user->id;
+        }
+
         if ($role === 'super_admin') {
             return true;
         }

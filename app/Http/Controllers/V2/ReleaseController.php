@@ -206,6 +206,38 @@ class ReleaseController extends Controller
         }
 
         /*
+         * Draft privacy:
+         *
+         * A draft is a private workspace belonging to its creator.
+         * Label/artist ownership and admin assignments must not expose
+         * another user's draft. Once submitted, the existing catalogue
+         * and assignment visibility rules continue to apply.
+         */
+        $query->where(
+            function ($builder) use ($request) {
+                $builder
+                    ->where(
+                        'status',
+                        '!=',
+                        'draft'
+                    )
+                    ->orWhere(
+                        function ($draft) use ($request) {
+                            $draft
+                                ->where(
+                                    'status',
+                                    'draft'
+                                )
+                                ->where(
+                                    'created_by',
+                                    $request->user()->id
+                                );
+                        }
+                    );
+            }
+        );
+
+        /*
          * My Releases summary metadata.
          *
          * Use real track metadata only. audio_duration_seconds is preferred
@@ -828,6 +860,13 @@ class ReleaseController extends Controller
             $release->status === 'draft',
             403,
             'Only draft releases can be deleted.'
+        );
+
+        abort_unless(
+            (int) $release->created_by
+                === (int) $request->user()->id,
+            403,
+            'Only the draft creator can delete this release.'
         );
 
         $access->authorizeUpdate(
