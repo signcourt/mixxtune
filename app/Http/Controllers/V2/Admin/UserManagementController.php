@@ -297,11 +297,97 @@ class UserManagementController extends Controller
                 'exists:labels,id',
             ],
 
+            'new_labels' => [
+                'nullable',
+                'array',
+            ],
+
+            'new_labels.*' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
             'permissions' => [
                 'nullable',
                 'array',
             ],
         ]);
+
+        if (
+            $validated['role'] === 'label'
+        ) {
+            $existingLabelIds =
+                $validated['label_ids']
+                ?? [];
+
+            $newLabelNames =
+                collect(
+                    $validated['new_labels']
+                    ?? []
+                )
+                    ->map(
+                        fn ($name) =>
+                            trim((string) $name)
+                    )
+                    ->filter()
+                    ->values();
+
+            if (
+                empty($existingLabelIds)
+                && $newLabelNames->isEmpty()
+            ) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'label_ids' => [
+                        'Select an existing label or add at least one new label.',
+                    ],
+                ]);
+            }
+
+            $duplicateNames =
+                $newLabelNames
+                    ->map(
+                        fn ($name) =>
+                            mb_strtolower($name)
+                    )
+                    ->duplicates();
+
+            if ($duplicateNames->isNotEmpty()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'new_labels' => [
+                        'Duplicate label names are not allowed.',
+                    ],
+                ]);
+            }
+
+            foreach (
+                $existingLabelIds
+                as $labelId
+            ) {
+                $label =
+                    \App\Models\Core\Label::query()
+                        ->find(
+                            (int) $labelId
+                        );
+
+                if (! $label) {
+                    continue;
+                }
+
+                if (
+                    $label->user_id
+                    && (int) $label->user_id
+                        !== 0
+                ) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'label_ids' => [
+                            "Label '{$label->name}' is already owned by another label user.",
+                        ],
+                    ]);
+                }
+            }
+        }
+
 
         $usernameService = app(
             \App\Services\V2\UsernameService::class
@@ -563,203 +649,6 @@ class UserManagementController extends Controller
                  */
                 if (
                     $validated['role'] ===
-                    'label'
-                ) {
-
-                    $normalizedEmail =
-                        strtolower(
-                            trim(
-                                $validated['email']
-                            )
-                        );
-
-                    /*
-                     * Email is the strongest ownership match.
-                     */
-                    $label =
-                        Label::query()
-                            ->whereRaw(
-                                'LOWER(email) = ?',
-                                [$normalizedEmail]
-                            )
-                            ->first();
-
-                    /*
-                     * Never take ownership away from another user.
-                     */
-                    if (
-                        $label
-                        && $label->user_id
-                        && (int) $label->user_id
-                            !== (int) $user->id
-                    ) {
-                        throw \Illuminate\Validation\ValidationException::withMessages([
-                            'email' => [
-                                'A label with this email is already linked to another user.',
-                            ],
-                        ]);
-                    }
-
-                    /*
-                     * Legacy labels can exist without an email link.
-                     * Reuse an exact-name orphan only.
-                     */
-                    if (! $label) {
-                        $orphanLabels =
-                            Label::query()
-                                ->whereNull(
-                                    'user_id'
-                                )
-                                ->whereRaw(
-                                    'LOWER(name) = ?',
-                                    [
-                                        strtolower(
-                                            trim(
-                                                $validated['name']
-                                            )
-                                        ),
-                                    ]
-                                )
-                                ->get();
-
-                        if (
-                            $orphanLabels->count() > 1
-                        ) {
-                            throw \Illuminate\Validation\ValidationException::withMessages([
-                                'name' => [
-                                    'Multiple unlinked labels with this name exist. Link the correct label manually before creating this user.',
-                                ],
-                            ]);
-                        }
-
-                        $label =
-                            $orphanLabels
-                                ->first();
-                    }
-
-                    /*
-                     * Reuse the orphan label when found.
-                     */
-                    if ($label) {
-
-                        $label->forceFill([
-                            'user_id' =>
-                                $user->id,
-
-                            'email' =>
-                                $label->email
-                                ?: $normalizedEmail,
-
-                            'phone' =>
-                                $label->phone
-                                ?: (
-                                    $validated['phone']
-                                    ?? null
-                                ),
-
-                            'updated_by' =>
-                                $request->user()->id,
-                        ]);
-
-                        $label->save();
-
-                    } else {
-
-                        $slugBase =
-                            Str::slug(
-                                $validated['name']
-                            );
-
-                        if ($slugBase === '') {
-                            $slugBase = 'label';
-                        }
-
-                        $slug =
-                            $slugBase
-                            .'-'
-                            .$user->id;
-
-                        while (
-                            Label::withTrashed()
-                                ->where(
-                                    'slug',
-                                    $slug
-                                )
-                                ->exists()
-                        ) {
-                            $slug =
-                                $slugBase
-                                .'-'
-                                .$user->id
-                                .'-'
-                                .Str::lower(
-                                    Str::random(5)
-                                );
-                        }
-
-                        do {
-                            $publicId =
-                                'LBL-'
-                                .Str::upper(
-                                    Str::random(12)
-                                );
-                        } while (
-                            Label::withTrashed()
-                                ->where(
-                                    'public_id',
-                                    $publicId
-                                )
-                                ->exists()
-                        );
-
-                        Label::create([
-                            'user_id' =>
-                                $user->id,
-
-                            'public_id' =>
-                                $publicId,
-
-                            'name' =>
-                                $validated['name'],
-
-                            'legal_name' =>
-                                $validated['name'],
-
-                            'slug' =>
-                                $slug,
-
-                            'email' =>
-                                $normalizedEmail,
-
-                            'phone' =>
-                                $validated['phone']
-                                ?? null,
-
-                            'country' =>
-                                $validated['country']
-                                ?? 'India',
-
-                            'timezone' =>
-                                'Asia/Kolkata',
-
-                            'currency' =>
-                                'INR',
-
-                            'status' =>
-                                'active',
-
-                            'created_by' =>
-                                $request->user()->id,
-
-                            'updated_by' =>
-                                $request->user()->id,
-                        ]);
-                    }
-                }
-
-
-                if (
-                    $validated['role'] ===
                     'admin'
                 ) {
                     $pivot = [
@@ -816,6 +705,221 @@ class UserManagementController extends Controller
                         ->assignedLabels()
                         ->sync($labelSync);
                 }
+
+                if (
+                    $validated['role'] ===
+                    'label'
+                ) {
+                    $labelPivot = [
+                        'assignment_role' =>
+                            'owner',
+
+                        'can_view' =>
+                            true,
+
+                        'can_edit' =>
+                            true,
+
+                        'can_manage_releases' =>
+                            true,
+
+                        'can_manage_team' =>
+                            false,
+
+                        'can_manage_splits' =>
+                            false,
+
+                        'assigned_by' =>
+                            $request->user()->id,
+                    ];
+
+                    $labelSync = [];
+
+                    foreach (
+                        $validated['label_ids']
+                            ?? []
+                        as $labelId
+                    ) {
+                        $labelSync[
+                            (int) $labelId
+                        ] = $labelPivot;
+                    }
+
+                    foreach (
+                        collect(
+                            $validated['new_labels']
+                                ?? []
+                        )
+                            ->map(
+                                fn ($name) =>
+                                    trim((string) $name)
+                            )
+                            ->filter()
+                            ->unique(
+                                fn ($name) =>
+                                    mb_strtolower($name)
+                            )
+                        as $labelName
+                    ) {
+                        $existingLabel =
+                            Label::query()
+                                ->whereRaw(
+                                    'LOWER(name) = ?',
+                                    [
+                                        mb_strtolower(
+                                            $labelName
+                                        ),
+                                    ]
+                                )
+                                ->first();
+
+                        if (
+                            $existingLabel
+                            && $existingLabel->user_id
+                            && (int) $existingLabel->user_id
+                                !== (int) $user->id
+                        ) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'new_labels' => [
+                                    "Label '{$labelName}' already belongs to another label user.",
+                                ],
+                            ]);
+                        }
+
+                        if ($existingLabel) {
+                            $label =
+                                $existingLabel;
+
+                            if (! $label->user_id) {
+                                $label->forceFill([
+                                    'user_id' =>
+                                        $user->id,
+
+                                    'updated_by' =>
+                                        $request
+                                            ->user()
+                                            ->id,
+                                ]);
+
+                                $label->save();
+                            }
+                        } else {
+                            $slugBase =
+                                Str::slug(
+                                    $labelName
+                                );
+
+                            if ($slugBase === '') {
+                                $slugBase = 'label';
+                            }
+
+                            $slug =
+                                $slugBase
+                                .'-'
+                                .$user->id;
+
+                            while (
+                                Label::withTrashed()
+                                    ->where(
+                                        'slug',
+                                        $slug
+                                    )
+                                    ->exists()
+                            ) {
+                                $slug =
+                                    $slugBase
+                                    .'-'
+                                    .$user->id
+                                    .'-'
+                                    .Str::lower(
+                                        Str::random(5)
+                                    );
+                            }
+
+                            do {
+                                $publicId =
+                                    'LBL-'
+                                    .Str::upper(
+                                        Str::random(12)
+                                    );
+                            } while (
+                                Label::withTrashed()
+                                    ->where(
+                                        'public_id',
+                                        $publicId
+                                    )
+                                    ->exists()
+                            );
+
+                            $label =
+                                Label::create([
+                                    'user_id' =>
+                                        $user->id,
+
+                                    'public_id' =>
+                                        $publicId,
+
+                                    'name' =>
+                                        $labelName,
+
+                                    'legal_name' =>
+                                        $labelName,
+
+                                    'slug' =>
+                                        $slug,
+
+                                    'email' =>
+                                        strtolower(
+                                            trim(
+                                                $validated[
+                                                    'email'
+                                                ]
+                                            )
+                                        ),
+
+                                    'phone' =>
+                                        $validated[
+                                            'phone'
+                                        ]
+                                        ?? null,
+
+                                    'country' =>
+                                        $validated[
+                                            'country'
+                                        ]
+                                        ?? 'India',
+
+                                    'timezone' =>
+                                        'Asia/Kolkata',
+
+                                    'currency' =>
+                                        'INR',
+
+                                    'status' =>
+                                        'active',
+
+                                    'created_by' =>
+                                        $request
+                                            ->user()
+                                            ->id,
+
+                                    'updated_by' =>
+                                        $request
+                                            ->user()
+                                            ->id,
+                                ]);
+                        }
+
+                        $labelSync[
+                            (int) $label->id
+                        ] = $labelPivot;
+                    }
+
+                    $user
+                        ->assignedLabels()
+                        ->sync($labelSync);
+                }
+
 
                 $permissionValues = [
                     'user_id' =>
@@ -1077,7 +1181,21 @@ class UserManagementController extends Controller
 
                 'assignedLabelIds' =>
                     $user->assignedLabels
-                        ->pluck('id'),
+                        ->pluck('id')
+                        ->merge(
+                            Label::query()
+                                ->where(
+                                    'user_id',
+                                    $user->id
+                                )
+                                ->pluck('id')
+                        )
+                        ->map(
+                            fn ($id) =>
+                                (int) $id
+                        )
+                        ->unique()
+                        ->values(),
             ]
         );
     }
@@ -1088,6 +1206,16 @@ class UserManagementController extends Controller
         PermissionService $permissions,
         AuditLogService $audit
     ): RedirectResponse {
+        file_put_contents(
+            storage_path('logs/label-save-debug.log'),
+            now()->toDateTimeString()
+            ." UPDATE_ENTER user={$user->id}"
+            ." role=".($request->input('role') ?? 'NULL')
+            ." label_ids=".json_encode($request->input('label_ids', []))
+            ." new_labels=".json_encode($request->input('new_labels', []))
+            .PHP_EOL,
+            FILE_APPEND
+        );
         $this->authorizeSuperAdmin(
             $request,
             $permissions
@@ -1100,7 +1228,20 @@ class UserManagementController extends Controller
             'You cannot remove your own Super Admin role.'
         );
 
-        $validated = $request->validate([
+                file_put_contents(
+            storage_path('logs/user-update-debug.log'),
+            now()->toDateTimeString()
+            ." UPDATE_REQUEST_PAYLOAD "
+            .json_encode(
+                $request->all(),
+                JSON_UNESCAPED_UNICODE
+                | JSON_UNESCAPED_SLASHES
+            )
+            .PHP_EOL,
+            FILE_APPEND
+        );
+
+$validated = $request->validate([
             'name' => [
                 'required',
                 'string',
@@ -1175,13 +1316,111 @@ class UserManagementController extends Controller
                 'exists:labels,id',
             ],
 
+            'new_labels' => [
+                'nullable',
+                'array',
+            ],
+
+            'new_labels.*' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
             'permissions' => [
                 'nullable',
                 'array',
             ],
         ]);
 
-        $usernameService = app(
+        if (
+            $validated['role'] === 'label'
+        ) {
+            $existingLabelIds =
+                array_map(
+                    'intval',
+                    $validated['label_ids']
+                        ?? []
+                );
+
+            $newLabelNames =
+                collect(
+                    $validated['new_labels']
+                        ?? []
+                )
+                    ->map(
+                        fn ($name) =>
+                            trim((string) $name)
+                    )
+                    ->filter()
+                    ->values();
+
+            if (
+                empty($existingLabelIds)
+                && $newLabelNames->isEmpty()
+            ) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'label_ids' => [
+                        'A Label account must have at least one label.',
+                    ],
+                ]);
+            }
+
+            $duplicateNames =
+                $newLabelNames
+                    ->map(
+                        fn ($name) =>
+                            mb_strtolower($name)
+                    )
+                    ->duplicates();
+
+            if (
+                $duplicateNames->isNotEmpty()
+            ) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'new_labels' => [
+                        'Duplicate label names are not allowed.',
+                    ],
+                ]);
+            }
+
+            foreach (
+                $existingLabelIds
+                as $labelId
+            ) {
+                $label =
+                    Label::query()
+                        ->findOrFail(
+                            $labelId
+                        );
+
+                if (
+                    $label->user_id
+                    && (int) $label->user_id
+                        !== (int) $user->id
+                ) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'label_ids' => [
+                            "Label '{$label->name}' already belongs to another Label account.",
+                        ],
+                    ]);
+                }
+            }
+        }
+
+
+                file_put_contents(
+            storage_path('logs/label-save-debug.log'),
+            now()->toDateTimeString()
+            ." VALIDATION_PASSED"
+            ." role=".($validated['role'] ?? 'NULL')
+            ." label_ids=".json_encode($validated['label_ids'] ?? [])
+            ." new_labels=".json_encode($validated['new_labels'] ?? [])
+            .PHP_EOL,
+            FILE_APPEND
+        );
+
+$usernameService = app(
             \App\Services\V2\UsernameService::class
         );
 
@@ -1308,8 +1547,11 @@ class UserManagementController extends Controller
                         'assignment_role' =>
                             'manager',
 
-                        'can_view' => true,
-                        'can_edit' => true,
+                        'can_view' =>
+                            true,
+
+                        'can_edit' =>
+                            true,
 
                         'can_manage_releases' =>
                             true,
@@ -1328,11 +1570,11 @@ class UserManagementController extends Controller
 
                     foreach (
                         $validated['artist_ids']
-                        ?? []
+                            ?? []
                         as $artistId
                     ) {
                         $artistSync[
-                            $artistId
+                            (int) $artistId
                         ] = $pivot;
                     }
 
@@ -1340,26 +1582,438 @@ class UserManagementController extends Controller
 
                     foreach (
                         $validated['label_ids']
-                        ?? []
+                            ?? []
                         as $labelId
                     ) {
                         $labelSync[
-                            $labelId
+                            (int) $labelId
                         ] = $pivot;
                     }
 
-                    $user->assignedArtists()
-                        ->sync($artistSync);
+                    $user
+                        ->assignedArtists()
+                        ->sync(
+                            $artistSync
+                        );
 
-                    $user->assignedLabels()
-                        ->sync($labelSync);
-                } else {
-                    $user->assignedArtists()
+                    file_put_contents(
+                        storage_path('logs/label-save-debug.log'),
+                        now()->toDateTimeString()
+                        ." BEFORE_SYNC"
+                        ." user={$user->id}"
+                        ." labelSync=".json_encode($labelSync)
+                        .PHP_EOL,
+                        FILE_APPEND
+                    );
+
+                    $user
+                        ->assignedLabels()
+                        ->sync(
+                            $labelSync
+                        );
+
+                    file_put_contents(
+                        storage_path('logs/label-save-debug.log'),
+                        now()->toDateTimeString()
+                        ." AFTER_SYNC"
+                        ." pivot_count="
+                        .$user->assignedLabels()
+                            ->count()
+                        .PHP_EOL,
+                        FILE_APPEND
+                    );
+                } elseif (
+                    $validated['role'] === 'label'
+                ) {
+                    /*
+                     * Label accounts do not use
+                     * artist assignments.
+                     */
+                    $user
+                        ->assignedArtists()
                         ->detach();
 
-                    $user->assignedLabels()
+                    $ownerPivot = [
+                        'assignment_role' =>
+                            'owner',
+
+                        'can_view' =>
+                            true,
+
+                        'can_edit' =>
+                            true,
+
+                        'can_manage_releases' =>
+                            true,
+
+                        'can_manage_team' =>
+                            false,
+
+                        'can_manage_splits' =>
+                            false,
+
+                        'assigned_by' =>
+                            $request->user()->id,
+                    ];
+
+                    /*
+                     * Remember current labels so
+                     * removed labels can be released
+                     * from this account without
+                     * deleting the label itself.
+                     */
+                    $previousLabelIds =
+                        $user
+                            ->assignedLabels()
+                            ->pluck(
+                                'labels.id'
+                            )
+                            ->map(
+                                fn ($id) =>
+                                    (int) $id
+                            )
+                            ->all();
+
+                    $labelSync = [];
+
+                    /*
+                     * Existing selected labels.
+                     */
+                    foreach (
+                        $validated['label_ids']
+                            ?? []
+                        as $labelId
+                    ) {
+                        $label =
+                            Label::query()
+                                ->lockForUpdate()
+                                ->findOrFail(
+                                    (int) $labelId
+                                );
+
+                        if (
+                            $label->user_id
+                            && (int) $label->user_id
+                                !== (int) $user->id
+                        ) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'label_ids' => [
+                                    "Label '{$label->name}' already belongs to another Label account.",
+                                ],
+                            ]);
+                        }
+
+                        if (
+                            ! $label->user_id
+                        ) {
+                            $label->forceFill([
+                                'user_id' =>
+                                    $user->id,
+
+                                'updated_by' =>
+                                    $request
+                                        ->user()
+                                        ->id,
+                            ]);
+
+                            $label->save();
+                        }
+
+                        $labelSync[
+                            (int) $label->id
+                        ] = $ownerPivot;
+                    }
+
+                    /*
+                     * Unlimited new labels.
+                     */
+                    $newLabelNames =
+                        collect(
+                            $validated[
+                                'new_labels'
+                            ] ?? []
+                        )
+                            ->map(
+                                fn ($name) =>
+                                    trim(
+                                        (string) $name
+                                    )
+                            )
+                            ->filter()
+                            ->unique(
+                                fn ($name) =>
+                                    mb_strtolower(
+                                        $name
+                                    )
+                            )
+                            ->values();
+
+                    foreach (
+                        $newLabelNames
+                        as $labelName
+                    ) {
+                        $label =
+                            Label::query()
+                                ->whereRaw(
+                                    'LOWER(name) = ?',
+                                    [
+                                        mb_strtolower(
+                                            $labelName
+                                        ),
+                                    ]
+                                )
+                                ->first();
+
+                        if (
+                            $label
+                            && $label->user_id
+                            && (int) $label->user_id
+                                !== (int) $user->id
+                        ) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'new_labels' => [
+                                    "Label '{$labelName}' already belongs to another Label account.",
+                                ],
+                            ]);
+                        }
+
+                        if (! $label) {
+                            $slugBase =
+                                Str::slug(
+                                    $labelName
+                                );
+
+                            if (
+                                $slugBase === ''
+                            ) {
+                                $slugBase =
+                                    'label';
+                            }
+
+                            $slug =
+                                $slugBase
+                                .'-'
+                                .$user->id;
+
+                            while (
+                                Label::withTrashed()
+                                    ->where(
+                                        'slug',
+                                        $slug
+                                    )
+                                    ->exists()
+                            ) {
+                                $slug =
+                                    $slugBase
+                                    .'-'
+                                    .$user->id
+                                    .'-'
+                                    .Str::lower(
+                                        Str::random(
+                                            5
+                                        )
+                                    );
+                            }
+
+                            do {
+                                $publicId =
+                                    'LBL-'
+                                    .Str::upper(
+                                        Str::random(
+                                            12
+                                        )
+                                    );
+                            } while (
+                                Label::withTrashed()
+                                    ->where(
+                                        'public_id',
+                                        $publicId
+                                    )
+                                    ->exists()
+                            );
+
+                            $label =
+                                Label::create([
+                                    'user_id' =>
+                                        $user->id,
+
+                                    'public_id' =>
+                                        $publicId,
+
+                                    'name' =>
+                                        $labelName,
+
+                                    'legal_name' =>
+                                        $labelName,
+
+                                    'slug' =>
+                                        $slug,
+
+                                    'email' =>
+                                        strtolower(
+                                            trim(
+                                                $validated[
+                                                    'email'
+                                                ]
+                                            )
+                                        ),
+
+                                    'phone' =>
+                                        $validated[
+                                            'phone'
+                                        ]
+                                        ?? null,
+
+                                    'country' =>
+                                        $validated[
+                                            'country'
+                                        ]
+                                        ?? 'India',
+
+                                    'timezone' =>
+                                        'Asia/Kolkata',
+
+                                    'currency' =>
+                                        'INR',
+
+                                    'status' =>
+                                        'active',
+
+                                    'created_by' =>
+                                        $request
+                                            ->user()
+                                            ->id,
+
+                                    'updated_by' =>
+                                        $request
+                                            ->user()
+                                            ->id,
+                                ]);
+                        } elseif (
+                            ! $label->user_id
+                        ) {
+                            $label->forceFill([
+                                'user_id' =>
+                                    $user->id,
+
+                                'updated_by' =>
+                                    $request
+                                        ->user()
+                                        ->id,
+                            ]);
+
+                            $label->save();
+                        }
+
+                        $labelSync[
+                            (int) $label->id
+                        ] = $ownerPivot;
+                    }
+
+                    /*
+                     * Labels removed in Edit:
+                     * do not delete the label.
+                     * Only release account ownership.
+                     */
+                    $finalLabelIds =
+                        array_map(
+                            'intval',
+                            array_keys(
+                                $labelSync
+                            )
+                        );
+
+                    $removedLabelIds =
+                        array_values(
+                            array_diff(
+                                $previousLabelIds,
+                                $finalLabelIds
+                            )
+                        );
+
+                    if (
+                        ! empty(
+                            $removedLabelIds
+                        )
+                    ) {
+                        Label::query()
+                            ->whereIn(
+                                'id',
+                                $removedLabelIds
+                            )
+                            ->where(
+                                'user_id',
+                                $user->id
+                            )
+                            ->update([
+                                'user_id' =>
+                                    null,
+
+                                'updated_by' =>
+                                    $request
+                                        ->user()
+                                        ->id,
+
+                                'updated_at' =>
+                                    now(),
+                            ]);
+                    }
+
+                    $user
+                        ->assignedLabels()
+                        ->sync(
+                            $labelSync
+                        );
+                } else {
+                    /*
+                     * Artist / other role:
+                     * remove assignment access.
+                     */
+                    $user
+                        ->assignedArtists()
+                        ->detach();
+
+                    $oldLabelIds =
+                        $user
+                            ->assignedLabels()
+                            ->pluck(
+                                'labels.id'
+                            )
+                            ->all();
+
+                    if (
+                        ! empty(
+                            $oldLabelIds
+                        )
+                    ) {
+                        Label::query()
+                            ->whereIn(
+                                'id',
+                                $oldLabelIds
+                            )
+                            ->where(
+                                'user_id',
+                                $user->id
+                            )
+                            ->update([
+                                'user_id' =>
+                                    null,
+
+                                'updated_by' =>
+                                    $request
+                                        ->user()
+                                        ->id,
+
+                                'updated_at' =>
+                                    now(),
+                            ]);
+                    }
+
+                    $user
+                        ->assignedLabels()
                         ->detach();
                 }
+
 
                 $permissionValues = [
                     'user_id' => $user->id,

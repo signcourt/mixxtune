@@ -173,12 +173,15 @@ export default function DistributionStep({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h2 className="text-xl font-semibold text-slate-900">
-                            {mode === 'stores' ? 'Stores' : mode === 'territory' ? 'Territory' : 'Stores & Territory'}
+                            {mode === 'stores' ? 'Stores' : mode === 'territory' ? 'Territories' : 'Stores & Territory'}
                         </h2>
 
                         <p className="mt-1 text-sm text-slate-500">
-                            All stores and Worldwide
-                            are selected by default.
+                            {mode === 'stores'
+                                ? 'Choose where this release should be delivered. All available stores are enabled by default.'
+                                : mode === 'territory'
+                                    ? 'All territories are selected by default.'
+                                    : 'All stores and territories are selected by default.'}
                         </p>
                     </div>
 
@@ -201,7 +204,7 @@ export default function DistributionStep({
     mode === 'stores'
         ? 'Save Stores'
         : mode === 'territory'
-            ? 'Save Territory'
+            ? 'Save Territories'
             : 'Save Stores & Territory'
 )}
                         </button>
@@ -209,17 +212,25 @@ export default function DistributionStep({
                 </div>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-2">
+            <div
+                className={`grid gap-6 ${
+                    showStores && showTerritory
+                        ? 'xl:grid-cols-2'
+                        : 'grid-cols-1'
+                }`}
+            >
+                {showStores && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-5">
                     <div className="flex items-center justify-between gap-3">
                         <div>
-                            <h3 className="font-semibold text-slate-900">
-                                Stores
+                            <h3 className="text-lg font-semibold text-slate-900">
+                                Distribution Stores
                             </h3>
 
                             <p className="mt-1 text-sm text-slate-500">
-                                {selectedStores.length}{' '}
-                                selected
+                                {selectedStores.length} of{' '}
+                                {distributionStores.length}{' '}
+                                stores enabled
                             </p>
                         </div>
 
@@ -233,7 +244,7 @@ export default function DistributionStep({
                                 }
                                 className="rounded-lg bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700"
                             >
-                                Select All
+                                Enable All
                             </button>
 
                             <button
@@ -245,13 +256,23 @@ export default function DistributionStep({
                                 }
                                 className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600"
                             >
-                                Clear
+                                Disable All
                             </button>
                         </div>
                     </div>
 
-                    <div className="mt-5 grid max-h-[620px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                        {distributionStores.map(
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {distributionStores.length === 0 ? (
+                            <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
+                                <div className="text-sm font-semibold text-slate-700">
+                                    No distribution stores are currently available.
+                                </div>
+
+                                <div className="mt-1 text-xs text-slate-400">
+                                    Stores enabled by the administrator will appear here automatically.
+                                </div>
+                            </div>
+                        ) : distributionStores.map(
                             (store) => {
                                 const checked =
                                     selectedStores.includes(
@@ -266,18 +287,22 @@ export default function DistributionStep({
                                             store.id
                                         }
                                         type="button"
+                                        role="switch"
+                                        aria-checked={
+                                            checked
+                                        }
                                         onClick={() =>
                                             toggleStore(
                                                 store.id
                                             )
                                         }
-                                        className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
+                                        className={`flex min-h-[74px] items-center gap-4 rounded-2xl border px-4 py-3 text-left transition-all ${
                                             checked
-                                                ? 'border-violet-400 bg-violet-50'
-                                                : 'border-slate-200 bg-white'
+                                                ? 'border-violet-200 bg-white shadow-sm'
+                                                : 'border-slate-200 bg-slate-50 opacity-75'
                                         }`}
                                     >
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-white">
                                             {store.logo_path ? (
                                                 <img
                                                     src={
@@ -303,29 +328,57 @@ export default function DistributionStep({
                                             )}
                                         </div>
 
-                                        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-800">
-                                            {store.name}
-                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="truncate text-sm font-semibold text-slate-900">
+                                                {store.name}
+                                            </div>
 
-                                        <span
-                                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[10px] font-bold ${
-                                                checked
-                                                    ? 'border-violet-600 bg-violet-600 text-white'
-                                                    : 'border-slate-300 text-transparent'
-                                            }`}
-                                        >
-                                            ✓
-                                        </span>
+                                            <div className="mt-0.5 text-[11px] text-slate-400">
+                                                Distribution store
+                                            </div>
+                                        </div>
+
+                                        <div className="ml-auto flex shrink-0 items-center gap-2">
+                                            <span
+                                                className={`text-[10px] font-bold uppercase tracking-wide ${
+                                                    checked
+                                                        ? 'text-emerald-600'
+                                                        : 'text-slate-400'
+                                                }`}
+                                            >
+                                                {checked
+                                                    ? 'On'
+                                                    : 'Off'}
+                                            </span>
+
+                                            <span
+                                                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition ${
+                                                    checked
+                                                        ? 'bg-violet-600'
+                                                        : 'bg-slate-300'
+                                                }`}
+                                            >
+                                                <span
+                                                    className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${
+                                                        checked
+                                                            ? 'left-6'
+                                                            : 'left-1'
+                                                    }`}
+                                                />
+                                            </span>
+                                        </div>
                                     </button>
                                 );
                             }
                         )}
                     </div>
                 </section>
+                )}
 
+                {showTerritory && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-5">
                     <h3 className="font-semibold text-slate-900">
-                        Territory
+                        Territories
                     </h3>
 
                     <label className="mt-5 flex cursor-pointer items-center justify-between rounded-2xl border border-violet-200 bg-violet-50 p-5">
@@ -405,11 +458,12 @@ export default function DistributionStep({
                             </div>
 
                             <p className="mt-2 text-sm text-emerald-700">
-                                पूरी territory selected है।
+                                Your release will be delivered to all supported territories.
                             </p>
                         </div>
                     )}
                 </section>
+                )}
             </div>
         </div>
     );

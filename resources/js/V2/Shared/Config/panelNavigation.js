@@ -297,6 +297,13 @@ const adminNavigation = (
             ),
         },
         {
+            id: 'create-release',
+            label: 'Create Release',
+            icon: icons.createRelease,
+            href: routes.createRelease,
+            permission: 'releases.create',
+        },
+        {
             id: 'distribution',
             label: 'Distribution',
             icon: icons.distribution,
@@ -362,7 +369,7 @@ const adminNavigation = (
             id: 'revenue-imports',
             label: 'Revenue Imports',
             icon: icons.reports,
-            href: '/admin/reports/imports',
+            href: '/v2/admin/reports/imports',
             permission: 'reports.view',
         },
         {

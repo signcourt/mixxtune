@@ -7,8 +7,8 @@ import {
 import { useEffect, useRef, useState } from 'react';
 
 import ReleaseWizardSidebar from '@/V2/Shared/Releases/V3/ReleaseWizardSidebar';
-import ReleaseStepHeader from '@/V2/Shared/Releases/V4/ReleaseStepHeader';
 import ReleaseHelpfulTip from '@/V2/Shared/Releases/V4/ReleaseHelpfulTip';
+import ReleaseCoverArtCard from '@/V2/Shared/Releases/V4/ReleaseCoverArtCard';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import ReleaseDetailsStep from '@/V2/Shared/Releases/Steps/ReleaseDetailsStep';
 import TrackManager from '@/V2/Shared/Releases/Steps/TrackManager';
@@ -78,7 +78,37 @@ export default function ReleaseWizard({
     availableLabels = [],
     distributionStores = [],
 }) {
+    const wizardStorageKey =
+        typeof window !== 'undefined'
+            ? `mixxtune-release-wizard-step-${
+                  release?.id ?? window.location.pathname
+              }`
+            : null;
+
     const [currentStep, setCurrentStep] = useState(() => {
+        if (
+            typeof window !== 'undefined'
+            && wizardStorageKey
+        ) {
+            const rememberedStep =
+                window.sessionStorage.getItem(
+                    wizardStorageKey
+                );
+
+            if (rememberedStep) {
+                const parsedStep =
+                    Number(rememberedStep);
+
+                if (
+                    Number.isInteger(parsedStep)
+                    && parsedStep >= 1
+                    && parsedStep <= 5
+                ) {
+                    return parsedStep;
+                }
+            }
+        }
+
         const step = Number(
             release?.wizard_step ?? 1
         );
@@ -88,6 +118,23 @@ export default function ReleaseWizard({
             5
         );
     });
+
+    useEffect(() => {
+        if (
+            typeof window === 'undefined'
+            || !wizardStorageKey
+        ) {
+            return;
+        }
+
+        window.sessionStorage.setItem(
+            wizardStorageKey,
+            String(currentStep)
+        );
+    }, [
+        currentStep,
+        wizardStorageKey,
+    ]);
 
     const currentYear = String(
         new Date().getFullYear()
@@ -118,17 +165,19 @@ export default function ReleaseWizard({
         label_id:
             release?.label_id ??
             label?.id ??
-            '',
+            (
+                availableLabels.length === 1
+                    ? availableLabels[0].id
+                    : ''
+            ),
 
         primary_artist_name:
             release?.primary_artist_name ??
-            artist?.stage_name ??
             (
-                availableArtists.length === 1
+                role === 'artist'
                     ? (
-                        availableArtists[0].stage_name ??
-                        availableArtists[0].legal_name ??
-                        availableArtists[0].name ??
+                        artist?.stage_name ??
+                        artist?.legal_name ??
                         ''
                     )
                     : ''
@@ -144,13 +193,11 @@ export default function ReleaseWizard({
                       {
                           name:
                               release?.primary_artist_name ??
-                              artist?.stage_name ??
                               (
-                                  availableArtists.length === 1
+                                  role === 'artist'
                                       ? (
-                                          availableArtists[0].stage_name ??
-                                          availableArtists[0].legal_name ??
-                                          availableArtists[0].name ??
+                                          artist?.stage_name ??
+                                          artist?.legal_name ??
                                           ''
                                       )
                                       : ''
@@ -185,6 +232,10 @@ export default function ReleaseWizard({
             generateCatalogNumber(),
 
         upc: release?.upc ?? '',
+        generate_upc:
+            release?.upc
+                ? false
+                : true,
         language: release?.language ?? '',
 
         primary_genre:
@@ -700,58 +751,7 @@ saveState === 'saving'
                 </div>
 
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="grid gap-3 border-b border-slate-200 px-4 py-5 sm:grid-cols-2 xl:grid-cols-5 xl:px-6">
-                        {wizardSteps.map((step) => (
-                            <button
-                                key={step.id}
-                                type="button"
-                                onClick={() =>
-                                    setCurrentStep(
-                                        step.id
-                                    )
-                                }
-                                className="flex items-center gap-3 text-left"
-                            >
-                                <div
-                                    className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${
-                                        currentStep ===
-                                        step.id
-                                            ? 'bg-violet-600 text-white'
-                                            : currentStep >
-                                                step.id
-                                              ? 'bg-emerald-100 text-emerald-700'
-                                              : 'bg-slate-100 text-slate-500'
-                                    }`}
-                                >
-                                    {currentStep >
-                                    step.id
-                                        ? '✓'
-                                        : step.id}
-                                </div>
-
-                                <span
-                                    className={`text-sm font-semibold ${
-                                        currentStep ===
-                                        step.id
-                                            ? 'text-slate-900'
-                                            : 'text-slate-500'
-                                    }`}
-                                >
-                                    {step.label}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="min-h-[420px] p-6">
-                        <ReleaseStepHeader
-                            currentStep={currentStep}
-                            saveState={saveState}
-                            processing={processing}
-                            onSave={() => {
-                                saveDraft();
-                            }}
-                        />
+<div className="min-h-[420px] p-6">
 
                         <div className="mixx-v4-step-grid">
                             <div className="mixx-v4-step-main">
@@ -799,6 +799,7 @@ saveState === 'saving'
                                     distributionStores={
                                         distributionStores
                                     }
+                                    mode="stores"
                                     initialSection="stores"
                                     onMascotEvent={
                                         handleMascotEvent
@@ -810,8 +811,8 @@ saveState === 'saving'
                                 />
                             ) : (
                                 <StepPlaceholder
-                                    title="Stores & Distribution"
-                                    description="Save release details before selecting stores."
+                                    title="Stores"
+                                    description="Save the release before selecting stores."
                                 />
                             )
                         )}
@@ -823,6 +824,7 @@ saveState === 'saving'
                                     distributionStores={
                                         distributionStores
                                     }
+                                    mode="territory"
                                     initialSection="territory"
                                     onMascotEvent={
                                         handleMascotEvent
@@ -834,8 +836,8 @@ saveState === 'saving'
                                 />
                             ) : (
                                 <StepPlaceholder
-                                    title="Territory"
-                                    description="Save the release before configuring territories."
+                                    title="Territories"
+                                    description="Save the release before selecting territories."
                                 />
                             )
                         )}
@@ -866,12 +868,20 @@ saveState === 'saving'
 
                             </div>
 
-                            {currentStep < 5 && (
-                                <ReleaseHelpfulTip
-                                    currentStep={
-                                        currentStep
-                                    }
+                            {currentStep === 1 ? (
+                                <ReleaseCoverArtCard
+                                    data={data}
+                                    setData={setData}
+                                    error={errors.artwork}
                                 />
+                            ) : (
+                                currentStep < 5 && (
+                                    <ReleaseHelpfulTip
+                                        currentStep={
+                                            currentStep
+                                        }
+                                    />
+                                )
                             )}
                         </div>
                     </div>

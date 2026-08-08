@@ -45,7 +45,7 @@ class NotificationController extends Controller
         );
     }
 
-    public function read(
+    public function markRead(
         Request $request,
         PanelNotification $notification
     ): RedirectResponse {
@@ -69,7 +69,7 @@ class NotificationController extends Controller
         return back();
     }
 
-    public function readAll(
+    public function markAllRead(
         Request $request
     ): RedirectResponse {
         PanelNotification::query()

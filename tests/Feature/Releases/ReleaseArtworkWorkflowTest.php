@@ -42,6 +42,20 @@ class ReleaseArtworkWorkflowTest extends TestCase
             'primary_artist_name' =>
                 $artist->stage_name
                 ?: $artist->legal_name,
+
+            'language' => 'Hindi',
+            'primary_genre' => 'Devotional',
+            'sub_genre' => 'Bhajan',
+
+            'digital_release_date' =>
+                now()->addDays(14)->toDateString(),
+
+            'copyright_owner' => 'Mixx Tune',
+            'copyright_year' => now()->year,
+
+            'phonographic_owner' => 'Mixx Tune',
+            'phonographic_year' => now()->year,
+
             'status' => 'draft',
             'wizard_step' => 3,
             'completion_percentage' => 60,
@@ -129,6 +143,8 @@ class ReleaseArtworkWorkflowTest extends TestCase
             'wizard_step' => 3,
 
             'completion_percentage' => 60,
+
+            'generate_upc' => true,
         ];
     }
 

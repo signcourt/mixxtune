@@ -133,6 +133,9 @@ export const PANEL_ROUTES = {
         releasesRejected:
             '/v2/admin/release-reviews?status=rejected',
 
+        createRelease:
+            '/v2/releases/create',
+
         distribution:
             '/v2/admin/distribution',
 
@@ -197,6 +200,9 @@ export const PANEL_ROUTES = {
 
         releasesRejected:
             '/v2/admin/release-reviews?status=rejected',
+
+        createRelease:
+            '/v2/releases/create',
 
         distribution:
             '/v2/admin/distribution',

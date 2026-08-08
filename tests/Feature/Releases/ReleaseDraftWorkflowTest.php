@@ -66,6 +66,8 @@ class ReleaseDraftWorkflowTest extends TestCase
             'featuring_artists' => [],
             'language' => 'Hindi',
             'primary_genre' => 'Devotional',
+            'sub_genre' => 'Bhajan',
+            'generate_upc' => true,
             'digital_release_date' => now()
                 ->addDays(14)
                 ->toDateString(),
@@ -151,6 +153,8 @@ class ReleaseDraftWorkflowTest extends TestCase
             'featuring_artists' => [],
             'language' => 'Hindi',
             'primary_genre' => 'Devotional',
+            'sub_genre' => 'Bhajan',
+            'generate_upc' => true,
             'digital_release_date' => now()
                 ->addDays(21)
                 ->toDateString(),

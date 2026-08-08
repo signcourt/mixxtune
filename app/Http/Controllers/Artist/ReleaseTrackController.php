@@ -72,6 +72,17 @@ class ReleaseTrackController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'version' => ['nullable', 'string', 'max:255'],
             'subtitle' => ['nullable', 'string', 'max:255'],
+            'track_type' => [
+                'nullable',
+                'string',
+                Rule::in([
+                    'original',
+                    'karaoke',
+                    'medley',
+                    'cover',
+                    'cover_by_cover_band',
+                ]),
+            ],
 
             'primary_artist_name' => [
                 'required',
@@ -85,6 +96,20 @@ class ReleaseTrackController extends Controller
                 'max:255',
             ],
 
+            'author_name' => ['nullable', 'string', 'max:255'],
+            'composer_name' => ['nullable', 'string', 'max:255'],
+            'arranger_name' => ['nullable', 'string', 'max:255'],
+            'producer_name' => ['nullable', 'string', 'max:255'],
+            'music_director_name' => ['nullable', 'string', 'max:255'],
+            'publisher_name' => ['nullable', 'string', 'max:255'],
+            'p_line' => ['nullable', 'string', 'max:255'],
+            'release_year' => [
+                'nullable',
+                'integer',
+                'min:1900',
+                'max:' . (date('Y') + 1),
+            ],
+
             'isrc' => [
                 'nullable',
                 'string',
@@ -93,10 +118,22 @@ class ReleaseTrackController extends Controller
             ],
 
             'language' => ['nullable', 'string', 'max:100'],
+            'title_language' => ['nullable', 'string', 'max:100'],
+            'lyrics_language' => ['nullable', 'string', 'max:100'],
             'genre' => ['nullable', 'string', 'max:100'],
             'sub_genre' => ['nullable', 'string', 'max:100'],
 
             'is_explicit' => ['nullable', 'boolean'],
+            'parental_advisory' => [
+                'nullable',
+                'string',
+                Rule::in(['yes', 'no', 'cleaned']),
+            ],
+            'price_tier' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
             'is_instrumental' => ['nullable', 'boolean'],
 
             'contains_ai_generated_content' => [
@@ -230,6 +267,17 @@ class ReleaseTrackController extends Controller
 
             'version' => ['nullable', 'string', 'max:255'],
             'subtitle' => ['nullable', 'string', 'max:255'],
+            'track_type' => [
+                'nullable',
+                'string',
+                Rule::in([
+                    'original',
+                    'karaoke',
+                    'medley',
+                    'cover',
+                    'cover_by_cover_band',
+                ]),
+            ],
 
             'primary_artist_name' => [
                 'sometimes',
@@ -244,6 +292,20 @@ class ReleaseTrackController extends Controller
                 'max:255',
             ],
 
+            'author_name' => ['nullable', 'string', 'max:255'],
+            'composer_name' => ['nullable', 'string', 'max:255'],
+            'arranger_name' => ['nullable', 'string', 'max:255'],
+            'producer_name' => ['nullable', 'string', 'max:255'],
+            'music_director_name' => ['nullable', 'string', 'max:255'],
+            'publisher_name' => ['nullable', 'string', 'max:255'],
+            'p_line' => ['nullable', 'string', 'max:255'],
+            'release_year' => [
+                'nullable',
+                'integer',
+                'min:1900',
+                'max:' . (date('Y') + 1),
+            ],
+
             'isrc' => [
                 'nullable',
                 'string',
@@ -253,10 +315,22 @@ class ReleaseTrackController extends Controller
             ],
 
             'language' => ['nullable', 'string', 'max:100'],
+            'title_language' => ['nullable', 'string', 'max:100'],
+            'lyrics_language' => ['nullable', 'string', 'max:100'],
             'genre' => ['nullable', 'string', 'max:100'],
             'sub_genre' => ['nullable', 'string', 'max:100'],
 
             'is_explicit' => ['nullable', 'boolean'],
+            'parental_advisory' => [
+                'nullable',
+                'string',
+                Rule::in(['yes', 'no', 'cleaned']),
+            ],
+            'price_tier' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
             'is_instrumental' => ['nullable', 'boolean'],
 
             'contains_ai_generated_content' => [

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V2;
 
+use App\Services\V2\UpcService;
+
 use App\Http\Controllers\Controller;
 use App\Models\Core\Artist;
 use App\Models\Core\Label;
@@ -326,7 +328,7 @@ class ReleaseController extends Controller
                 'catalog_number' =>
                     $catalogNumber,
 
-                'artist_id' => $artist->id,
+                'artist_id' => $artist?->id,
                 'label_id' => $label?->id,
 
                 'release_type' =>
@@ -335,13 +337,39 @@ class ReleaseController extends Controller
                 'title' => $validated['title'],
 
                 'primary_artist_name' =>
-                    $artist->stage_name
-                    ?: $artist->legal_name,
+                    collect(
+                        $validated['primary_artists'] ?? []
+                    )
+                        ->pluck('name')
+                        ->filter()
+                        ->first()
+                    ?: (
+                        $validated['primary_artist_name']
+                        ?? $artist?->stage_name
+                        ?? $artist?->legal_name
+                    ),
 
                 'featuring_artist_name' =>
-                    $validated[
-                        'featuring_artist_name'
-                    ] ?? null,
+                    collect(
+                        $validated['featuring_artists'] ?? []
+                    )
+                        ->pluck('name')
+                        ->filter()
+                        ->implode(', ')
+                    ?: (
+                        $validated['featuring_artist_name']
+                        ?? null
+                    ),
+
+                'primary_artists' =>
+                    array_values(
+                        $validated['primary_artists'] ?? []
+                    ),
+
+                'featuring_artists' =>
+                    array_values(
+                        $validated['featuring_artists'] ?? []
+                    ),
 
                 'language' =>
                     $validated['language'] ?? null,
@@ -354,8 +382,8 @@ class ReleaseController extends Controller
                 'sub_genre' =>
                     $validated['sub_genre'] ?? null,
 
-                'upc' =>
-                    $validated['upc'] ?? null,
+                'upc' => null,
+                'upc_is_auto_generated' => false,
 
                 'original_release_date' =>
                     $validated[
@@ -400,6 +428,30 @@ class ReleaseController extends Controller
                     $request->user()->id,
             ]);
         });
+
+        /** @var UpcService $upcService */
+        $upcService = app(UpcService::class);
+
+        if ((bool) $validated['generate_upc']) {
+            $release = $upcService->generate(
+                $release,
+                $request->user()
+            );
+
+            $release->update([
+                'upc_is_auto_generated' => true,
+            ]);
+        } else {
+            $release = $upcService->assignManual(
+                $release,
+                $validated['upc'],
+                $request->user()
+            );
+
+            $release->update([
+                'upc_is_auto_generated' => false,
+            ]);
+        }
 
         return redirect()
             ->route(
@@ -678,7 +730,7 @@ class ReleaseController extends Controller
             'catalog_number' =>
                 $validated['catalog_number'],
 
-            'artist_id' => $artist->id,
+            'artist_id' => $artist?->id,
             'label_id' => $label?->id,
 
             'release_type' =>
@@ -690,8 +742,18 @@ class ReleaseController extends Controller
                 $validated['version'] ?? null,
 
             'primary_artist_name' =>
-                $artist->stage_name
-                ?: $artist->legal_name,
+                collect(
+                    $validated['primary_artists'] ?? []
+                )
+                    ->pluck('name')
+                    ->filter()
+                    ->first()
+                ?: (
+                    $validated['primary_artist_name']
+                    ?? $release->primary_artist_name
+                    ?? $artist?->stage_name
+                    ?? $artist?->legal_name
+                ),
 
             'featuring_artist_name' =>
                 collect(
@@ -731,8 +793,11 @@ class ReleaseController extends Controller
             'sub_genre' =>
                 $validated['sub_genre'] ?? null,
 
-            'upc' =>
-                $validated['upc'] ?? null,
+            /*
+             * UPC is immutable once assigned.
+             * Prevent Step 1 edits from clearing or replacing it.
+             */
+            'upc' => $release->upc,
 
             'original_release_date' =>
                 $validated[
@@ -1111,6 +1176,7 @@ class ReleaseController extends Controller
                 'required',
                 'array',
                 'min:1',
+                'max:3',
             ],
 
             'primary_artists.*.name' => [
@@ -1154,26 +1220,32 @@ class ReleaseController extends Controller
                 'max:100',
             ],
 
+            'generate_upc' => [
+                'required',
+                'boolean',
+            ],
+
             'upc' => [
                 'nullable',
                 'string',
                 'max:20',
+                'required_if:generate_upc,false',
             ],
 
             'language' => [
-                'nullable',
+                'required',
                 'string',
                 'max:100',
             ],
 
             'primary_genre' => [
-                'nullable',
+                'required',
                 'string',
                 'max:100',
             ],
 
             'sub_genre' => [
-                'nullable',
+                'required',
                 'string',
                 'max:100',
             ],
@@ -1190,26 +1262,26 @@ class ReleaseController extends Controller
             ],
 
             'copyright_owner' => [
-                'nullable',
+                'required',
                 'string',
                 'max:255',
             ],
 
             'copyright_year' => [
-                'nullable',
+                'required',
                 'integer',
                 'min:1900',
                 'max:2100',
             ],
 
             'phonographic_owner' => [
-                'nullable',
+                'required',
                 'string',
                 'max:255',
             ],
 
             'phonographic_year' => [
-                'nullable',
+                'required',
                 'integer',
                 'min:1900',
                 'max:2100',
@@ -1318,11 +1390,46 @@ class ReleaseController extends Controller
             $validated['artist_id']
             ?? $release?->artist_id;
 
-        abort_unless(
-            $artistId,
-            422,
-            'Select an artist.'
-        );
+        $labelId =
+            $validated['label_id']
+            ?? $release?->label_id;
+
+        /*
+         * Admin / Super Admin may create a release directly
+         * under a catalog Label without attaching an Artist
+         * login account. Artist credits remain mandatory
+         * metadata and are handled separately.
+         */
+        if (! $artistId) {
+            abort_unless(
+                $labelId,
+                422,
+                'Select a catalog label.'
+            );
+
+            $label = Label::query()
+                ->where('id', $labelId)
+                ->whereNull('deleted_at')
+                ->firstOrFail();
+
+            if ($role === 'admin') {
+                $assignments = app(
+                    AdminAssignmentService::class
+                );
+
+                abort_unless(
+                    $assignments->canAccessRelease(
+                        $request->user(),
+                        null,
+                        (int) $label->id
+                    ),
+                    403,
+                    'This label is not assigned to you.'
+                );
+            }
+
+            return [null, $label];
+        }
 
         $artist = Artist::query()
             ->where('id', $artistId)
@@ -1330,9 +1437,8 @@ class ReleaseController extends Controller
             ->firstOrFail();
 
         $labelId =
-            $validated['label_id']
-            ?? $artist->label_id
-            ?? $release?->label_id;
+            $labelId
+            ?? $artist->label_id;
 
         $label = $labelId
             ? Label::query()->findOrFail(
@@ -1458,38 +1564,110 @@ class ReleaseController extends Controller
         }
 
         if ($role === 'label') {
-            $label = Label::query()
-                ->where(
-                    'user_id',
-                    $request->user()->id
-                )
-                ->whereNull('deleted_at')
-                ->first();
+            /*
+             * A single Label login may own/operate
+             * multiple labels.
+             *
+             * Prefer explicit assignedLabels pivot,
+             * while also retaining legacy labels
+             * linked directly by labels.user_id.
+             */
+            $assignedLabelIds =
+                $request
+                    ->user()
+                    ->assignedLabels()
+                    ->pluck('labels.id')
+                    ->map(
+                        fn ($id) =>
+                            (int) $id
+                    );
 
-            if ($label) {
-                $availableArtists = Artist::query()
+            $directLabelIds =
+                Label::query()
                     ->where(
-                        'label_id',
-                        $label->id
-                    )
-                    ->where(
-                        'account_status',
-                        'active'
-                    )
-                    ->where(
-                        'can_create_releases',
-                        true
+                        'user_id',
+                        $request->user()->id
                     )
                     ->whereNull('deleted_at')
-                    ->orderBy('stage_name')
-                    ->get([
-                        'id',
-                        'stage_name',
-                        'legal_name',
-                        'label_id',
-                        'account_status',
-                        'can_create_releases',
-                    ]);
+                    ->pluck('id')
+                    ->map(
+                        fn ($id) =>
+                            (int) $id
+                    );
+
+            $labelIds =
+                $assignedLabelIds
+                    ->merge(
+                        $directLabelIds
+                    )
+                    ->unique()
+                    ->values();
+
+            if (
+                $labelIds->isNotEmpty()
+            ) {
+                $availableLabels =
+                    Label::query()
+                        ->whereIn(
+                            'id',
+                            $labelIds
+                        )
+                        ->whereNull(
+                            'deleted_at'
+                        )
+                        ->orderBy(
+                            'name'
+                        )
+                        ->get([
+                            'id',
+                            'name',
+                        ]);
+
+                /*
+                 * Preserve existing single-label
+                 * behaviour for old UI/defaults.
+                 */
+                if (
+                    $availableLabels->count()
+                        === 1
+                ) {
+                    $label =
+                        $availableLabels
+                            ->first();
+                }
+
+                /*
+                 * Artists from every label assigned
+                 * to this Label login.
+                 */
+                $availableArtists =
+                    Artist::query()
+                        ->whereIn(
+                            'label_id',
+                            $labelIds
+                        )
+                        ->where(
+                            'account_status',
+                            'active'
+                        )
+                        ->where(
+                            'can_create_releases',
+                            true
+                        )
+                        ->whereNull(
+                            'deleted_at'
+                        )
+                        ->orderBy(
+                            'stage_name'
+                        )
+                        ->get([
+                            'id',
+                            'stage_name',
+                            'legal_name',
+                            'label_id',
+                            'account_status',
+                            'can_create_releases',
+                        ]);
             }
         }
 
@@ -1500,8 +1678,22 @@ class ReleaseController extends Controller
                 true
             )
         ) {
+            /*
+             * Account Artist selector must contain only real,
+             * active Artist login accounts. Manual Primary Artist
+             * metadata is handled separately in the release form.
+             */
             $artistsQuery = Artist::query()
-                ->whereNull('deleted_at');
+                ->whereNull('deleted_at')
+                ->whereNotNull('user_id')
+                ->where('account_status', 'active')
+                ->where('can_create_releases', true)
+                ->whereHas(
+                    'user',
+                    function ($query) {
+                        $query->where('role', 'artist');
+                    }
+                );
 
             if ($role === 'admin') {
                 $assignments = app(
@@ -1620,9 +1812,9 @@ class ReleaseController extends Controller
                 ? [
                     'id' => $artist->id,
                     'stage_name' =>
-                        $artist->stage_name,
+                        $artist?->stage_name,
                     'legal_name' =>
-                        $artist->legal_name,
+                        $artist?->legal_name,
                     'label_id' =>
                         $artist->label_id,
                 ]

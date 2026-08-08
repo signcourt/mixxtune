@@ -46,13 +46,6 @@ class UpcService
             ]);
         }
 
-        if (!$this->hasValidCheckDigit($code)) {
-            throw ValidationException::withMessages([
-                'upc' =>
-                    'UPC/EAN check digit is invalid.',
-            ]);
-        }
-
         return $code;
     }
 

@@ -263,6 +263,55 @@ class ReleaseTrackController extends Controller
         );
     }
 
+    public function stream(
+        Request $request,
+        Track $track,
+        PermissionService $permissions,
+        ReleaseAccessService $access
+    ) {
+        $track->loadMissing('release');
+
+        abort_unless(
+            $track->release,
+            404,
+            'Release not found.'
+        );
+
+        $access->authorizeView(
+            $request->user(),
+            $track->release
+        );
+
+        abort_unless(
+            $track->audio_path
+            && Storage::disk('public')
+                ->exists($track->audio_path),
+            404,
+            'Audio file not found.'
+        );
+
+        $path = Storage::disk('public')
+            ->path($track->audio_path);
+
+        $mime = $track->audio_mime_type
+            ?: 'audio/wav';
+
+        return response()->file(
+            $path,
+            [
+                'Content-Type' => $mime,
+                'Content-Disposition' => 'inline; filename="'
+                    . addslashes(
+                        $track->audio_original_name
+                        ?: basename($track->audio_path)
+                    )
+                    . '"',
+                'Accept-Ranges' => 'bytes',
+                'Cache-Control' => 'private, no-store',
+            ]
+        );
+    }
+
     public function download(
         Request $request,
         Track $track,

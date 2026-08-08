@@ -24,7 +24,7 @@ export default function Imports({
         event.preventDefault();
 
         post(
-            '/admin/reports/imports',
+            '/v2/admin/reports/imports',
             {
                 forceFormData: true,
 

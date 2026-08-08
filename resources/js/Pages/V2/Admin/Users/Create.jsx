@@ -79,6 +79,7 @@ export default function Create({
         send_invitation: true,
         artist_ids: [],
         label_ids: [],
+        new_labels: [''],
         permissions: Object.fromEntries(
             permissionOptions.map(
                 ([field]) => [
@@ -171,8 +172,18 @@ export default function Create({
                     ? current.artist_ids
                     : [],
             label_ids:
-                selectedRole === 'admin'
+                ['admin', 'label'].includes(
+                    selectedRole
+                )
                     ? current.label_ids
+                    : [],
+            new_labels:
+                selectedRole === 'label'
+                    ? (
+                        current.new_labels?.length
+                            ? current.new_labels
+                            : ['']
+                    )
                     : [],
             permissions:
                 Object.fromEntries(
@@ -197,6 +208,40 @@ export default function Create({
             items.map((item) =>
                 Number(item.id)
             )
+        );
+    };
+
+    const addNewLabel = () => {
+        setData(
+            'new_labels',
+            [
+                ...(data.new_labels ?? []),
+                '',
+            ]
+        );
+    };
+
+    const updateNewLabel = (index, value) => {
+        const next = [
+            ...(data.new_labels ?? []),
+        ];
+
+        next[index] = value;
+
+        setData('new_labels', next);
+    };
+
+    const removeNewLabel = (index) => {
+        const next = (
+            data.new_labels ?? []
+        ).filter(
+            (_, itemIndex) =>
+                itemIndex !== index
+        );
+
+        setData(
+            'new_labels',
+            next.length ? next : ['']
         );
     };
 
@@ -481,6 +526,129 @@ export default function Create({
                             }
                         />
                     </div>
+                )}
+
+                {data.role === 'label' && (
+                    <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-6 shadow-sm">
+                        <div className="mb-5">
+                            <h2 className="text-lg font-semibold text-slate-900">
+                                Labels for this Account
+                            </h2>
+
+                            <p className="mt-1 text-sm text-slate-500">
+                                Select all labels this user can manage. More labels can be added later by Super Admin.
+                            </p>
+                        </div>
+
+                        <SelectionBox
+                            title="Assigned Labels"
+                            items={labels}
+                            selected={data.label_ids}
+                            nameKey="name"
+                            onToggle={(id) =>
+                                toggleSelection(
+                                    'label_ids',
+                                    id
+                                )
+                            }
+                            onSelectAll={() =>
+                                selectAll(
+                                    'label_ids',
+                                    labels
+                                )
+                            }
+                            onClear={() =>
+                                setData(
+                                    'label_ids',
+                                    []
+                                )
+                            }
+                        />
+
+                        {errors.label_ids && (
+                            <p className="mt-3 text-sm font-medium text-red-600">
+                                {errors.label_ids}
+                            </p>
+                        )}
+
+                        <div className="mt-5 rounded-xl border border-violet-200 bg-white p-5">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <div className="text-sm font-semibold text-slate-900">
+                                        Create New Labels
+                                    </div>
+
+                                    <div className="mt-1 text-xs text-slate-500">
+                                        Add one or more label names. Only Super Admin can create labels.
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={addNewLabel}
+                                    className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+                                >
+                                    + Add Label
+                                </button>
+                            </div>
+
+                            <div className="mt-4 space-y-3">
+                                {(data.new_labels ?? []).map(
+                                    (labelName, index) => (
+                                        <div
+                                            key={index}
+                                            className="flex items-start gap-3"
+                                        >
+                                            <div className="flex-1">
+                                                <input
+                                                    type="text"
+                                                    value={labelName}
+                                                    placeholder={`Label ${index + 1} name`}
+                                                    onChange={(event) =>
+                                                        updateNewLabel(
+                                                            index,
+                                                            event.target.value
+                                                        )
+                                                    }
+                                                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                                                />
+
+                                                {errors[
+                                                    `new_labels.${index}`
+                                                ] && (
+                                                    <p className="mt-1 text-xs font-medium text-red-600">
+                                                        {
+                                                            errors[
+                                                                `new_labels.${index}`
+                                                            ]
+                                                        }
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    removeNewLabel(
+                                                        index
+                                                    )
+                                                }
+                                                className="rounded-xl border border-red-200 px-3 py-3 text-sm font-semibold text-red-600 hover:bg-red-50"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    )
+                                )}
+                            </div>
+
+                            {errors.new_labels && (
+                                <p className="mt-3 text-sm font-medium text-red-600">
+                                    {errors.new_labels}
+                                </p>
+                            )}
+                        </div>
+                    </section>
                 )}
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

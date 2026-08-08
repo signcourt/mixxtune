@@ -23,7 +23,7 @@ export default function Index({
                     <button
                         type="button"
                         onClick={() =>
-                            router.post(
+                            router.patch(
                                 '/v2/notifications/read-all'
                             )
                         }
@@ -39,7 +39,7 @@ export default function Index({
                             key={item.id}
                             type="button"
                             onClick={() =>
-                                router.post(
+                                router.patch(
                                     `/v2/notifications/${item.id}/read`
                                 )
                             }

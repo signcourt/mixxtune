@@ -1496,6 +1496,14 @@ Route::middleware(['auth', 'verified'])
 
 Route::middleware(['auth', 'verified'])
     ->get(
+        '/v2/tracks/{track}/stream',
+        [\App\Http\Controllers\V2\ReleaseTrackController::class, 'stream']
+    )
+    ->name('v2.release-tracks.stream');
+
+
+Route::middleware(['auth', 'verified'])
+    ->get(
         '/v2/tracks/{track}/download',
         [\App\Http\Controllers\V2\ReleaseTrackController::class, 'download']
     )
@@ -1918,6 +1926,14 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.reports.index');
 
+Route::middleware(['auth','verified'])
+    ->get(
+        '/v2/admin/reports',
+        [\App\Http\Controllers\V2\ReportController::class,'index']
+    )
+    ->name('v2.admin.reports.index');
+
+
 
 Route::middleware(['auth', 'verified'])
     ->get(
@@ -1942,6 +1958,14 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.royalties.index');
 
+Route::middleware(['auth','verified'])
+    ->get(
+        '/v2/admin/royalties',
+        [\App\Http\Controllers\V2\RoyaltyController::class,'index']
+    )
+    ->name('v2.admin.royalties.index');
+
+
 
 Route::middleware(['auth', 'verified'])
     ->get(
@@ -1949,6 +1973,14 @@ Route::middleware(['auth', 'verified'])
         [\App\Http\Controllers\V2\WalletController::class, 'index']
     )
     ->name('v2.wallet.index');
+
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/admin/wallet',
+        [\App\Http\Controllers\V2\WalletController::class, 'index']
+    )
+    ->name('v2.admin.wallet.index');
+
 
 
 Route::middleware(['auth', 'verified'])
@@ -2061,6 +2093,14 @@ Route::middleware(['auth', 'verified'])
         [\App\Http\Controllers\V2\StatementController::class, 'index']
     )
     ->name('v2.statements.index');
+
+Route::middleware(['auth','verified'])
+    ->get(
+        '/v2/admin/statements',
+        [\App\Http\Controllers\V2\StatementController::class,'index']
+    )
+    ->name('v2.admin.statements.index');
+
 
 
 Route::middleware(['auth', 'verified'])

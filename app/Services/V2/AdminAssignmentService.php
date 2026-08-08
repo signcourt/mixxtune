@@ -115,21 +115,64 @@ class AdminAssignmentService
             return false;
         }
 
+        /*
+         * Admin creation/access rules:
+         *
+         * 1. Artist directly assigned to Admin => allowed.
+         *
+         * 2. Artist belongs to a Label assigned to Admin
+         *    => allowed.
+         *
+         * 3. When label_id is supplied, Artist must actually
+         *    belong to that Label. This prevents mixing an
+         *    assigned Artist with an unrelated Label.
+         */
+
+        /*
+         * Operator-owned catalog release:
+         * a Label assignment is sufficient when no Artist
+         * account is intentionally attached.
+         */
+        if (! $artistId) {
+            return $labelId
+                ? $this->canAccessLabel($user, $labelId)
+                : false;
+        }
+
+        $artist = DB::table('artists')
+            ->where('id', $artistId)
+            ->whereNull('deleted_at')
+            ->first([
+                'id',
+                'label_id',
+            ]);
+
+        if (! $artist) {
+            return false;
+        }
+
         if (
-            $artistId
-            && $this->canAccessArtist(
+            $labelId
+            && (int) ($artist->label_id ?? 0)
+                !== (int) $labelId
+        ) {
+            return false;
+        }
+
+        if (
+            $this->canAccessArtist(
                 $user,
-                $artistId
+                (int) $artist->id
             )
         ) {
             return true;
         }
 
         if (
-            $labelId
+            $artist->label_id
             && $this->canAccessLabel(
                 $user,
-                $labelId
+                (int) $artist->label_id
             )
         ) {
             return true;

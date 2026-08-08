@@ -159,7 +159,7 @@ export default function Dashboard({
         {
             label: 'Import Revenue',
             description: 'Upload DSP reports',
-            href: '/admin/reports/imports',
+            href: '/v2/admin/reports/imports',
             icon: FileUp,
         },
         {
@@ -188,7 +188,7 @@ export default function Dashboard({
             title: 'Reports',
             description:
                 'Inspect revenue, streams and reporting performance.',
-            href: '/admin/reports/imports',
+            href: '/v2/admin/reports/imports',
             icon: TrendingUp,
         },
         {
@@ -224,7 +224,7 @@ export default function Dashboard({
                 }}
                 secondaryAction={{
                     label: 'Import Revenue',
-                    href: '/admin/reports/imports',
+                    href: '/v2/admin/reports/imports',
                 }}
                 accountStatus="active"
                 kycStatus="verified"
@@ -253,7 +253,7 @@ export default function Dashboard({
                     normalizedAnalytics
                 }
                 currency="INR"
-                reportsHref="/admin/reports/imports"
+                reportsHref="/v2/admin/reports/imports"
             />
 
             <AdminOperationsSection

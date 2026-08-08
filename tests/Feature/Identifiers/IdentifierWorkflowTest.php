@@ -626,7 +626,7 @@ class IdentifierWorkflowTest extends TestCase
         );
     }
 
-    public function test_invalid_upc_checksum_is_rejected(): void
+    public function test_manual_upc_does_not_require_valid_checksum(): void
     {
         [
             ,
@@ -637,24 +637,42 @@ class IdentifierWorkflowTest extends TestCase
             $admin,
         ] = $this->createContext();
 
+        $upc = '890000000019';
+
         $response = $this
             ->actingAs($admin)
             ->postJson(
                 $this->assignUpcUrl($release),
                 [
-                    'upc' =>
-                        '890000000019',
+                    'upc' => $upc,
                 ]
             );
 
         $response
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(
-                'upc'
+            ->assertOk()
+            ->assertJsonPath(
+                'message',
+                'UPC assigned successfully.'
+            )
+            ->assertJsonPath(
+                'release.upc',
+                $upc
             );
 
-        $this->assertNull(
-            $release->fresh()->upc
+        $release->refresh();
+
+        $this->assertSame(
+            $upc,
+            $release->upc
+        );
+
+        $this->assertDatabaseHas(
+            'upc_codes',
+            [
+                'code' => $upc,
+                'release_id' => $release->id,
+                'status' => 'assigned',
+            ]
         );
     }
 
