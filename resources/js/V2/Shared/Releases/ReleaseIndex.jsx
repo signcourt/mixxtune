@@ -88,26 +88,6 @@ const statusBorder = {
     failed: 'border-red-200',
 };
 
-const progressClass = {
-    draft:
-        'from-violet-500 to-indigo-500',
-    submitted:
-        'from-blue-500 to-cyan-500',
-    approved:
-        'from-emerald-500 to-teal-500',
-    rejected:
-        'from-rose-500 to-orange-500',
-    changes_requested:
-        'from-amber-500 to-orange-500',
-    processing:
-        'from-amber-500 to-yellow-500',
-    delivered:
-        'from-violet-500 to-purple-500',
-    live:
-        'from-green-500 to-emerald-500',
-    failed:
-        'from-red-500 to-rose-500',
-};
 
 export default function ReleaseIndex({
     role = 'artist',
@@ -578,30 +558,30 @@ export default function ReleaseIndex({
                             <table className="min-w-full divide-y divide-slate-200">
                                 <thead className="bg-slate-50">
                                     <tr className="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-                                        <th className="px-5 py-4">
-                                            Release
-                                        </th>
+                                            <th className="px-5 py-4">
+                                                Tracks
+                                            </th>
 
-                                        <th className="px-5 py-4">
-                                            UPC
-                                        </th>
+                                            <th className="px-5 py-4">
+                                                Status
+                                            </th>
 
-                                        <th className="px-5 py-4">
-                                            Release Date
-                                        </th>
+                                            <th className="px-5 py-4">
+                                                Release
+                                            </th>
 
-                                        <th className="px-5 py-4">
-                                            Status
-                                        </th>
+                                            <th className="px-5 py-4">
+                                                Release Date
+                                            </th>
 
-                                        <th className="px-5 py-4">
-                                            Progress
-                                        </th>
+                                            <th className="px-5 py-4">
+                                                UPC
+                                            </th>
 
-                                        <th className="px-5 py-4 text-right">
-                                            Action
-                                        </th>
-                                    </tr>
+                                            <th className="px-5 py-4 text-right">
+                                                Action
+                                            </th>
+                                        </tr>
                                 </thead>
 
                                 <tbody className="divide-y divide-slate-100">
@@ -649,16 +629,38 @@ function ReleaseCard({
         'rejected',
     ].includes(status);
 
-    const percentage = Math.min(
-        Math.max(
-            Number(
-                release.completion_percentage
-                ?? 0
-            ),
-            0
-        ),
-        100
+    const isDraft =
+        status === 'draft';
+
+    const trackCount = Math.max(
+        Number(release.track_count ?? 0),
+        0
     );
+
+    const openPath = editable
+        ? `${basePath}/${release.id}/edit`
+        : `${basePath}/${release.id}`;
+
+    const deleteDraft = () => {
+        if (!isDraft) {
+            return;
+        }
+
+        if (
+            !window.confirm(
+                `Delete draft "${release.title || 'Untitled Release'}"?\n\nThis action will remove the draft from My Releases.`
+            )
+        ) {
+            return;
+        }
+
+        router.delete(
+            `/v2/releases/${release.id}`,
+            {
+                preserveScroll: true,
+            }
+        );
+    };
 
     return (
         <article
@@ -667,50 +669,56 @@ function ReleaseCard({
                 ?? 'border-slate-200'
             }`}
         >
-            <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200">
-                {release.artwork_path ? (
-                    <img
-                        src={`/storage/${release.artwork_path}`}
-                        alt={release.title}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                    />
-                ) : (
-                    <div className="flex h-full items-center justify-center">
-                        <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/80 text-5xl text-violet-600 shadow-lg backdrop-blur">
-                            ♫
-                        </div>
-                    </div>
-                )}
-
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent p-5 pt-16">
-                    <div className="flex items-end justify-between gap-4">
-                        <div className="min-w-0">
-                            <p className="truncate text-xl font-bold text-white">
-                                {release.title
-                                    || 'Untitled Release'}
-                            </p>
-
-                            <p className="mt-1 truncate text-sm text-white/75">
-                                {release.primary_artist_name
-                                    || 'Artist'}
-                            </p>
-                        </div>
-
-                        <StatusBadge
-                            status={status}
+            <Link
+                href={openPath}
+                className="block"
+            >
+                <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200">
+                    {release.artwork_path ? (
+                        <img
+                            src={`/storage/${release.artwork_path}`}
+                            alt={release.title}
+                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                         />
+                    ) : (
+                        <div className="flex h-full items-center justify-center">
+                            <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/80 text-5xl text-violet-600 shadow-lg backdrop-blur">
+                                ♫
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent p-5 pt-16">
+                        <div className="flex items-end justify-between gap-4">
+                            <div className="min-w-0">
+                                <p className="truncate text-xl font-bold text-white">
+                                    {release.title
+                                        || 'Untitled Release'}
+                                </p>
+
+                                <p className="mt-1 truncate text-sm text-white/75">
+                                    {release.primary_artist_name
+                                        || 'Artist'}
+                                </p>
+                            </div>
+
+                            <StatusBadge
+                                status={status}
+                            />
+                        </div>
                     </div>
                 </div>
-            </div>
+            </Link>
 
-            <div className="space-y-5 p-5">
+            <div className="p-5">
                 <div className="grid grid-cols-2 gap-3">
                     <InfoBox
-                        label="Release Type"
-                        value={
-                            release.release_type
-                            || 'Release'
-                        }
+                        label="Tracks"
+                        value={`${trackCount} ${
+                            trackCount === 1
+                                ? 'Track'
+                                : 'Tracks'
+                        }`}
                     />
 
                     <InfoBox
@@ -729,78 +737,54 @@ function ReleaseCard({
                     />
 
                     <InfoBox
-                        label="Release ID"
-                        value={
-                            release.public_id
-                            || `#${release.id}`
-                        }
+                        label="Status"
+                        value={status}
                     />
                 </div>
 
-                <div>
-                    <div className="mb-2 flex items-center justify-between text-xs">
-                        <span className="font-semibold text-slate-500">
-                            Release completion
-                        </span>
-
-                        <span className="font-bold text-slate-900">
-                            {percentage}%
-                        </span>
-                    </div>
-
-                    <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                            className={`h-full rounded-full bg-gradient-to-r transition-all duration-500 ${
-                                progressClass[
-                                    status
-                                ]
-                                ?? 'from-violet-500 to-indigo-500'
-                            }`}
-                            style={{
-                                width:
-                                    `${percentage}%`,
-                            }}
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3 border-t border-slate-100 pt-4">
-                    {editable ? (
-                        <Link
-                            href={
-                            editable
-                                ? `${basePath}/${release.id}/edit`
-                                : `${basePath}/${release.id}`
-                        }
-                            className="inline-flex flex-1 items-center justify-center rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
-                        >
-                            Continue Release
-                        </Link>
-                    ) : (
-                        <Link
-                            href={`${basePath}/${release.id}`}
-                            className="inline-flex flex-1 items-center justify-center rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-                        >
-                            View Details
-                        </Link>
-                    )}
-
+                <div className="mt-4 flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
                     <Link
-                        href={
+                        href={openPath}
+                        title={
                             editable
-                                ? `${basePath}/${release.id}/edit`
-                                : `${basePath}/${release.id}`
+                                ? 'Edit release'
+                                : 'View release'
                         }
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
-                        title="Open release"
+                        aria-label={
+                            editable
+                                ? 'Edit release'
+                                : 'View release'
+                        }
+                        className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition ${
+                            editable
+                                ? 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'
+                        }`}
                     >
-                        →
+                        {editable ? (
+                            <PencilIcon />
+                        ) : (
+                            <EyeIcon />
+                        )}
                     </Link>
+
+                    {isDraft && (
+                        <button
+                            type="button"
+                            onClick={deleteDraft}
+                            title="Delete draft"
+                            aria-label="Delete draft"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100"
+                        >
+                            <TrashIcon />
+                        </button>
+                    )}
                 </div>
             </div>
         </article>
     );
 }
+
 
 function ReleaseRow({
     release,
@@ -815,28 +799,73 @@ function ReleaseRow({
         'rejected',
     ].includes(status);
 
-    const percentage = Math.min(
-        Math.max(
-            Number(
-                release.completion_percentage
-                ?? 0
-            ),
-            0
-        ),
-        100
+    const isDraft =
+        status === 'draft';
+
+    const trackCount = Math.max(
+        Number(release.track_count ?? 0),
+        0
     );
+
+    const openPath = editable
+        ? `${basePath}/${release.id}/edit`
+        : `${basePath}/${release.id}`;
+
+    const deleteDraft = () => {
+        if (!isDraft) {
+            return;
+        }
+
+        if (
+            !window.confirm(
+                `Delete draft "${release.title || 'Untitled Release'}"?\n\nThis action will remove the draft from My Releases.`
+            )
+        ) {
+            return;
+        }
+
+        router.delete(
+            `/v2/releases/${release.id}`,
+            {
+                preserveScroll: true,
+            }
+        );
+    };
 
     return (
         <tr className="transition hover:bg-slate-50">
             <td className="px-5 py-4">
+                <div className="inline-flex items-center gap-2 whitespace-nowrap">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-sm text-violet-600">
+                        ♫
+                    </span>
+
+                    <span className="text-sm font-semibold text-slate-700">
+                        {trackCount}
+                        {' '}
+                        {trackCount === 1
+                            ? 'Track'
+                            : 'Tracks'}
+                    </span>
+                </div>
+            </td>
+
+            <td className="px-5 py-4">
+                <StatusBadge
+                    status={status}
+                />
+            </td>
+
+            <td className="px-5 py-4">
                 <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100">
+                    <Link
+                        href={openPath}
+                        className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100"
+                    >
                         {release.artwork_path ? (
                             <img
                                 src={`/storage/${release.artwork_path}`}
-                                alt={
-                                    release.title
-                                }
+                                alt={release.title}
                                 className="h-full w-full object-cover"
                             />
                         ) : (
@@ -844,13 +873,16 @@ function ReleaseRow({
                                 ♫
                             </span>
                         )}
-                    </div>
+                    </Link>
 
                     <div className="min-w-0">
-                        <div className="max-w-64 truncate font-semibold text-slate-900">
+                        <Link
+                            href={openPath}
+                            className="block max-w-64 truncate font-semibold text-slate-900 transition hover:text-violet-700"
+                        >
                             {release.title
                                 || 'Untitled Release'}
-                        </div>
+                        </Link>
 
                         <div className="mt-1 max-w-64 truncate text-sm text-slate-500">
                             {release.primary_artist_name
@@ -865,71 +897,125 @@ function ReleaseRow({
                 </div>
             </td>
 
-            <td className="px-5 py-4 text-sm font-medium text-slate-600">
-                {release.upc || 'Pending'}
-            </td>
-
             <td className="px-5 py-4 text-sm text-slate-600">
                 {formatDate(
                     release.digital_release_date
                 )}
             </td>
 
-            <td className="px-5 py-4">
-                <StatusBadge
-                    status={status}
-                />
+            <td className="px-5 py-4 text-sm font-medium text-slate-600">
+                {release.upc || 'Pending'}
             </td>
 
             <td className="px-5 py-4">
-                <div className="min-w-36">
-                    <div className="mb-1.5 flex justify-between text-xs text-slate-500">
-                        <span>
-                            Completion
-                        </span>
+                <div className="flex items-center justify-end gap-2">
+                    <Link
+                        href={openPath}
+                        title={
+                            editable
+                                ? 'Edit release'
+                                : 'View release'
+                        }
+                        aria-label={
+                            editable
+                                ? 'Edit release'
+                                : 'View release'
+                        }
+                        className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                            editable
+                                ? 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'
+                        }`}
+                    >
+                        {editable ? (
+                            <PencilIcon />
+                        ) : (
+                            <EyeIcon />
+                        )}
+                    </Link>
 
-                        <span className="font-semibold text-slate-700">
-                            {percentage}%
-                        </span>
-                    </div>
-
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                            className={`h-full rounded-full bg-gradient-to-r ${
-                                progressClass[
-                                    status
-                                ]
-                                ?? 'from-violet-500 to-indigo-500'
-                            }`}
-                            style={{
-                                width:
-                                    `${percentage}%`,
-                            }}
-                        />
-                    </div>
+                    {isDraft && (
+                        <button
+                            type="button"
+                            onClick={deleteDraft}
+                            title="Delete draft"
+                            aria-label="Delete draft"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100"
+                        >
+                            <TrashIcon />
+                        </button>
+                    )}
                 </div>
-            </td>
-
-            <td className="px-5 py-4 text-right">
-                {editable ? (
-                    <Link
-                        href={`${basePath}/${release.id}/edit`}
-                        className="inline-flex rounded-xl bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
-                    >
-                        Continue
-                    </Link>
-                ) : (
-                    <Link
-                        href={`${basePath}/${release.id}`}
-                        className="inline-flex rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-                    >
-                        View
-                    </Link>
-                )}
             </td>
         </tr>
     );
 }
+
+
+function EyeIcon() {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="h-4 w-4"
+            aria-hidden="true"
+        >
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"
+            />
+            <circle
+                cx="12"
+                cy="12"
+                r="2.75"
+            />
+        </svg>
+    );
+}
+
+
+function PencilIcon() {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="h-4 w-4"
+            aria-hidden="true"
+        >
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="m14.7 5.3 4 4M4.5 19.5l4.2-.9L19 8.3a2.1 2.1 0 0 0-3-3L5.7 15.6l-1.2 3.9Z"
+            />
+        </svg>
+    );
+}
+
+
+function TrashIcon() {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="h-4 w-4"
+            aria-hidden="true"
+        >
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4.5 7.5h15M9 7.5V4.75h6V7.5M7 7.5l.75 12h8.5L17 7.5M9.75 10.5v6M14.25 10.5v6"
+            />
+        </svg>
+    );
+}
+
 
 function InfoBox({
     label,

@@ -1,4 +1,10 @@
 import {
+    useEffect,
+    useRef,
+    useState,
+} from 'react';
+
+import {
     Head,
     Link,
 } from '@inertiajs/react';
@@ -47,6 +53,215 @@ const readable = (value) =>
     String(value ?? '')
         .replaceAll('_', ' ')
         .trim();
+
+
+function CompactTrackPlayer({ src, compact = false }) {
+    const audioRef = useRef(null);
+
+    const [playing, setPlaying] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+
+    useEffect(() => {
+        const audio = audioRef.current;
+
+        if (!audio) {
+            return undefined;
+        }
+
+        const syncTime = () => {
+            setCurrentTime(audio.currentTime || 0);
+        };
+
+        const syncDuration = () => {
+            setDuration(
+                Number.isFinite(audio.duration)
+                    ? audio.duration
+                    : 0
+            );
+        };
+
+        const handleEnded = () => {
+            setPlaying(false);
+            setCurrentTime(0);
+        };
+
+        audio.addEventListener(
+            'timeupdate',
+            syncTime
+        );
+
+        audio.addEventListener(
+            'loadedmetadata',
+            syncDuration
+        );
+
+        audio.addEventListener(
+            'durationchange',
+            syncDuration
+        );
+
+        audio.addEventListener(
+            'ended',
+            handleEnded
+        );
+
+        return () => {
+            audio.pause();
+
+            audio.removeEventListener(
+                'timeupdate',
+                syncTime
+            );
+
+            audio.removeEventListener(
+                'loadedmetadata',
+                syncDuration
+            );
+
+            audio.removeEventListener(
+                'durationchange',
+                syncDuration
+            );
+
+            audio.removeEventListener(
+                'ended',
+                handleEnded
+            );
+        };
+    }, [src]);
+
+    const formatTime = (value) => {
+        const seconds =
+            Number.isFinite(value)
+                ? Math.max(0, Math.floor(value))
+                : 0;
+
+        const minutes =
+            Math.floor(seconds / 60);
+
+        const remaining =
+            seconds % 60;
+
+        return `${String(minutes).padStart(2, '0')}:${String(remaining).padStart(2, '0')}`;
+    };
+
+    const togglePlayback = async () => {
+        const audio = audioRef.current;
+
+        if (!audio) {
+            return;
+        }
+
+        try {
+            if (audio.paused) {
+                await audio.play();
+                setPlaying(true);
+            } else {
+                audio.pause();
+                setPlaying(false);
+            }
+        } catch (error) {
+            console.error(
+                'Audio playback failed:',
+                error
+            );
+        }
+    };
+
+    const progress =
+        duration > 0
+            ? Math.min(
+                100,
+                Math.max(
+                    0,
+                    (currentTime / duration) * 100
+                )
+            )
+            : 0;
+
+    const circumference = 2 * Math.PI * 18;
+
+    const dashOffset =
+        circumference
+        - (progress / 100) * circumference;
+
+    return (
+        <div className="flex items-center gap-2">
+            <audio
+                ref={audioRef}
+                src={src}
+                preload="metadata"
+            />
+
+            <button
+                type="button"
+                onClick={togglePlayback}
+                className="group relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                title={
+                    playing
+                        ? 'Pause audio'
+                        : 'Play audio'
+                }
+            >
+                <svg
+                    viewBox="0 0 44 44"
+                    className="absolute inset-0 h-11 w-11 -rotate-90"
+                    aria-hidden="true"
+                >
+                    <circle
+                        cx="22"
+                        cy="22"
+                        r="18"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        className="text-slate-200"
+                    />
+
+                    <circle
+                        cx="22"
+                        cy="22"
+                        r="18"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeDasharray={
+                            circumference
+                        }
+                        strokeDashoffset={
+                            dashOffset
+                        }
+                        className="text-violet-600 transition-[stroke-dashoffset] duration-150"
+                    />
+                </svg>
+
+                <span className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-[11px] text-white transition group-hover:bg-violet-600">
+                    {playing ? (
+                        <span className="font-bold">
+                            ❚❚
+                        </span>
+                    ) : (
+                        <span className="ml-0.5">
+                            ▶
+                        </span>
+                    )}
+                </span>
+            </button>
+
+            {!compact && (
+                <div className="whitespace-nowrap font-mono text-[11px] font-semibold text-slate-500">
+                    {formatTime(currentTime)}
+                    <span className="mx-1 text-slate-300">
+                        /
+                    </span>
+                    {formatTime(duration)}
+                </div>
+            )}
+        </div>
+    );
+}
 
 export default function Show({
     role = 'artist',
@@ -225,14 +440,15 @@ export default function Show({
                                 <tr>
                                     {[
                                         '#',
+                                        '',
                                         'Track',
                                         'Artist',
                                         'ISRC',
                                         'Audio QC',
                                         'Status',
-                                    ].map((heading) => (
+                                    ].map((heading, headingIndex) => (
                                         <th
-                                            key={heading}
+                                            key={`${heading}-${headingIndex}`}
                                             className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
                                         >
                                             {heading}
@@ -248,6 +464,15 @@ export default function Show({
                                             <tr key={track.id}>
                                                 <td className="px-5 py-4 text-sm text-slate-500">
                                                     {index + 1}
+                                                </td>
+
+                                                <td className="w-16 px-2 py-4">
+                                                    {track.stream_url ? (
+                                                        <CompactTrackPlayer
+                                                            src={track.stream_url}
+                                                            compact
+                                                        />
+                                                    ) : null}
                                                 </td>
 
                                                 <td className="px-5 py-4">

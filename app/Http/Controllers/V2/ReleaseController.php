@@ -83,20 +83,69 @@ class ReleaseController extends Controller
         }
 
         if ($role === 'label') {
-            $label = Label::query()
+            /*
+             * Label catalogue visibility:
+             *
+             * A label user can see releases belonging to:
+             * 1. Every label directly owned by that user.
+             * 2. Every descendant/sub-label underneath those labels.
+             *
+             * This keeps My Releases, search, filters and status counts
+             * inside the same catalogue scope.
+             */
+            $rootLabelIds = Label::query()
                 ->where(
                     'user_id',
                     $request->user()->id
                 )
                 ->whereNull('deleted_at')
-                ->first();
+                ->pluck('id');
 
-            $label
-                ? $query->where(
+            if ($rootLabelIds->isEmpty()) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $visibleLabelIds = $rootLabelIds
+                    ->map(fn ($id) => (int) $id)
+                    ->values();
+
+                $frontier = $visibleLabelIds;
+
+                /*
+                 * Resolve the complete descendant tree instead of
+                 * limiting catalogue visibility to one sub-label level.
+                 */
+                while ($frontier->isNotEmpty()) {
+                    $childIds = Label::query()
+                        ->whereIn(
+                            'parent_label_id',
+                            $frontier
+                        )
+                        ->whereNull('deleted_at')
+                        ->pluck('id')
+                        ->map(fn ($id) => (int) $id)
+                        ->reject(
+                            fn ($id) =>
+                                $visibleLabelIds->contains($id)
+                        )
+                        ->values();
+
+                    if ($childIds->isEmpty()) {
+                        break;
+                    }
+
+                    $visibleLabelIds = $visibleLabelIds
+                        ->merge($childIds)
+                        ->unique()
+                        ->values();
+
+                    $frontier = $childIds;
+                }
+
+                $query->whereIn(
                     'label_id',
-                    $label->id
-                )
-                : $query->whereRaw('1 = 0');
+                    $visibleLabelIds
+                );
+            }
         }
 
         if ($role === 'admin') {
@@ -155,6 +204,34 @@ class ReleaseController extends Controller
                 );
             }
         }
+
+        /*
+         * My Releases summary metadata.
+         *
+         * Use real track metadata only. audio_duration_seconds is preferred
+         * because it comes from audio validation; duration_seconds remains
+         * the safe fallback for older tracks.
+         */
+        $query
+            ->addSelect([
+                'track_count' => DB::table('tracks')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn(
+                        'tracks.release_id',
+                        'releases.id'
+                    )
+                    ->whereNull('tracks.deleted_at'),
+
+                'total_audio_duration_seconds' => DB::table('tracks')
+                    ->selectRaw(
+                        'ROUND(SUM(COALESCE(NULLIF(audio_duration_seconds, 0), NULLIF(duration_seconds, 0), 0)))'
+                    )
+                    ->whereColumn(
+                        'tracks.release_id',
+                        'releases.id'
+                    )
+                    ->whereNull('tracks.deleted_at'),
+            ]);
 
         $scopedQuery = clone $query;
 
@@ -488,10 +565,51 @@ class ReleaseController extends Controller
                 'You cannot view this release.'
             );
         } elseif ($role === 'label') {
+            $rootLabelIds = Label::query()
+                ->where(
+                    'user_id',
+                    $request->user()->id
+                )
+                ->whereNull('deleted_at')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            $visibleLabelIds = $rootLabelIds;
+            $frontier = $rootLabelIds;
+
+            while ($frontier->isNotEmpty()) {
+                $childIds = Label::query()
+                    ->whereIn(
+                        'parent_label_id',
+                        $frontier
+                    )
+                    ->whereNull('deleted_at')
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->reject(
+                        fn ($id) =>
+                            $visibleLabelIds->contains($id)
+                    )
+                    ->values();
+
+                if ($childIds->isEmpty()) {
+                    break;
+                }
+
+                $visibleLabelIds = $visibleLabelIds
+                    ->merge($childIds)
+                    ->unique()
+                    ->values();
+
+                $frontier = $childIds;
+            }
+
             abort_unless(
                 $release->label
-                && (int) $release->label->user_id
-                    === (int) $request->user()->id,
+                && $visibleLabelIds->contains(
+                    (int) $release->label->id
+                ),
                 403,
                 'You cannot view this release.'
             );
@@ -636,6 +754,13 @@ class ReleaseController extends Controller
                                         (bool) $track->is_instrumental,
                                     'audio_path' =>
                                         $track->audio_path,
+                                    'stream_url' =>
+                                        $track->audio_path
+                                            ? route(
+                                                'v2.release-tracks.stream',
+                                                $track
+                                            )
+                                            : null,
                                     'audio_original_name' =>
                                         $track->audio_original_name,
                                     'audio_size_bytes' =>
@@ -688,6 +813,46 @@ class ReleaseController extends Controller
             ]
         );
     }
+
+    public function destroy(
+        Request $request,
+        Release $release,
+        ReleaseAccessService $access
+    ): RedirectResponse {
+        /*
+         * Normal catalogue deletion is intentionally limited to drafts.
+         * Submitted, approved, delivered, live and other workflow states
+         * must use their dedicated workflow instead.
+         */
+        abort_unless(
+            $release->status === 'draft',
+            403,
+            'Only draft releases can be deleted.'
+        );
+
+        $access->authorizeUpdate(
+            $request->user(),
+            $release
+        );
+
+        $title = $release->title;
+
+        $release->update([
+            'updated_by' => $request->user()->id,
+        ]);
+
+        /*
+         * Release uses SoftDeletes. Related production records and files
+         * are therefore not physically destroyed by this action.
+         */
+        $release->delete();
+
+        return back()->with(
+            'success',
+            "Draft '{$title}' deleted successfully."
+        );
+    }
+
 
     public function update(
         Request $request,

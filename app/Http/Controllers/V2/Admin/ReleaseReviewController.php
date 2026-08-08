@@ -5,6 +5,7 @@ namespace App\Http\Controllers\V2\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Core\Artist;
 use App\Models\Distribution\Release;
+use App\Models\Distribution\Track;
 use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\AdminReleaseReviewService;
 use App\Services\V2\PermissionService;
@@ -278,13 +279,38 @@ class ReleaseReviewController extends Controller
         );
 
         $release->load([
+            'artist',
+            'label',
             'tracks' => function ($query) {
                 $query
+                    ->with([
+                        'contributors',
+                        'contributorCredits',
+                    ])
                     ->orderBy('disc_number')
                     ->orderBy('track_number')
                     ->orderBy('id');
             },
         ]);
+
+        $release->setAttribute(
+            'label_name',
+            $release->label?->name
+                ?? $release->label?->label_name
+                ?? null
+        );
+
+        $release->tracks->each(function ($track) {
+            $track->setAttribute(
+                'stream_url',
+                $track->audio_path
+                    ? route(
+                        'v2.release-tracks.stream',
+                        $track
+                    )
+                    : null
+            );
+        });
 
         $statusLogs = [];
 
@@ -345,6 +371,124 @@ class ReleaseReviewController extends Controller
             ]
         );
     }
+
+    public function updateMetadata(
+        Request $request,
+        Release $release,
+        AdminReleaseReviewService $reviews,
+        ReleaseAccessService $access
+    ): RedirectResponse {
+        $reviews->authorizeReviewer($request->user());
+        $access->authorizeView($request->user(), $release);
+
+        abort_unless(
+            in_array($release->status, [
+                'submitted',
+                'changes_requested',
+                'approved',
+            ], true),
+            422,
+            'Release metadata cannot be edited in its current status.'
+        );
+
+        $validated = $request->validate([
+            'title' => ['sometimes', 'required', 'string', 'max:255'],
+            'version' => ['nullable', 'string', 'max:255'],
+            'release_type' => ['nullable', 'string', 'max:100'],
+            'primary_artist_name' => ['nullable', 'string', 'max:255'],
+            'featuring_artist_name' => ['nullable', 'string', 'max:255'],
+            'language' => ['nullable', 'string', 'max:100'],
+            'primary_genre' => ['nullable', 'string', 'max:100'],
+            'sub_genre' => ['nullable', 'string', 'max:100'],
+            'original_release_date' => ['nullable', 'date'],
+            'digital_release_date' => ['nullable', 'date'],
+            'copyright_owner' => ['nullable', 'string', 'max:255'],
+            'copyright_year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+            'phonographic_owner' => ['nullable', 'string', 'max:255'],
+            'phonographic_year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+            'release_timezone' => ['nullable', 'string', 'max:100'],
+            'pre_order' => ['nullable', 'boolean'],
+        ]);
+
+        $validated['updated_by'] = $request->user()->id;
+
+        $release->fill($validated);
+        $release->save();
+
+        return back()->with(
+            'success',
+            'Release metadata updated successfully.'
+        );
+    }
+
+
+    public function updateTrackMetadata(
+        Request $request,
+        Release $release,
+        Track $track,
+        AdminReleaseReviewService $reviews,
+        ReleaseAccessService $access
+    ): RedirectResponse {
+        $reviews->authorizeReviewer($request->user());
+        $access->authorizeView($request->user(), $release);
+
+        abort_unless(
+            (int) $track->release_id === (int) $release->id,
+            404
+        );
+
+        abort_unless(
+            in_array($release->status, [
+                'submitted',
+                'changes_requested',
+                'approved',
+            ], true),
+            422,
+            'Track metadata cannot be edited in its current status.'
+        );
+
+        $validated = $request->validate([
+            'disc_number' => ['nullable', 'integer', 'min:1'],
+            'track_number' => ['nullable', 'integer', 'min:1'],
+            'title' => ['sometimes', 'required', 'string', 'max:255'],
+            'version' => ['nullable', 'string', 'max:255'],
+            'subtitle' => ['nullable', 'string', 'max:255'],
+            'track_type' => ['nullable', 'string', 'max:100'],
+            'primary_artist_name' => ['nullable', 'string', 'max:255'],
+            'featuring_artist_name' => ['nullable', 'string', 'max:255'],
+            'author_name' => ['nullable', 'string', 'max:255'],
+            'composer_name' => ['nullable', 'string', 'max:255'],
+            'arranger_name' => ['nullable', 'string', 'max:255'],
+            'producer_name' => ['nullable', 'string', 'max:255'],
+            'music_director_name' => ['nullable', 'string', 'max:255'],
+            'publisher_name' => ['nullable', 'string', 'max:255'],
+            'p_line' => ['nullable', 'string', 'max:255'],
+            'release_year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
+            'language' => ['nullable', 'string', 'max:100'],
+            'title_language' => ['nullable', 'string', 'max:100'],
+            'lyrics_language' => ['nullable', 'string', 'max:100'],
+            'genre' => ['nullable', 'string', 'max:100'],
+            'sub_genre' => ['nullable', 'string', 'max:100'],
+            'parental_advisory' => ['nullable', 'string', 'max:50'],
+            'price_tier' => ['nullable', 'string', 'max:50'],
+            'is_explicit' => ['nullable', 'boolean'],
+            'is_instrumental' => ['nullable', 'boolean'],
+            'contains_ai_generated_content' => ['nullable', 'boolean'],
+            'preview_start_seconds' => ['nullable', 'integer', 'min:0'],
+            'lyrics' => ['nullable', 'string'],
+        ]);
+
+        $validated['updated_by'] = $request->user()->id;
+
+        $track->fill($validated);
+        $track->save();
+
+        return back()->with(
+            'success',
+            'Track metadata updated successfully.'
+        );
+    }
+
 
     public function approve(
         Request $request,

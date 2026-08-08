@@ -317,13 +317,7 @@ class AudioValidationService
             '-select_streams',
             'a:0',
             '-show_entries',
-            implode(',', [
-                'stream=codec_name,codec_long_name',
-                'stream=sample_rate,channels',
-                'stream=channel_layout,bits_per_sample',
-                'stream=bits_per_raw_sample',
-                'format=format_name,duration,size',
-            ]),
+            'stream=codec_name,codec_long_name,sample_rate,channels,channel_layout,bits_per_sample,bits_per_raw_sample:format=format_name,duration,size',
             '-of',
             'json',
             $path,
@@ -702,17 +696,6 @@ class AudioValidationService
         if ($duration > 7200) {
             $errors['duration_limit'] =
                 'Audio duration cannot exceed 120 minutes.';
-        }
-
-        $peak = $metadata['peak_db']
-            ?? null;
-
-        if (
-            $peak !== null
-            && (float) $peak >= 0
-        ) {
-            $errors['clipping'] =
-                'Audio peak reaches 0 dB and may be clipped.';
         }
 
         $leading = (float) (

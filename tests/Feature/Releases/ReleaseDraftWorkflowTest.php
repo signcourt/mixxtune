@@ -204,6 +204,83 @@ class ReleaseDraftWorkflowTest extends TestCase
         );
     }
 
+    public function test_artist_can_delete_own_draft_release(): void
+    {
+        [$user, $label, $artist] = $this->createArtistContext();
+
+        $release = Release::factory()->create([
+            'artist_id' => $artist->id,
+            'label_id' => $label->id,
+            'created_by' => $user->id,
+            'status' => 'draft',
+            'title' => 'Delete Me Draft',
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->delete(route('v2.releases.destroy', $release));
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success');
+
+        $this->assertSoftDeleted('releases', [
+            'id' => $release->id,
+        ]);
+    }
+
+    public function test_artist_cannot_delete_another_artists_draft(): void
+    {
+        [$owner, $ownerLabel, $ownerArtist] = $this->createArtistContext();
+        [$otherUser] = $this->createArtistContext();
+
+        $release = Release::factory()->create([
+            'artist_id' => $ownerArtist->id,
+            'label_id' => $ownerLabel->id,
+            'created_by' => $owner->id,
+            'status' => 'draft',
+            'title' => 'Protected Foreign Draft',
+        ]);
+
+        $response = $this
+            ->actingAs($otherUser)
+            ->delete(route('v2.releases.destroy', $release));
+
+        $response->assertForbidden();
+
+        $this->assertDatabaseHas('releases', [
+            'id' => $release->id,
+            'status' => 'draft',
+            'deleted_at' => null,
+        ]);
+    }
+
+    public function test_artist_cannot_delete_submitted_or_approved_release(): void
+    {
+        [$user, $label, $artist] = $this->createArtistContext();
+
+        foreach (['submitted', 'approved'] as $status) {
+            $release = Release::factory()->create([
+                'artist_id' => $artist->id,
+                'label_id' => $label->id,
+                'created_by' => $user->id,
+                'status' => $status,
+                'title' => "Protected {$status} Release",
+            ]);
+
+            $response = $this
+                ->actingAs($user)
+                ->delete(route('v2.releases.destroy', $release));
+
+            $response->assertForbidden();
+
+            $this->assertDatabaseHas('releases', [
+                'id' => $release->id,
+                'status' => $status,
+                'deleted_at' => null,
+            ]);
+        }
+    }
+
     public function test_guest_cannot_create_release(): void
     {
         $response = $this->post(

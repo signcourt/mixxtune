@@ -1471,6 +1471,14 @@ Route::middleware(['auth', 'verified'])
 
 
 Route::middleware(['auth', 'verified'])
+    ->delete(
+        '/v2/releases/{release}',
+        [\App\Http\Controllers\V2\ReleaseController::class, 'destroy']
+    )
+    ->name('v2.releases.destroy');
+
+
+Route::middleware(['auth', 'verified'])
     ->post(
         '/v2/releases/{release}/tracks',
         [\App\Http\Controllers\V2\ReleaseTrackController::class, 'store']
@@ -1556,6 +1564,21 @@ Route::middleware(['auth', 'verified'])
         [\App\Http\Controllers\V2\Admin\ReleaseReviewController::class, 'show']
     )
     ->name('v2.admin.release-reviews.show');
+
+
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/v2/admin/release-reviews/{release}/metadata',
+        [\App\Http\Controllers\V2\Admin\ReleaseReviewController::class, 'updateMetadata']
+    )
+    ->name('v2.admin.release-reviews.metadata.update');
+
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/v2/admin/release-reviews/{release}/tracks/{track}/metadata',
+        [\App\Http\Controllers\V2\Admin\ReleaseReviewController::class, 'updateTrackMetadata']
+    )
+    ->name('v2.admin.release-reviews.track-metadata.update');
 
 
 Route::middleware(['auth', 'verified'])
