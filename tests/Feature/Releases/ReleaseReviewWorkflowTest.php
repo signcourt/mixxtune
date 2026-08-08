@@ -657,6 +657,280 @@ class ReleaseReviewWorkflowTest extends TestCase
         );
     }
 
+    public function test_artist_can_edit_and_resubmit_changes_requested_release(): void
+    {
+        [
+            $artistUser,
+            ,
+            ,
+            $release,
+        ] = $this->createArtistContext();
+
+        $release = $this->submitRelease(
+            $artistUser,
+            $release
+        );
+
+        $admin = $this->createSuperAdmin();
+
+        $this
+            ->actingAs($admin)
+            ->postJson(
+                $this->requestChangesUrl($release),
+                [
+                    'notes' =>
+                        'Please correct the release metadata.',
+                ]
+            )
+            ->assertRedirect(
+                route('v2.admin.release-reviews.index')
+            );
+
+        $release->refresh();
+
+        $this->assertSame(
+            'changes_requested',
+            $release->status
+        );
+
+        $updatedTitle =
+            'Review Workflow Release Corrected';
+
+        $payload = [
+            'catalog_number' =>
+                $release->catalog_number,
+            'release_type' =>
+                $release->release_type,
+            'title' =>
+                $updatedTitle,
+            'version' =>
+                $release->version,
+            'artist_id' =>
+                $release->artist_id,
+            'label_id' =>
+                $release->label_id,
+            'primary_artist_name' =>
+                $release->primary_artist_name,
+            'primary_artists' =>
+                $release->primary_artists,
+            'featuring_artists' =>
+                $release->featuring_artists ?? [],
+            'language' =>
+                $release->language,
+            'primary_genre' =>
+                $release->primary_genre,
+            'sub_genre' =>
+                $release->sub_genre ?? 'Bhajan',
+            'generate_upc' => true,
+            'digital_release_date' =>
+                $release->digital_release_date,
+            'copyright_owner' =>
+                $release->copyright_owner,
+            'copyright_year' =>
+                $release->copyright_year,
+            'phonographic_owner' =>
+                $release->phonographic_owner,
+            'phonographic_year' =>
+                $release->phonographic_year,
+        ];
+
+        $this
+            ->actingAs($artistUser)
+            ->patch(
+                route(
+                    'v2.releases.update',
+                    $release
+                ),
+                $payload
+            )
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(
+                route(
+                    'v2.releases.edit',
+                    $release,
+                    absolute: false
+                )
+            );
+
+        $release->refresh();
+
+        $this->assertSame(
+            'changes_requested',
+            $release->status
+        );
+
+        $this->assertSame(
+            $updatedTitle,
+            $release->title
+        );
+
+        $this
+            ->actingAs($artistUser)
+            ->post(
+                $this->submitUrl($release)
+            )
+            ->assertRedirect(
+                route('v2.releases.index')
+            );
+
+        $release->refresh();
+
+        $this->assertSame(
+            'submitted',
+            $release->status
+        );
+
+        $this->assertNotNull(
+            $release->submitted_at
+        );
+
+        $this->assertDatabaseHas(
+            'release_status_logs',
+            [
+                'release_id' => $release->id,
+                'old_status' => 'changes_requested',
+                'new_status' => 'submitted',
+                'changed_by' => $artistUser->id,
+            ]
+        );
+    }
+
+    public function test_artist_cannot_edit_rejected_release(): void
+    {
+        [
+            $artistUser,
+            ,
+            ,
+            $release,
+        ] = $this->createArtistContext();
+
+        $release = $this->submitRelease(
+            $artistUser,
+            $release
+        );
+
+        $admin = $this->createSuperAdmin();
+
+        $reason =
+            'Release does not meet delivery requirements.';
+
+        $this
+            ->actingAs($admin)
+            ->postJson(
+                $this->rejectUrl($release),
+                [
+                    'reason' => $reason,
+                ]
+            )
+            ->assertRedirect(
+                route('v2.admin.release-reviews.index')
+            );
+
+        $release->refresh();
+
+        $this->assertSame(
+            'rejected',
+            $release->status
+        );
+
+        $originalTitle = $release->title;
+
+        $this
+            ->actingAs($artistUser)
+            ->patchJson(
+                route(
+                    'v2.releases.update',
+                    $release
+                ),
+                [
+                    'title' =>
+                        'Rejected Release Must Stay Locked',
+                ]
+            )
+            ->assertForbidden();
+
+        $release->refresh();
+
+        $this->assertSame(
+            'rejected',
+            $release->status
+        );
+
+        $this->assertSame(
+            $originalTitle,
+            $release->title
+        );
+
+        $this->assertSame(
+            $reason,
+            $release->rejection_reason
+        );
+    }
+
+    public function test_artist_cannot_resubmit_rejected_release(): void
+    {
+        [
+            $artistUser,
+            ,
+            ,
+            $release,
+        ] = $this->createArtistContext();
+
+        $release = $this->submitRelease(
+            $artistUser,
+            $release
+        );
+
+        $admin = $this->createSuperAdmin();
+
+        $this
+            ->actingAs($admin)
+            ->postJson(
+                $this->rejectUrl($release),
+                [
+                    'reason' =>
+                        'Release rejected as a final review decision.',
+                ]
+            )
+            ->assertRedirect(
+                route('v2.admin.release-reviews.index')
+            );
+
+        $release->refresh();
+
+        $this->assertSame(
+            'rejected',
+            $release->status
+        );
+
+        $this
+            ->actingAs($artistUser)
+            ->postJson(
+                $this->submitUrl($release)
+            )
+            ->assertForbidden();
+
+        $release->refresh();
+
+        $this->assertSame(
+            'rejected',
+            $release->status
+        );
+
+        $this->assertNull(
+            $release->approved_at
+        );
+
+        $this->assertDatabaseMissing(
+            'release_status_logs',
+            [
+                'release_id' => $release->id,
+                'old_status' => 'rejected',
+                'new_status' => 'submitted',
+            ]
+        );
+    }
+
     public function test_super_admin_can_start_processing_after_approval(): void
     {
         [

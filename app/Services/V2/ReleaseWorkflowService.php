@@ -22,11 +22,7 @@ class ReleaseWorkflowService
             'archived',
         ],
 
-        'rejected' => [
-            'draft',
-            'submitted',
-            'archived',
-        ],
+        'rejected' => [],
 
         'submitted' => [
             'changes_requested',

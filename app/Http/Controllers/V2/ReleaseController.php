@@ -662,7 +662,6 @@ class ReleaseController extends Controller
             [
                 'draft',
                 'changes_requested',
-                'rejected',
             ],
             true
         );
@@ -1038,9 +1037,7 @@ class ReleaseController extends Controller
                 ?? $release->artwork_path,
 
             'status' =>
-                $release->status === 'rejected'
-                    ? 'draft'
-                    : $release->status,
+                $release->status,
 
             'wizard_step' => max(
                 1,
@@ -1068,10 +1065,6 @@ class ReleaseController extends Controller
                     )
                 )
             ),
-
-            'rejection_reason' => null,
-            'rejected_at' => null,
-            'rejected_by' => null,
 
             'updated_by' =>
                 $request->user()->id,

@@ -146,7 +146,6 @@ class ReleaseAccessService
             [
                 'draft',
                 'changes_requested',
-                'rejected',
             ],
             true
         );

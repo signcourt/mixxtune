@@ -626,7 +626,9 @@ function ReleaseCard({
     const isDraft =
         status === 'draft';
 
-    const editable = isDraft;
+    const editable =
+        status === 'draft'
+        || status === 'changes_requested';
 
     const trackCount = Math.max(
         Number(release.track_count ?? 0),
@@ -792,7 +794,9 @@ function ReleaseRow({
     const isDraft =
         status === 'draft';
 
-    const editable = isDraft;
+    const editable =
+        status === 'draft'
+        || status === 'changes_requested';
 
     const trackCount = Math.max(
         Number(release.track_count ?? 0),
