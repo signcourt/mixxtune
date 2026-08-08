@@ -2,31 +2,22 @@
 
 namespace App\Services\V2;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class OwnershipRoyaltyService
 {
+    private array $shareCache = [];
+
     public function generateMonthlyStatements(
         string $month,
         float $commissionPercent = 0,
         string $currency = 'INR'
     ): array {
-        $owners = DB::table('report_rows')
-            ->where('sale_month', $month)
-            ->where('mapping_status', 'mapped')
-            ->whereNotNull(
-                'revenue_owner_type'
-            )
-            ->whereNotNull(
-                'revenue_owner_id'
-            )
-            ->select([
-                'revenue_owner_type',
-                'revenue_owner_id',
-            ])
-            ->distinct()
-            ->get();
+        $owners = $this->statementOwners(
+            $month
+        );
 
         $created = 0;
         $updated = 0;
@@ -46,14 +37,12 @@ class OwnershipRoyaltyService
                         strtoupper($currency)
                     )
                     ->when(
-                        $owner->revenue_owner_type
-                            === 'label',
+                        $owner['type'] === 'label',
                         fn ($query) =>
                             $query
                                 ->where(
                                     'label_id',
-                                    $owner
-                                        ->revenue_owner_id
+                                    $owner['id']
                                 )
                                 ->whereNull(
                                     'artist_id'
@@ -62,8 +51,7 @@ class OwnershipRoyaltyService
                             $query
                                 ->where(
                                     'artist_id',
-                                    $owner
-                                        ->revenue_owner_id
+                                    $owner['id']
                                 )
                                 ->whereNull(
                                     'label_id'
@@ -73,8 +61,8 @@ class OwnershipRoyaltyService
 
                 $this->generateOwnerStatement(
                     $month,
-                    $owner->revenue_owner_type,
-                    (int) $owner->revenue_owner_id,
+                    $owner['type'],
+                    $owner['id'],
                     $commissionPercent,
                     $currency,
                     $existing
@@ -86,13 +74,14 @@ class OwnershipRoyaltyService
             } catch (\Throwable $exception) {
                 $failed[] = [
                     'owner_type' =>
-                        $owner->revenue_owner_type,
+                        $owner['type'],
 
                     'owner_id' =>
-                        $owner->revenue_owner_id,
+                        $owner['id'],
 
                     'message' =>
-                        $exception->getMessage(),
+                        $exception
+                            ->getMessage(),
                 ];
             }
         }
@@ -100,9 +89,108 @@ class OwnershipRoyaltyService
         return [
             'created' => $created,
             'updated' => $updated,
+
             'failed_count' =>
                 count($failed),
+
             'failed' => $failed,
+        ];
+    }
+
+    private function statementOwners(
+        string $month
+    ): array {
+        $owners = [];
+        $seen = [];
+
+        $sourceOwners = DB::table(
+            'report_rows'
+        )
+            ->where(
+                'sale_month',
+                $month
+            )
+            ->where(
+                'mapping_status',
+                'mapped'
+            )
+            ->whereNotNull(
+                'revenue_owner_type'
+            )
+            ->whereNotNull(
+                'revenue_owner_id'
+            )
+            ->select([
+                'revenue_owner_type',
+                'revenue_owner_id',
+            ])
+            ->distinct()
+            ->get();
+
+        foreach ($sourceOwners as $owner) {
+            $this->addOwner(
+                $owners,
+                $seen,
+                (string)
+                    $owner
+                        ->revenue_owner_type,
+                (int)
+                    $owner
+                        ->revenue_owner_id
+            );
+
+            $share =
+                $this->activeShareForBeneficiary(
+                    (string)
+                        $owner
+                            ->revenue_owner_type,
+                    (int)
+                        $owner
+                            ->revenue_owner_id,
+                    $month
+                );
+
+            if (!$share) {
+                continue;
+            }
+
+            /*
+             * A configured child creates a second
+             * statement beneficiary:
+             *
+             * Child  = configured percentage
+             * Master = remaining percentage
+             */
+            $this->addOwner(
+                $owners,
+                $seen,
+                'label',
+                (int)
+                    $share
+                        ->master_label_id
+            );
+        }
+
+        return $owners;
+    }
+
+    private function addOwner(
+        array &$owners,
+        array &$seen,
+        string $type,
+        int $id
+    ): void {
+        $key = $type.':'.$id;
+
+        if (isset($seen[$key])) {
+            return;
+        }
+
+        $seen[$key] = true;
+
+        $owners[] = [
+            'type' => $type,
+            'id' => $id,
         ];
     }
 
@@ -122,38 +210,41 @@ class OwnershipRoyaltyService
             $currency,
             $existing
         ) {
-            $query = DB::table('report_rows')
-                ->where(
-                    'sale_month',
-                    $month
-                )
-                ->where(
-                    'mapping_status',
-                    'mapped'
-                )
-                ->where(
-                    'revenue_owner_type',
-                    $ownerType
-                )
-                ->where(
-                    'revenue_owner_id',
-                    $ownerId
+            $allocations =
+                $this->buildAllocations(
+                    $month,
+                    $ownerType,
+                    $ownerId,
+                    $commissionPercent
                 );
 
             $gross = round(
-                (float) (clone $query)
-                    ->sum('earnings'),
-                8
-            );
-
-            $commission = round(
-                $gross
-                * ($commissionPercent / 100),
+                array_sum(
+                    array_column(
+                        $allocations,
+                        'gross_amount'
+                    )
+                ),
                 8
             );
 
             $net = round(
-                $gross - $commission,
+                array_sum(
+                    array_column(
+                        $allocations,
+                        'net_amount'
+                    )
+                ),
+                8
+            );
+
+            /*
+             * Calculate commission as the exact
+             * difference so statement arithmetic
+             * always reconciles after row rounding.
+             */
+            $commission = round(
+                $gross - $net,
                 8
             );
 
@@ -176,7 +267,9 @@ class OwnershipRoyaltyService
                     $month,
 
                 'currency' =>
-                    strtoupper($currency),
+                    strtoupper(
+                        $currency
+                    ),
 
                 'gross_earnings' =>
                     $gross,
@@ -184,11 +277,9 @@ class OwnershipRoyaltyService
                 'commission_amount' =>
                     $commission,
 
-                'tax_amount' =>
-                    0,
+                'tax_amount' => 0,
 
-                'other_deductions' =>
-                    0,
+                'other_deductions' => 0,
 
                 'net_payable' =>
                     $net,
@@ -222,88 +313,486 @@ class OwnershipRoyaltyService
                 $statementId =
                     DB::table(
                         'royalty_statements'
-                    )->insertGetId(
-                        $statementData
-                    );
+                    )
+                        ->insertGetId(
+                            $statementData
+                        );
             }
 
-            DB::table('royalty_allocations')
+            /*
+             * Regeneration is idempotent.
+             */
+            DB::table(
+                'royalty_allocations'
+            )
                 ->where(
                     'royalty_statement_id',
                     $statementId
                 )
                 ->delete();
 
-            $query
-                ->select([
-                    'id',
-                    'release_id',
-                    'track_id',
-                    'earnings',
-                ])
-                ->orderBy('id')
-                ->chunkById(
-                    1000,
-                    function ($rows) use (
+            if ($allocations === []) {
+                return;
+            }
+
+            $payload = [];
+
+            foreach ($allocations as $allocation) {
+                $payload[] = [
+                    'public_id' =>
+                        (string)
+                            Str::ulid(),
+
+                    'royalty_statement_id' =>
                         $statementId,
-                        $commissionPercent
-                    ) {
-                        $payload = [];
 
-                        foreach ($rows as $row) {
-                            $grossAmount =
-                                (float) $row->earnings;
+                    'report_row_id' =>
+                        $allocation[
+                            'report_row_id'
+                        ],
 
-                            $payload[] = [
-                                'public_id' =>
-                                    (string) Str::ulid(),
+                    'release_id' =>
+                        $allocation[
+                            'release_id'
+                        ],
 
-                                'royalty_statement_id' =>
-                                    $statementId,
+                    'track_id' =>
+                        $allocation[
+                            'track_id'
+                        ],
 
-                                'report_row_id' =>
-                                    $row->id,
+                    'gross_amount' =>
+                        $allocation[
+                            'gross_amount'
+                        ],
 
-                                'release_id' =>
-                                    $row->release_id,
+                    'net_amount' =>
+                        $allocation[
+                            'net_amount'
+                        ],
 
-                                'track_id' =>
-                                    $row->track_id,
+                    'share_percentage' =>
+                        $allocation[
+                            'share_percentage'
+                        ],
 
-                                'gross_amount' =>
-                                    $grossAmount,
+                    'created_at' =>
+                        now(),
 
-                                'net_amount' =>
-                                    round(
-                                        $grossAmount
-                                        * (
-                                            1
-                                            - (
-                                                $commissionPercent
-                                                / 100
-                                            )
-                                        ),
-                                        8
-                                    ),
+                    'updated_at' =>
+                        now(),
+                ];
+            }
 
-                                'share_percentage' =>
-                                    100,
-
-                                'created_at' =>
-                                    now(),
-
-                                'updated_at' =>
-                                    now(),
-                            ];
-                        }
-
-                        if ($payload !== []) {
-                            DB::table(
-                                'royalty_allocations'
-                            )->insert($payload);
-                        }
-                    }
-                );
+            foreach (
+                array_chunk(
+                    $payload,
+                    1000
+                )
+                as $chunk
+            ) {
+                DB::table(
+                    'royalty_allocations'
+                )->insert($chunk);
+            }
         });
+    }
+
+    private function buildAllocations(
+        string $month,
+        string $statementOwnerType,
+        int $statementOwnerId,
+        float $commissionPercent
+    ): array {
+        $allocations = [];
+
+        DB::table('report_rows')
+            ->where(
+                'sale_month',
+                $month
+            )
+            ->where(
+                'mapping_status',
+                'mapped'
+            )
+            ->whereNotNull(
+                'revenue_owner_type'
+            )
+            ->whereNotNull(
+                'revenue_owner_id'
+            )
+            ->select([
+                'id',
+                'release_id',
+                'track_id',
+                'earnings',
+                'revenue_owner_type',
+                'revenue_owner_id',
+            ])
+            ->orderBy('id')
+            ->chunkById(
+                1000,
+                function ($rows) use (
+                    $month,
+                    $statementOwnerType,
+                    $statementOwnerId,
+                    $commissionPercent,
+                    &$allocations
+                ) {
+                    foreach ($rows as $row) {
+                        $sharePercent =
+                            $this->shareForStatement(
+                                (string)
+                                    $row
+                                        ->revenue_owner_type,
+                                (int)
+                                    $row
+                                        ->revenue_owner_id,
+                                $statementOwnerType,
+                                $statementOwnerId,
+                                $month
+                            );
+
+                        if (
+                            $sharePercent
+                            <= 0
+                        ) {
+                            continue;
+                        }
+
+                        $sourceGross =
+                            (float)
+                                $row
+                                    ->earnings;
+
+                        $allocatedGross =
+                            round(
+                                $sourceGross
+                                * (
+                                    $sharePercent
+                                    / 100
+                                ),
+                                8
+                            );
+
+                        $netAmount =
+                            round(
+                                $allocatedGross
+                                * (
+                                    1
+                                    - (
+                                        $commissionPercent
+                                        / 100
+                                    )
+                                ),
+                                8
+                            );
+
+                        $allocations[] = [
+                            'report_row_id' =>
+                                $row->id,
+
+                            'release_id' =>
+                                $row
+                                    ->release_id,
+
+                            'track_id' =>
+                                $row
+                                    ->track_id,
+
+                            /*
+                             * gross_amount here is the
+                             * beneficiary's allocated
+                             * gross, not a second copy
+                             * of DSP gross revenue.
+                             */
+                            'gross_amount' =>
+                                $allocatedGross,
+
+                            'net_amount' =>
+                                $netAmount,
+
+                            'share_percentage' =>
+                                round(
+                                    $sharePercent,
+                                    4
+                                ),
+                        ];
+                    }
+                },
+                'id'
+            );
+
+        return $allocations;
+    }
+
+    private function shareForStatement(
+        string $sourceOwnerType,
+        int $sourceOwnerId,
+        string $statementOwnerType,
+        int $statementOwnerId,
+        string $month
+    ): float {
+        $share =
+            $this->activeShareForBeneficiary(
+                $sourceOwnerType,
+                $sourceOwnerId,
+                $month
+            );
+
+        /*
+         * No explicit master/child share:
+         * preserve existing behaviour.
+         *
+         * Source owner receives 100%.
+         */
+        if (!$share) {
+            return (
+                $sourceOwnerType
+                    === $statementOwnerType
+                && $sourceOwnerId
+                    === $statementOwnerId
+            )
+                ? 100.0
+                : 0.0;
+        }
+
+        $childPercent =
+            (float)
+                $share
+                    ->revenue_share_percent;
+
+        /*
+         * Source child gets configured share.
+         */
+        if (
+            $sourceOwnerType
+                === $statementOwnerType
+            && $sourceOwnerId
+                === $statementOwnerId
+        ) {
+            return $childPercent;
+        }
+
+        /*
+         * Master label receives only
+         * the retained difference.
+         */
+        if (
+            $statementOwnerType === 'label'
+            && $statementOwnerId
+                === (int)
+                    $share
+                        ->master_label_id
+        ) {
+            return round(
+                100.0
+                    - $childPercent,
+                4
+            );
+        }
+
+        return 0.0;
+    }
+
+    private function activeShareForBeneficiary(
+        string $beneficiaryType,
+        int $beneficiaryId,
+        string $month
+    ): ?object {
+        $key =
+            $month
+            .'|'
+            .$beneficiaryType
+            .'|'
+            .$beneficiaryId;
+
+        if (
+            array_key_exists(
+                $key,
+                $this->shareCache
+            )
+        ) {
+            return $this
+                ->shareCache[
+                    $key
+                ];
+        }
+
+        if (
+            !in_array(
+                $beneficiaryType,
+                [
+                    'label',
+                    'artist',
+                ],
+                true
+            )
+        ) {
+            return $this
+                ->shareCache[
+                    $key
+                ] = null;
+        }
+
+        $periodDate =
+            Carbon::createFromFormat(
+                'Y-m',
+                $month
+            )
+                ->endOfMonth()
+                ->toDateString();
+
+        $share = DB::table(
+            'label_revenue_shares'
+        )
+            ->where(
+                'beneficiary_type',
+                $beneficiaryType
+            )
+            ->where(
+                'beneficiary_id',
+                $beneficiaryId
+            )
+            ->where(
+                'is_active',
+                true
+            )
+            ->where(function ($query) use (
+                $periodDate
+            ) {
+                $query
+                    ->whereNull(
+                        'effective_from'
+                    )
+                    ->orWhere(
+                        'effective_from',
+                        '<=',
+                        $periodDate
+                    );
+            })
+            ->where(function ($query) use (
+                $periodDate
+            ) {
+                $query
+                    ->whereNull(
+                        'effective_to'
+                    )
+                    ->orWhere(
+                        'effective_to',
+                        '>=',
+                        $periodDate
+                    );
+            })
+            ->first();
+
+        if (!$share) {
+            return $this
+                ->shareCache[
+                    $key
+                ] = null;
+        }
+
+        /*
+         * HARD SECURITY / HIERARCHY CHECK
+         *
+         * Only:
+         * Master -> direct Sub-Label
+         * Master -> direct Artist
+         *
+         * No child-of-child split.
+         */
+        if (
+            !$this->isValidDirectChildShare(
+                $share
+            )
+        ) {
+            return $this
+                ->shareCache[
+                    $key
+                ] = null;
+        }
+
+        return $this
+            ->shareCache[
+                $key
+            ] = $share;
+    }
+
+    private function isValidDirectChildShare(
+        object $share
+    ): bool {
+        $master = DB::table(
+            'labels'
+        )
+            ->where(
+                'id',
+                $share
+                    ->master_label_id
+            )
+            ->whereNull(
+                'deleted_at'
+            )
+            ->first([
+                'id',
+                'parent_label_id',
+            ]);
+
+        if (
+            !$master
+            || $master
+                ->parent_label_id
+                !== null
+        ) {
+            return false;
+        }
+
+        if (
+            $share
+                ->beneficiary_type
+            === 'label'
+        ) {
+            return DB::table(
+                'labels'
+            )
+                ->where(
+                    'id',
+                    $share
+                        ->beneficiary_id
+                )
+                ->where(
+                    'parent_label_id',
+                    $master->id
+                )
+                ->whereNull(
+                    'deleted_at'
+                )
+                ->exists();
+        }
+
+        if (
+            $share
+                ->beneficiary_type
+            === 'artist'
+        ) {
+            return DB::table(
+                'artists'
+            )
+                ->where(
+                    'id',
+                    $share
+                        ->beneficiary_id
+                )
+                ->where(
+                    'label_id',
+                    $master->id
+                )
+                ->whereNull(
+                    'deleted_at'
+                )
+                ->exists();
+        }
+
+        return false;
     }
 }
