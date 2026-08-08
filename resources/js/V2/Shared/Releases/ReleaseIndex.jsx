@@ -623,14 +623,10 @@ function ReleaseCard({
     const status =
         normaliseStatus(release.status);
 
-    const editable = [
-        'draft',
-        'changes_requested',
-        'rejected',
-    ].includes(status);
-
     const isDraft =
         status === 'draft';
+
+    const editable = isDraft;
 
     const trackCount = Math.max(
         Number(release.track_count ?? 0),
@@ -793,14 +789,10 @@ function ReleaseRow({
     const status =
         normaliseStatus(release.status);
 
-    const editable = [
-        'draft',
-        'changes_requested',
-        'rejected',
-    ].includes(status);
-
     const isDraft =
         status === 'draft';
+
+    const editable = isDraft;
 
     const trackCount = Math.max(
         Number(release.track_count ?? 0),
