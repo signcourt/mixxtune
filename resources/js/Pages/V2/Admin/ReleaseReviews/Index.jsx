@@ -9,6 +9,34 @@ const statusClasses = {
     processing: 'bg-blue-100 text-blue-700',
 };
 
+const statusLabels = {
+    submitted: 'In Review',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    changes_requested: 'Need Changes',
+    processing: 'Processing',
+};
+
+const formatDateTime = (value) => {
+    if (!value) {
+        return '—';
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return new Intl.DateTimeFormat('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(date);
+};
+
 export default function Index({
     role = 'admin',
     releases = {},
@@ -116,10 +144,10 @@ export default function Index({
                                     {[
                                         'Release',
                                         'Artist',
-                                        'UPC',
                                         'Tracks',
                                         'Status',
                                         'Submitted',
+                                        'UPC',
                                         'Action',
                                     ].map((heading) => (
                                         <th
@@ -137,59 +165,80 @@ export default function Index({
                                     rows.map((release) => (
                                         <tr key={release.id}>
                                             <td className="px-5 py-4">
-                                                <div className="font-semibold text-slate-900">
-                                                    {release.title}
+                                                <Link
+                                                    href={`/v2/admin/release-reviews/${release.id}`}
+                                                    className="group inline-block"
+                                                >
+                                                    <div className="font-semibold text-slate-900 transition group-hover:text-violet-700">
+                                                        {release.title}
+                                                    </div>
+
+                                                    <div className="mt-1 text-xs text-slate-500">
+                                                        {release.catalog_number ||
+                                                            'No catalogue number'}
+                                                    </div>
+                                                </Link>
+                                            </td>
+
+                                            <td className="px-5 py-4">
+                                                <div className="text-sm font-medium text-slate-700">
+                                                    {release.primary_artist_name ||
+                                                        '—'}
                                                 </div>
+                                            </td>
 
-                                                <div className="text-xs text-slate-500">
-                                                    {release.catalog_number ||
-                                                        'No catalogue number'}
+                                            <td className="px-5 py-4">
+                                                <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                                    <TrackIcon />
+                                                    <span>
+                                                        {release.tracks_count ??
+                                                            0}
+                                                    </span>
                                                 </div>
-                                            </td>
-
-                                            <td className="px-5 py-4 text-sm text-slate-600">
-                                                {release.primary_artist_name ||
-                                                    '—'}
-                                            </td>
-
-                                            <td className="px-5 py-4 text-sm text-slate-600">
-                                                {release.upc ||
-                                                    'Pending'}
-                                            </td>
-
-                                            <td className="px-5 py-4 text-sm text-slate-600">
-                                                {release.tracks_count ??
-                                                    0}
                                             </td>
 
                                             <td className="px-5 py-4">
                                                 <span
                                                     className={[
-                                                        'rounded-full px-3 py-1 text-xs font-semibold capitalize',
+                                                        'inline-flex rounded-full px-3 py-1 text-xs font-semibold',
                                                         statusClasses[
                                                             release.status
                                                         ] ??
                                                             'bg-slate-100 text-slate-700',
                                                     ].join(' ')}
                                                 >
-                                                    {release.status.replaceAll(
-                                                        '_',
-                                                        ' '
-                                                    )}
+                                                    {statusLabels[
+                                                        release.status
+                                                    ] ??
+                                                        release.status.replaceAll(
+                                                            '_',
+                                                            ' '
+                                                        )}
                                                 </span>
                                             </td>
 
-                                            <td className="px-5 py-4 text-sm text-slate-600">
-                                                {release.submitted_at ||
-                                                    release.updated_at}
+                                            <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
+                                                {formatDateTime(
+                                                    release.submitted_at ||
+                                                        release.updated_at
+                                                )}
+                                            </td>
+
+                                            <td className="whitespace-nowrap px-5 py-4">
+                                                <div className="text-sm font-medium text-slate-700">
+                                                    {release.upc ||
+                                                        'Pending'}
+                                                </div>
                                             </td>
 
                                             <td className="px-5 py-4">
                                                 <Link
                                                     href={`/v2/admin/release-reviews/${release.id}`}
-                                                    className="rounded-lg border border-violet-300 px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50"
+                                                    aria-label={`Open review for ${release.title}`}
+                                                    title="Open Review"
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-200"
                                                 >
-                                                    Review
+                                                    <EyeIcon />
                                                 </Link>
                                             </td>
                                         </tr>
@@ -210,5 +259,46 @@ export default function Index({
                 </div>
             </div>
         </PanelLayout>
+    );
+}
+
+function EyeIcon() {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="h-4 w-4"
+            aria-hidden="true"
+        >
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.25 12s3.5-6 9.75-6 9.75 6 9.75 6-3.5 6-9.75 6S2.25 12 2.25 12Z"
+            />
+            <circle cx="12" cy="12" r="2.75" />
+        </svg>
+    );
+}
+
+function TrackIcon() {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="h-4 w-4 text-slate-400"
+            aria-hidden="true"
+        >
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 18V5l10-2v13"
+            />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="16" cy="16" r="3" />
+        </svg>
     );
 }
