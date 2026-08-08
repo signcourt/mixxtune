@@ -78,10 +78,52 @@ const listValue = (value) => {
     }).join(', ');
 };
 
+
+const STATUS_STYLES = {
+    submitted: 'bg-amber-100 text-amber-700 ring-amber-200',
+    approved: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+    rejected: 'bg-red-100 text-red-700 ring-red-200',
+    changes_requested: 'bg-orange-100 text-orange-700 ring-orange-200',
+    processing: 'bg-blue-100 text-blue-700 ring-blue-200',
+    delivered: 'bg-indigo-100 text-indigo-700 ring-indigo-200',
+    live: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+    draft: 'bg-slate-100 text-slate-700 ring-slate-200',
+};
+
+const STATUS_LABELS = {
+    submitted: 'In Review',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    changes_requested: 'Changes Requested',
+    processing: 'Processing',
+    delivered: 'Delivered',
+    live: 'Live',
+    draft: 'Draft',
+};
+
+const formatDateTime = (value) => {
+    if (!value) return '—';
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return String(value);
+    }
+
+    return new Intl.DateTimeFormat('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(date);
+};
+
 export default function Show({
     role = 'admin',
     release,
     availableActions = {},
+    statusLogs = [],
 }) {
     const [notes, setNotes] = useState('');
     const [processing, setProcessing] = useState(false);
@@ -199,42 +241,9 @@ export default function Show({
             type: 'number',
         },
         {
-            key: 'worldwide',
-            label: 'Worldwide',
-            readonly: true,
-            display: yesNo(release.worldwide),
-        },
-        {
-            key: 'stores',
-            label: 'Stores',
-            readonly: true,
-            display: listValue(release.stores),
-        },
-        {
-            key: 'territories',
-            label: 'Territories',
-            readonly: true,
-            display: listValue(release.territories),
-        },
-        {
-            key: 'status',
-            label: 'Status',
-            readonly: true,
-        },
-        {
             key: 'public_id',
             label: 'Release Public ID',
             readonly: true,
-        },
-        {
-            key: 'completion_percentage',
-            label: 'Completion',
-            readonly: true,
-            display:
-                release.completion_percentage !== null &&
-                release.completion_percentage !== undefined
-                    ? `${release.completion_percentage}%`
-                    : '—',
         },
         {
             key: 'submitted_at',
@@ -260,19 +269,85 @@ export default function Show({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <Link
                         href="/v2/admin/release-reviews"
-                        className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-200 hover:text-violet-700"
                     >
-                        ← Back to Queue
+                        <span aria-hidden="true">←</span>
+                        <span>Review Queue</span>
                     </Link>
 
-                    <span className="rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold capitalize text-amber-700">
-                        {(release.status || '').replaceAll('_', ' ')}
-                    </span>
+                    <StatusBadge status={release.status} />
                 </div>
+
+                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="p-5 sm:p-6">
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
+                            {release.artwork_path ? (
+                                <img
+                                    src={`/storage/${release.artwork_path}`}
+                                    alt={release.title}
+                                    className="h-32 w-32 shrink-0 rounded-2xl border border-slate-200 object-cover shadow-sm sm:h-36 sm:w-36"
+                                />
+                            ) : (
+                                <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-center text-xs font-semibold uppercase tracking-wide text-slate-400 sm:h-36 sm:w-36">
+                                    No Artwork
+                                </div>
+                            )}
+
+                            <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
+                                    {release.release_type || 'Release'}
+                                </div>
+
+                                <h1 className="mt-1 break-words text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                                    {release.title}
+                                </h1>
+
+                                <div className="mt-2 text-sm font-medium text-slate-600">
+                                    {release.primary_artist_name || 'Artist not specified'}
+
+                                    {release.label_name && (
+                                        <span>
+                                            {' '}• {release.label_name}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                    <SummaryItem
+                                        label="UPC / EAN"
+                                        value={release.upc || 'Pending'}
+                                    />
+
+                                    <SummaryItem
+                                        label="Release Date"
+                                        value={displayDate(
+                                            release.digital_release_date
+                                        )}
+                                    />
+
+                                    <SummaryItem
+                                        label="Tracks"
+                                        value={`${release.tracks?.length ?? 0}`}
+                                    />
+
+                                    <SummaryItem
+                                        label="Submitted"
+                                        value={formatDateTime(
+                                            release.submitted_at
+                                        )}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
                 <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
                     <div className="space-y-6">
-                        <Section title="Release Information">
+                        <Section
+                            title="Release Metadata"
+                            subtitle="Review and correct release-level information."
+                        >
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                 {releaseFields.map((field) => (
                                     <EditableField
@@ -284,17 +359,15 @@ export default function Show({
                             </div>
                         </Section>
 
-                        {release.artwork_path && (
-                            <Section title="Artwork">
-                                <img
-                                    src={`/storage/${release.artwork_path}`}
-                                    alt={release.title}
-                                    className="h-48 w-48 rounded-2xl border border-slate-200 object-cover shadow-sm"
-                                />
-                            </Section>
-                        )}
 
-                        <Section title="Tracks">
+                        <Section
+                            title="Tracks & Audio QC"
+                            subtitle={`${release.tracks?.length ?? 0} ${
+                                (release.tracks?.length ?? 0) === 1
+                                    ? 'track'
+                                    : 'tracks'
+                            } attached to this release.`}
+                        >
                             <div className="space-y-5">
                                 {(release.tracks ?? []).map(
                                     (track, index) => (
@@ -308,13 +381,80 @@ export default function Show({
                                 )}
                             </div>
                         </Section>
+
+                        <Section
+                            title="Distribution"
+                            subtitle="Store selection and territory configuration."
+                        >
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <ReadOnlyBox
+                                    label="Territory Mode"
+                                    value={
+                                        release.worldwide
+                                            ? 'Worldwide'
+                                            : 'Selected Territories'
+                                    }
+                                />
+
+                                <ReadOnlyBox
+                                    label="Stores"
+                                    value={listValue(
+                                        release.stores
+                                    )}
+                                />
+
+                                <ReadOnlyBox
+                                    label="Territories"
+                                    value={
+                                        release.worldwide
+                                            ? 'Worldwide'
+                                            : listValue(
+                                                  release.territories
+                                              )
+                                    }
+                                />
+                            </div>
+                        </Section>
+
+                        <Section
+                            title="Review History"
+                            subtitle="Workflow activity for this release."
+                        >
+                            <ReviewHistory
+                                logs={statusLogs}
+                            />
+                        </Section>
                     </div>
 
                     <aside className="space-y-5">
                         <div className="sticky top-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <h3 className="font-semibold text-slate-900">
-                                Review Actions
-                            </h3>
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <h3 className="font-bold text-slate-950">
+                                        Review Actions
+                                    </h3>
+
+                                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                                        Available actions depend on the current release status.
+                                    </p>
+                                </div>
+
+                                <StatusBadge
+                                    status={release.status}
+                                />
+                            </div>
+
+                            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Submitted
+                                </div>
+
+                                <div className="mt-1 text-sm font-semibold text-slate-800">
+                                    {formatDateTime(
+                                        release.submitted_at
+                                    )}
+                                </div>
+                            </div>
 
                             <textarea
                                 value={notes}
@@ -322,7 +462,7 @@ export default function Show({
                                     setNotes(e.target.value)
                                 }
                                 placeholder="Add remarks, rejection reason or change request..."
-                                className="mt-4 min-h-32 w-full rounded-xl border border-slate-300 p-3 text-sm outline-none focus:border-violet-500"
+                                className="mt-4 min-h-32 w-full resize-y rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                             />
 
                             <div className="mt-4 space-y-3">
@@ -956,14 +1096,175 @@ function ReadOnlyBox({ label, value }) {
     );
 }
 
-function Section({ title, children }) {
+function Section({ title, subtitle, children }) {
     return (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">
-                {title}
-            </h2>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-5">
+                <h2 className="text-lg font-bold text-slate-950">
+                    {title}
+                </h2>
+
+                {subtitle && (
+                    <p className="mt-1 text-sm text-slate-500">
+                        {subtitle}
+                    </p>
+                )}
+            </div>
+
             {children}
         </section>
+    );
+}
+
+function ReviewHistory({ logs = [] }) {
+    if (!logs.length) {
+        return (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm text-slate-500">
+                No workflow history is available yet.
+            </div>
+        );
+    }
+
+    return (
+        <div className="divide-y divide-slate-100">
+            {logs.map((log, index) => {
+                const from =
+                    log.from_status ||
+                    log.old_status ||
+                    null;
+
+                const to =
+                    log.to_status ||
+                    log.new_status ||
+                    null;
+
+                const message =
+                    log.remarks ||
+                    log.notes ||
+                    log.reason ||
+                    null;
+
+                const action =
+                    log.action
+                        ? String(log.action)
+                              .replaceAll('_', ' ')
+                        : null;
+
+                return (
+                    <div
+                        key={log.id ?? index}
+                        className="flex gap-4 py-4 first:pt-0 last:pb-0"
+                    >
+                        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-violet-700">
+                            <HistoryIcon />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {from && (
+                                    <span className="text-sm font-medium text-slate-500">
+                                        {STATUS_LABELS[from] ??
+                                            String(from).replaceAll(
+                                                '_',
+                                                ' '
+                                            )}
+                                    </span>
+                                )}
+
+                                {from && to && (
+                                    <span className="text-slate-300">
+                                        →
+                                    </span>
+                                )}
+
+                                {to && (
+                                    <span className="text-sm font-bold text-slate-900">
+                                        {STATUS_LABELS[to] ??
+                                            String(to).replaceAll(
+                                                '_',
+                                                ' '
+                                            )}
+                                    </span>
+                                )}
+                            </div>
+
+                            {action && (
+                                <div className="mt-1 text-xs font-semibold capitalize text-violet-600">
+                                    {action}
+                                </div>
+                            )}
+
+                            {message && (
+                                <div className="mt-1 break-words text-sm leading-6 text-slate-600">
+                                    {String(message)}
+                                </div>
+                            )}
+
+                            <div className="mt-1 text-xs text-slate-400">
+                                {formatDateTime(
+                                    log.created_at ||
+                                        log.changed_at ||
+                                        log.updated_at
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+function HistoryIcon() {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="h-4 w-4"
+            aria-hidden="true"
+        >
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 8v4l3 2"
+            />
+            <circle
+                cx="12"
+                cy="12"
+                r="9"
+            />
+        </svg>
+    );
+}
+
+function StatusBadge({ status }) {
+    return (
+        <span
+            className={[
+                'inline-flex items-center rounded-full px-3.5 py-1.5 text-sm font-semibold ring-1 ring-inset',
+                STATUS_STYLES[status] ??
+                    'bg-slate-100 text-slate-700 ring-slate-200',
+            ].join(' ')}
+        >
+            {STATUS_LABELS[status] ??
+                String(status || 'Unknown').replaceAll('_', ' ')}
+        </span>
+    );
+}
+
+function SummaryItem({ label, value }) {
+    return (
+        <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                {label}
+            </div>
+
+            <div className="mt-1 break-words text-sm font-semibold text-slate-800">
+                {empty(value)}
+            </div>
+        </div>
     );
 }
 
