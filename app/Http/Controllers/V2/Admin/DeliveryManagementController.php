@@ -331,6 +331,29 @@ class DeliveryManagementController extends Controller
             $permissions
         );
 
+        /*
+         * Validate delivery eligibility before release visibility.
+         *
+         * Draft releases are creator-private in ReleaseAccessService.
+         * For this workflow, an authorised admin attempting to initialise
+         * an ineligible release must receive the delivery-specific 422
+         * response rather than a draft-access 403.
+         */
+        abort_unless(
+            in_array(
+                $release->status,
+                [
+                    'approved',
+                    'processing',
+                    'delivered',
+                    'live',
+                ],
+                true
+            ),
+            422,
+            'Release must be approved before delivery starts.'
+        );
+
         $access->authorizeView(
             $request->user(),
             $release

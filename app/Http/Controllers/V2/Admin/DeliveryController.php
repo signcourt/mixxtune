@@ -62,6 +62,29 @@ class DeliveryController extends Controller
             'delivery.manage'
         );
 
+        /*
+         * Delivery eligibility must be checked before release visibility.
+         *
+         * Draft releases are creator-private in ReleaseAccessService.
+         * For an authorised delivery administrator, attempting to initialise
+         * an ineligible release must return the workflow-specific 422 instead
+         * of being intercepted as a draft-access 403.
+         */
+        abort_unless(
+            in_array(
+                $release->status,
+                [
+                    'approved',
+                    'processing',
+                    'delivered',
+                    'live',
+                ],
+                true
+            ),
+            422,
+            'Release must be approved before delivery starts.'
+        );
+
         $access->authorizeView(
             $request->user(),
             $release
