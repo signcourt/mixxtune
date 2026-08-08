@@ -35,6 +35,8 @@ class CatalogueOwnershipService
                 'id',
                 'isrc',
                 'upc',
+                'track_title',
+                'track_artist',
             ])
             ->orderBy('id');
 
@@ -59,6 +61,18 @@ class CatalogueOwnershipService
                     $track = $this->findTrack(
                         $row->isrc
                     );
+
+                    // Controlled fallback:
+                    // only when ISRC did not resolve a track.
+                    // Requires BOTH title + artist and exactly one
+                    // matching active catalogue track.
+                    if (!$track) {
+                        $track =
+                            $this->findTrackByTitleAndArtist(
+                                $row->track_title ?? null,
+                                $row->track_artist ?? null
+                            );
+                    }
 
                     $release = null;
 
@@ -709,6 +723,100 @@ class CatalogueOwnershipService
                 [$normalized]
             )
             ->first();
+    }
+
+    private function findTrackByTitleAndArtist(
+        ?string $title,
+        ?string $artist
+    ): ?object {
+        $title = $this->normalizeText(
+            $title
+        );
+
+        $artist = $this->normalizeText(
+            $artist
+        );
+
+        if (
+            $title === ''
+            || $artist === ''
+        ) {
+            return null;
+        }
+
+        $matches = [];
+
+        DB::table('tracks')
+            ->select([
+                'id',
+                'release_id',
+                'title',
+                'primary_artist_name',
+            ])
+            ->whereNull('deleted_at')
+            ->orderBy('id')
+            ->chunkById(
+                500,
+                function ($tracks) use (
+                    $title,
+                    $artist,
+                    &$matches
+                ) {
+                    foreach ($tracks as $track) {
+                        if (
+                            $this->normalizeText(
+                                $track->title
+                            ) !== $title
+                        ) {
+                            continue;
+                        }
+
+                        if (
+                            $this->normalizeText(
+                                $track->primary_artist_name
+                            ) !== $artist
+                        ) {
+                            continue;
+                        }
+
+                        $matches[] = $track;
+
+                        /*
+                         * Never auto-map an ambiguous
+                         * title + artist combination.
+                         */
+                        if (
+                            count($matches) > 1
+                        ) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                },
+                'id'
+            );
+
+        if (count($matches) !== 1) {
+            return null;
+        }
+
+        return $matches[0];
+    }
+
+    private function normalizeText(
+        ?string $value
+    ): string {
+        return mb_strtolower(
+            trim(
+                preg_replace(
+                    '/\s+/u',
+                    ' ',
+                    (string) $value
+                )
+            ),
+            'UTF-8'
+        );
     }
 
     private function normalizeIsrc(
