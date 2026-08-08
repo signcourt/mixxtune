@@ -6,6 +6,7 @@ use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -392,4 +393,216 @@ class AdminReleaseOwnershipTest extends TestCase
             'created_by' => $super->id,
         ]);
     }
+
+    public function test_release_creator_can_see_own_draft_in_index(): void
+    {
+        $super = $this->user('super_admin');
+        $admin = $this->user('admin');
+
+        $label = $this->label($super);
+        $artist = $this->artist($super, $label);
+
+        $this->assignLabel(
+            $admin,
+            $label,
+            $super
+        );
+
+        $this
+            ->actingAs($admin)
+            ->post(
+                route('v2.releases.store'),
+                $this->payload(
+                    $artist,
+                    $label,
+                    'Creator Private Draft'
+                )
+            )
+            ->assertSessionHasNoErrors();
+
+        $response = $this
+            ->actingAs($admin)
+            ->get(route('v2.releases.index'));
+
+        $response
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component('V2/Releases/Index')
+                        ->has(
+                            'releases.data',
+                            fn (Assert $releases) =>
+                                $releases
+                                    ->where(
+                                        '0.title',
+                                        'Creator Private Draft'
+                                    )
+                                    ->etc()
+                        )
+            );
+    }
+
+
+    public function test_label_owner_cannot_see_admin_created_draft_in_index(): void
+    {
+        $super = $this->user('super_admin');
+        $admin = $this->user('admin');
+        $labelUser = $this->user('label');
+
+        $label = Label::factory()->create([
+            'created_by' => $labelUser->id,
+        ]);
+
+        $artist = $this->artist(
+            $labelUser,
+            $label
+        );
+
+        $this->assignLabel(
+            $admin,
+            $label,
+            $super
+        );
+
+        $this
+            ->actingAs($admin)
+            ->post(
+                route('v2.releases.store'),
+                $this->payload(
+                    $artist,
+                    $label,
+                    'Admin Draft Hidden From Label'
+                )
+            )
+            ->assertSessionHasNoErrors();
+
+        $response = $this
+            ->actingAs($labelUser)
+            ->get(route('v2.releases.index'));
+
+        $response
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component('V2/Releases/Index')
+                        ->where(
+                            'releases.data',
+                            fn ($releases) =>
+                                ! collect($releases)
+                                    ->pluck('title')
+                                    ->contains(
+                                        'Admin Draft Hidden From Label'
+                                    )
+                        )
+                        ->etc()
+            );
+    }
+
+
+    public function test_super_admin_cannot_see_another_users_draft_in_index(): void
+    {
+        $super = $this->user('super_admin');
+        $admin = $this->user('admin');
+
+        $label = $this->label($super);
+        $artist = $this->artist($super, $label);
+
+        $this->assignLabel(
+            $admin,
+            $label,
+            $super
+        );
+
+        $this
+            ->actingAs($admin)
+            ->post(
+                route('v2.releases.store'),
+                $this->payload(
+                    $artist,
+                    $label,
+                    'Admin Draft Hidden From Super'
+                )
+            )
+            ->assertSessionHasNoErrors();
+
+        $response = $this
+            ->actingAs($super)
+            ->get(route('v2.releases.index'));
+
+        $response
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component('V2/Releases/Index')
+                        ->where(
+                            'releases.data',
+                            fn ($releases) =>
+                                ! collect($releases)
+                                    ->pluck('title')
+                                    ->contains(
+                                        'Admin Draft Hidden From Super'
+                                    )
+                        )
+                        ->etc()
+            );
+    }
+
+
+    public function test_review_queue_cannot_be_forced_to_show_drafts(): void
+    {
+        $super = $this->user('super_admin');
+
+        $label = $this->label($super);
+        $artist = $this->artist($super, $label);
+
+        $this
+            ->actingAs($super)
+            ->post(
+                route('v2.releases.store'),
+                $this->payload(
+                    $artist,
+                    $label,
+                    'Private Draft Review Guard'
+                )
+            )
+            ->assertSessionHasNoErrors();
+
+        $response = $this
+            ->actingAs($super)
+            ->get(
+                route(
+                    'v2.admin.release-reviews.index',
+                    ['status' => 'draft']
+                )
+            );
+
+        $response
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component(
+                            'V2/Admin/ReleaseReviews/Index'
+                        )
+                        ->where(
+                            'filters.status',
+                            'submitted'
+                        )
+                        ->where(
+                            'releases.data',
+                            fn ($releases) =>
+                                ! collect($releases)
+                                    ->pluck('title')
+                                    ->contains(
+                                        'Private Draft Review Guard'
+                                    )
+                        )
+                        ->etc()
+            );
+    }
+
+
 }
