@@ -45,7 +45,7 @@ export const PANEL_ROUTES = {
             '/artist/support',
 
         notifications:
-            '/artist/notifications',
+            '/v2/notifications',
 
         settings:
             '/profile',
@@ -244,10 +244,10 @@ export const PANEL_ROUTES = {
             '/v2/admin/support',
 
         logs:
-            '/v2/admin/logs',
+            '/v2/admin/audit-logs',
 
         activity:
-            '/v2/admin/activity',
+            '/v2/admin/audit-logs',
 
         notifications:
             '/v2/notifications',
