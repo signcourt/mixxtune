@@ -245,7 +245,7 @@ export default function CommonDashboard({
 
                             <p className="mt-1 text-sm text-slate-500">
                                 {revenueSummary.is_master
-                                    ? 'Master revenue, direct child allocations and retained earnings.'
+                                    ? 'Master revenue, direct beneficiary allocations and retained earnings.'
                                     : 'Your allocated royalty revenue and payable earnings.'}
                             </p>
                         </div>
@@ -272,13 +272,13 @@ export default function CommonDashboard({
                                     </p>
 
                                     <p className="mt-2 text-xs leading-5 text-slate-500">
-                                        Gross revenue managed across direct sub-labels.
+                                        Gross revenue managed across direct sub-labels and artists.
                                     </p>
                                 </article>
 
                                 <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                                     <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                        Child Allocations
+                                        Allocated Revenue
                                     </p>
 
                                     <p className="mt-3 text-2xl font-black text-slate-950">
@@ -288,7 +288,7 @@ export default function CommonDashboard({
                                     </p>
 
                                     <p className="mt-2 text-xs leading-5 text-slate-500">
-                                        Revenue payable to direct child accounts.
+                                        Revenue allocated to direct sub-label and artist accounts.
                                     </p>
                                 </article>
 
@@ -304,7 +304,7 @@ export default function CommonDashboard({
                                     </p>
 
                                     <p className="mt-2 text-xs leading-5 text-slate-500">
-                                        Master share retained after child allocation.
+                                        Master share retained from direct revenue-share allocations.
                                     </p>
                                 </article>
 
@@ -329,11 +329,11 @@ export default function CommonDashboard({
                                 <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                                     <div className="border-b border-slate-200 px-6 py-5">
                                         <h3 className="text-lg font-black text-slate-950">
-                                            Sub-Label Revenue Breakdown
+                                            Revenue Beneficiary Breakdown
                                         </h3>
 
                                         <p className="mt-1 text-sm text-slate-500">
-                                            Direct child revenue allocation and master retention.
+                                            Direct sub-label and artist allocation with master retention.
                                         </p>
                                     </div>
 
@@ -342,10 +342,11 @@ export default function CommonDashboard({
                                             <thead className="bg-slate-50">
                                                 <tr>
                                                     {[
-                                                        'Sub-Label',
+                                                        'Type',
+                                                        'Beneficiary',
                                                         'Managed',
                                                         'Share',
-                                                        'Child Payable',
+                                                        'Beneficiary Payable',
                                                         'Master Retained',
                                                     ].map(
                                                         (
@@ -372,11 +373,21 @@ export default function CommonDashboard({
                                                         child
                                                     ) => (
                                                         <tr
-                                                            key={
-                                                                child.id
-                                                            }
+                                                            key={`${child.type}-${child.id}`}
                                                             className="hover:bg-slate-50"
                                                         >
+                                                            <td className="whitespace-nowrap px-5 py-4">
+                                                                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                                                                    child.type === 'artist'
+                                                                        ? 'bg-blue-50 text-blue-700'
+                                                                        : 'bg-violet-50 text-violet-700'
+                                                                }`}>
+                                                                    {child.type === 'artist'
+                                                                        ? 'Artist'
+                                                                        : 'Sub-Label'}
+                                                                </span>
+                                                            </td>
+
                                                             <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-900">
                                                                 {
                                                                     child.name
