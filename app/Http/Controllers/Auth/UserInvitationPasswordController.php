@@ -22,7 +22,7 @@ class UserInvitationPasswordController extends Controller
 
         if (! $userId) {
             return redirect()->route(
-                'user.invitation.invalid'
+                'single.invitation.invalid'
             );
         }
 
@@ -40,7 +40,7 @@ class UserInvitationPasswordController extends Controller
             );
 
             return redirect()->route(
-                'user.invitation.invalid'
+                'single.invitation.invalid'
             );
         }
 
@@ -66,7 +66,7 @@ class UserInvitationPasswordController extends Controller
 
         if (! $userId) {
             return redirect()->route(
-                'user.invitation.invalid'
+                'single.invitation.invalid'
             );
         }
 

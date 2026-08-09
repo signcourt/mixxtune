@@ -129,7 +129,7 @@ class RevenueImportController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.revenue-imports.show', $import)
+            ->route('single.admin.revenue-imports.show', $import)
             ->with('success', 'Revenue report uploaded successfully.');
     }
 
@@ -156,7 +156,7 @@ class RevenueImportController extends Controller
         $parser->parse($revenueImport);
 
         return redirect()
-            ->route('admin.revenue-imports.show', $revenueImport)
+            ->route('single.admin.revenue-imports.show', $revenueImport)
             ->with('success', 'Revenue report processed successfully.');
     }
 
@@ -178,7 +178,7 @@ class RevenueImportController extends Controller
         $revenueImport->delete();
 
         return redirect()
-            ->route('admin.revenue-imports.index')
+            ->route('single.admin.revenue-imports.index')
             ->with('success', 'Revenue import deleted.');
     }
 

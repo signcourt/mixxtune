@@ -26,7 +26,7 @@ class AcceptUserInvitationController extends Controller
 
         if (! $user) {
             return redirect()
-                ->route('user.invitation.invalid')
+                ->route('single.invitation.invalid')
                 ->withErrors([
                     'invitation' =>
                         'This invitation link is invalid or has already been used.',
@@ -44,7 +44,7 @@ class AcceptUserInvitationController extends Controller
             ])->save();
 
             return redirect()
-                ->route('user.invitation.invalid')
+                ->route('single.invitation.invalid')
                 ->withErrors([
                     'invitation' =>
                         'This invitation has expired. Please ask the administrator to resend it.',

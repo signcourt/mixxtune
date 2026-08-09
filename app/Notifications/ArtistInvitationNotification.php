@@ -22,7 +22,7 @@ class ArtistInvitationNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $url = route('artist.invitation.accept', [
+        $url = route('single.invitation.accept', [
             'token' => $this->invitationToken,
         ]);
 
