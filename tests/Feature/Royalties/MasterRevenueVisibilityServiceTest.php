@@ -364,6 +364,168 @@ class MasterRevenueVisibilityServiceTest extends TestCase
         );
     }
 
+    public function test_artist_summary_respects_revenue_share_visibility(): void
+    {
+        $master = $this->label(
+            'Artist Master'
+        );
+
+        $artistId = DB::table(
+            'artists'
+        )->insertGetId([
+            'public_id' =>
+                (string) Str::ulid(),
+
+            'label_id' =>
+                $master->id,
+
+            'stage_name' =>
+                'Visibility Artist',
+
+            'slug' =>
+                'visibility-artist-'
+                .Str::lower(
+                    Str::random(8)
+                ),
+
+            'email' =>
+                'visibility-'
+                .Str::lower(
+                    Str::random(8)
+                )
+                .'@example.test',
+
+            'country' =>
+                'IN',
+
+            'timezone' =>
+                'Asia/Kolkata',
+
+            'currency' =>
+                'INR',
+
+            'account_status' =>
+                'active',
+
+            'kyc_status' =>
+                'pending',
+
+            'can_receive_splits' =>
+                true,
+
+            'can_create_releases' =>
+                true,
+
+            'created_at' =>
+                now(),
+
+            'updated_at' =>
+                now(),
+        ]);
+
+        $shareId = DB::table(
+            'label_revenue_shares'
+        )->insertGetId([
+            'master_label_id' =>
+                $master->id,
+
+            'beneficiary_type' =>
+                'artist',
+
+            'beneficiary_id' =>
+                $artistId,
+
+            'revenue_share_percent' =>
+                70,
+
+            'show_revenue_share' =>
+                false,
+
+            'is_active' =>
+                true,
+
+            'created_at' =>
+                now(),
+
+            'updated_at' =>
+                now(),
+        ]);
+
+        $this->statement(
+            'artist',
+            $artistId,
+            70,
+            70
+        );
+
+        $service = app(
+            MasterRevenueVisibilityService::class
+        );
+
+        $hidden = $service->artistSummary(
+            $artistId,
+            '2026-07'
+        );
+
+        $this->assertFalse(
+            $hidden['is_master']
+        );
+
+        $this->assertEqualsWithDelta(
+            70,
+            $hidden['allocated_revenue'],
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            70,
+            $hidden['payable_revenue'],
+            0.00000001
+        );
+
+        $this->assertFalse(
+            $hidden['share_visible']
+        );
+
+        $this->assertNull(
+            $hidden['share_percent']
+        );
+
+        DB::table(
+            'label_revenue_shares'
+        )
+            ->where('id', $shareId)
+            ->update([
+                'show_revenue_share' =>
+                    true,
+
+                'updated_at' =>
+                    now(),
+            ]);
+
+        $visible = $service->artistSummary(
+            $artistId,
+            '2026-07'
+        );
+
+        $this->assertTrue(
+            $visible['share_visible']
+        );
+
+        $this->assertEqualsWithDelta(
+            70,
+            $visible['share_percent'],
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            70,
+            $visible['payable_revenue'],
+            0.00000001
+        );
+    }
+
+
     public function test_artist_under_child_label_is_not_a_direct_master_beneficiary(): void
     {
         $master = $this->label(

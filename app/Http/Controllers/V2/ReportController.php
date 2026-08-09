@@ -112,6 +112,25 @@ class ReportController extends Controller
             }
         }
 
+        if ($role === 'artist') {
+            $artist = DB::table('artists')
+                ->where(
+                    'user_id',
+                    $request->user()->id
+                )
+                ->whereNull('deleted_at')
+                ->first();
+
+            if ($artist) {
+                $revenueSummary =
+                    $revenueVisibility
+                        ->artistSummary(
+                            (int) $artist->id,
+                            $filters['month'] ?: null
+                        );
+            }
+        }
+
         return Inertia::render(
             'V2/Reports/Index',
             [

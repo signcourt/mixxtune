@@ -133,6 +133,18 @@ class DashboardController extends Controller
             }
         }
 
+        if (
+            $role === 'artist'
+            && isset($artist)
+            && $artist
+        ) {
+            $revenueSummary =
+                $revenueVisibility
+                    ->artistSummary(
+                        (int) $artist->id
+                    );
+        }
+
         if ($role === 'label' && isset($label) && $label) {
             $activeArtists = DB::table('artists')
                 ->where('label_id', $label->id)

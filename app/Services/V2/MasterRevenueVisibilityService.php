@@ -177,6 +177,94 @@ class MasterRevenueVisibilityService
         ];
     }
 
+    public function artistSummary(
+        int $artistId,
+        ?string $statementMonth = null
+    ): array {
+        $artist = DB::table('artists')
+            ->where('id', $artistId)
+            ->whereNull('deleted_at')
+            ->first([
+                'id',
+                'label_id',
+            ]);
+
+        $own = $this->statementTotals(
+            'artist',
+            $artistId,
+            $statementMonth
+        );
+
+        if (! $artist) {
+            return [
+                'is_master' => false,
+
+                'managed_revenue' => 0.0,
+                'allocated_revenue' => 0.0,
+                'retained_revenue' => 0.0,
+                'payable_revenue' => 0.0,
+                'gross_statement_revenue' => 0.0,
+
+                'share_percent' => null,
+                'share_visible' => false,
+
+                'children' => [],
+            ];
+        }
+
+        /*
+         * A direct artist's label_id identifies the
+         * master account that owns the beneficiary
+         * revenue-share contract.
+         *
+         * The beneficiary always sees its payable
+         * amount. Percentage visibility is controlled
+         * exclusively by show_revenue_share.
+         */
+        $share = $artist->label_id
+            ? $this->activeShare(
+                'artist',
+                $artistId,
+                (int) $artist->label_id
+            )
+            : null;
+
+        return [
+            'is_master' => false,
+
+            'managed_revenue' =>
+                (float) $own['net'],
+
+            'allocated_revenue' =>
+                (float) $own['net'],
+
+            'retained_revenue' =>
+                0.0,
+
+            'payable_revenue' =>
+                (float) $own['net'],
+
+            'gross_statement_revenue' =>
+                (float) $own['gross'],
+
+            'share_percent' =>
+                $share
+                && (bool)
+                    $share->show_revenue_share
+                    ? (float)
+                        $share->revenue_share_percent
+                    : null,
+
+            'share_visible' =>
+                $share
+                    ? (bool)
+                        $share->show_revenue_share
+                    : false,
+
+            'children' => [],
+        ];
+    }
+
     private function beneficiarySummary(
         int $masterLabelId,
         string $type,

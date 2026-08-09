@@ -235,7 +235,7 @@ export default function CommonDashboard({
                 cards={cards}
             />
 
-            {isLabel && revenueSummary && (
+            {(isLabel || role === 'artist') && revenueSummary && (
                 <section className="mt-6 space-y-5">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                         <div>
