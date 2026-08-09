@@ -104,42 +104,32 @@ class ReleaseController extends Controller
             if ($rootLabelIds->isEmpty()) {
                 $query->whereRaw('1 = 0');
             } else {
-                $visibleLabelIds = $rootLabelIds
-                    ->map(fn ($id) => (int) $id)
+                $rootLabelIds = $rootLabelIds
+                    ->map(
+                        fn ($id) => (int) $id
+                    )
                     ->values();
 
-                $frontier = $visibleLabelIds;
-
                 /*
-                 * Resolve the complete descendant tree instead of
-                 * limiting catalogue visibility to one sub-label level.
+                 * Strict two-tier catalogue:
+                 * root labels + direct child labels only.
                  */
-                while ($frontier->isNotEmpty()) {
-                    $childIds = Label::query()
-                        ->whereIn(
-                            'parent_label_id',
-                            $frontier
-                        )
-                        ->whereNull('deleted_at')
-                        ->pluck('id')
-                        ->map(fn ($id) => (int) $id)
-                        ->reject(
-                            fn ($id) =>
-                                $visibleLabelIds->contains($id)
-                        )
-                        ->values();
+                $childLabelIds = Label::query()
+                    ->whereIn(
+                        'parent_label_id',
+                        $rootLabelIds
+                    )
+                    ->whereNull('deleted_at')
+                    ->pluck('id')
+                    ->map(
+                        fn ($id) => (int) $id
+                    );
 
-                    if ($childIds->isEmpty()) {
-                        break;
-                    }
-
-                    $visibleLabelIds = $visibleLabelIds
-                        ->merge($childIds)
+                $visibleLabelIds =
+                    $rootLabelIds
+                        ->merge($childLabelIds)
                         ->unique()
                         ->values();
-
-                    $frontier = $childIds;
-                }
 
                 $query->whereIn(
                     'label_id',
@@ -607,35 +597,28 @@ class ReleaseController extends Controller
                 ->map(fn ($id) => (int) $id)
                 ->values();
 
-            $visibleLabelIds = $rootLabelIds;
-            $frontier = $rootLabelIds;
+            /*
+             * Strict two-tier visibility:
+             * directly owned labels + direct child labels.
+             *
+             * No recursive descendant access.
+             */
+            $childLabelIds = Label::query()
+                ->whereIn(
+                    'parent_label_id',
+                    $rootLabelIds
+                )
+                ->whereNull('deleted_at')
+                ->pluck('id')
+                ->map(
+                    fn ($id) => (int) $id
+                );
 
-            while ($frontier->isNotEmpty()) {
-                $childIds = Label::query()
-                    ->whereIn(
-                        'parent_label_id',
-                        $frontier
-                    )
-                    ->whereNull('deleted_at')
-                    ->pluck('id')
-                    ->map(fn ($id) => (int) $id)
-                    ->reject(
-                        fn ($id) =>
-                            $visibleLabelIds->contains($id)
-                    )
-                    ->values();
-
-                if ($childIds->isEmpty()) {
-                    break;
-                }
-
-                $visibleLabelIds = $visibleLabelIds
-                    ->merge($childIds)
+            $visibleLabelIds =
+                $rootLabelIds
+                    ->merge($childLabelIds)
                     ->unique()
                     ->values();
-
-                $frontier = $childIds;
-            }
 
             abort_unless(
                 $release->label
@@ -1697,17 +1680,55 @@ class ReleaseController extends Controller
         }
 
         if ($role === 'label') {
-            $label = Label::query()
+            $rootLabelIds = Label::query()
                 ->where(
                     'user_id',
                     $request->user()->id
                 )
                 ->whereNull('deleted_at')
-                ->firstOrFail();
+                ->pluck('id')
+                ->map(
+                    fn ($id) => (int) $id
+                );
+
+            abort_if(
+                $rootLabelIds->isEmpty(),
+                403,
+                'You cannot manage this release.'
+            );
+
+            /*
+             * Mixx Tune hierarchy is strictly two-tier:
+             *
+             * Master Label
+             *   -> direct Sub-Labels
+             *
+             * A master may manage its own catalogue and
+             * direct child-label catalogue. No recursive
+             * descendant access is granted.
+             */
+            $childLabelIds = Label::query()
+                ->whereIn(
+                    'parent_label_id',
+                    $rootLabelIds
+                )
+                ->whereNull('deleted_at')
+                ->pluck('id')
+                ->map(
+                    fn ($id) => (int) $id
+                );
+
+            $manageableLabelIds =
+                $rootLabelIds
+                    ->merge($childLabelIds)
+                    ->unique()
+                    ->values();
 
             abort_unless(
-                (int) $release->label_id
-                    === (int) $label->id,
+                $release->label_id
+                && $manageableLabelIds->contains(
+                    (int) $release->label_id
+                ),
                 403,
                 'You cannot manage this release.'
             );

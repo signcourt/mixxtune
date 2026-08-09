@@ -118,14 +118,52 @@ class ReleaseAccessService
         }
 
         if ($role === 'label') {
-            $label = Label::query()
-                ->where('user_id', $user->id)
+            /*
+             * Mixx Tune hierarchy is strictly two-tier.
+             *
+             * A Label login may access:
+             * - releases of labels directly owned by it
+             * - releases of direct child/sub-labels
+             *
+             * Grandchildren and unrelated labels remain
+             * outside the access boundary.
+             */
+            $rootLabelIds = Label::query()
+                ->where(
+                    'user_id',
+                    $user->id
+                )
                 ->whereNull('deleted_at')
-                ->first();
+                ->pluck('id')
+                ->map(
+                    fn ($id) => (int) $id
+                );
 
-            return $label
-                && (int) $release->label_id
-                    === (int) $label->id;
+            if ($rootLabelIds->isEmpty()) {
+                return false;
+            }
+
+            $childLabelIds = Label::query()
+                ->whereIn(
+                    'parent_label_id',
+                    $rootLabelIds
+                )
+                ->whereNull('deleted_at')
+                ->pluck('id')
+                ->map(
+                    fn ($id) => (int) $id
+                );
+
+            $accessibleLabelIds =
+                $rootLabelIds
+                    ->merge($childLabelIds)
+                    ->unique()
+                    ->values();
+
+            return $release->label_id
+                && $accessibleLabelIds->contains(
+                    (int) $release->label_id
+                );
         }
 
         if ($role === 'admin') {
