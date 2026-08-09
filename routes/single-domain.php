@@ -64,6 +64,15 @@
             ]
         )->name('release-tracks.store');
 
+
+        Route::get(
+            '/tracks/{track}/stream',
+            [
+                \App\Http\Controllers\Artist\ReleaseTrackController::class,
+                'stream',
+            ]
+        )->name('tracks.stream');
+
         \Illuminate\Support\Facades\Route::patch(
             '/releases/{release}/distribution',
             [
@@ -79,6 +88,15 @@
                 'submitForReview',
             ]
         )->name('releases.submit');
+
+
+        Route::delete(
+            '/releases/{release}',
+            [
+                \App\Http\Controllers\Artist\ReleaseController::class,
+                'destroy',
+            ]
+        )->name('releases.destroy');
 
         \Illuminate\Support\Facades\Route::patch(
             '/tracks/{track}',
@@ -229,16 +247,6 @@ Route::middleware([
     'verified',
     'role:artist',
 ])->prefix('artist')->group(function () {
-    Route::redirect(
-        '/releases',
-        '/v2/releases'
-    )->name('single.artist.releases.redirect');
-
-    Route::redirect(
-        '/releases/create',
-        '/v2/releases/create'
-    )->name('single.artist.releases.create.redirect');
-
     Route::redirect(
         '/wallet',
         '/v2/wallet'

@@ -729,4 +729,46 @@ class ReleaseController extends Controller
                 "Draft '{$release->title}' successfully created."
             );
     }
+    public function destroy(
+        Request $request,
+        \App\Models\Distribution\Release $release
+    ) {
+        abort_unless(
+            $release->status === 'draft',
+            403,
+            'Only draft releases can be deleted.'
+        );
+
+        abort_unless(
+            (int) $release->created_by
+                === (int) $request->user()->id,
+            403,
+            'Only the draft creator can delete this release.'
+        );
+
+        $artist = Artist::query()
+            ->where('user_id', $request->user()->id)
+            ->whereNull('deleted_at')
+            ->firstOrFail();
+
+        abort_unless(
+            (int) $release->artist_id === (int) $artist->id,
+            403,
+            'You cannot delete this release.'
+        );
+
+        $title = $release->title;
+
+        $release->update([
+            'updated_by' => $request->user()->id,
+        ]);
+
+        $release->delete();
+
+        return back()->with(
+            'success',
+            "Draft '{$title}' deleted successfully."
+        );
+    }
+
 }

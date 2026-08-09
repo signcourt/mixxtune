@@ -653,7 +653,7 @@ function ReleaseCard({
         }
 
         router.delete(
-            `/v2/releases/${release.id}`,
+            `${basePath}/${release.id}`,
             {
                 preserveScroll: true,
             }
@@ -821,7 +821,7 @@ function ReleaseRow({
         }
 
         router.delete(
-            `/v2/releases/${release.id}`,
+            `${basePath}/${release.id}`,
             {
                 preserveScroll: true,
             }
