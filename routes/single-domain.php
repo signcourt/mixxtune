@@ -107,7 +107,6 @@
 
 
 
-use App\Http\Controllers\Artist\DashboardController as ArtistDashboardController;
 use App\Http\Controllers\Auth\AcceptUserInvitationController;
 use App\Http\Controllers\Auth\UserInvitationPasswordController;
 use App\Http\Controllers\V2\Admin\DashboardController as AdminDashboardController;
@@ -186,7 +185,7 @@ Route::middleware([
 
     Route::middleware('role:artist')->get(
         '/artist/dashboard',
-        [ArtistDashboardController::class, 'index']
+        SharedDashboardController::class
     )->name('single.artist.dashboard');
 
     Route::middleware('role:label')->get(

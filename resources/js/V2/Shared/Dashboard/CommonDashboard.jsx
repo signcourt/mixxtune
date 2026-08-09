@@ -1,12 +1,15 @@
 import { Head } from '@inertiajs/react';
 import {
+    Clock3,
     Disc3,
+    Landmark,
     Radio,
     Users,
     WalletCards,
 } from 'lucide-react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import {
+    ArtistActivitySection,
     DashboardAnalyticsSection,
     DashboardHero,
     DashboardKpiGrid,
@@ -29,6 +32,8 @@ export default function CommonDashboard({
     analytics = {},
     revenueSummary = null,
     recentReleases = [],
+    recentTransactions = [],
+    recentWithdrawals = [],
     quickActions = [],
 }) {
     const isLabel = role === 'label';
@@ -64,7 +69,9 @@ export default function CommonDashboard({
         {
             title: isLabel
                 ? 'Active Artists'
-                : 'Wallet Balance',
+                : role === 'artist'
+                  ? 'Available Balance'
+                  : 'Wallet Balance',
             value: isLabel
                 ? number(
                       stats.activeArtists
@@ -73,13 +80,50 @@ export default function CommonDashboard({
                   '₹0.00',
             note: isLabel
                 ? 'Artists under this label'
-                : 'Current available balance',
+                : role === 'artist'
+                  ? 'Available for withdrawal'
+                  : 'Current available balance',
             icon: isLabel
                 ? Users
                 : WalletCards,
             tone: 'amber',
         },
     ];
+
+    if (role === 'artist') {
+        const currency =
+            stats.walletCurrency || 'INR';
+
+        const financeMoney = (value) =>
+            new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency,
+                maximumFractionDigits: 2,
+            }).format(Number(value ?? 0));
+
+        cards.push(
+            {
+                title: 'Pending Balance',
+                value: financeMoney(
+                    stats.walletPendingBalance
+                ),
+                note:
+                    'Royalty balance pending availability',
+                icon: Clock3,
+                tone: 'amber',
+            },
+            {
+                title: 'Pending Withdrawals',
+                value: number(
+                    stats.pendingWithdrawals
+                ),
+                note:
+                    'Withdrawal requests currently in process',
+                icon: Landmark,
+                tone: 'blue',
+            }
+        );
+    }
 
     const normalizedAnalytics = {
         has_data:
@@ -171,7 +215,9 @@ export default function CommonDashboard({
                     href:
                         role === 'label'
                             ? '/label/releases'
-                            : '/v2/releases/create',
+                            : role === 'artist'
+                              ? '/artist/releases/create'
+                              : '/v2/releases/create',
                 }}
                 secondaryAction={{
                     label: isLabel
@@ -179,7 +225,9 @@ export default function CommonDashboard({
                         : 'View Releases',
                     href: isLabel
                         ? '/label/artists'
-                        : '/v2/releases',
+                        : role === 'artist'
+                          ? '/artist/releases'
+                          : '/v2/releases',
                 }}
             />
 
@@ -434,11 +482,26 @@ export default function CommonDashboard({
                 reportsHref={
                     role === 'label'
                         ? '/label/reports'
-                        : '/v2/reports'
+                        : role === 'artist'
+                          ? '/artist/reports'
+                          : '/v2/reports'
                 }
             />
 
-            <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            {role === 'artist' && (
+                <ArtistActivitySection
+                    recentReleases={recentReleases}
+                    recentTransactions={recentTransactions}
+                    recentWithdrawals={recentWithdrawals}
+                    quickActions={quickActions}
+                    currency={
+                        stats.walletCurrency || 'INR'
+                    }
+                />
+            )}
+
+            {role !== 'artist' && (
+                <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h3 className="text-lg font-black text-slate-950">
                     Recent Releases
                 </h3>
@@ -490,6 +553,7 @@ export default function CommonDashboard({
                     )}
                 </div>
             </section>
+            )}
         </PanelLayout>
     );
 }

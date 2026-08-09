@@ -141,6 +141,110 @@ class DashboardController extends Controller
                 ->count();
         }
 
+        /*
+         * Artist finance summary.
+         *
+         * The V2 dashboard must use the same wallet ledger that powers
+         * royalties and withdrawals. Never calculate artist earnings
+         * independently here.
+         */
+        $walletBalance = 0.0;
+        $pendingBalance = 0.0;
+        $pendingWithdrawals = 0;
+        $walletCurrency = 'INR';
+
+        if (
+            $role === 'artist'
+            && isset($artist)
+            && $artist
+        ) {
+            $wallet = DB::table('wallets')
+                ->where('artist_id', $artist->id)
+                ->first();
+
+            if ($wallet) {
+                $walletBalance = (float) (
+                    $wallet->available_balance ?? 0
+                );
+
+                $pendingBalance = (float) (
+                    $wallet->pending_balance ?? 0
+                );
+
+                $walletCurrency =
+                    $wallet->currency
+                    ?? 'INR';
+            }
+
+            $pendingWithdrawals = DB::table('withdrawals')
+                ->where('artist_id', $artist->id)
+                ->whereIn(
+                    'status',
+                    [
+                        'pending',
+                        'approved',
+                        'processing',
+                    ]
+                )
+                ->count();
+        }
+
+        $recentTransactions = [];
+        $recentWithdrawals = [];
+
+        if (
+            $role === 'artist'
+            && isset($artist)
+            && $artist
+        ) {
+            $recentTransactions = DB::table(
+                'wallet_transactions'
+            )
+                ->where('artist_id', $artist->id)
+                ->latest('id')
+                ->limit(5)
+                ->get()
+                ->map(fn ($transaction) => [
+                    'id' => $transaction->id,
+                    'type' =>
+                        $transaction->type ?? null,
+                    'amount' =>
+                        (float) ($transaction->amount ?? 0),
+                    'currency' =>
+                        $transaction->currency
+                        ?? $walletCurrency,
+                    'description' =>
+                        $transaction->description
+                        ?? null,
+                    'created_at' =>
+                        $transaction->created_at,
+                ])
+                ->values()
+                ->all();
+
+            $recentWithdrawals = DB::table(
+                'withdrawals'
+            )
+                ->where('artist_id', $artist->id)
+                ->latest('id')
+                ->limit(5)
+                ->get()
+                ->map(fn ($withdrawal) => [
+                    'id' => $withdrawal->id,
+                    'amount' =>
+                        (float) ($withdrawal->amount ?? 0),
+                    'currency' =>
+                        $withdrawal->currency
+                        ?? $walletCurrency,
+                    'status' =>
+                        $withdrawal->status ?? null,
+                    'created_at' =>
+                        $withdrawal->created_at,
+                ])
+                ->values()
+                ->all();
+        }
+
         $panelName = match ($role) {
             'super_admin' => 'Super Admin',
             'admin' => 'Admin',
@@ -153,8 +257,38 @@ class DashboardController extends Controller
                 ['label' => 'Review Releases', 'href' => '/release-reviews'],
                 ['label' => 'Create Release', 'href' => '/v2/releases/create'],
             ],
-            'label', 'artist' => [
-                ['label' => 'Create Release', 'href' => '/v2/releases/create'],
+            'label' => [
+                [
+                    'label' => 'Create Release',
+                    'href' => '/label/releases',
+                ],
+            ],
+
+            'artist' => [
+                [
+                    'label' => 'Create Release',
+                    'href' => '/artist/releases/create',
+                ],
+                [
+                    'label' => 'Wallet',
+                    'href' => '/artist/wallet',
+                ],
+                [
+                    'label' => 'Royalties',
+                    'href' => '/artist/royalties',
+                ],
+                [
+                    'label' => 'Statements',
+                    'href' => '/artist/statements',
+                ],
+                [
+                    'label' => 'Withdraw',
+                    'href' => '/artist/withdrawals',
+                ],
+                [
+                    'label' => 'Reports',
+                    'href' => '/artist/reports',
+                ],
             ],
             default => [],
         };
@@ -168,12 +302,36 @@ class DashboardController extends Controller
                 'totalReleases' => $totalReleases,
                 'submittedReleases' => $submittedReleases,
                 'approvedReleases' => $approvedReleases,
-                'walletBalance' => '₹0.00',
+                'walletBalance' =>
+                    $walletCurrency === 'INR'
+                        ? '₹'.number_format(
+                            $walletBalance,
+                            2
+                        )
+                        : $walletCurrency.' '.number_format(
+                            $walletBalance,
+                            2
+                        ),
+
+                'walletAvailableBalance' =>
+                    $walletBalance,
+
+                'walletPendingBalance' =>
+                    $pendingBalance,
+
+                'pendingWithdrawals' =>
+                    $pendingWithdrawals,
+
+                'walletCurrency' =>
+                    $walletCurrency,
+
                 'activeArtists' => $activeArtists,
             ],
             'analytics' => $analytics,
             'revenueSummary' => $revenueSummary,
             'recentReleases' => $recentReleases,
+            'recentTransactions' => $recentTransactions,
+            'recentWithdrawals' => $recentWithdrawals,
             'quickActions' => $quickActions,
         ]);
     }
