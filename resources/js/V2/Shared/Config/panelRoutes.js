@@ -64,6 +64,9 @@ export const PANEL_ROUTES = {
         artists:
             '/v2/label/artists',
 
+        revenueSharing:
+            '/v2/label/revenue-sharing',
+
         releases:
             '/v2/releases',
         releasesAll:

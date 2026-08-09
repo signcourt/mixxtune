@@ -5,6 +5,7 @@ namespace App\Http\Controllers\V2;
 use App\Http\Controllers\Controller;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReportAnalyticsService;
+use App\Services\V2\MasterRevenueVisibilityService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -14,7 +15,8 @@ class ReportController extends Controller
     public function index(
         Request $request,
         PermissionService $permissions,
-        ReportAnalyticsService $analytics
+        ReportAnalyticsService $analytics,
+        MasterRevenueVisibilityService $revenueVisibility
     ): Response {
         $permissions->authorize(
             $request->user(),
@@ -86,13 +88,37 @@ class ReportController extends Controller
             ->orderBy('country_code')
             ->pluck('country_code');
 
+        $role = $permissions->role(
+            $request->user()
+        );
+
+        $revenueSummary = null;
+
+        if ($role === 'label') {
+            $label = \App\Models\Core\Label::query()
+                ->where(
+                    'user_id',
+                    $request->user()->id
+                )
+                ->whereNull('deleted_at')
+                ->first();
+
+            if ($label) {
+                $revenueSummary =
+                    $revenueVisibility->summary(
+                        $label,
+                        $filters['month'] ?: null
+                    );
+            }
+        }
+
         return Inertia::render(
             'V2/Reports/Index',
             [
-                'role' =>
-                    $permissions->role(
-                        $request->user()
-                    ),
+                'role' => $role,
+
+                'revenueSummary' =>
+                    $revenueSummary,
 
                 'filters' =>
                     $filters,

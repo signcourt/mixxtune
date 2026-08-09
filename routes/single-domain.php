@@ -360,3 +360,66 @@ Route::middleware([
     )->whereNumber('artist')
      ->name('v2.label.artists.show');
 });
+
+
+/*
+|--------------------------------------------------------------------------
+| MIXX TUNE V1.3 — MASTER LABEL REVENUE SHARING
+|--------------------------------------------------------------------------
+|
+| Strict two-tier hierarchy:
+|
+| Master Label
+|   -> unlimited direct Sub-Labels
+|   -> unlimited direct Artists
+|
+| Sub-Labels / Artists cannot create another hierarchy.
+|
+*/
+
+\Illuminate\Support\Facades\Route::middleware([
+    'auth',
+    'verified',
+    'role:label',
+])->group(function () {
+    \Illuminate\Support\Facades\Route::get(
+        '/v2/label/revenue-sharing',
+        [
+            \App\Http\Controllers\V2\Label\RevenueSharingController::class,
+            'index',
+        ]
+    )->name(
+        'v2.label.revenue-sharing.index'
+    );
+
+    \Illuminate\Support\Facades\Route::patch(
+        '/v2/label/revenue-sharing/{type}/{id}',
+        [
+            \App\Http\Controllers\V2\Label\RevenueSharingController::class,
+            'update',
+        ]
+    )
+        ->whereIn(
+            'type',
+            [
+                'label',
+                'artist',
+            ]
+        )
+        ->whereNumber('id')
+        ->name(
+            'v2.label.revenue-sharing.update'
+        );
+
+    \Illuminate\Support\Facades\Route::patch(
+        '/v2/label/revenue-sharing/{share}/toggle',
+        [
+            \App\Http\Controllers\V2\Label\RevenueSharingController::class,
+            'toggle',
+        ]
+    )
+        ->whereNumber('share')
+        ->name(
+            'v2.label.revenue-sharing.toggle'
+        );
+});

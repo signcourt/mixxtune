@@ -15,11 +15,19 @@ import {
 const number = (value) =>
     Number(value ?? 0).toLocaleString('en-IN');
 
+const money = (value) =>
+    new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 2,
+    }).format(Number(value ?? 0));
+
 export default function CommonDashboard({
     role = 'artist',
     panelName = 'Artist',
     stats = {},
     analytics = {},
+    revenueSummary = null,
     recentReleases = [],
     quickActions = [],
 }) {
@@ -178,6 +186,245 @@ export default function CommonDashboard({
             <DashboardKpiGrid
                 cards={cards}
             />
+
+            {isLabel && revenueSummary && (
+                <section className="mt-6 space-y-5">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 className="text-xl font-black text-slate-950">
+                                Revenue Overview
+                            </h2>
+
+                            <p className="mt-1 text-sm text-slate-500">
+                                {revenueSummary.is_master
+                                    ? 'Master revenue, direct child allocations and retained earnings.'
+                                    : 'Your allocated royalty revenue and payable earnings.'}
+                            </p>
+                        </div>
+
+                        {revenueSummary.is_master && (
+                            <span className="w-fit rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700">
+                                Master Account
+                            </span>
+                        )}
+                    </div>
+
+                    {revenueSummary.is_master ? (
+                        <>
+                            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                        Managed Revenue
+                                    </p>
+
+                                    <p className="mt-3 text-2xl font-black text-slate-950">
+                                        {money(
+                                            revenueSummary.managed_revenue
+                                        )}
+                                    </p>
+
+                                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                                        Gross revenue managed across direct sub-labels.
+                                    </p>
+                                </article>
+
+                                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                        Child Allocations
+                                    </p>
+
+                                    <p className="mt-3 text-2xl font-black text-slate-950">
+                                        {money(
+                                            revenueSummary.allocated_revenue
+                                        )}
+                                    </p>
+
+                                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                                        Revenue payable to direct child accounts.
+                                    </p>
+                                </article>
+
+                                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                        Retained Revenue
+                                    </p>
+
+                                    <p className="mt-3 text-2xl font-black text-slate-950">
+                                        {money(
+                                            revenueSummary.retained_revenue
+                                        )}
+                                    </p>
+
+                                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                                        Master share retained after child allocation.
+                                    </p>
+                                </article>
+
+                                <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                        Master Payable
+                                    </p>
+
+                                    <p className="mt-3 text-2xl font-black text-slate-950">
+                                        {money(
+                                            revenueSummary.payable_revenue
+                                        )}
+                                    </p>
+
+                                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                                        Actual royalty payable to this master account.
+                                    </p>
+                                </article>
+                            </div>
+
+                            {revenueSummary.children?.length > 0 && (
+                                <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                                    <div className="border-b border-slate-200 px-6 py-5">
+                                        <h3 className="text-lg font-black text-slate-950">
+                                            Sub-Label Revenue Breakdown
+                                        </h3>
+
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            Direct child revenue allocation and master retention.
+                                        </p>
+                                    </div>
+
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-slate-200">
+                                            <thead className="bg-slate-50">
+                                                <tr>
+                                                    {[
+                                                        'Sub-Label',
+                                                        'Managed',
+                                                        'Share',
+                                                        'Child Payable',
+                                                        'Master Retained',
+                                                    ].map(
+                                                        (
+                                                            heading
+                                                        ) => (
+                                                            <th
+                                                                key={
+                                                                    heading
+                                                                }
+                                                                className="whitespace-nowrap px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
+                                                            >
+                                                                {
+                                                                    heading
+                                                                }
+                                                            </th>
+                                                        )
+                                                    )}
+                                                </tr>
+                                            </thead>
+
+                                            <tbody className="divide-y divide-slate-100">
+                                                {revenueSummary.children.map(
+                                                    (
+                                                        child
+                                                    ) => (
+                                                        <tr
+                                                            key={
+                                                                child.id
+                                                            }
+                                                            className="hover:bg-slate-50"
+                                                        >
+                                                            <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-900">
+                                                                {
+                                                                    child.name
+                                                                }
+                                                            </td>
+
+                                                            <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-700">
+                                                                {money(
+                                                                    child.managed_revenue
+                                                                )}
+                                                            </td>
+
+                                                            <td className="whitespace-nowrap px-5 py-4 text-sm font-semibold text-slate-700">
+                                                                {number(
+                                                                    child.share_percent
+                                                                )}
+                                                                %
+                                                            </td>
+
+                                                            <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-900">
+                                                                {money(
+                                                                    child.allocated_revenue
+                                                                )}
+                                                            </td>
+
+                                                            <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-900">
+                                                                {money(
+                                                                    child.master_retained
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                            <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                    Your Revenue
+                                </p>
+
+                                <p className="mt-3 text-2xl font-black text-slate-950">
+                                    {money(
+                                        revenueSummary.allocated_revenue
+                                    )}
+                                </p>
+
+                                <p className="mt-2 text-xs leading-5 text-slate-500">
+                                    Revenue allocated to your account.
+                                </p>
+                            </article>
+
+                            <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                    Payable Revenue
+                                </p>
+
+                                <p className="mt-3 text-2xl font-black text-slate-950">
+                                    {money(
+                                        revenueSummary.payable_revenue
+                                    )}
+                                </p>
+
+                                <p className="mt-2 text-xs leading-5 text-slate-500">
+                                    Your current royalty entitlement.
+                                </p>
+                            </article>
+
+                            {revenueSummary.share_visible &&
+                                revenueSummary.share_percent !== null && (
+                                    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                            Revenue Share
+                                        </p>
+
+                                        <p className="mt-3 text-2xl font-black text-slate-950">
+                                            {number(
+                                                revenueSummary.share_percent
+                                            )}
+                                            %
+                                        </p>
+
+                                        <p className="mt-2 text-xs leading-5 text-slate-500">
+                                            Your configured revenue-share percentage.
+                                        </p>
+                                    </article>
+                                )}
+                        </div>
+                    )}
+                </section>
+            )}
 
             <DashboardAnalyticsSection
                 analytics={

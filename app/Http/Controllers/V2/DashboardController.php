@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\V2;
 
 use App\Http\Controllers\Controller;
+use App\Models\Core\Label;
+use App\Services\V2\MasterRevenueVisibilityService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReportAnalyticsService;
 use Illuminate\Http\Request;
@@ -14,7 +16,8 @@ class DashboardController extends Controller
     public function __invoke(
         Request $request,
         PermissionService $permissionService,
-        ReportAnalyticsService $analyticsService
+        ReportAnalyticsService $analyticsService,
+        MasterRevenueVisibilityService $revenueVisibility
     ) {
         $user = $request->user();
         $role = $user->role ?? 'artist';
@@ -111,6 +114,25 @@ class DashboardController extends Controller
 
         $activeArtists = 0;
 
+        $revenueSummary = null;
+
+        if (
+            $role === 'label'
+            && isset($label)
+            && $label
+        ) {
+            $labelModel = Label::query()
+                ->find($label->id);
+
+            if ($labelModel) {
+                $revenueSummary =
+                    $revenueVisibility
+                        ->summary(
+                            $labelModel
+                        );
+            }
+        }
+
         if ($role === 'label' && isset($label) && $label) {
             $activeArtists = DB::table('artists')
                 ->where('label_id', $label->id)
@@ -150,6 +172,7 @@ class DashboardController extends Controller
                 'activeArtists' => $activeArtists,
             ],
             'analytics' => $analytics,
+            'revenueSummary' => $revenueSummary,
             'recentReleases' => $recentReleases,
             'quickActions' => $quickActions,
         ]);

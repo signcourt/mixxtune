@@ -138,12 +138,20 @@ const ownerNavigation = (
     ];
 
     if (role === 'label') {
-        items.push({
-            id: 'artists',
-            label: 'Artists',
-            icon: icons.artists,
-            href: routes.artists,
-        });
+        items.push(
+            {
+                id: 'artists',
+                label: 'Artists',
+                icon: icons.artists,
+                href: routes.artists,
+            },
+            {
+                id: 'revenue-sharing',
+                label: 'Revenue Sharing',
+                icon: icons.royalties,
+                href: routes.revenueSharing,
+            }
+        );
     }
 
     items.push(

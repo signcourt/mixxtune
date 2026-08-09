@@ -1115,6 +1115,12 @@ Route::middleware([
                 );
             })->name('artists.index');
 
+            Route::get('/revenue-sharing', function () {
+                return redirect()->route(
+                    'v2.label.revenue-sharing.index'
+                );
+            })->name('revenue-sharing.index');
+
             Route::get('/releases', function () {
                 return redirect()->route(
                     'v2.releases.index'
