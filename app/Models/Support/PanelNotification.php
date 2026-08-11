@@ -15,18 +15,22 @@ class PanelNotification extends Model
         'message',
         'action_url',
         'data',
+        'severity',
+        'category',
         'read_at',
+        'starred_at',
+        'dismissed_at',
     ];
 
     protected $casts = [
         'data' => 'array',
         'read_at' => 'datetime',
+        'starred_at' => 'datetime',
+        'dismissed_at' => 'datetime',
     ];
 
     public function user()
     {
-        return $this->belongsTo(
-            User::class
-        );
+        return $this->belongsTo(User::class);
     }
 }

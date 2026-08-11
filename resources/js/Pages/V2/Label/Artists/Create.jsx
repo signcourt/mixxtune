@@ -6,6 +6,45 @@ import {
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 
+const indiaStates = [
+    ['AN', 'Andaman and Nicobar Islands'],
+    ['AP', 'Andhra Pradesh'],
+    ['AR', 'Arunachal Pradesh'],
+    ['AS', 'Assam'],
+    ['BR', 'Bihar'],
+    ['CH', 'Chandigarh'],
+    ['CG', 'Chhattisgarh'],
+    ['DN', 'Dadra and Nagar Haveli and Daman and Diu'],
+    ['DL', 'Delhi'],
+    ['GA', 'Goa'],
+    ['GJ', 'Gujarat'],
+    ['HR', 'Haryana'],
+    ['HP', 'Himachal Pradesh'],
+    ['JK', 'Jammu and Kashmir'],
+    ['JH', 'Jharkhand'],
+    ['KA', 'Karnataka'],
+    ['KL', 'Kerala'],
+    ['LA', 'Ladakh'],
+    ['LD', 'Lakshadweep'],
+    ['MP', 'Madhya Pradesh'],
+    ['MH', 'Maharashtra'],
+    ['MN', 'Manipur'],
+    ['ML', 'Meghalaya'],
+    ['MZ', 'Mizoram'],
+    ['NL', 'Nagaland'],
+    ['OD', 'Odisha'],
+    ['PY', 'Puducherry'],
+    ['PB', 'Punjab'],
+    ['RJ', 'Rajasthan'],
+    ['SK', 'Sikkim'],
+    ['TN', 'Tamil Nadu'],
+    ['TS', 'Telangana'],
+    ['TR', 'Tripura'],
+    ['UP', 'Uttar Pradesh'],
+    ['UK', 'Uttarakhand'],
+    ['WB', 'West Bengal'],
+];
+
 export default function Create({
     role = 'label',
     label = {},
@@ -23,6 +62,7 @@ export default function Create({
         email: '',
         phone: '',
         country: 'India',
+        state_code: 'DL',
         timezone: 'Asia/Kolkata',
         currency: 'INR',
         account_status: 'active',
@@ -196,6 +236,41 @@ export default function Create({
                                 )
                             }
                         />
+
+                        <label>
+                            <span className="text-sm font-semibold text-slate-700">
+                                State / Region
+                            </span>
+
+                            <select
+                                value={data.state_code}
+                                onChange={(event) =>
+                                    setData(
+                                        'state_code',
+                                        event.target.value
+                                    )
+                                }
+                                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
+                                required
+                            >
+                                {indiaStates.map(
+                                    ([code, name]) => (
+                                        <option
+                                            key={code}
+                                            value={code}
+                                        >
+                                            {name} ({code})
+                                        </option>
+                                    )
+                                )}
+                            </select>
+
+                            {errors.state_code && (
+                                <p className="mt-1 text-xs text-red-600">
+                                    {errors.state_code}
+                                </p>
+                            )}
+                        </label>
 
                         <Field
                             label="Timezone"

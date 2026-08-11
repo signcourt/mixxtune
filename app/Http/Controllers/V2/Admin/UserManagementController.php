@@ -7,6 +7,7 @@ use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\System\UserPanelPermission;
 use App\Models\User;
+use App\Services\V2\ClientIdService;
 use App\Services\V2\AuditLogService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\UserInvitationService;
@@ -258,6 +259,13 @@ class UserManagementController extends Controller
                 'max:100',
             ],
 
+            'state_code' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'max:10',
+            ],
+
             'role' => [
                 'required',
                 'string',
@@ -273,6 +281,101 @@ class UserManagementController extends Controller
             'send_invitation' => [
                 'required',
                 'boolean',
+            ],
+
+            'account_holder_name' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'max:190',
+            ],
+
+            'bank_account_number' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'max:60',
+            ],
+
+            'bank_name' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'max:190',
+            ],
+
+            'ifsc_code' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'max:30',
+            ],
+
+            'branch_name' => [
+                'nullable',
+                'string',
+                'max:190',
+            ],
+
+            'upi_id' => [
+                'nullable',
+                'string',
+                'max:190',
+            ],
+
+            'pan_number' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'max:30',
+            ],
+
+            'gst_number' => [
+                'nullable',
+                'string',
+                'max:40',
+            ],
+
+            'address_line_1' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'max:255',
+            ],
+
+            'address_line_2' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'city' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'max:120',
+            ],
+
+            'state' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'max:120',
+            ],
+
+            'postal_code' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'max:30',
+            ],
+
+            'country_code' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'string',
+                'size:2',
+                'regex:/^[A-Za-z]{2}$/',
             ],
 
             'artist_ids' => [
@@ -486,6 +589,18 @@ class UserManagementController extends Controller
                         $validated['country']
                         ?? null,
 
+                    'state_code' =>
+                        isset($validated['state_code'])
+                        && trim(
+                            (string) $validated['state_code']
+                        ) !== ''
+                            ? strtoupper(
+                                trim(
+                                    $validated['state_code']
+                                )
+                            )
+                            : null,
+
                     'role' =>
                         $validated['role'],
 
@@ -527,6 +642,138 @@ class UserManagementController extends Controller
                             ? 1
                             : 0,
                 ]);
+
+                /*
+                 * Permanent Client ID + Profile/KYC/Payout
+                 * are created together with the account.
+                 */
+                if (
+                    in_array(
+                        $validated['role'],
+                        ['label', 'artist'],
+                        true
+                    )
+                ) {
+                    $countryCode =
+                        strtoupper(
+                            $validated['country_code']
+                            ?? 'IN'
+                        );
+
+                    $stateCode =
+                        strtoupper(
+                            $validated['state_code']
+                            ?? 'NA'
+                        );
+
+                    $user->forceFill([
+                        'client_id' =>
+                            app(
+                                \App\Services\V2\ClientIdService::class
+                            )->generate(
+                                $validated['role'],
+                                $countryCode,
+                                $stateCode
+                            ),
+                    ])->save();
+
+                    \App\Models\Finance\PayoutProfile::query()
+                        ->create([
+                            'public_id' =>
+                                (string) \Illuminate\Support\Str::ulid(),
+
+                            'user_id' =>
+                                $user->id,
+
+                            'account_holder_name' =>
+                                $validated[
+                                    'account_holder_name'
+                                ],
+
+                            'bank_account_number' =>
+                                $validated[
+                                    'bank_account_number'
+                                ],
+
+                            'bank_name' =>
+                                $validated[
+                                    'bank_name'
+                                ],
+
+                            'ifsc_code' =>
+                                strtoupper(
+                                    trim(
+                                        $validated[
+                                            'ifsc_code'
+                                        ]
+                                    )
+                                ),
+
+                            'branch_name' =>
+                                $validated[
+                                    'branch_name'
+                                ]
+                                ?? null,
+
+                            'upi_id' =>
+                                $validated[
+                                    'upi_id'
+                                ]
+                                ?? null,
+
+                            'pan_number' =>
+                                strtoupper(
+                                    trim(
+                                        $validated[
+                                            'pan_number'
+                                        ]
+                                    )
+                                ),
+
+                            'gst_number' =>
+                                !empty(
+                                    $validated[
+                                        'gst_number'
+                                    ]
+                                )
+                                    ? strtoupper(
+                                        trim(
+                                            $validated[
+                                                'gst_number'
+                                            ]
+                                        )
+                                    )
+                                    : null,
+
+                            'address_line_1' =>
+                                $validated[
+                                    'address_line_1'
+                                ],
+
+                            'address_line_2' =>
+                                $validated[
+                                    'address_line_2'
+                                ]
+                                ?? null,
+
+                            'city' =>
+                                $validated['city'],
+
+                            'state' =>
+                                $validated['state'],
+
+                            'postal_code' =>
+                                $validated[
+                                    'postal_code'
+                                ],
+
+                            'country_code' =>
+                                $countryCode,
+
+                            'kyc_status' =>
+                                'pending',
+                        ]);
+                }
 
                 /*
                  * Every artist login requires a linked artists row.
@@ -1126,7 +1373,12 @@ class UserManagementController extends Controller
                     'user_id' => $user->id,
                 ]);
 
-        return Inertia::render(
+                $payoutProfile =
+            \App\Models\Finance\PayoutProfile::query()
+                ->where('user_id', $user->id)
+                ->first();
+
+return Inertia::render(
             'V2/Admin/Users/Edit',
             [
                 'role' => 'super_admin',
@@ -1134,6 +1386,8 @@ class UserManagementController extends Controller
                 'managedUser' => [
                     'id' => $user->id,
                     'name' => $user->name,
+                    'username' => $user->username,
+                    'client_id' => $user->client_id,
                     'email' => $user->email,
                     'phone' => $user->phone,
                     'country' => $user->country,
@@ -1174,6 +1428,70 @@ class UserManagementController extends Controller
                             'name',
                             'email',
                         ]),
+
+                'payoutProfile' =>
+                    $payoutProfile
+                        ? [
+                            'public_id' =>
+                                $payoutProfile->public_id,
+
+                            'account_holder_name' =>
+                                $payoutProfile->account_holder_name,
+
+                            /*
+                             * Sensitive encrypted values are
+                             * intentionally NOT returned in full.
+                             */
+                            'bank_account_number' => '',
+                            'masked_bank_account' =>
+                                $payoutProfile->masked_bank_account,
+
+                            'bank_name' =>
+                                $payoutProfile->bank_name,
+
+                            'ifsc_code' =>
+                                $payoutProfile->ifsc_code,
+
+                            'branch_name' =>
+                                $payoutProfile->branch_name,
+
+                            'upi_id' =>
+                                $payoutProfile->upi_id,
+
+                            'pan_number' => '',
+                            'masked_pan' =>
+                                $payoutProfile->masked_pan,
+
+                            'gst_number' =>
+                                $payoutProfile->gst_number,
+
+                            'address_line_1' =>
+                                $payoutProfile->address_line_1,
+
+                            'address_line_2' =>
+                                $payoutProfile->address_line_2,
+
+                            'city' =>
+                                $payoutProfile->city,
+
+                            'state' =>
+                                $payoutProfile->state,
+
+                            'postal_code' =>
+                                $payoutProfile->postal_code,
+
+                            'country_code' =>
+                                $payoutProfile->country_code,
+
+                            'kyc_status' =>
+                                $payoutProfile->kyc_status,
+
+                            'verified_at' =>
+                                optional(
+                                    $payoutProfile->verified_at
+                                )?->toDateTimeString(),
+                        ]
+                        : null,
 
                 'assignedArtistIds' =>
                     $user->assignedArtists
@@ -1246,12 +1564,6 @@ $validated = $request->validate([
                 'required',
                 'string',
                 'max:150',
-            ],
-
-            'username' => [
-                'required',
-                'string',
-                'max:40',
             ],
 
             'email' => [
@@ -1331,6 +1643,91 @@ $validated = $request->validate([
                 'nullable',
                 'array',
             ],
+            'account_holder_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'bank_account_number' => [
+                'nullable',
+                'string',
+                'min:6',
+                'max:40',
+            ],
+
+            'bank_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'ifsc_code' => [
+                'nullable',
+                'string',
+                'max:30',
+            ],
+
+            'branch_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'upi_id' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'pan_number' => [
+                'nullable',
+                'string',
+                'max:20',
+            ],
+
+            'gst_number' => [
+                'nullable',
+                'string',
+                'max:30',
+            ],
+
+            'address_line_1' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'address_line_2' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'city' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'state' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'postal_code' => [
+                'nullable',
+                'string',
+                'max:20',
+            ],
+
+            'country_code' => [
+                'nullable',
+                'string',
+                'size:2',
+            ],
+
         ]);
 
         if (
@@ -1420,64 +1817,7 @@ $validated = $request->validate([
             FILE_APPEND
         );
 
-$usernameService = app(
-            \App\Services\V2\UsernameService::class
-        );
-
-        $requestedUsername = trim(
-            (string) $validated['username']
-        );
-
-        $username =
-            $usernameService->normalize(
-                $requestedUsername
-            );
-
-        if (
-            strtolower($requestedUsername)
-                !== $username
-        ) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'username' =>
-                    'Username may contain lowercase letters, numbers and hyphens only.',
-            ]);
-        }
-
-        if (
-            ! $usernameService->validateFormat(
-                $username
-            )
-        ) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'username' =>
-                    'Username must be between 4 and 40 characters.',
-            ]);
-        }
-
-        if (
-            $usernameService->isReserved(
-                $username
-            )
-        ) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'username' =>
-                    'This username is reserved.',
-            ]);
-        }
-
-        if (
-            $usernameService->exists(
-                $username,
-                $user->id
-            )
-        ) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'username' =>
-                    'This username is already in use.',
-            ]);
-        }
-
-        $oldValues = [
+$oldValues = [
             'user' => $user->only([
                 'name',
                 'username',
@@ -1504,15 +1844,11 @@ $usernameService = app(
             function () use (
                 $validated,
                 $request,
-                $user,
-                $username
+                $user
             ) {
                 $user->update([
                     'name' =>
                         $validated['name'],
-
-                    'username' =>
-                        $username,
 
                     'email' =>
                         strtolower(
@@ -2041,6 +2377,170 @@ $usernameService = app(
                         ],
                         $permissionValues
                     );
+                /*
+                 * ADMIN_MANAGED_PAYOUT_PROFILE
+                 *
+                 * Super Admin manages the target user's KYC/Payout
+                 * profile. Blank sensitive fields preserve existing
+                 * encrypted Bank Account and PAN values.
+                 */
+                $payoutFields = [
+                    'account_holder_name',
+                    'bank_account_number',
+                    'bank_name',
+                    'ifsc_code',
+                    'branch_name',
+                    'upi_id',
+                    'pan_number',
+                    'gst_number',
+                    'address_line_1',
+                    'address_line_2',
+                    'city',
+                    'state',
+                    'postal_code',
+                    'country_code',
+                ];
+                
+                $hasPayoutInput = collect(
+                    $payoutFields
+                )->contains(
+                    fn (string $field): bool =>
+                        $request->exists($field)
+                );
+                
+                if ($hasPayoutInput) {
+                    $existingPayout =
+                        \App\Models\Finance\PayoutProfile::query()
+                            ->where(
+                                'user_id',
+                                $user->id
+                            )
+                            ->first();
+                
+                    $payoutData = [];
+                
+                    foreach ($payoutFields as $field) {
+                        if (
+                            array_key_exists(
+                                $field,
+                                $validated
+                            )
+                        ) {
+                            $payoutData[$field] =
+                                $validated[$field];
+                        }
+                    }
+                
+                    /*
+                     * Empty sensitive values mean:
+                     * keep the current encrypted value.
+                     */
+                    if (
+                        empty(
+                            $payoutData[
+                                'bank_account_number'
+                            ] ?? null
+                        )
+                        && $existingPayout
+                    ) {
+                        unset(
+                            $payoutData[
+                                'bank_account_number'
+                            ]
+                        );
+                    }
+                
+                    if (
+                        empty(
+                            $payoutData[
+                                'pan_number'
+                            ] ?? null
+                        )
+                        && $existingPayout
+                    ) {
+                        unset(
+                            $payoutData[
+                                'pan_number'
+                            ]
+                        );
+                    }
+                
+                    if (
+                        isset(
+                            $payoutData[
+                                'country_code'
+                            ]
+                        )
+                    ) {
+                        $payoutData['country_code'] =
+                            strtoupper(
+                                $payoutData[
+                                    'country_code'
+                                ]
+                            );
+                    }
+                
+                    if (
+                        isset(
+                            $payoutData[
+                                'ifsc_code'
+                            ]
+                        )
+                    ) {
+                        $payoutData['ifsc_code'] =
+                            strtoupper(
+                                $payoutData[
+                                    'ifsc_code'
+                                ]
+                            );
+                    }
+                
+                    if (
+                        isset(
+                            $payoutData[
+                                'pan_number'
+                            ]
+                        )
+                    ) {
+                        $payoutData['pan_number'] =
+                            strtoupper(
+                                $payoutData[
+                                    'pan_number'
+                                ]
+                            );
+                    }
+                
+                    /*
+                     * KYC status remains controlled by the existing
+                     * Super Admin account-status/KYC-status workflow.
+                     */
+                    if (
+                        array_key_exists(
+                            'kyc_status',
+                            $validated
+                        )
+                    ) {
+                        $payoutData['kyc_status'] =
+                            $validated['kyc_status'];
+                    }
+                
+                    \App\Models\Finance\PayoutProfile::query()
+                        ->updateOrCreate(
+                            [
+                                'user_id' =>
+                                    $user->id,
+                            ],
+                            [
+                                'public_id' =>
+                                    $existingPayout?->public_id
+                                    ?: (string)
+                                        \Illuminate\Support\Str::ulid(),
+                
+                                ...$payoutData,
+                            ]
+                        );
+                }
+
             }
         );
 

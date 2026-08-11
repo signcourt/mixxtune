@@ -22,8 +22,21 @@ class WithdrawalService
         User $user,
         float $amount,
         string $paymentMethod,
-        ?string $note = null
+        ?string $note = null,
+        ?User $actor = null
     ): WithdrawalRequest {
+        /*
+         * WITHDRAWAL_REQUEST_ACTOR
+         *
+         * $user  = financial owner of wallet/payout profile.
+         * $actor = authenticated person who initiated request.
+         *
+         * Existing callers remain backward compatible:
+         * when no actor is supplied, financial owner is actor.
+         */
+        $actor ??= $user;
+
+
         $amount = round($amount, 8);
 
         if ($amount < self::MINIMUM_AMOUNT) {
@@ -85,8 +98,8 @@ class WithdrawalService
             $profile,
             $amount,
             $paymentMethod,
-            $note
-        ) {
+            $note,
+                $actor) {
             $lockedWallet = DB::table('wallets')
                 ->where('id', $wallet->id)
                 ->lockForUpdate()
@@ -200,7 +213,7 @@ class WithdrawalService
                         now(),
 
                     'created_by' =>
-                        $user->id,
+                        $actor->id,
 
                     'updated_by' =>
                         $user->id,
@@ -290,7 +303,7 @@ class WithdrawalService
                         ]),
 
                     'created_by' =>
-                        $user->id,
+                        $actor->id,
 
                     'created_at' =>
                         now(),

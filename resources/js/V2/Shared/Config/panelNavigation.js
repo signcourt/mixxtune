@@ -20,6 +20,7 @@ import {
     UsersRound,
     WalletCards,
     WalletMinimal,
+    UserCog,
 } from 'lucide-react';
 
 import {
@@ -150,6 +151,14 @@ const ownerNavigation = (
                 label: 'Revenue Sharing',
                 icon: icons.royalties,
                 href: routes.revenueSharing,
+                permission: 'revenue_sharing.manage',
+            },
+            {
+                id: 'user-access',
+                label: 'User Access',
+                icon: UserCog,
+                href: routes.userAccess,
+                permission: 'team.manage',
             }
         );
     }
@@ -355,6 +364,12 @@ const adminNavigation = (
                     id: 'catalogue-transfer-history',
                     label: 'Transfer History',
                     href: '/v2/admin/ownership',
+                    permission: 'catalogue.view',
+                },
+                {
+                    id: 'catalogue-legacy-import',
+                    label: 'Legacy Import',
+                    href: routes.legacyCatalogueImports,
                     permission: 'catalogue.view',
                 },
             ],

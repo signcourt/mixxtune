@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\Distribution\Release;
-use App\Models\PanelNotification;
+use App\Models\Support\PanelNotification;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -320,7 +320,13 @@ class NotificationService
                     $severity,
 
                 'action_url' =>
-                    "/v2/releases/{$release->id}/edit",
+                    in_array(
+                        $type,
+                        ['release.changes_requested'],
+                        true
+                    )
+                        ? "/v2/releases/{$release->id}/edit"
+                        : "/v2/releases/{$release->id}",
 
                 'related_type' =>
                     Release::class,

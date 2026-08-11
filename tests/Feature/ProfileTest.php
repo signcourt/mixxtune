@@ -21,44 +21,46 @@ class ProfileTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_profile_information_can_be_updated(): void
+    public function test_profile_information_is_read_only_for_user(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'name' => 'Original User',
+            'email' => 'original@example.com',
+        ]);
 
         $response = $this
             ->actingAs($user)
             ->patch('/profile', [
-                'name' => 'Test User',
-                'email' => 'test@example.com',
+                'name' => 'Changed User',
+                'email' => 'changed@example.com',
             ]);
 
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/profile');
+        $response->assertForbidden();
 
         $user->refresh();
 
-        $this->assertSame('Test User', $user->name);
-        $this->assertSame('test@example.com', $user->email);
-        $this->assertNull($user->email_verified_at);
+        $this->assertSame('Original User', $user->name);
+        $this->assertSame('original@example.com', $user->email);
     }
 
-    public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged(): void
+    public function test_read_only_profile_update_does_not_change_email_verification_status(): void
     {
         $user = User::factory()->create();
+
+        $verifiedAt = $user->email_verified_at;
 
         $response = $this
             ->actingAs($user)
             ->patch('/profile', [
-                'name' => 'Test User',
+                'name' => 'Changed User',
                 'email' => $user->email,
             ]);
 
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/profile');
+        $response->assertForbidden();
 
-        $this->assertNotNull($user->refresh()->email_verified_at);
+        $user->refresh();
+
+        $this->assertEquals($verifiedAt, $user->email_verified_at);
     }
 
     public function test_user_can_delete_their_account(): void

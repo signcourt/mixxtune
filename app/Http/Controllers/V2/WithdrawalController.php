@@ -8,6 +8,7 @@ use App\Models\Finance\WithdrawalRequest;
 use App\Services\V2\PermissionService;
 use App\Services\V2\WalletService;
 use App\Services\V2\WithdrawalService;
+use App\Services\V2\LabelAccess\LabelFinancialContextService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,16 +19,24 @@ class WithdrawalController extends Controller
     public function index(
         Request $request,
         PermissionService $permissions,
-        WalletService $walletService
+        WalletService $walletService,
+        LabelFinancialContextService $financialContext
     ): Response {
+        $actor = $request->user();
+
+        $financialOwner =
+            $financialContext->owner(
+                $actor
+            );
+
         $wallet = $walletService->account(
-            $request->user()
+            $financialOwner
         );
 
         $profile = PayoutProfile::query()
             ->where(
                 'user_id',
-                $request->user()->id
+                $financialOwner->id
             )
             ->first();
 
@@ -36,7 +45,7 @@ class WithdrawalController extends Controller
             [
                 'role' =>
                     $permissions->role(
-                        $request->user()
+                        $financialOwner
                     ),
 
                 'wallet' =>
@@ -52,7 +61,7 @@ class WithdrawalController extends Controller
                     WithdrawalRequest::query()
                         ->where(
                             'user_id',
-                            $request->user()->id
+                            $financialOwner->id
                         )
                         ->orderByDesc('id')
                         ->paginate(25),
@@ -62,7 +71,8 @@ class WithdrawalController extends Controller
 
     public function store(
         Request $request,
-        WithdrawalService $withdrawals
+        WithdrawalService $withdrawals,
+        LabelFinancialContextService $financialContext
     ): RedirectResponse {
         $validated = $request->validate([
             'amount' => [
@@ -84,12 +94,20 @@ class WithdrawalController extends Controller
             ],
         ]);
 
+        $actor = $request->user();
+
+        $financialOwner =
+            $financialContext->owner(
+                $actor
+            );
+
         $withdrawal = $withdrawals->create(
-            $request->user(),
+            $financialOwner,
             (float) $validated['amount'],
             $validated['payment_method'],
             $validated['request_note']
-                ?? null
+                ?? null,
+            $actor
         );
 
         return back()->with(

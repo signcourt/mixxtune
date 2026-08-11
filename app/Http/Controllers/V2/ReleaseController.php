@@ -14,6 +14,7 @@ use App\Services\V2\PermissionService;
 use App\Services\V2\ReleaseWorkflowService;
 use App\Services\V2\ReleaseValidationService;
 use App\Services\V2\ReleaseAccessService;
+use App\Services\V2\LabelAccess\LabelTeamAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -84,57 +85,151 @@ class ReleaseController extends Controller
 
         if ($role === 'label') {
             /*
-             * Label catalogue visibility:
+             * Team-aware Label catalogue scope.
              *
-             * A label user can see releases belonging to:
-             * 1. Every label directly owned by that user.
-             * 2. Every descendant/sub-label underneath those labels.
+             * Master Owner:
+             *   master + direct child labels.
              *
-             * This keeps My Releases, search, filters and status counts
-             * inside the same catalogue scope.
+             * Team / entire_label:
+             *   permitted strict two-tier catalogue.
+             *
+             * Team / selected:
+             *   only selected Artists / child Labels.
              */
-            $rootLabelIds = Label::query()
-                ->where(
-                    'user_id',
-                    $request->user()->id
-                )
-                ->whereNull('deleted_at')
-                ->pluck('id');
+            $teamAccess = app(
+                LabelTeamAccessService::class
+            );
 
-            if ($rootLabelIds->isEmpty()) {
-                $query->whereRaw('1 = 0');
+            $teamMember =
+                $teamAccess->membership(
+                    $request->user()
+                );
+
+            if ($teamMember) {
+                $visibleLabelIds =
+                    $teamAccess
+                        ->accessibleLabelIds(
+                            $request->user()
+                        );
+
+                $visibleArtistIds =
+                    $teamAccess
+                        ->accessibleArtistIds(
+                            $request->user()
+                        );
+
+                if (
+                    $visibleLabelIds->isEmpty()
+                    && $visibleArtistIds->isEmpty()
+                ) {
+                    $query->whereRaw('1 = 0');
+                } elseif (
+                    $teamMember->scope_level
+                    === 'entire_label'
+                ) {
+                    $query->whereIn(
+                        'label_id',
+                        $visibleLabelIds
+                    );
+                } else {
+                    $query->where(
+                        function ($scope) use (
+                            $visibleArtistIds,
+                            $visibleLabelIds
+                        ) {
+                            if (
+                                $visibleArtistIds
+                                    ->isNotEmpty()
+                            ) {
+                                $scope->whereIn(
+                                    'artist_id',
+                                    $visibleArtistIds
+                                );
+                            }
+
+                            /*
+                             * Artist-less operator catalogue
+                             * releases remain label-scoped.
+                             */
+                            if (
+                                $visibleLabelIds
+                                    ->isNotEmpty()
+                            ) {
+                                $method =
+                                    $visibleArtistIds
+                                        ->isNotEmpty()
+                                        ? 'orWhere'
+                                        : 'where';
+
+                                $scope->{$method}(
+                                    function ($labelOnly) use (
+                                        $visibleLabelIds
+                                    ) {
+                                        $labelOnly
+                                            ->whereNull(
+                                                'artist_id'
+                                            )
+                                            ->whereIn(
+                                                'label_id',
+                                                $visibleLabelIds
+                                            );
+                                    }
+                                );
+                            }
+                        }
+                    );
+                }
             } else {
-                $rootLabelIds = $rootLabelIds
-                    ->map(
-                        fn ($id) => (int) $id
-                    )
-                    ->values();
-
                 /*
-                 * Strict two-tier catalogue:
-                 * root labels + direct child labels only.
+                 * Preserve existing Label Owner behaviour.
                  */
-                $childLabelIds = Label::query()
-                    ->whereIn(
-                        'parent_label_id',
-                        $rootLabelIds
+                $rootLabelIds = Label::query()
+                    ->where(
+                        'user_id',
+                        $request->user()->id
                     )
                     ->whereNull('deleted_at')
-                    ->pluck('id')
-                    ->map(
-                        fn ($id) => (int) $id
+                    ->pluck('id');
+
+                if ($rootLabelIds->isEmpty()) {
+                    $query->whereRaw('1 = 0');
+                } else {
+                    $rootLabelIds =
+                        $rootLabelIds
+                            ->map(
+                                fn ($id) =>
+                                    (int) $id
+                            )
+                            ->values();
+
+                    $childLabelIds =
+                        Label::query()
+                            ->whereIn(
+                                'parent_label_id',
+                                $rootLabelIds
+                            )
+                            ->whereNull(
+                                'deleted_at'
+                            )
+                            ->pluck('id')
+                            ->map(
+                                fn ($id) =>
+                                    (int) $id
+                            );
+
+                    $visibleLabelIds =
+                        $rootLabelIds
+                            ->merge(
+                                $childLabelIds
+                            )
+                            ->unique()
+                            ->values();
+
+                    $query->whereIn(
+                        'label_id',
+                        $visibleLabelIds
                     );
-
-                $visibleLabelIds =
-                    $rootLabelIds
-                        ->merge($childLabelIds)
-                        ->unique()
-                        ->values();
-
-                $query->whereIn(
-                    'label_id',
-                    $visibleLabelIds
-                );
+                }
             }
         }
 
@@ -587,46 +682,15 @@ class ReleaseController extends Controller
                 'You cannot view this release.'
             );
         } elseif ($role === 'label') {
-            $rootLabelIds = Label::query()
-                ->where(
-                    'user_id',
-                    $request->user()->id
-                )
-                ->whereNull('deleted_at')
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->values();
-
             /*
-             * Strict two-tier visibility:
-             * directly owned labels + direct child labels.
-             *
-             * No recursive descendant access.
+             * ReleaseAccessService is now the single
+             * Team-aware release authorization source.
              */
-            $childLabelIds = Label::query()
-                ->whereIn(
-                    'parent_label_id',
-                    $rootLabelIds
-                )
-                ->whereNull('deleted_at')
-                ->pluck('id')
-                ->map(
-                    fn ($id) => (int) $id
-                );
-
-            $visibleLabelIds =
-                $rootLabelIds
-                    ->merge($childLabelIds)
-                    ->unique()
-                    ->values();
-
-            abort_unless(
-                $release->label
-                && $visibleLabelIds->contains(
-                    (int) $release->label->id
-                ),
-                403,
-                'You cannot view this release.'
+            app(
+                ReleaseAccessService::class
+            )->authorizeView(
+                $request->user(),
+                $release
             );
         } else {
             abort_unless(
@@ -648,6 +712,42 @@ class ReleaseController extends Controller
             ],
             true
         );
+
+        /*
+         * For selected-scope Team Users, expose only Tracks
+         * that their catalogue scope permits.
+         *
+         * Owners, Artists, Admins and Super Admins keep the
+         * existing behaviour.
+         */
+        $visibleTracks = $release->tracks;
+
+        if ($role === 'label') {
+            $teamAccess = app(
+                LabelTeamAccessService::class
+            );
+
+            if (
+                $teamAccess->membership(
+                    $request->user()
+                )
+            ) {
+                $allowedTrackIds =
+                    $teamAccess->accessibleTrackIds(
+                        $request->user()
+                    );
+
+                $visibleTracks =
+                    $visibleTracks
+                        ->filter(
+                            fn ($track) =>
+                                $allowedTrackIds->contains(
+                                    (int) $track->id
+                                )
+                        )
+                        ->values();
+            }
+        }
 
         return Inertia::render(
             'V2/Releases/Show',
@@ -734,7 +834,7 @@ class ReleaseController extends Controller
                         $editable,
 
                     'tracks' =>
-                        $release->tracks
+                        $visibleTracks
                             ->sortBy([
                                 ['disc_number', 'asc'],
                                 ['track_number', 'asc'],

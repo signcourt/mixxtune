@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReportAnalyticsService;
 use App\Services\V2\MasterRevenueVisibilityService;
+use App\Services\V2\LabelAccess\LabelTeamAccessService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -95,15 +96,27 @@ class ReportController extends Controller
         $revenueSummary = null;
 
         if ($role === 'label') {
-            $label = \App\Models\Core\Label::query()
-                ->where(
-                    'user_id',
-                    $request->user()->id
-                )
-                ->whereNull('deleted_at')
-                ->first();
+            $teamAccess = app(
+                LabelTeamAccessService::class
+            );
 
-            if ($label) {
+            $label = $teamAccess->effectiveLabel(
+                $request->user()
+            );
+
+            /*
+             * Revenue summary is shown only when the
+             * team user has finance/report visibility.
+             * Catalogue rows themselves are already
+             * restricted by ReportAnalyticsService.
+             */
+            if (
+                $label
+                && $teamAccess->allows(
+                    $request->user(),
+                    'reports.view'
+                )
+            ) {
                 $revenueSummary =
                     $revenueVisibility->summary(
                         $label,

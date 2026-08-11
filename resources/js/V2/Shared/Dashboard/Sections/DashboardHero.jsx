@@ -42,23 +42,6 @@ export default function DashboardHero({
                         {description}
                     </p>
 
-                    <div className="mt-6 flex flex-wrap gap-3">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold capitalize">
-                            <CheckCircle2
-                                size={14}
-                                className="text-emerald-300"
-                            />
-                            Account: {accountStatus || 'active'}
-                        </span>
-
-                        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold capitalize">
-                            <Landmark
-                                size={14}
-                                className="text-blue-300"
-                            />
-                            KYC: {kycStatus || 'pending'}
-                        </span>
-                    </div>
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row xl:flex-col">

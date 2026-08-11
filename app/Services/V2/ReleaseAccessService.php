@@ -2,6 +2,8 @@
 
 namespace App\Services\V2;
 
+use App\Services\V2\LabelAccess\LabelTeamAccessService;
+
 use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\Distribution\Release;
@@ -24,6 +26,29 @@ class ReleaseAccessService
         ?User $user,
         Release $release
     ): void {
+
+        /*
+         * LABEL_TEAM_VIEW_PERMISSION
+         *
+         * Team members require explicit releases.view.
+         * Normal Artist / Label Owner / Admin behaviour
+         * continues through the existing code below.
+         */
+        $teamAccess = app(
+            LabelTeamAccessService::class
+        );
+
+        if ($teamAccess->membership($user)) {
+            abort_unless(
+                $teamAccess->allows(
+                    $user,
+                    'releases.view'
+                ),
+                403,
+                'You do not have permission to view releases.'
+            );
+        }
+
         $this->permissions->authorize(
             $user,
             'releases.view'
@@ -40,6 +65,25 @@ class ReleaseAccessService
         ?User $user,
         Release $release
     ): void {
+
+        /*
+         * LABEL_TEAM_UPDATE_PERMISSION
+         */
+        $teamAccess = app(
+            LabelTeamAccessService::class
+        );
+
+        if ($teamAccess->membership($user)) {
+            abort_unless(
+                $teamAccess->allows(
+                    $user,
+                    'releases.edit'
+                ),
+                403,
+                'You do not have permission to edit releases.'
+            );
+        }
+
         $this->permissions->authorize(
             $user,
             'releases.update'
@@ -62,6 +106,28 @@ class ReleaseAccessService
         ?User $user,
         Release $release
     ): void {
+
+        /*
+         * LABEL_TEAM_SUBMIT_PERMISSION
+         *
+         * Standard Team Users cannot receive this permission.
+         * Advanced users receive it only when explicitly enabled.
+         */
+        $teamAccess = app(
+            LabelTeamAccessService::class
+        );
+
+        if ($teamAccess->membership($user)) {
+            abort_unless(
+                $teamAccess->allows(
+                    $user,
+                    'releases.submit'
+                ),
+                403,
+                'You do not have permission to submit releases.'
+            );
+        }
+
         $this->permissions->authorize(
             $user,
             'releases.submit'
@@ -84,6 +150,97 @@ class ReleaseAccessService
         ?User $user,
         Release $release
     ): bool {
+
+        /*
+         * LABEL_TEAM_RELEASE_SCOPE
+         *
+         * Team User release access is resolved from the
+         * central strict two-tier catalogue scope.
+         *
+         * Draft privacy remains enforced:
+         * another user's draft is never exposed.
+         */
+        $teamAccess = app(
+            LabelTeamAccessService::class
+        );
+
+        $membership =
+            $teamAccess->membership($user);
+
+        if ($membership) {
+            if (
+                (string) $release->status === 'draft'
+                && (int) $release->created_by
+                    !== (int) $user->id
+            ) {
+                return false;
+            }
+
+            $labelIds =
+                $teamAccess
+                    ->accessibleLabelIds($user);
+
+            if (
+                !$release->label_id
+                || !$labelIds->contains(
+                    (int) $release->label_id
+                )
+            ) {
+                return false;
+            }
+
+            /*
+             * Entire-label Team Users can access every
+             * release inside their allowed label boundary.
+             */
+            if (
+                $membership->scope_level
+                === 'entire_label'
+            ) {
+                return true;
+            }
+
+            /*
+             * Explicit Track scope grants visibility to the
+             * parent Release shell so the assigned Track can
+             * be reached.
+             *
+             * It does NOT grant access to sibling Tracks.
+             */
+            $trackIds =
+                $teamAccess->accessibleTrackIds($user);
+
+            if (
+                $trackIds->isNotEmpty()
+                && $release->tracks()
+                    ->whereIn('id', $trackIds)
+                    ->exists()
+            ) {
+                return true;
+            }
+
+            /*
+             * Selected-scope releases attached to an Artist
+             * require that Artist to be explicitly accessible.
+             */
+            if ($release->artist_id) {
+                return $teamAccess
+                    ->accessibleArtistIds($user)
+                    ->contains(
+                        (int) $release->artist_id
+                    );
+            }
+
+            /*
+             * Operator catalogue releases can have no Artist.
+             * In that case the explicitly accessible Label
+             * boundary controls visibility.
+             */
+            return $labelIds->contains(
+                (int) $release->label_id
+            );
+        }
+
         if (!$user) {
             return false;
         }

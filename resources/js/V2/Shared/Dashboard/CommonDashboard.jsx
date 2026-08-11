@@ -325,7 +325,7 @@ export default function CommonDashboard({
                                 </article>
                             </div>
 
-                            {revenueSummary.children?.length > 0 && (
+                            {false && revenueSummary.children?.length > 0 && (
                                 <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                                     <div className="border-b border-slate-200 px-6 py-5">
                                         <h3 className="text-lg font-black text-slate-950">

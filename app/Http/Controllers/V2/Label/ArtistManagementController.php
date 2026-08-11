@@ -4,6 +4,9 @@ namespace App\Http\Controllers\V2\Label;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\V2\ClientIdService;
+use App\Services\V2\LabelAccess\LabelTeamAccessService;
+use App\Services\V2\PermissionService;
 use App\Services\V2\UserInvitationService;
 use App\Services\V2\UsernameService;
 use Illuminate\Http\RedirectResponse;
@@ -20,8 +23,9 @@ class ArtistManagementController extends Controller
     public function index(
         Request $request
     ): Response {
-        $label = $this->currentLabel(
-            $request
+        $label = $this->authorizedLabel(
+            $request,
+            'artists.view'
         );
 
         $search = trim(
@@ -38,6 +42,12 @@ class ArtistManagementController extends Controller
             )
         );
 
+        $accessibleArtistIds =
+            app(LabelTeamAccessService::class)
+                ->accessibleArtistIds(
+                    $request->user()
+                );
+
         $query = DB::table('artists')
             ->leftJoin(
                 'users',
@@ -48,6 +58,10 @@ class ArtistManagementController extends Controller
             ->where(
                 'artists.label_id',
                 $label->id
+            )
+            ->whereIn(
+                'artists.id',
+                $accessibleArtistIds
             )
             ->whereNull(
                 'artists.deleted_at'
@@ -126,6 +140,10 @@ class ArtistManagementController extends Controller
                 'label_id',
                 $label->id
             )
+            ->whereIn(
+                'id',
+                $accessibleArtistIds
+            )
             ->whereNull('deleted_at');
 
         return Inertia::render(
@@ -189,8 +207,9 @@ class ArtistManagementController extends Controller
     public function create(
         Request $request
     ): Response {
-        $label = $this->currentLabel(
-            $request
+        $label = $this->authorizedLabel(
+            $request,
+            'artists.manage'
         );
 
         return Inertia::render(
@@ -213,8 +232,9 @@ class ArtistManagementController extends Controller
         UsernameService $usernameService,
         UserInvitationService $invitationService
     ): RedirectResponse {
-        $label = $this->currentLabel(
-            $request
+        $label = $this->authorizedLabel(
+            $request,
+            'artists.manage'
         );
 
         $validated = $request->validate([
@@ -254,6 +274,13 @@ class ArtistManagementController extends Controller
                 'required',
                 'string',
                 'max:100',
+            ],
+
+            'state_code' => [
+                'required',
+                'string',
+                'size:2',
+                'regex:/^[A-Za-z]{2}$/',
             ],
 
             'timezone' => [
@@ -389,6 +416,13 @@ class ArtistManagementController extends Controller
                     'country' =>
                         $validated['country'],
 
+                    'state_code' =>
+                        strtoupper(
+                            $validated[
+                                'state_code'
+                            ]
+                        ),
+
                     'role' =>
                         'artist',
 
@@ -430,6 +464,54 @@ class ArtistManagementController extends Controller
                             ? 1
                             : 0,
                 ]);
+
+                $countryCode =
+                    strcasecmp(
+                        trim(
+                            $validated['country']
+                        ),
+                        'India'
+                    ) === 0
+                        ? 'IN'
+                        : strtoupper(
+                            substr(
+                                preg_replace(
+                                    '/[^A-Za-z]/',
+                                    '',
+                                    $validated[
+                                        'country'
+                                    ]
+                                ),
+                                0,
+                                2
+                            )
+                        );
+
+                if (
+                    strlen($countryCode) !== 2
+                ) {
+                    throw ValidationException::withMessages([
+                        'country' => [
+                            'A valid country is required to generate the Client ID.',
+                        ],
+                    ]);
+                }
+
+                $user->forceFill([
+                    'client_id' =>
+                        app(
+                            ClientIdService::class
+                        )->generate(
+                            'artist',
+                            $countryCode,
+                            strtoupper(
+                                $validated[
+                                    'state_code'
+                                ]
+                            )
+                        ),
+                ])->save();
+
 
                 $slugBase = Str::slug(
                     $validated[
@@ -598,11 +680,13 @@ class ArtistManagementController extends Controller
         Request $request,
         int $artist
     ): Response {
-        $label = $this->currentLabel(
-            $request
+        $label = $this->authorizedLabel(
+            $request,
+            'artists.view'
         );
 
         $managedArtist = $this->ownedArtist(
+            $request->user(),
             $label->id,
             $artist
         );
@@ -882,11 +966,13 @@ class ArtistManagementController extends Controller
         Request $request,
         int $artist
     ): Response {
-        $label = $this->currentLabel(
-            $request
+        $label = $this->authorizedLabel(
+            $request,
+            'artists.manage'
         );
 
         $managedArtist = $this->ownedArtist(
+            $request->user(),
             $label->id,
             $artist
         );
@@ -967,11 +1053,13 @@ class ArtistManagementController extends Controller
         int $artist,
         UsernameService $usernameService
     ): RedirectResponse {
-        $label = $this->currentLabel(
-            $request
+        $label = $this->authorizedLabel(
+            $request,
+            'artists.manage'
         );
 
         $managedArtist = $this->ownedArtist(
+            $request->user(),
             $label->id,
             $artist
         );
@@ -1237,11 +1325,13 @@ class ArtistManagementController extends Controller
         Request $request,
         int $artist
     ): RedirectResponse {
-        $label = $this->currentLabel(
-            $request
+        $label = $this->authorizedLabel(
+            $request,
+            'artists.manage'
         );
 
         $managedArtist = $this->ownedArtist(
+            $request->user(),
             $label->id,
             $artist
         );
@@ -1297,11 +1387,13 @@ class ArtistManagementController extends Controller
         int $artist,
         UserInvitationService $invitationService
     ): RedirectResponse {
-        $label = $this->currentLabel(
-            $request
+        $label = $this->authorizedLabel(
+            $request,
+            'artists.manage'
         );
 
         $managedArtist = $this->ownedArtist(
+            $request->user(),
             $label->id,
             $artist
         );
@@ -1335,11 +1427,13 @@ class ArtistManagementController extends Controller
         int $artist,
         UserInvitationService $invitationService
     ): RedirectResponse {
-        $label = $this->currentLabel(
-            $request
+        $label = $this->authorizedLabel(
+            $request,
+            'artists.manage'
         );
 
         $managedArtist = $this->ownedArtist(
+            $request->user(),
             $label->id,
             $artist
         );
@@ -1385,9 +1479,20 @@ class ArtistManagementController extends Controller
     }
 
     private function ownedArtist(
+        User $user,
         int $labelId,
         int $artistId
     ): object {
+        if (
+            ! app(LabelTeamAccessService::class)
+                ->canAccessArtist(
+                    $user,
+                    $artistId
+                )
+        ) {
+            abort(403);
+        }
+
         $artist = DB::table('artists')
             ->where(
                 'id',
@@ -1454,4 +1559,56 @@ class ArtistManagementController extends Controller
 
         return $label;
     }
+
+    private function authorizedLabel(
+        Request $request,
+        string $permission
+    ) {
+        $user = $request->user();
+
+        abort_unless(
+            $user,
+            403
+        );
+
+        $teamAccess = app(
+            LabelTeamAccessService::class
+        );
+
+        $membership =
+            $teamAccess->membership(
+                $user
+            );
+
+        if ($membership) {
+            abort_unless(
+                app(PermissionService::class)
+                    ->can(
+                        $user,
+                        $permission
+                    ),
+                403
+            );
+
+            $label =
+                $teamAccess->effectiveLabel(
+                    $user
+                );
+
+            abort_unless(
+                $label,
+                403
+            );
+
+            return $label;
+        }
+
+        /*
+         * Existing Label Owner flow remains unchanged.
+         */
+        return $this->currentLabel(
+            $request
+        );
+    }
+
 }

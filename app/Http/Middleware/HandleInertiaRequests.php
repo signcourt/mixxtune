@@ -90,6 +90,45 @@ class HandleInertiaRequests extends Middleware
                     'panelPermissions'
                 ],
 
+            'notificationCount' => fn () =>
+                $request->user()
+                    ? \App\Models\Support\PanelNotification::query()
+                        ->where('user_id', $request->user()->id)
+                        ->whereNull('read_at')
+                        ->whereNull('dismissed_at')
+                        ->count()
+                    : 0,
+
+            'headerNotifications' => fn () =>
+                $request->user()
+                    ? \App\Models\Support\PanelNotification::query()
+                        ->where('user_id', $request->user()->id)
+                        ->whereNull('dismissed_at')
+                        ->latest('id')
+                        ->limit(5)
+                        ->get([
+                            'id',
+                            'title',
+                            'message',
+                            'severity',
+                            'action_url',
+                            'read_at',
+                            'created_at',
+                        ])
+                        ->map(fn ($notification) => [
+                            'id' => $notification->id,
+                            'title' => $notification->title,
+                            'message' => $notification->message,
+                            'severity' => $notification->severity,
+                            'action_url' => $notification->action_url,
+                            'read_at' => $notification->read_at,
+                            'created_at' => optional(
+                                $notification->created_at
+                            )->diffForHumans(),
+                        ])
+                        ->values()
+                    : [],
+
             'auth' => [
                 'user' =>
                     $request->user(),

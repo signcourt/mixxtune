@@ -1,84 +1,59 @@
-import { Head, useForm } from '@inertiajs/react';
-import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { Head, useForm } from "@inertiajs/react";
+import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import UpdatePasswordForm from "@/Pages/Profile/Partials/UpdatePasswordForm";
 
 export default function Index({
-    role = 'super_admin',
+    role = "super_admin",
     settings = {},
     serverLimits = {},
 }) {
-    const getValue = (group, key, fallback = '') =>
+    const getValue = (group, key, fallback = "") =>
         settings?.[group]?.[`${group}.${key}`] ?? fallback;
 
-    const {
-        data,
-        setData,
-        patch,
-        processing,
-        errors,
-    } = useForm({
+    const { data, setData, patch, processing, errors } = useForm({
         company: {
-            name: getValue('company', 'name', 'MixxTune'),
-            legal_name: getValue('company', 'legal_name'),
-            email: getValue('company', 'email'),
-            phone: getValue('company', 'phone'),
-            address: getValue('company', 'address'),
-            gst_number: getValue('company', 'gst_number'),
-            pan_number: getValue('company', 'pan_number'),
+            name: getValue("company", "name", "MixxTune"),
+            legal_name: getValue("company", "legal_name"),
+            email: getValue("company", "email"),
+            phone: getValue("company", "phone"),
+            address: getValue("company", "address"),
+            gst_number: getValue("company", "gst_number"),
+            pan_number: getValue("company", "pan_number"),
         },
 
         release: {
             minimum_days_ahead: Number(
-                getValue('release', 'minimum_days_ahead', 7)
+                getValue("release", "minimum_days_ahead", 7),
             ),
             allow_explicit: Boolean(
-                getValue('release', 'allow_explicit', true)
+                getValue("release", "allow_explicit", true),
             ),
             require_artwork: Boolean(
-                getValue('release', 'require_artwork', true)
+                getValue("release", "require_artwork", true),
             ),
-            require_wav: Boolean(
-                getValue('release', 'require_wav', true)
-            ),
+            require_wav: Boolean(getValue("release", "require_wav", true)),
         },
 
         upload: {
-            audio_max_mb: Number(
-                getValue('upload', 'audio_max_mb', 300)
-            ),
-            artwork_max_mb: Number(
-                getValue('upload', 'artwork_max_mb', 20)
-            ),
-            report_max_mb: Number(
-                getValue('upload', 'report_max_mb', 500)
-            ),
+            audio_max_mb: Number(getValue("upload", "audio_max_mb", 300)),
+            artwork_max_mb: Number(getValue("upload", "artwork_max_mb", 20)),
+            report_max_mb: Number(getValue("upload", "report_max_mb", 500)),
         },
 
         finance: {
-            default_currency: getValue(
-                'finance',
-                'default_currency',
-                'INR'
-            ),
+            default_currency: getValue("finance", "default_currency", "INR"),
             minimum_withdrawal: Number(
-                getValue('finance', 'minimum_withdrawal', 1000)
+                getValue("finance", "minimum_withdrawal", 1000),
             ),
             default_commission_percent: Number(
-                getValue(
-                    'finance',
-                    'default_commission_percent',
-                    0
-                )
+                getValue("finance", "default_commission_percent", 0),
             ),
         },
 
         invoice: {
-            prefix: getValue('invoice', 'prefix', 'INV'),
-            gst_percent: Number(
-                getValue('invoice', 'gst_percent', 0)
-            ),
-            tds_percent: Number(
-                getValue('invoice', 'tds_percent', 0)
-            ),
+            prefix: getValue("invoice", "prefix", "INV"),
+            gst_percent: Number(getValue("invoice", "gst_percent", 0)),
+            tds_percent: Number(getValue("invoice", "tds_percent", 0)),
         },
     });
 
@@ -92,7 +67,7 @@ export default function Index({
     const submit = (event) => {
         event.preventDefault();
 
-        patch('/v2/admin/settings', {
+        patch("/v2/admin/settings", {
             preserveScroll: true,
         });
     };
@@ -112,7 +87,7 @@ export default function Index({
                             label="Company Name"
                             value={data.company.name}
                             onChange={(value) =>
-                                update('company', 'name', value)
+                                update("company", "name", value)
                             }
                         />
 
@@ -120,7 +95,7 @@ export default function Index({
                             label="Legal Name"
                             value={data.company.legal_name}
                             onChange={(value) =>
-                                update('company', 'legal_name', value)
+                                update("company", "legal_name", value)
                             }
                         />
 
@@ -129,7 +104,7 @@ export default function Index({
                             type="email"
                             value={data.company.email}
                             onChange={(value) =>
-                                update('company', 'email', value)
+                                update("company", "email", value)
                             }
                         />
 
@@ -137,7 +112,7 @@ export default function Index({
                             label="Phone"
                             value={data.company.phone}
                             onChange={(value) =>
-                                update('company', 'phone', value)
+                                update("company", "phone", value)
                             }
                         />
 
@@ -145,7 +120,7 @@ export default function Index({
                             label="GST Number"
                             value={data.company.gst_number}
                             onChange={(value) =>
-                                update('company', 'gst_number', value)
+                                update("company", "gst_number", value)
                             }
                         />
 
@@ -153,7 +128,7 @@ export default function Index({
                             label="PAN Number"
                             value={data.company.pan_number}
                             onChange={(value) =>
-                                update('company', 'pan_number', value)
+                                update("company", "pan_number", value)
                             }
                         />
 
@@ -161,7 +136,7 @@ export default function Index({
                             label="Address"
                             value={data.company.address}
                             onChange={(value) =>
-                                update('company', 'address', value)
+                                update("company", "address", value)
                             }
                             wide
                         />
@@ -176,9 +151,9 @@ export default function Index({
                             value={data.release.minimum_days_ahead}
                             onChange={(value) =>
                                 update(
-                                    'release',
-                                    'minimum_days_ahead',
-                                    Number(value)
+                                    "release",
+                                    "minimum_days_ahead",
+                                    Number(value),
                                 )
                             }
                         />
@@ -187,11 +162,7 @@ export default function Index({
                             label="Allow Explicit Content"
                             checked={data.release.allow_explicit}
                             onChange={(checked) =>
-                                update(
-                                    'release',
-                                    'allow_explicit',
-                                    checked
-                                )
+                                update("release", "allow_explicit", checked)
                             }
                         />
 
@@ -199,11 +170,7 @@ export default function Index({
                             label="Artwork Required"
                             checked={data.release.require_artwork}
                             onChange={(checked) =>
-                                update(
-                                    'release',
-                                    'require_artwork',
-                                    checked
-                                )
+                                update("release", "require_artwork", checked)
                             }
                         />
 
@@ -211,11 +178,7 @@ export default function Index({
                             label="WAV Audio Required"
                             checked={data.release.require_wav}
                             onChange={(checked) =>
-                                update(
-                                    'release',
-                                    'require_wav',
-                                    checked
-                                )
+                                update("release", "require_wav", checked)
                             }
                         />
                     </Grid>
@@ -228,11 +191,7 @@ export default function Index({
                             type="number"
                             value={data.upload.audio_max_mb}
                             onChange={(value) =>
-                                update(
-                                    'upload',
-                                    'audio_max_mb',
-                                    Number(value)
-                                )
+                                update("upload", "audio_max_mb", Number(value))
                             }
                         />
 
@@ -242,9 +201,9 @@ export default function Index({
                             value={data.upload.artwork_max_mb}
                             onChange={(value) =>
                                 update(
-                                    'upload',
-                                    'artwork_max_mb',
-                                    Number(value)
+                                    "upload",
+                                    "artwork_max_mb",
+                                    Number(value),
                                 )
                             }
                         />
@@ -254,11 +213,7 @@ export default function Index({
                             type="number"
                             value={data.upload.report_max_mb}
                             onChange={(value) =>
-                                update(
-                                    'upload',
-                                    'report_max_mb',
-                                    Number(value)
-                                )
+                                update("upload", "report_max_mb", Number(value))
                             }
                         />
                     </Grid>
@@ -274,7 +229,7 @@ export default function Index({
                                     <div key={key}>
                                         <strong>{key}</strong>: {value}
                                     </div>
-                                )
+                                ),
                             )}
                         </div>
                     </div>
@@ -286,11 +241,7 @@ export default function Index({
                             label="Default Currency"
                             value={data.finance.default_currency}
                             onChange={(value) =>
-                                update(
-                                    'finance',
-                                    'default_currency',
-                                    value
-                                )
+                                update("finance", "default_currency", value)
                             }
                         />
 
@@ -300,9 +251,9 @@ export default function Index({
                             value={data.finance.minimum_withdrawal}
                             onChange={(value) =>
                                 update(
-                                    'finance',
-                                    'minimum_withdrawal',
-                                    Number(value)
+                                    "finance",
+                                    "minimum_withdrawal",
+                                    Number(value),
                                 )
                             }
                         />
@@ -310,14 +261,12 @@ export default function Index({
                         <Field
                             label="Default Commission %"
                             type="number"
-                            value={
-                                data.finance.default_commission_percent
-                            }
+                            value={data.finance.default_commission_percent}
                             onChange={(value) =>
                                 update(
-                                    'finance',
-                                    'default_commission_percent',
-                                    Number(value)
+                                    "finance",
+                                    "default_commission_percent",
+                                    Number(value),
                                 )
                             }
                         />
@@ -326,7 +275,7 @@ export default function Index({
                             label="Invoice Prefix"
                             value={data.invoice.prefix}
                             onChange={(value) =>
-                                update('invoice', 'prefix', value)
+                                update("invoice", "prefix", value)
                             }
                         />
 
@@ -335,11 +284,7 @@ export default function Index({
                             type="number"
                             value={data.invoice.gst_percent}
                             onChange={(value) =>
-                                update(
-                                    'invoice',
-                                    'gst_percent',
-                                    Number(value)
-                                )
+                                update("invoice", "gst_percent", Number(value))
                             }
                         />
 
@@ -348,11 +293,7 @@ export default function Index({
                             type="number"
                             value={data.invoice.tds_percent}
                             onChange={(value) =>
-                                update(
-                                    'invoice',
-                                    'tds_percent',
-                                    Number(value)
-                                )
+                                update("invoice", "tds_percent", Number(value))
                             }
                         />
                     </Grid>
@@ -370,10 +311,14 @@ export default function Index({
                         disabled={processing}
                         className="rounded-xl bg-violet-600 px-7 py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
                     >
-                        {processing ? 'Saving...' : 'Save Settings'}
+                        {processing ? "Saving..." : "Save Settings"}
                     </button>
                 </div>
             </form>
+
+            <section className="mt-6 w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <UpdatePasswordForm />
+            </section>
         </PanelLayout>
     );
 }
@@ -381,9 +326,7 @@ export default function Index({
 function Section({ title, children }) {
     return (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">
-                {title}
-            </h2>
+            <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
 
             <div className="mt-5">{children}</div>
         </section>
@@ -398,31 +341,17 @@ function Grid({ children }) {
     );
 }
 
-function Field({
-    label,
-    value,
-    onChange,
-    type = 'text',
-    wide = false,
-}) {
+function Field({ label, value, onChange, type = "text", wide = false }) {
     return (
-        <label
-            className={
-                wide
-                    ? 'md:col-span-2 xl:col-span-3'
-                    : ''
-            }
-        >
+        <label className={wide ? "md:col-span-2 xl:col-span-3" : ""}>
             <span className="text-sm font-semibold text-slate-700">
                 {label}
             </span>
 
             <input
                 type={type}
-                value={value ?? ''}
-                onChange={(event) =>
-                    onChange(event.target.value)
-                }
+                value={value ?? ""}
+                onChange={(event) => onChange(event.target.value)}
                 className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
             />
         </label>
@@ -435,9 +364,7 @@ function Toggle({ label, checked, onChange }) {
             <input
                 type="checkbox"
                 checked={checked}
-                onChange={(event) =>
-                    onChange(event.target.checked)
-                }
+                onChange={(event) => onChange(event.target.checked)}
             />
 
             <span className="text-sm font-semibold text-slate-700">

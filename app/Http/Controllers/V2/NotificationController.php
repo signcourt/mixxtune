@@ -7,6 +7,7 @@ use App\Models\Support\PanelNotification;
 use App\Services\V2\PermissionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,22 +17,39 @@ class NotificationController extends Controller
         Request $request,
         PermissionService $permissions
     ): Response {
+        $validated = $request->validate([
+            'category' => [
+                'nullable',
+                Rule::in([
+                    'primary',
+                    'announcement',
+                    'promotion',
+                ]),
+            ],
+        ]);
+
+        $category = $validated['category'] ?? 'primary';
+
+        $query = PanelNotification::query()
+            ->where('user_id', $request->user()->id)
+            ->whereNull('dismissed_at');
+
+        $query->where(
+            'category',
+            $category
+        );
+
         return Inertia::render(
             'V2/Notifications/Index',
             [
-                'role' =>
-                    $permissions->role(
-                        $request->user()
-                    ),
+                'role' => $permissions->role(
+                    $request->user()
+                ),
 
-                'notifications' =>
-                    PanelNotification::query()
-                        ->where(
-                            'user_id',
-                            $request->user()->id
-                        )
-                        ->orderByDesc('id')
-                        ->paginate(30),
+                'notifications' => $query
+                    ->orderByDesc('id')
+                    ->paginate(30)
+                    ->withQueryString(),
 
                 'unreadCount' =>
                     PanelNotification::query()
@@ -39,8 +57,52 @@ class NotificationController extends Controller
                             'user_id',
                             $request->user()->id
                         )
+                        ->whereNull('dismissed_at')
                         ->whereNull('read_at')
                         ->count(),
+
+                'categoryCounts' => [
+                    'primary' =>
+                        PanelNotification::query()
+                            ->where(
+                                'user_id',
+                                $request->user()->id
+                            )
+                            ->whereNull('dismissed_at')
+                            ->where(
+                                'category',
+                                'primary'
+                            )
+                            ->count(),
+
+                    'announcement' =>
+                        PanelNotification::query()
+                            ->where(
+                                'user_id',
+                                $request->user()->id
+                            )
+                            ->whereNull('dismissed_at')
+                            ->where(
+                                'category',
+                                'announcement'
+                            )
+                            ->count(),
+
+                    'promotion' =>
+                        PanelNotification::query()
+                            ->where(
+                                'user_id',
+                                $request->user()->id
+                            )
+                            ->whereNull('dismissed_at')
+                            ->where(
+                                'category',
+                                'promotion'
+                            )
+                            ->count(),
+                ],
+
+                'activeCategory' => $category,
             ]
         );
     }
@@ -49,16 +111,16 @@ class NotificationController extends Controller
         Request $request,
         PanelNotification $notification
     ): RedirectResponse {
-        abort_unless(
-            $notification->user_id ===
-                $request->user()->id,
-            403
+        $this->authorizeNotification(
+            $request,
+            $notification
         );
 
-        $notification->update([
-            'read_at' =>
-                now(),
-        ]);
+        if (!$notification->read_at) {
+            $notification->update([
+                'read_at' => now(),
+            ]);
+        }
 
         if ($notification->action_url) {
             return redirect(
@@ -77,15 +139,64 @@ class NotificationController extends Controller
                 'user_id',
                 $request->user()->id
             )
+            ->whereNull('dismissed_at')
             ->whereNull('read_at')
             ->update([
-                'read_at' =>
-                    now(),
+                'read_at' => now(),
             ]);
 
         return back()->with(
             'success',
             'All notifications marked as read.'
+        );
+    }
+
+    public function toggleStar(
+        Request $request,
+        PanelNotification $notification
+    ): RedirectResponse {
+        $this->authorizeNotification(
+            $request,
+            $notification
+        );
+
+        $notification->update([
+            'starred_at' =>
+                $notification->starred_at
+                    ? null
+                    : now(),
+        ]);
+
+        return back();
+    }
+
+    public function dismiss(
+        Request $request,
+        PanelNotification $notification
+    ): RedirectResponse {
+        $this->authorizeNotification(
+            $request,
+            $notification
+        );
+
+        $notification->update([
+            'dismissed_at' => now(),
+        ]);
+
+        return back()->with(
+            'success',
+            'Notification removed.'
+        );
+    }
+
+    private function authorizeNotification(
+        Request $request,
+        PanelNotification $notification
+    ): void {
+        abort_unless(
+            (int) $notification->user_id ===
+                (int) $request->user()->id,
+            403
         );
     }
 }

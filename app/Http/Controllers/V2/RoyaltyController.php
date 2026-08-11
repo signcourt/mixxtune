@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Finance\RoyaltyStatement;
 use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\PermissionService;
+use App\Services\V2\LabelAccess\LabelTeamAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -43,17 +44,54 @@ class RoyaltyController extends Controller
                 $artistId ?: 0
             );
         } elseif ($role === 'label') {
-            $labelId = DB::table('labels')
-                ->where(
-                    'user_id',
-                    $request->user()->id
-                )
-                ->value('id');
-
-            $query->where(
-                'label_id',
-                $labelId ?: 0
+            $teamAccess = app(
+                LabelTeamAccessService::class
             );
+
+            $labelIds = $teamAccess
+                ->accessibleLabelIds(
+                    $request->user()
+                );
+
+            $artistIds = $teamAccess
+                ->accessibleArtistIds(
+                    $request->user()
+                );
+
+            if (
+                $labelIds->isEmpty()
+                && $artistIds->isEmpty()
+            ) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(
+                    function ($builder) use (
+                        $labelIds,
+                        $artistIds
+                    ) {
+                        if ($labelIds->isNotEmpty()) {
+                            $builder->whereIn(
+                                'label_id',
+                                $labelIds
+                            );
+                        }
+
+                        if ($artistIds->isNotEmpty()) {
+                            if ($labelIds->isNotEmpty()) {
+                                $builder->orWhereIn(
+                                    'artist_id',
+                                    $artistIds
+                                );
+                            } else {
+                                $builder->whereIn(
+                                    'artist_id',
+                                    $artistIds
+                                );
+                            }
+                        }
+                    }
+                );
+            }
         } elseif ($role === 'admin') {
             $artistIds =
                 $assignments->artistIds(

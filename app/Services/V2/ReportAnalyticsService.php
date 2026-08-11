@@ -2,6 +2,8 @@
 
 namespace App\Services\V2;
 
+use App\Services\V2\LabelAccess\LabelTeamAccessService;
+
 use App\Models\Reports\ReportRow;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -47,20 +49,48 @@ class ReportAnalyticsService
         }
 
         if ($role === 'label') {
-            $labelId = DB::table('labels')
-                ->where(
-                    'user_id',
-                    $user->id
-                )
-                ->whereNull('deleted_at')
-                ->value('id');
+            $teamAccess = app(LabelTeamAccessService::class);
 
-            return $labelId
-                ? $query->where(
-                    'label_id',
-                    $labelId
-                )
-                : $query->whereRaw('1 = 0');
+            $labelIds = $teamAccess
+                ->accessibleLabelIds($user);
+
+            $artistIds = $teamAccess
+                ->accessibleArtistIds($user);
+
+            if (
+                $labelIds->isEmpty()
+                && $artistIds->isEmpty()
+            ) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(function ($builder) use (
+                    $labelIds,
+                    $artistIds
+                ) {
+                    if ($labelIds->isNotEmpty()) {
+                        $builder->whereIn(
+                            'label_id',
+                            $labelIds
+                        );
+                    }
+
+                    if ($artistIds->isNotEmpty()) {
+                        if ($labelIds->isNotEmpty()) {
+                            $builder->orWhereIn(
+                                'artist_id',
+                                $artistIds
+                            );
+                        } else {
+                            $builder->whereIn(
+                                'artist_id',
+                                $artistIds
+                            );
+                        }
+                    }
+                });
+            }
+
+            return $query;
         }
 
         if ($role === 'admin') {

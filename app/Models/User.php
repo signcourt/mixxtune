@@ -26,6 +26,8 @@ use Laravel\Sanctum\HasApiTokens;
     'phone',
     'label_name',
     'country',
+    'state_code',
+    'client_id',
     'account_status',
     'kyc_status',
     'wallet_balance',

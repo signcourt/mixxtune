@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Artist\DashboardController as ArtistDashboardController;
 use App\Http\Controllers\Artist\WalletController as ArtistWalletController;
+use App\Http\Controllers\V2\Admin\NotificationManagementController;
 
 /*
 |--------------------------------------------------------------------------
@@ -230,9 +231,7 @@ Route::middleware([
             })->name('support.index');
 
             Route::get('/settings', function () {
-                return redirect()->route(
-                    'profile.edit'
-                );
+                return inertia('Profile/Settings');
             })->name('settings.index');
         });
 
@@ -310,9 +309,7 @@ Route::middleware([
             })->name('support.index');
 
             Route::get('/settings', function () {
-                return redirect()->route(
-                    'profile.edit'
-                );
+                return inertia('Profile/Settings');
             })->name('settings.index');
         });
 
@@ -747,6 +744,69 @@ Route::middleware([
         ->name('single.super-admin.')
         ->middleware('role:super_admin')
         ->group(function () {
+
+            /*
+             * Legacy Catalogue Bulk Import
+             *
+             * Super Admin only.
+             * Metadata staging/validation only.
+             * No audio upload.
+             * No automatic UPC/ISRC generation.
+             */
+            Route::get(
+                '/legacy-catalogue-imports',
+                [
+                    \App\Http\Controllers\V2\Admin\LegacyCatalogueImportController::class,
+                    'index',
+                ]
+            )->name('legacy-catalogue-imports.index');
+
+            Route::post(
+                '/legacy-catalogue-imports',
+                [
+                    \App\Http\Controllers\V2\Admin\LegacyCatalogueImportController::class,
+                    'store',
+                ]
+            )->name('legacy-catalogue-imports.store');
+
+            Route::post(
+                '/legacy-catalogue-imports/{legacyCatalogueImport}/dry-run',
+                [
+                    \App\Http\Controllers\V2\Admin\LegacyCatalogueImportController::class,
+                    'dryRun',
+                ]
+            )->name(
+                'legacy-catalogue-imports.dry-run'
+            );
+
+            Route::post(
+                '/legacy-catalogue-imports/{legacyCatalogueImport}/approve-entities',
+                [
+                    \App\Http\Controllers\V2\Admin\LegacyCatalogueImportController::class,
+                    'approveEntities',
+                ]
+            )->name(
+                'legacy-catalogue-imports.approve-entities'
+            );
+
+            Route::post(
+                '/legacy-catalogue-imports/{legacyCatalogueImport}/import',
+                [
+                    \App\Http\Controllers\V2\Admin\LegacyCatalogueImportController::class,
+                    'import',
+                ]
+            )->name(
+                'legacy-catalogue-imports.import'
+            );
+
+            Route::get(
+                '/legacy-catalogue-imports/{legacyCatalogueImport}',
+                [
+                    \App\Http\Controllers\V2\Admin\LegacyCatalogueImportController::class,
+                    'show',
+                ]
+            )->name('legacy-catalogue-imports.show');
+
             Route::get('/', function () {
                 return redirect()->route(
                     'single.super-admin.dashboard'
@@ -1218,6 +1278,13 @@ Route::middleware(['auth', 'verified'])
         [\App\Http\Controllers\V2\NotificationController::class, 'dismiss']
     )
     ->name('v2.notifications.dismiss');
+
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/v2/notifications/{notification}/star',
+        [\App\Http\Controllers\V2\NotificationController::class, 'toggleStar']
+    )
+    ->name('v2.notifications.star');
 
 
 Route::middleware(['auth', 'verified'])
@@ -2021,3 +2088,15 @@ Route::middleware(['auth', 'role:label'])
             ]
         )->name('destroy');
     });
+
+Route::middleware('auth')->group(function () {
+    Route::get(
+        '/v2/admin/notification-management',
+        [NotificationManagementController::class, 'index']
+    )->name('v2.admin.notification-management.index');
+
+    Route::post(
+        '/v2/admin/notification-management',
+        [NotificationManagementController::class, 'store']
+    )->name('v2.admin.notification-management.store');
+});

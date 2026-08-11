@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Core\Label;
 use App\Services\V2\MasterRevenueVisibilityService;
 use App\Services\V2\PermissionService;
+use App\Services\V2\LabelAccess\LabelTeamAccessService;
 use App\Services\V2\ReportAnalyticsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,8 @@ class DashboardController extends Controller
         Request $request,
         PermissionService $permissionService,
         ReportAnalyticsService $analyticsService,
-        MasterRevenueVisibilityService $revenueVisibility
+        MasterRevenueVisibilityService $revenueVisibility,
+        LabelTeamAccessService $teamAccess
     ) {
         $user = $request->user();
         $role = $user->role ?? 'artist';
@@ -39,13 +41,76 @@ class DashboardController extends Controller
         }
 
         if ($role === 'label') {
-            $label = DB::table('labels')
-                ->where('user_id', $user->id)
-                ->whereNull('deleted_at')
-                ->first();
+            /*
+             * Label dashboard visibility must use the same
+             * two-tier/team scope rules as catalogue/releases.
+             *
+             * Owner:
+             *   master + direct child catalogue
+             *
+             * Team user:
+             *   entire-label or explicitly selected scope
+             */
+            $labelModel = $teamAccess->effectiveLabel($user);
 
-            if ($label) {
-                $query->where('label_id', $label->id);
+            $label = $labelModel
+                ? (object) [
+                    'id' => $labelModel->id,
+                    'user_id' => $labelModel->user_id,
+                ]
+                : null;
+
+            if ($labelModel) {
+                abort_unless(
+                    $teamAccess->allows(
+                        $user,
+                        'dashboard.view'
+                    ),
+                    403
+                );
+
+                $accessibleLabelIds =
+                    $teamAccess
+                        ->accessibleLabelIds($user)
+                        ->map(fn ($id) => (int) $id)
+                        ->values();
+
+                $accessibleArtistIds =
+                    $teamAccess
+                        ->accessibleArtistIds($user)
+                        ->map(fn ($id) => (int) $id)
+                        ->values();
+
+                if (
+                    $accessibleLabelIds->isEmpty()
+                    && $accessibleArtistIds->isEmpty()
+                ) {
+                    $query->whereRaw('1 = 0');
+                } else {
+                    $query->where(function ($scope) use (
+                        $accessibleLabelIds,
+                        $accessibleArtistIds
+                    ) {
+                        if ($accessibleLabelIds->isNotEmpty()) {
+                            $scope->whereIn(
+                                'label_id',
+                                $accessibleLabelIds
+                            );
+                        }
+
+                        if ($accessibleArtistIds->isNotEmpty()) {
+                            $method =
+                                $accessibleLabelIds->isNotEmpty()
+                                    ? 'orWhereIn'
+                                    : 'whereIn';
+
+                            $scope->{$method}(
+                                'artist_id',
+                                $accessibleArtistIds
+                            );
+                        }
+                    });
+                }
             } else {
                 $query->whereRaw('1 = 0');
             }
@@ -121,8 +186,10 @@ class DashboardController extends Controller
             && isset($label)
             && $label
         ) {
-            $labelModel = Label::query()
-                ->find($label->id);
+            $labelModel =
+                $role === 'label'
+                    ? $teamAccess->effectiveLabel($user)
+                    : Label::query()->find($label->id);
 
             if ($labelModel) {
                 $revenueSummary =
@@ -146,11 +213,19 @@ class DashboardController extends Controller
         }
 
         if ($role === 'label' && isset($label) && $label) {
-            $activeArtists = DB::table('artists')
-                ->where('label_id', $label->id)
-                ->whereNull('deleted_at')
-                ->where('account_status', 'active')
-                ->count();
+            $dashboardArtistIds =
+                $teamAccess
+                    ->accessibleArtistIds($user)
+                    ->map(fn ($id) => (int) $id)
+                    ->values();
+
+            if ($dashboardArtistIds->isNotEmpty()) {
+                $activeArtists = DB::table('artists')
+                    ->whereIn('id', $dashboardArtistIds)
+                    ->whereNull('deleted_at')
+                    ->where('account_status', 'active')
+                    ->count();
+            }
         }
 
         /*

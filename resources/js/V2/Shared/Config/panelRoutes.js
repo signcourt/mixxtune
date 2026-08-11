@@ -1,272 +1,182 @@
 export const PANEL_ROUTES = {
     common: {
-        notifications: '/v2/notifications',
+        notifications: "/v2/notifications",
     },
 
     artist: {
-        dashboard:
-            '/artist/dashboard',
+        dashboard: "/artist/dashboard",
 
-        releases:
-            '/artist/releases',
-        releasesAll:
-            '/artist/releases',
-        releasesLive:
-            '/artist/releases?status=live',
-        releasesReview:
-            '/artist/releases?status=submitted',
-        releasesDraft:
-            '/artist/releases?status=draft',
-        releasesRejected:
-            '/artist/releases?status=rejected',
+        releases: "/artist/releases",
+        releasesAll: "/artist/releases",
+        releasesLive: "/artist/releases?status=live",
+        releasesReview: "/artist/releases?status=submitted",
+        releasesDraft: "/artist/releases?status=draft",
+        releasesRejected: "/artist/releases?status=rejected",
 
-        createRelease:
-            '/artist/releases/create',
+        createRelease: "/artist/releases/create",
 
-        catalogue:
-            '/artist/catalogue',
+        catalogue: "/artist/catalogue",
 
-        royalties:
-            '/artist/royalties',
+        royalties: "/artist/royalties",
 
-        wallet:
-            '/artist/wallet',
+        wallet: "/artist/wallet",
 
-        withdrawals:
-            '/artist/withdrawals',
+        withdrawals: "/artist/withdrawals",
 
-        reports:
-            '/artist/reports',
+        reports: "/artist/reports",
 
-        kyc:
-            '/artist/kyc',
+        kyc: "/artist/kyc",
 
-        support:
-            '/artist/support',
+        support: "/artist/support",
 
-        notifications:
-            '/v2/notifications',
+        notifications: "/v2/notifications",
 
-        settings:
-            '/profile',
+        settings: "/artist/settings",
 
-        statements:
-            '/artist/statements',
+        statements: "/artist/statements",
 
-        invoices:
-            '/artist/invoices',
+        invoices: "/artist/invoices",
     },
 
     label: {
-        dashboard:
-            '/label/dashboard',
+        dashboard: "/label/dashboard",
 
-        artists:
-            '/v2/label/artists',
+        artists: "/v2/label/artists",
 
-        revenueSharing:
-            '/v2/label/revenue-sharing',
+        revenueSharing: "/v2/label/revenue-sharing",
 
-        releases:
-            '/v2/releases',
-        releasesAll:
-            '/v2/releases',
-        releasesLive:
-            '/v2/releases?status=live',
-        releasesReview:
-            '/v2/releases?status=submitted',
-        releasesDraft:
-            '/v2/releases?status=draft',
-        releasesRejected:
-            '/v2/releases?status=rejected',
+        userAccess: "/v2/label/user-access",
 
-        createRelease:
-            '/v2/releases/create',
+        releases: "/v2/releases",
+        releasesAll: "/v2/releases",
+        releasesLive: "/v2/releases?status=live",
+        releasesReview: "/v2/releases?status=submitted",
+        releasesDraft: "/v2/releases?status=draft",
+        releasesRejected: "/v2/releases?status=rejected",
 
-        catalogue:
-            '/v2/catalogue',
+        createRelease: "/v2/releases/create",
 
-        royalties:
-            '/v2/royalties',
+        catalogue: "/v2/catalogue",
 
-        wallet:
-            '/v2/wallet',
+        royalties: "/v2/royalties",
 
-        withdrawals:
-            '/v2/withdrawals',
+        wallet: "/v2/wallet",
 
-        reports:
-            '/v2/reports',
+        withdrawals: "/v2/withdrawals",
 
-        kyc:
-            '/v2/kyc-profile',
+        reports: "/v2/reports",
 
-        support:
-            '/v2/support',
+        kyc: "/v2/kyc-profile",
 
-        notifications:
-            '/v2/notifications',
+        support: "/v2/support",
 
-        settings:
-            '/profile',
+        notifications: "/v2/notifications",
+
+        settings: "/label/settings",
     },
 
     admin: {
-        dashboard:
-            '/admin/dashboard',
+        dashboard: "/admin/dashboard",
 
-        artists:
-            '/v2/admin/artists',
+        artists: "/v2/admin/artists",
 
-        labels:
-            '/v2/admin/labels',
+        labels: "/v2/admin/labels",
 
-        releases:
-            '/v2/admin/release-reviews',
+        releases: "/v2/admin/release-reviews",
 
-        releasesAll:
-            '/v2/admin/release-reviews?status=',
+        releasesAll: "/v2/admin/release-reviews?status=",
 
-        releasesReview:
-            '/v2/admin/release-reviews?status=submitted',
+        releasesReview: "/v2/admin/release-reviews?status=submitted",
 
-        releasesApproved:
-            '/v2/admin/release-reviews?status=approved',
+        releasesApproved: "/v2/admin/release-reviews?status=approved",
 
-        releasesRejected:
-            '/v2/admin/release-reviews?status=rejected',
+        releasesRejected: "/v2/admin/release-reviews?status=rejected",
 
-        createRelease:
-            '/v2/releases/create',
+        createRelease: "/v2/releases/create",
 
-        distribution:
-            '/v2/admin/distribution',
+        distribution: "/v2/admin/distribution",
 
-        identifiers:
-            '/v2/admin/identifiers/pending',
+        identifiers: "/v2/admin/identifiers/pending",
 
-        catalogue:
-            '/v2/catalogue',
+        catalogue: "/v2/catalogue",
 
-        stores:
-            '/v2/admin/stores',
+        stores: "/v2/admin/stores",
 
-        royalties:
-            '/v2/admin/royalties',
+        royalties: "/v2/admin/royalties",
 
-        reports:
-            '/v2/admin/reports',
+        reports: "/v2/admin/reports",
 
-        wallet:
-            '/v2/admin/wallet',
+        wallet: "/v2/admin/wallet",
 
-        withdrawals:
-            '/v2/admin/withdrawals',
+        withdrawals: "/v2/admin/withdrawals",
 
-        support:
-            '/v2/admin/support',
+        support: "/v2/admin/support",
 
-        notifications:
-            '/v2/notifications',
+        notifications: "/v2/notifications",
 
-        settings:
-            '/v2/admin/settings',
+        settings: "/v2/admin/settings",
     },
 
     super_admin: {
-        dashboard:
-            '/super-admin/dashboard',
+        dashboard: "/super-admin/dashboard",
 
-        users:
-            '/v2/admin/users',
+        users: "/v2/admin/users",
 
-        admins:
-            '/v2/admin/admins',
+        admins: "/v2/admin/admins",
 
-        labels:
-            '/v2/admin/labels',
+        labels: "/v2/admin/labels",
 
-        artists:
-            '/v2/admin/artists',
+        artists: "/v2/admin/artists",
 
-        releases:
-            '/v2/admin/release-reviews',
+        releases: "/v2/admin/release-reviews",
 
-        releasesAll:
-            '/v2/admin/release-reviews?status=',
+        releasesAll: "/v2/admin/release-reviews?status=",
 
-        releasesReview:
-            '/v2/admin/release-reviews?status=submitted',
+        releasesReview: "/v2/admin/release-reviews?status=submitted",
 
-        releasesApproved:
-            '/v2/admin/release-reviews?status=approved',
+        releasesApproved: "/v2/admin/release-reviews?status=approved",
 
-        releasesRejected:
-            '/v2/admin/release-reviews?status=rejected',
+        releasesRejected: "/v2/admin/release-reviews?status=rejected",
 
-        createRelease:
-            '/v2/releases/create',
+        createRelease: "/v2/releases/create",
 
-        distribution:
-            '/v2/admin/distribution',
+        distribution: "/v2/admin/distribution",
 
-        identifiers:
-            '/v2/admin/identifiers/pending',
+        identifiers: "/v2/admin/identifiers/pending",
 
-        stores:
-            '/v2/admin/stores',
+        stores: "/v2/admin/stores",
 
-        catalogue:
-            '/v2/catalogue',
+        catalogue: "/v2/catalogue",
+        legacyCatalogueImports: "/super-admin/legacy-catalogue-imports",
 
-        royalties:
-            '/v2/admin/royalties',
+        royalties: "/v2/admin/royalties",
 
-        reports:
-            '/v2/admin/reports',
+        reports: "/v2/admin/reports",
 
-        finance:
-            '/v2/admin/finance',
+        finance: "/v2/admin/finance",
 
-        invoices:
-            '/v2/admin/invoices',
+        invoices: "/v2/admin/invoices",
 
-        statements:
-            '/v2/admin/statements',
+        statements: "/v2/admin/statements",
 
-        wallet:
-            '/v2/admin/wallet',
+        wallet: "/v2/admin/wallet",
 
-        withdrawals:
-            '/v2/admin/withdrawals',
+        withdrawals: "/v2/admin/withdrawals",
 
-        support:
-            '/v2/admin/support',
+        support: "/v2/admin/support",
 
-        logs:
-            '/v2/admin/audit-logs',
+        logs: "/v2/admin/audit-logs",
 
-        activity:
-            '/v2/admin/audit-logs',
+        activity: "/v2/admin/audit-logs",
 
-        notifications:
-            '/v2/notifications',
+        notifications: "/v2/notifications",
 
-        settings:
-            '/v2/admin/settings',
+        settings: "/v2/admin/settings",
     },
 };
 
-export const getPanelRoutes = (
-    role = 'artist'
-) => {
-    const normalizedRole =
-        role === 'super-admin'
-            ? 'super_admin'
-            : role;
+export const getPanelRoutes = (role = "artist") => {
+    const normalizedRole = role === "super-admin" ? "super_admin" : role;
 
-    return (
-        PANEL_ROUTES[normalizedRole] ??
-        PANEL_ROUTES.artist
-    );
+    return PANEL_ROUTES[normalizedRole] ?? PANEL_ROUTES.artist;
 };

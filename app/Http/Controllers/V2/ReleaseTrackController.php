@@ -10,6 +10,7 @@ use App\Models\Distribution\Track;
 use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReleaseAccessService;
+use App\Services\V2\LabelAccess\LabelTeamAccessService;
 use App\Services\V2\AudioValidationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -282,6 +283,21 @@ class ReleaseTrackController extends Controller
             $track->release
         );
 
+        $teamAccess = app(
+            LabelTeamAccessService::class
+        );
+
+        if ($teamAccess->membership($request->user())) {
+            abort_unless(
+                $teamAccess->canAccessTrack(
+                    $request->user(),
+                    $track
+                ),
+                403,
+                'You cannot access this track.'
+            );
+        }
+
         abort_unless(
             $track->audio_path
             && Storage::disk('public')
@@ -330,6 +346,21 @@ class ReleaseTrackController extends Controller
             $request->user(),
             $track->release
         );
+
+        $teamAccess = app(
+            LabelTeamAccessService::class
+        );
+
+        if ($teamAccess->membership($request->user())) {
+            abort_unless(
+                $teamAccess->canAccessTrack(
+                    $request->user(),
+                    $track
+                ),
+                403,
+                'You cannot access this track.'
+            );
+        }
 
         abort_unless(
             $track->audio_path
