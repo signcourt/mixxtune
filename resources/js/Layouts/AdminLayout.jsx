@@ -25,19 +25,19 @@ const menuGroups = [
     {
         title: "FINANCE",
         items: [
-            { label: "Royalties", icon: "₹", href: "#" },
-            { label: "Wallet", icon: "▰", href: "#" },
-            { label: "Withdrawals", icon: "↗", href: "#" },
-            { label: "Reports", icon: "▥", href: "#" },
-            { label: "Invoices", icon: "□", href: "#" },
+            { label: "Royalties", icon: "₹", href: "/admin/royalties" },
+            { label: "Wallet", icon: "▰", href: "/admin/wallet" },
+            { label: "Withdrawals", icon: "↗", href: "/admin/withdrawals" },
+            { label: "Reports", icon: "▥", href: "/admin/reports" },
+            { label: "Invoices", icon: "□", href: "/v2/admin/invoices" },
         ],
     },
     {
         title: "MANAGEMENT",
         items: [
-            { label: "KYC & Profiles", icon: "✓", href: "#" },
-            { label: "Support Tickets", icon: "?", href: "#" },
-            { label: "Settings", icon: "⚙", href: "#" },
+            { label: "KYC & Profiles", icon: "✓", href: "/v2/admin/kyc" },
+            { label: "Support Tickets", icon: "?", href: "/admin/support" },
+            { label: "Settings", icon: "⚙", href: "/admin/settings" },
             {
                 label: "DSP Management",
                 icon: "◈",

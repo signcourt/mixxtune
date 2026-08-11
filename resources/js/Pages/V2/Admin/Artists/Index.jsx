@@ -18,6 +18,16 @@ export default function Index({
         >
             <Head title="Artists" />
 
+            <div className="mb-5 flex justify-end">
+                <a
+                    href="/v2/admin/artists/create"
+                    className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                    + Add Artist
+                </a>
+            </div>
+
+
             <div className="space-y-5">
                 <input
                     type="search"
@@ -52,6 +62,7 @@ export default function Index({
                                     'KYC',
                                     'Releases',
                                     'Assigned Admins',
+                                    'Actions',
                                 ].map((heading) => (
                                     <th
                                         key={heading}
@@ -114,6 +125,48 @@ export default function Index({
                                                 )
                                                 .join(', ') ||
                                                 'Unassigned'}
+                                        </Cell>
+
+                                        <Cell>
+                                            <div className="flex items-center gap-2">
+                                                <a
+                                                    href={`/v2/admin/artists/${artist.id}`}
+                                                    title="View"
+                                                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-50"
+                                                >
+                                                    View
+                                                </a>
+
+                                                <a
+                                                    href={`/v2/admin/artists/${artist.id}/edit`}
+                                                    title="Edit"
+                                                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-50"
+                                                >
+                                                    Edit
+                                                </a>
+
+                                                <button
+                                                    type="button"
+                                                    title="Delete"
+                                                    onClick={() => {
+                                                        if (
+                                                            window.confirm(
+                                                                `Delete ${artist.stage_name}?`
+                                                            )
+                                                        ) {
+                                                            router.delete(
+                                                                `/v2/admin/artists/${artist.id}`,
+                                                                {
+                                                                    preserveScroll: true,
+                                                                }
+                                                            );
+                                                        }
+                                                    }}
+                                                    className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
                                         </Cell>
                                     </tr>
                                 )

@@ -1808,6 +1808,60 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.admin.artists.index');
 
+Route::middleware([
+    'auth',
+    'verified',
+])->group(function () {
+    Route::get(
+        '/v2/admin/artists/create',
+        [
+            \App\Http\Controllers\V2\Admin\AssignmentManagementController::class,
+            'createArtist',
+        ]
+    )->name('v2.admin.artists.create');
+
+    Route::post(
+        '/v2/admin/artists',
+        [
+            \App\Http\Controllers\V2\Admin\AssignmentManagementController::class,
+            'storeArtist',
+        ]
+    )->name('v2.admin.artists.store');
+
+    Route::get(
+        '/v2/admin/artists/{artist}',
+        [
+            \App\Http\Controllers\V2\Admin\AssignmentManagementController::class,
+            'showArtist',
+        ]
+    )->name('v2.admin.artists.show');
+
+    Route::get(
+        '/v2/admin/artists/{artist}/edit',
+        [
+            \App\Http\Controllers\V2\Admin\AssignmentManagementController::class,
+            'editArtist',
+        ]
+    )->name('v2.admin.artists.edit');
+
+    Route::patch(
+        '/v2/admin/artists/{artist}',
+        [
+            \App\Http\Controllers\V2\Admin\AssignmentManagementController::class,
+            'updateArtist',
+        ]
+    )->name('v2.admin.artists.update');
+
+    Route::delete(
+        '/v2/admin/artists/{artist}',
+        [
+            \App\Http\Controllers\V2\Admin\AssignmentManagementController::class,
+            'destroyArtist',
+        ]
+    )->name('v2.admin.artists.destroy');
+});
+
+
 
 Route::middleware(['auth', 'verified'])
     ->get(
