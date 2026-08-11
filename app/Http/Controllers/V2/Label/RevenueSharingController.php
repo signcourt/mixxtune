@@ -9,6 +9,7 @@ use App\Models\Finance\LabelRevenueShare;
 use App\Services\V2\LabelRevenueShareService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -84,6 +85,17 @@ class RevenueSharingController extends Controller
             })
             ->values();
 
+        $beneficiaries =
+            $labels
+                ->concat($artists)
+                ->values();
+
+        $revenueReport =
+            $this->buildRevenueReport(
+                $master,
+                $beneficiaries
+            );
+
         return Inertia::render(
             'V2/Label/RevenueSharing/Index',
             [
@@ -96,11 +108,838 @@ class RevenueSharingController extends Controller
                 ],
 
                 'beneficiaries' =>
-                    $labels
-                        ->concat($artists)
-                        ->values(),
+                    $beneficiaries,
+
+                'revenueReport' =>
+                    $revenueReport,
             ]
         );
+    }
+
+    public function export(
+        Request $request,
+        ?string $type = null,
+        ?int $id = null
+    ) {
+        $master = $this->masterLabel(
+            $request
+        );
+
+        if (
+            $type !== null
+            && ! in_array(
+                $type,
+                [
+                    'artist',
+                    'label',
+                ],
+                true
+            )
+        ) {
+            abort(404);
+        }
+
+        $beneficiaries =
+            $this->reportBeneficiaries(
+                $master
+            );
+
+        $filename =
+            'revenue-beneficiary-report-'
+            .now()->format('Ymd-His')
+            .'.csv';
+
+        return response()->streamDownload(
+            function () use (
+                $master,
+                $beneficiaries,
+                $type,
+                $id
+            ) {
+                $handle = fopen(
+                    'php://output',
+                    'w'
+                );
+
+                /*
+                 * UTF-8 BOM for Excel compatibility.
+                 */
+                fwrite(
+                    $handle,
+                    "\xEF\xBB\xBF"
+                );
+
+                fputcsv(
+                    $handle,
+                    [
+                        'Sale Date',
+                        'Sale Month',
+                        'Beneficiary Type',
+                        'Beneficiary',
+                        'Track',
+                        'Track Artist',
+                        'ISRC',
+                        'UPC',
+                        'Platform',
+                        'Country',
+                        'Currency',
+                        'Streams',
+                        'Managed Revenue',
+                        'Share %',
+                        'Beneficiary Payable',
+                        'Master Retained',
+                    ]
+                );
+
+                foreach (
+                    $this->reportQuery(
+                        $master
+                    )->cursor()
+                    as $row
+                ) {
+                    $beneficiary =
+                        $this->resolveBeneficiary(
+                            $beneficiaries,
+                            $row
+                        );
+
+                    if (! $beneficiary) {
+                        continue;
+                    }
+
+                    if (
+                        ! $this->shareAppliesToRow(
+                            $beneficiary,
+                            $row
+                        )
+                    ) {
+                        continue;
+                    }
+
+                    if (
+                        $type !== null
+                        && $beneficiary['type']
+                            !== $type
+                    ) {
+                        continue;
+                    }
+
+                    if (
+                        $id !== null
+                        && (int)
+                            $beneficiary['id']
+                            !== (int) $id
+                    ) {
+                        continue;
+                    }
+
+                    $calc =
+                        $this->calculateRevenueRow(
+                            $beneficiary,
+                            $row
+                        );
+
+                    fputcsv(
+                        $handle,
+                        [
+                            $row->sale_date,
+                            $row->sale_month,
+                            $beneficiary['type'],
+                            $beneficiary['name'],
+                            $row->track_title,
+                            $row->track_artist,
+                            $row->isrc,
+                            $row->upc,
+                            $row->platform,
+                            $row->country_code,
+                            $row->currency,
+                            $row->streams,
+                            number_format(
+                                $calc[
+                                    'managed_revenue'
+                                ],
+                                8,
+                                '.',
+                                ''
+                            ),
+                            number_format(
+                                $calc[
+                                    'share_percent'
+                                ],
+                                4,
+                                '.',
+                                ''
+                            ),
+                            number_format(
+                                $calc[
+                                    'beneficiary_payable'
+                                ],
+                                8,
+                                '.',
+                                ''
+                            ),
+                            number_format(
+                                $calc[
+                                    'master_retained'
+                                ],
+                                8,
+                                '.',
+                                ''
+                            ),
+                        ]
+                    );
+                }
+
+                fclose($handle);
+            },
+            $filename,
+            [
+                'Content-Type' =>
+                    'text/csv; charset=UTF-8',
+            ]
+        );
+    }
+
+    private function buildRevenueReport(
+        Label $master,
+        $beneficiaries
+    ): array {
+        $beneficiaryMap =
+            $beneficiaries
+                ->mapWithKeys(
+                    fn (array $item) => [
+                        $item['type']
+                        .':'
+                        .$item['id']
+                        => $item,
+                    ]
+                )
+                ->all();
+
+        $summary = [
+            'managed_revenue' => 0.0,
+            'beneficiary_payable' => 0.0,
+            'master_retained' => 0.0,
+            'streams' => 0.0,
+        ];
+
+        $grouped = [];
+        $displayRows = [];
+
+        foreach (
+            $this->reportQuery(
+                $master
+            )->cursor()
+            as $row
+        ) {
+            $beneficiary =
+                $this->resolveBeneficiary(
+                    $beneficiaryMap,
+                    $row
+                );
+
+            if (! $beneficiary) {
+                continue;
+            }
+
+            if (
+                ! $this->shareAppliesToRow(
+                    $beneficiary,
+                    $row
+                )
+            ) {
+                continue;
+            }
+
+            $calc =
+                $this->calculateRevenueRow(
+                    $beneficiary,
+                    $row
+                );
+
+            $key =
+                $beneficiary['type']
+                .':'
+                .$beneficiary['id'];
+
+            if (! isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'type' =>
+                        $beneficiary['type'],
+
+                    'id' =>
+                        (int)
+                            $beneficiary['id'],
+
+                    'name' =>
+                        $beneficiary['name'],
+
+                    'share_percent' =>
+                        $calc[
+                            'share_percent'
+                        ],
+
+                    'managed_revenue' =>
+                        0.0,
+
+                    'beneficiary_payable' =>
+                        0.0,
+
+                    'master_retained' =>
+                        0.0,
+
+                    'streams' =>
+                        0.0,
+
+                    'track_ids' =>
+                        [],
+                ];
+            }
+
+            foreach (
+                [
+                    'managed_revenue',
+                    'beneficiary_payable',
+                    'master_retained',
+                    'streams',
+                ]
+                as $field
+            ) {
+                $summary[$field] +=
+                    $calc[$field];
+
+                $grouped[
+                    $key
+                ][$field] +=
+                    $calc[$field];
+            }
+
+            if ($row->track_id) {
+                $grouped[
+                    $key
+                ]['track_ids'][
+                    (string)
+                        $row->track_id
+                ] = true;
+            }
+
+            /*
+             * Browser page: latest 100 rows only.
+             * CSV export remains unlimited.
+             */
+            if (
+                count(
+                    $displayRows
+                ) < 100
+            ) {
+                $displayRows[] = [
+                    'id' =>
+                        $row->id,
+
+                    'sale_date' =>
+                        $row->sale_date,
+
+                    'sale_month' =>
+                        $row->sale_month,
+
+                    'type' =>
+                        $beneficiary['type'],
+
+                    'beneficiary_id' =>
+                        (int)
+                            $beneficiary['id'],
+
+                    'beneficiary' =>
+                        $beneficiary['name'],
+
+                    'track_title' =>
+                        $row->track_title
+                        ?: 'Untitled Track',
+
+                    'track_artist' =>
+                        $row->track_artist,
+
+                    'isrc' =>
+                        $row->isrc,
+
+                    'upc' =>
+                        $row->upc,
+
+                    'platform' =>
+                        $row->platform,
+
+                    'country_code' =>
+                        $row->country_code,
+
+                    'currency' =>
+                        $row->currency
+                        ?: (
+                            $master->currency
+                            ?: 'INR'
+                        ),
+
+                    'streams' =>
+                        $calc['streams'],
+
+                    'managed_revenue' =>
+                        $calc[
+                            'managed_revenue'
+                        ],
+
+                    'share_percent' =>
+                        $calc[
+                            'share_percent'
+                        ],
+
+                    'beneficiary_payable' =>
+                        $calc[
+                            'beneficiary_payable'
+                        ],
+
+                    'master_retained' =>
+                        $calc[
+                            'master_retained'
+                        ],
+                ];
+            }
+        }
+
+        $beneficiaryRows =
+            collect($grouped)
+                ->map(
+                    function (
+                        array $item
+                    ) {
+                        $item['track_count'] =
+                            count(
+                                $item[
+                                    'track_ids'
+                                ]
+                            );
+
+                        unset(
+                            $item[
+                                'track_ids'
+                            ]
+                        );
+
+                        return $item;
+                    }
+                )
+                ->sortByDesc(
+                    'managed_revenue'
+                )
+                ->values()
+                ->all();
+
+        return [
+            'summary' =>
+                $summary,
+
+            'beneficiaries' =>
+                $beneficiaryRows,
+
+            'rows' =>
+                $displayRows,
+
+            'display_limit' =>
+                100,
+        ];
+    }
+
+    private function reportBeneficiaries(
+        Label $master
+    ): array {
+        $shares =
+            LabelRevenueShare::query()
+                ->where(
+                    'master_label_id',
+                    $master->id
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->get();
+
+        $labels =
+            Label::query()
+                ->where(
+                    'parent_label_id',
+                    $master->id
+                )
+                ->whereNull(
+                    'deleted_at'
+                )
+                ->get()
+                ->keyBy('id');
+
+        $artists =
+            Artist::query()
+                ->where(
+                    'label_id',
+                    $master->id
+                )
+                ->whereNull(
+                    'deleted_at'
+                )
+                ->get()
+                ->keyBy('id');
+
+        $result = [];
+
+        foreach ($shares as $share) {
+            if (
+                $share->beneficiary_type
+                === 'artist'
+            ) {
+                $artist =
+                    $artists->get(
+                        $share
+                            ->beneficiary_id
+                    );
+
+                if (! $artist) {
+                    continue;
+                }
+
+                $name =
+                    $artist
+                        ->stage_name;
+            } elseif (
+                $share->beneficiary_type
+                === 'label'
+            ) {
+                $label =
+                    $labels->get(
+                        $share
+                            ->beneficiary_id
+                    );
+
+                if (! $label) {
+                    continue;
+                }
+
+                $name =
+                    $label->name;
+            } else {
+                continue;
+            }
+
+            $key =
+                $share->beneficiary_type
+                .':'
+                .$share->beneficiary_id;
+
+            $result[$key] = [
+                'type' =>
+                    $share
+                        ->beneficiary_type,
+
+                'id' =>
+                    (int)
+                        $share
+                            ->beneficiary_id,
+
+                'name' =>
+                    $name,
+
+                'revenue_share_percent' =>
+                    (float)
+                        $share
+                            ->revenue_share_percent,
+
+                'is_active' =>
+                    (bool)
+                        $share
+                            ->is_active,
+
+                'effective_from' =>
+                    $share
+                        ->effective_from
+                        ?->format(
+                            'Y-m-d'
+                        ),
+
+                'effective_to' =>
+                    $share
+                        ->effective_to
+                        ?->format(
+                            'Y-m-d'
+                        ),
+            ];
+        }
+
+        return $result;
+    }
+
+    private function reportQuery(
+        Label $master
+    ) {
+        return DB::table(
+            'report_rows'
+        )
+            ->where(
+                'revenue_owner_type',
+                'label'
+            )
+            ->where(
+                'revenue_owner_id',
+                $master->id
+            )
+            ->where(
+                'mapping_status',
+                'mapped'
+            )
+            ->select([
+                'id',
+                'track_id',
+                'artist_id',
+                'label_id',
+                'track_artist',
+                'track_title',
+                'isrc',
+                'upc',
+                'platform',
+                'currency',
+                'country_code',
+                'sale_date',
+                'sale_month',
+                'streams',
+                'earnings',
+            ])
+            ->orderByDesc(
+                'sale_date'
+            )
+            ->orderByDesc(
+                'id'
+            );
+    }
+
+    private function resolveBeneficiary(
+        array $beneficiaries,
+        object $row
+    ): ?array {
+        /*
+         * Artist takes precedence where the
+         * report row is mapped directly to
+         * a master-owned Artist.
+         */
+        if ($row->artist_id) {
+            $key =
+                'artist:'
+                .$row->artist_id;
+
+            if (
+                isset(
+                    $beneficiaries[
+                        $key
+                    ]
+                )
+            ) {
+                return
+                    $beneficiaries[
+                        $key
+                    ];
+            }
+        }
+
+        /*
+         * Otherwise check whether revenue
+         * belongs to a direct Sub-Label.
+         */
+        if ($row->label_id) {
+            $key =
+                'label:'
+                .$row->label_id;
+
+            if (
+                isset(
+                    $beneficiaries[
+                        $key
+                    ]
+                )
+            ) {
+                return
+                    $beneficiaries[
+                        $key
+                    ];
+            }
+        }
+
+        return null;
+    }
+
+    private function shareAppliesToRow(
+        array $beneficiary,
+        object $row
+    ): bool {
+        if (
+            empty(
+                $beneficiary[
+                    'is_active'
+                ]
+            )
+        ) {
+            return false;
+        }
+
+        /*
+         * MIXX TUNE MONTHLY REVENUE RULE
+         *
+         * DSP royalty reports are allocated by sale month.
+         * If sale_month exists, revenue-share effective dates
+         * are compared at YYYY-MM level.
+         *
+         * Example:
+         * sale_month     = 2026-08
+         * effective_from = 2026-08-11
+         *
+         * Result: INCLUDED because both belong to August 2026.
+         */
+        if (! empty($row->sale_month)) {
+            $rowMonth = substr(
+                (string) $row->sale_month,
+                0,
+                7
+            );
+
+            if (
+                ! empty(
+                    $beneficiary[
+                        'effective_from'
+                    ]
+                )
+            ) {
+                $fromMonth = substr(
+                    (string)
+                        $beneficiary[
+                            'effective_from'
+                        ],
+                    0,
+                    7
+                );
+
+                if ($rowMonth < $fromMonth) {
+                    return false;
+                }
+            }
+
+            if (
+                ! empty(
+                    $beneficiary[
+                        'effective_to'
+                    ]
+                )
+            ) {
+                $toMonth = substr(
+                    (string)
+                        $beneficiary[
+                            'effective_to'
+                        ],
+                    0,
+                    7
+                );
+
+                if ($rowMonth > $toMonth) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /*
+         * Fallback for reports without sale_month:
+         * use exact sale_date boundaries.
+         */
+        if (! empty($row->sale_date)) {
+            $date = substr(
+                (string) $row->sale_date,
+                0,
+                10
+            );
+
+            if (
+                ! empty(
+                    $beneficiary[
+                        'effective_from'
+                    ]
+                )
+                && $date <
+                    $beneficiary[
+                        'effective_from'
+                    ]
+            ) {
+                return false;
+            }
+
+            if (
+                ! empty(
+                    $beneficiary[
+                        'effective_to'
+                    ]
+                )
+                && $date >
+                    $beneficiary[
+                        'effective_to'
+                    ]
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function calculateRevenueRow(
+        array $beneficiary,
+        object $row
+    ): array {
+        $managed =
+            (float)
+                ($row->earnings ?? 0);
+
+        $share = min(
+            100,
+            max(
+                0,
+                (float)
+                    $beneficiary[
+                        'revenue_share_percent'
+                    ]
+            )
+        );
+
+        $payable = round(
+            $managed
+            * ($share / 100),
+            8
+        );
+
+        $retained = round(
+            $managed
+            - $payable,
+            8
+        );
+
+        return [
+            'managed_revenue' =>
+                $managed,
+
+            'share_percent' =>
+                $share,
+
+            'beneficiary_payable' =>
+                $payable,
+
+            'master_retained' =>
+                $retained,
+
+            'streams' =>
+                (float)
+                    ($row->streams ?? 0),
+        ];
     }
 
     public function update(

@@ -399,6 +399,35 @@ Route::middleware([
         'v2.label.revenue-sharing.index'
     );
 
+    \Illuminate\Support\Facades\Route::get(
+        '/v2/label/revenue-sharing/export',
+        [
+            \App\Http\Controllers\V2\Label\RevenueSharingController::class,
+            'export',
+        ]
+    )->name(
+        'v2.label.revenue-sharing.export-all'
+    );
+
+    \Illuminate\Support\Facades\Route::get(
+        '/v2/label/revenue-sharing/{type}/{id}/export',
+        [
+            \App\Http\Controllers\V2\Label\RevenueSharingController::class,
+            'export',
+        ]
+    )
+        ->whereIn(
+            'type',
+            [
+                'label',
+                'artist',
+            ]
+        )
+        ->whereNumber('id')
+        ->name(
+            'v2.label.revenue-sharing.export'
+        );
+
     \Illuminate\Support\Facades\Route::patch(
         '/v2/label/revenue-sharing/{type}/{id}',
         [

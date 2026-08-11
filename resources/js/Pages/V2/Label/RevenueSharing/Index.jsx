@@ -234,9 +234,30 @@ function ShareRow({
     );
 }
 
+const revenueMoney = (
+    value,
+    currency = 'INR'
+) =>
+    new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: currency || 'INR',
+        maximumFractionDigits: 2,
+    }).format(Number(value ?? 0));
+
+const revenueNumber = (value) =>
+    Number(value ?? 0).toLocaleString(
+        'en-IN'
+    );
+
 export default function Index({
     master,
     beneficiaries = [],
+    revenueReport = {
+        summary: {},
+        beneficiaries: [],
+        rows: [],
+        display_limit: 100,
+    },
 }) {
     const labels = beneficiaries.filter(
         (item) =>
@@ -302,6 +323,299 @@ export default function Index({
                         another hierarchy.
                     </p>
                 </div>
+
+                  <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
+                          <div>
+                              <h2 className="text-lg font-bold text-slate-900">
+                                  Revenue Beneficiary Breakdown
+                              </h2>
+
+                              <p className="mt-1 text-sm text-slate-500">
+                                  See exactly which tracks generated revenue, the applied share and the amount retained by the master.
+                              </p>
+                          </div>
+
+                          <a
+                              href="/v2/label/revenue-sharing/export"
+                              className="inline-flex w-fit items-center justify-center rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700"
+                          >
+                              Download Full Report
+                          </a>
+                      </div>
+
+                      <div className="grid gap-3 border-b border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
+                              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  Managed Revenue
+                              </p>
+                              <p className="mt-2 text-xl font-black text-slate-950">
+                                  {revenueMoney(
+                                      revenueReport.summary?.managed_revenue,
+                                      master.currency
+                                  )}
+                              </p>
+                          </div>
+
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
+                              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  Beneficiary Payable
+                              </p>
+                              <p className="mt-2 text-xl font-black text-emerald-700">
+                                  {revenueMoney(
+                                      revenueReport.summary?.beneficiary_payable,
+                                      master.currency
+                                  )}
+                              </p>
+                          </div>
+
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
+                              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  Master Retained
+                              </p>
+                              <p className="mt-2 text-xl font-black text-violet-700">
+                                  {revenueMoney(
+                                      revenueReport.summary?.master_retained,
+                                      master.currency
+                                  )}
+                              </p>
+                          </div>
+
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
+                              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  Streams
+                              </p>
+                              <p className="mt-2 text-xl font-black text-slate-950">
+                                  {revenueNumber(
+                                      revenueReport.summary?.streams
+                                  )}
+                              </p>
+                          </div>
+                      </div>
+
+                      {revenueReport.beneficiaries?.length > 0 && (
+                          <div className="overflow-x-auto border-b border-slate-200">
+                              <table className="min-w-full divide-y divide-slate-200">
+                                  <thead className="bg-slate-50">
+                                      <tr>
+                                          {[
+                                              'Type',
+                                              'Beneficiary',
+                                              'Tracks',
+                                              'Managed',
+                                              'Share',
+                                              'Beneficiary Payable',
+                                              'Master Retained',
+                                              'Download',
+                                          ].map((heading) => (
+                                              <th
+                                                  key={heading}
+                                                  className="whitespace-nowrap px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
+                                              >
+                                                  {heading}
+                                              </th>
+                                          ))}
+                                      </tr>
+                                  </thead>
+
+                                  <tbody className="divide-y divide-slate-100">
+                                      {revenueReport.beneficiaries.map(
+                                          (item) => (
+                                              <tr
+                                                  key={`${item.type}-${item.id}`}
+                                                  className="hover:bg-slate-50"
+                                              >
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm">
+                                                      <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
+                                                          {item.type === 'artist'
+                                                              ? 'Artist'
+                                                              : 'Sub-Label'}
+                                                      </span>
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-900">
+                                                      {item.name}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
+                                                      {revenueNumber(
+                                                          item.track_count
+                                                      )}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
+                                                      {revenueMoney(
+                                                          item.managed_revenue,
+                                                          master.currency
+                                                      )}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-700">
+                                                      {Number(
+                                                          item.share_percent ?? 0
+                                                      ).toFixed(2)}
+                                                      %
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-emerald-700">
+                                                      {revenueMoney(
+                                                          item.beneficiary_payable,
+                                                          master.currency
+                                                      )}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-violet-700">
+                                                      {revenueMoney(
+                                                          item.master_retained,
+                                                          master.currency
+                                                      )}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3">
+                                                      <a
+                                                          href={`/v2/label/revenue-sharing/${item.type}/${item.id}/export`}
+                                                          className="text-sm font-bold text-violet-700 hover:text-violet-900"
+                                                      >
+                                                          Download CSV
+                                                      </a>
+                                                  </td>
+                                              </tr>
+                                          )
+                                      )}
+                                  </tbody>
+                              </table>
+                          </div>
+                      )}
+
+                      <div className="border-b border-slate-200 px-5 py-4">
+                          <h3 className="font-bold text-slate-900">
+                              Track-Level Allocation
+                          </h3>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                              Latest {revenueReport.display_limit ?? 100} eligible rows are shown here. Full CSV contains all eligible rows.
+                          </p>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-slate-200">
+                              <thead className="bg-slate-50">
+                                  <tr>
+                                      {[
+                                          'Month',
+                                          'Beneficiary',
+                                          'Track',
+                                          'ISRC',
+                                          'Platform',
+                                          'Streams',
+                                          'Managed',
+                                          'Share',
+                                          'Payable',
+                                          'Master Retained',
+                                      ].map((heading) => (
+                                          <th
+                                              key={heading}
+                                              className="whitespace-nowrap px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
+                                          >
+                                              {heading}
+                                          </th>
+                                      ))}
+                                  </tr>
+                              </thead>
+
+                              <tbody className="divide-y divide-slate-100">
+                                  {revenueReport.rows?.length ? (
+                                      revenueReport.rows.map(
+                                          (row) => (
+                                              <tr
+                                                  key={row.id}
+                                                  className="hover:bg-slate-50"
+                                              >
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
+                                                      {row.sale_month || '—'}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3">
+                                                      <div className="text-sm font-bold text-slate-900">
+                                                          {row.beneficiary}
+                                                      </div>
+
+                                                      <div className="text-xs text-slate-500">
+                                                          {row.type === 'artist'
+                                                              ? 'Artist'
+                                                              : 'Sub-Label'}
+                                                      </div>
+                                                  </td>
+
+                                                  <td className="min-w-[220px] px-4 py-3">
+                                                      <div className="text-sm font-bold text-slate-900">
+                                                          {row.track_title}
+                                                      </div>
+
+                                                      <div className="text-xs text-slate-500">
+                                                          {row.track_artist || '—'}
+                                                      </div>
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-600">
+                                                      {row.isrc || '—'}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
+                                                      {row.platform || '—'}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
+                                                      {revenueNumber(
+                                                          row.streams
+                                                      )}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
+                                                      {revenueMoney(
+                                                          row.managed_revenue,
+                                                          row.currency
+                                                      )}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-700">
+                                                      {Number(
+                                                          row.share_percent ?? 0
+                                                      ).toFixed(2)}
+                                                      %
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-emerald-700">
+                                                      {revenueMoney(
+                                                          row.beneficiary_payable,
+                                                          row.currency
+                                                      )}
+                                                  </td>
+
+                                                  <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-violet-700">
+                                                      {revenueMoney(
+                                                          row.master_retained,
+                                                          row.currency
+                                                      )}
+                                                  </td>
+                                              </tr>
+                                          )
+                                      )
+                                  ) : (
+                                      <tr>
+                                          <td
+                                              colSpan={10}
+                                              className="px-5 py-10 text-center text-sm text-slate-500"
+                                          >
+                                              No eligible beneficiary revenue rows available yet.
+                                          </td>
+                                      </tr>
+                                  )}
+                              </tbody>
+                          </table>
+                      </div>
+                  </section>
+
 
                 <section>
                     <div className="mb-4">
