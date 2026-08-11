@@ -1965,3 +1965,59 @@ Route::middleware(['auth'])
 */
 
 require __DIR__.'/single-domain.php';
+
+/*
+|--------------------------------------------------------------------------
+| Mixx Tune V2 — Label User Access
+|--------------------------------------------------------------------------
+|
+| SECURITY:
+| UserAccessController performs an additional owner/master-label boundary
+| check. These endpoints are never linked from Artist/Admin/Super Admin UI.
+|
+*/
+
+Route::middleware(['auth', 'role:label'])
+    ->prefix('v2/label/user-access')
+    ->name('v2.label.user-access.')
+    ->group(function () {
+        Route::get(
+            '/',
+            [
+                \App\Http\Controllers\V2\Label\UserAccessController::class,
+                'index'
+            ]
+        )->name('index');
+
+        Route::post(
+            '/',
+            [
+                \App\Http\Controllers\V2\Label\UserAccessController::class,
+                'store'
+            ]
+        )->name('store');
+
+        Route::put(
+            '/{member}',
+            [
+                \App\Http\Controllers\V2\Label\UserAccessController::class,
+                'update'
+            ]
+        )->name('update');
+
+        Route::patch(
+            '/{member}/status',
+            [
+                \App\Http\Controllers\V2\Label\UserAccessController::class,
+                'status'
+            ]
+        )->name('status');
+
+        Route::delete(
+            '/{member}',
+            [
+                \App\Http\Controllers\V2\Label\UserAccessController::class,
+                'destroy'
+            ]
+        )->name('destroy');
+    });

@@ -2,6 +2,8 @@
 
 namespace App\Services\V2;
 
+use App\Services\V2\LabelAccess\LabelTeamAccessService;
+
 use App\Models\System\UserPanelPermission;
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
@@ -74,6 +76,8 @@ class PermissionService
             'withdrawals.create',
             'support.create',
             'profile.update',
+              'team.manage',
+              'revenue_sharing.manage',
         ],
 
         'artist' => [
@@ -179,21 +183,26 @@ class PermissionService
 
     public function role(?User $user): string
     {
-        $role = strtolower(
-            trim(
-                (string) (
-                    $user?->role
-                    ?? 'artist'
-                )
-            )
+        if (!$user) {
+            return 'guest';
+        }
+
+        /*
+         * A Team User keeps its actual database role,
+         * but behaves as a Label user inside the
+         * Label Panel authorization layer.
+         */
+        $teamAccess = app(
+            LabelTeamAccessService::class
         );
 
-        return array_key_exists(
-            $role,
-            $this->rolePermissions
-        )
-            ? $role
-            : 'artist';
+        if ($teamAccess->membership($user)) {
+            return 'label';
+        }
+
+        return (string) (
+            $user->role ?? 'artist'
+        );
     }
 
     /**
@@ -203,6 +212,53 @@ class PermissionService
     {
         if (!$user) {
             return [];
+        }
+
+
+        /*
+         * LABEL_TEAM_EFFECTIVE_PERMISSION_LIST
+         *
+         * A Team relationship must be evaluated before
+         * legacy role defaults.
+         *
+         * Active Team User:
+         *   only explicitly granted Team permissions.
+         *
+         * Suspended / disabled Team User:
+         *   no Team permissions and no fallback to the
+         *   placeholder database role.
+         */
+        $teamAccess = app(
+            LabelTeamAccessService::class
+        );
+
+        $teamRecord =
+            $teamAccess->membershipRecord(
+                $user
+            );
+
+        if ($teamRecord) {
+            if (!$teamRecord->isActive()) {
+                return [];
+            }
+
+            return collect(
+                $teamRecord->permissions ?? []
+            )
+                ->filter(
+                    fn ($permission) =>
+                        $teamAccess->allows(
+                            $user,
+                            (string) $permission
+                        )
+                )
+                ->map(
+                    fn ($permission) =>
+                        (string) $permission
+                )
+                ->unique()
+                ->values()
+                ->all();
         }
 
         $role = $this->role($user);
@@ -269,6 +325,37 @@ class PermissionService
         ?User $user,
         string $permission
     ): bool {
+
+        /*
+         * Label Team permission overlay.
+         *
+         * IMPORTANT:
+         * membershipRecord() includes suspended/disabled
+         * records. This prevents an inactive Team account
+         * from falling back to its placeholder Artist role.
+         */
+        if ($user) {
+            $teamAccess = app(
+                LabelTeamAccessService::class
+            );
+
+            $teamRecord =
+                $teamAccess->membershipRecord(
+                    $user
+                );
+
+            if ($teamRecord) {
+                if (!$teamRecord->isActive()) {
+                    return false;
+                }
+
+                return $teamAccess->allows(
+                    $user,
+                    $permission
+                );
+            }
+        }
+
         $permissions =
             $this->permissions($user);
 
