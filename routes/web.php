@@ -1297,6 +1297,14 @@ Route::middleware(['auth', 'verified'])
 
 Route::middleware(['auth', 'verified'])
     ->get(
+        '/v2/catalogue/export',
+        [\App\Http\Controllers\V2\CatalogueController::class, 'export']
+    )
+    ->name('v2.catalogue.export');
+
+
+Route::middleware(['auth', 'verified'])
+    ->get(
         '/v2/catalogue/{catalogueItem}',
         [\App\Http\Controllers\V2\CatalogueController::class, 'show']
     )

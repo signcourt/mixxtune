@@ -351,20 +351,51 @@ class CatalogueService
         }
 
         if ($role === 'label') {
-            $labelId = DB::table('labels')
+            /*
+             * Strict two-tier Mixx Tune catalogue scope:
+             *
+             * Label account can see:
+             * - its own direct label catalogue
+             * - direct child/sub-label catalogue
+             *
+             * No recursive grandchildren.
+             */
+            $rootLabelIds = DB::table('labels')
                 ->where(
                     'user_id',
                     $user->id
                 )
                 ->whereNull('deleted_at')
-                ->value('id');
+                ->pluck('id')
+                ->map(
+                    fn ($id) => (int) $id
+                );
 
-            return $labelId
-                ? $query->where(
-                    'label_id',
-                    $labelId
+            if ($rootLabelIds->isEmpty()) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            $childLabelIds = DB::table('labels')
+                ->whereIn(
+                    'parent_label_id',
+                    $rootLabelIds
                 )
-                : $query->whereRaw('1 = 0');
+                ->whereNull('deleted_at')
+                ->pluck('id')
+                ->map(
+                    fn ($id) => (int) $id
+                );
+
+            $accessibleLabelIds =
+                $rootLabelIds
+                    ->merge($childLabelIds)
+                    ->unique()
+                    ->values();
+
+            return $query->whereIn(
+                'label_id',
+                $accessibleLabelIds
+            );
         }
 
         if ($role === 'admin') {

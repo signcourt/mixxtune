@@ -151,6 +151,9 @@ export default function Index({
     const [searchValue, setSearchValue] =
         useState(filters.search ?? '');
 
+    const [showAdvanced, setShowAdvanced] =
+        useState(false);
+
     const title =
         role === 'artist'
             ? 'My Catalogue'
@@ -362,31 +365,23 @@ export default function Index({
                     )}
                 </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                    <div className="grid gap-3 xl:grid-cols-[minmax(280px,1fr)_190px_190px_170px_auto]">
-                        <div className="flex overflow-hidden rounded-xl border border-slate-300 bg-white focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100">
-                            <span className="flex items-center px-4 text-slate-400">
+                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                        <div className="flex min-w-0 flex-1 overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100">
+                            <span className="flex items-center px-3 text-slate-400">
                                 ⌕
                             </span>
 
                             <input
                                 type="search"
-                                value={
-                                    searchValue
-                                }
-                                placeholder="Search title, artist, UPC, ISRC or catalogue number"
-                                onChange={(
-                                    event
-                                ) =>
+                                value={searchValue}
+                                placeholder="Search by release title, artist, UPC, ISRC or catalogue number"
+                                onChange={(event) =>
                                     setSearchValue(
-                                        event
-                                            .target
-                                            .value
+                                        event.target.value
                                     )
                                 }
-                                onKeyDown={(
-                                    event
-                                ) => {
+                                onKeyDown={(event) => {
                                     if (
                                         event.key ===
                                         'Enter'
@@ -394,156 +389,255 @@ export default function Index({
                                         applySearch();
                                     }
                                 }}
-                                className="min-w-0 flex-1 border-0 px-0 py-3 pr-4 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                                className="min-w-0 flex-1 border-0 px-0 py-2.5 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-400"
                             />
 
                             <button
                                 type="button"
-                                onClick={
-                                    applySearch
-                                }
-                                className="m-1.5 rounded-lg bg-slate-900 px-4 text-xs font-bold text-white transition hover:bg-violet-700"
+                                onClick={applySearch}
+                                className="m-1 rounded-md bg-slate-900 px-4 text-xs font-bold text-white transition hover:bg-violet-700"
                             >
                                 Search
                             </button>
                         </div>
 
-                        <select
-                            value={
-                                filters.status ??
-                                ''
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setShowAdvanced(
+                                    (value) => !value
+                                )
                             }
-                            onChange={(
-                                event
-                            ) =>
-                                updateFilter({
-                                    status:
-                                        event
-                                            .target
-                                            .value,
-                                })
-                            }
-                            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-violet-500"
+                            className={[
+                                'inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-bold transition',
+                                showAdvanced
+                                    ? 'border-violet-300 bg-violet-50 text-violet-700'
+                                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+                            ].join(' ')}
                         >
-                            <option value="">
-                                All Statuses
-                            </option>
-
-                            <option value="draft">
-                                Draft
-                            </option>
-
-                            <option value="submitted">
-                                Under Review
-                            </option>
-
-                            <option value="approved">
-                                Approved
-                            </option>
-
-                            <option value="processing">
-                                Processing
-                            </option>
-
-                            <option value="delivered">
-                                Delivered
-                            </option>
-
-                            <option value="live">
-                                Live
-                            </option>
-
-                            <option value="rejected">
-                                Rejected
-                            </option>
-
-                            <option value="takedown_requested">
-                                Takedown Requested
-                            </option>
-
-                            <option value="taken_down">
-                                Taken Down
-                            </option>
-                        </select>
-
-                        <select
-                            value={
-                                filters.visibility ??
-                                ''
-                            }
-                            onChange={(
-                                event
-                            ) =>
-                                updateFilter({
-                                    visibility:
-                                        event
-                                            .target
-                                            .value,
-                                })
-                            }
-                            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-violet-500"
-                        >
-                            <option value="">
-                                All Visibility
-                            </option>
-
-                            <option value="visible">
-                                Visible
-                            </option>
-
-                            <option value="hidden">
-                                Hidden
-                            </option>
-                        </select>
-
-                        <select
-                            value={
-                                filters.sort ??
-                                'latest'
-                            }
-                            onChange={(
-                                event
-                            ) =>
-                                updateFilter({
-                                    sort:
-                                        event
-                                            .target
-                                            .value,
-                                })
-                            }
-                            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-violet-500"
-                        >
-                            <option value="latest">
-                                Latest Added
-                            </option>
-
-                            <option value="oldest">
-                                Oldest Added
-                            </option>
-
-                            <option value="title_asc">
-                                Title A–Z
-                            </option>
-
-                            <option value="title_desc">
-                                Title Z–A
-                            </option>
-
-                            <option value="release_date">
-                                Release Date
-                            </option>
-                        </select>
+                            ⚙ Advanced
+                            <span className="text-[10px]">
+                                {showAdvanced
+                                    ? '▲'
+                                    : '▼'}
+                            </span>
+                        </button>
 
                         <button
                             type="button"
-                            onClick={
-                                clearFilters
+                            onClick={() =>
+                                window.print()
                             }
-                            className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                        >
+                            ⇩ Export
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={clearFilters}
+                            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
                         >
                             Clear
                         </button>
                     </div>
+
+                    {showAdvanced && (
+                        <div className="mt-4 border-t border-slate-200 pt-4">
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                                <FilterField label="Status">
+                                    <select
+                                        value={
+                                            filters.status ??
+                                            ''
+                                        }
+                                        onChange={(event) =>
+                                            updateFilter({
+                                                status:
+                                                    event
+                                                        .target
+                                                        .value,
+                                            })
+                                        }
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-violet-500"
+                                    >
+                                        <option value="">
+                                            All Statuses
+                                        </option>
+                                        <option value="draft">
+                                            Draft
+                                        </option>
+                                        <option value="submitted">
+                                            Under Review
+                                        </option>
+                                        <option value="approved">
+                                            Approved
+                                        </option>
+                                        <option value="processing">
+                                            Processing
+                                        </option>
+                                        <option value="delivered">
+                                            Delivered
+                                        </option>
+                                        <option value="live">
+                                            Live
+                                        </option>
+                                        <option value="rejected">
+                                            Rejected
+                                        </option>
+                                        <option value="takedown_requested">
+                                            Takedown Requested
+                                        </option>
+                                        <option value="taken_down">
+                                            Taken Down
+                                        </option>
+                                    </select>
+                                </FilterField>
+
+                                <FilterField label="Product Type">
+                                    <select
+                                        value={
+                                            filters.product_type ??
+                                            ''
+                                        }
+                                        onChange={(event) =>
+                                            updateFilter({
+                                                product_type:
+                                                    event
+                                                        .target
+                                                        .value,
+                                            })
+                                        }
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-violet-500"
+                                    >
+                                        <option value="">
+                                            All Types
+                                        </option>
+                                        <option value="single">
+                                            Single
+                                        </option>
+                                        <option value="ep">
+                                            EP
+                                        </option>
+                                        <option value="album">
+                                            Album
+                                        </option>
+                                    </select>
+                                </FilterField>
+
+                                <FilterField label="Label">
+                                    <input
+                                        type="text"
+                                        value={
+                                            filters.label ??
+                                            ''
+                                        }
+                                        placeholder="All labels"
+                                        onChange={(event) =>
+                                            updateFilter({
+                                                label:
+                                                    event
+                                                        .target
+                                                        .value,
+                                            })
+                                        }
+                                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
+                                    />
+                                </FilterField>
+
+                                <FilterField label="Artist">
+                                    <input
+                                        type="text"
+                                        value={
+                                            filters.artist ??
+                                            ''
+                                        }
+                                        placeholder="All artists"
+                                        onChange={(event) =>
+                                            updateFilter({
+                                                artist:
+                                                    event
+                                                        .target
+                                                        .value,
+                                            })
+                                        }
+                                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
+                                    />
+                                </FilterField>
+
+                                <FilterField label="From">
+                                    <input
+                                        type="date"
+                                        value={
+                                            filters.date_from ??
+                                            ''
+                                        }
+                                        onChange={(event) =>
+                                            updateFilter({
+                                                date_from:
+                                                    event
+                                                        .target
+                                                        .value,
+                                            })
+                                        }
+                                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
+                                    />
+                                </FilterField>
+
+                                <FilterField label="To">
+                                    <input
+                                        type="date"
+                                        value={
+                                            filters.date_to ??
+                                            ''
+                                        }
+                                        onChange={(event) =>
+                                            updateFilter({
+                                                date_to:
+                                                    event
+                                                        .target
+                                                        .value,
+                                            })
+                                        }
+                                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
+                                    />
+                                </FilterField>
+                            </div>
+
+                            <div className="mt-3 flex justify-end">
+                                <select
+                                    value={
+                                        filters.sort ??
+                                        'latest'
+                                    }
+                                    onChange={(event) =>
+                                        updateFilter({
+                                            sort:
+                                                event.target
+                                                    .value,
+                                        })
+                                    }
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                                >
+                                    <option value="latest">
+                                        Latest Added
+                                    </option>
+                                    <option value="oldest">
+                                        Oldest Added
+                                    </option>
+                                    <option value="title_asc">
+                                        Title A–Z
+                                    </option>
+                                    <option value="title_desc">
+                                        Title Z–A
+                                    </option>
+                                    <option value="release_date">
+                                        Release Date
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    )}
                 </section>
 
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -570,70 +664,15 @@ export default function Index({
                             </p>
                         </div>
 
-                        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setViewMode(
-                                        'table'
-                                    )
-                                }
-                                className={[
-                                    'rounded-lg px-4 py-2 text-xs font-bold transition',
-                                    viewMode ===
-                                    'table'
-                                        ? 'bg-white text-violet-700 shadow-sm'
-                                        : 'text-slate-500 hover:text-slate-800',
-                                ].join(
-                                    ' '
-                                )}
-                            >
-                                ☷ Table
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setViewMode(
-                                        'grid'
-                                    )
-                                }
-                                className={[
-                                    'rounded-lg px-4 py-2 text-xs font-bold transition',
-                                    viewMode ===
-                                    'grid'
-                                        ? 'bg-white text-violet-700 shadow-sm'
-                                        : 'text-slate-500 hover:text-slate-800',
-                                ].join(
-                                    ' '
-                                )}
-                            >
-                                ▦ Grid
-                            </button>
+                        <div className="text-xs font-semibold text-slate-500">
+                            50 releases per page
                         </div>
                     </div>
 
                     {rows.length > 0 ? (
-                        viewMode === 'grid' ? (
-                            <div className="grid gap-5 p-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                                {rows.map(
-                                    (item) => (
-                                        <CatalogueCard
-                                            key={
-                                                item.id
-                                            }
-                                            item={
-                                                item
-                                            }
-                                        />
-                                    )
-                                )}
-                            </div>
-                        ) : (
-                            <CatalogueTable
-                                rows={rows}
-                            />
-                        )
+                        <CatalogueTable
+                            rows={rows}
+                        />
                     ) : (
                         <EmptyState
                             clearFilters={
@@ -659,23 +698,23 @@ function CatalogueTable({
 }) {
     return (
         <div className="overflow-x-auto">
-            <table className="min-w-[1180px] w-full border-collapse">
+            <table className="w-full min-w-[1100px] border-collapse">
                 <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/80 text-left">
+                    <tr className="border-b border-slate-200 bg-slate-50/90 text-left">
                         <TableHeading>
                             Release
                         </TableHeading>
 
                         <TableHeading>
-                            Identifiers
+                            UPC / Catalogue
+                        </TableHeading>
+
+                        <TableHeading>
+                            Type
                         </TableHeading>
 
                         <TableHeading>
                             Tracks
-                        </TableHeading>
-
-                        <TableHeading>
-                            DSP Delivery
                         </TableHeading>
 
                         <TableHeading>
@@ -687,24 +726,18 @@ function CatalogueTable({
                         </TableHeading>
 
                         <TableHeading align="right">
-                            Action
+                            Actions
                         </TableHeading>
                     </tr>
                 </thead>
 
                 <tbody>
-                    {rows.map(
-                        (item) => (
-                            <CatalogueRow
-                                key={
-                                    item.id
-                                }
-                                item={
-                                    item
-                                }
-                            />
-                        )
-                    )}
+                    {rows.map((item) => (
+                        <CatalogueRow
+                            key={item.id}
+                            item={item}
+                        />
+                    ))}
                 </tbody>
             </table>
         </div>
@@ -714,39 +747,17 @@ function CatalogueTable({
 function CatalogueRow({
     item,
 }) {
-    const delivery =
-        item.delivery_summary ?? {};
-
-    const totalDelivery =
-        Number(delivery.total ?? 0);
-
-    const liveDelivery =
-        Number(delivery.live ?? 0);
-
-    const deliveryPercent =
-        totalDelivery > 0
-            ? Math.min(
-                  100,
-                  Math.round(
-                      (liveDelivery /
-                          totalDelivery) *
-                          100
-                  )
-              )
-            : 0;
-
-    const artwork =
-        artworkUrl(
-            item.artwork_path
-        );
+    const artwork = artworkUrl(
+        item.artwork_path
+    );
 
     return (
-        <tr className="group border-b border-slate-100 transition last:border-b-0 hover:bg-violet-50/30">
-            <td className="px-5 py-4">
-                <div className="flex min-w-[300px] items-center gap-4">
+        <tr className="group border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50/80">
+            <td className="px-5 py-3">
+                <div className="flex min-w-[310px] items-center gap-3">
                     <Link
                         href={`/v2/catalogue/${item.id}`}
-                        className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm"
+                        className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm"
                     >
                         {artwork ? (
                             <img
@@ -755,10 +766,10 @@ function CatalogueRow({
                                     item.title ??
                                     'Release artwork'
                                 }
-                                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                                className="h-full w-full object-cover"
                             />
                         ) : (
-                            <div className="flex h-full w-full items-center justify-center text-2xl text-slate-300">
+                            <div className="flex h-full w-full items-center justify-center text-xl text-slate-300">
                                 ♪
                             </div>
                         )}
@@ -767,122 +778,81 @@ function CatalogueRow({
                     <div className="min-w-0">
                         <Link
                             href={`/v2/catalogue/${item.id}`}
-                            className="block max-w-[230px] truncate text-sm font-bold text-slate-900 transition hover:text-violet-700"
+                            className="block max-w-[260px] truncate text-sm font-bold text-slate-900 transition hover:text-violet-700"
                         >
                             {item.title ??
                                 'Untitled Release'}
                         </Link>
 
-                        <p className="mt-1 max-w-[230px] truncate text-xs font-medium text-slate-500">
+                        <p className="mt-0.5 max-w-[260px] truncate text-xs font-medium text-slate-500">
                             {item.primary_artist_name ||
                                 'Unknown Artist'}
                         </p>
 
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                            {item.label_name && (
-                                <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
-                                    {
-                                        item.label_name
-                                    }
-                                </span>
-                            )}
-
-                            {item.release_type && (
-                                <span className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-semibold capitalize text-slate-500">
-                                    {
-                                        item.release_type
-                                    }
-                                </span>
-                            )}
-                        </div>
+                        {item.label_name && (
+                            <p className="mt-1 max-w-[260px] truncate text-[11px] text-slate-400">
+                                {item.label_name}
+                            </p>
+                        )}
                     </div>
                 </div>
             </td>
 
-            <td className="px-5 py-4">
-                <div className="min-w-[165px] space-y-3">
-                    <Identifier
-                        label="UPC"
-                        value={
-                            item.upc
-                        }
-                    />
-
-                    <Identifier
-                        label="Catalogue"
-                        value={
-                            item.catalog_number
-                        }
-                    />
-                </div>
-            </td>
-
-            <td className="px-5 py-4">
-                <div className="min-w-[105px]">
-                    <div className="text-sm font-bold text-slate-900">
-                        {item.track_count ??
-                            0}
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-500">
-                        ISRC assigned
-                    </div>
-
-                    <div className="mt-1 text-xs font-bold text-violet-700">
-                        {item.isrc_assigned_count ??
-                            0}
-                        /
-                        {item.track_count ??
-                            0}
-                    </div>
-                </div>
-            </td>
-
-            <td className="px-5 py-4">
+            <td className="px-5 py-3">
                 <div className="min-w-[170px]">
-                    <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-slate-600">
-                            {
-                                liveDelivery
-                            }{' '}
-                            Live
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase text-slate-400">
+                            UPC
                         </span>
 
-                        <span className="font-bold text-slate-900">
-                            {
-                                deliveryPercent
-                            }
-                            %
+                        <span className="text-xs font-semibold text-slate-700">
+                            {item.upc || 'Pending'}
                         </span>
                     </div>
 
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                            className="h-full rounded-full bg-violet-600 transition-all"
-                            style={{
-                                width: `${deliveryPercent}%`,
-                            }}
-                        />
-                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase text-slate-400">
+                            CAT
+                        </span>
 
-                    <p className="mt-2 text-[11px] text-slate-500">
-                        {
-                            totalDelivery
-                        }{' '}
-                        total DSP deliveries
-                    </p>
+                        <span className="max-w-[130px] truncate text-xs text-slate-500">
+                            {item.catalog_number ||
+                                '—'}
+                        </span>
+                    </div>
                 </div>
             </td>
 
-            <td className="px-5 py-4">
-                <div className="min-w-[120px] text-sm font-semibold text-slate-700">
+            <td className="px-5 py-3">
+                <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-bold capitalize text-slate-600">
+                    {item.release_type ||
+                        'Single'}
+                </span>
+            </td>
+
+            <td className="px-5 py-3">
+                <div className="text-sm font-bold text-slate-900">
+                    {item.track_count ?? 0}
+                </div>
+
+                <div className="mt-0.5 text-[10px] text-slate-400">
+                    {item.isrc_assigned_count ??
+                        0}
+                    /
+                    {item.track_count ?? 0}{' '}
+                    ISRC
+                </div>
+            </td>
+
+            <td className="px-5 py-3">
+                <span className="whitespace-nowrap text-xs font-semibold text-slate-700">
                     {formatDate(
                         item.digital_release_date
                     )}
-                </div>
+                </span>
             </td>
 
-            <td className="px-5 py-4">
+            <td className="px-5 py-3">
                 <StatusBadge
                     status={
                         item.release_status
@@ -890,13 +860,26 @@ function CatalogueRow({
                 />
             </td>
 
-            <td className="px-5 py-4 text-right">
-                <Link
-                    href={`/v2/catalogue/${item.id}`}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
-                >
-                    View Details →
-                </Link>
+            <td className="px-5 py-3">
+                <div className="flex items-center justify-end gap-1.5">
+                    <Link
+                        href={`/v2/catalogue/${item.id}`}
+                        title="View release"
+                        aria-label="View release"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-base text-slate-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                    >
+                        ◉
+                    </Link>
+
+                    <Link
+                        href={`/v2/catalogue/${item.id}`}
+                        title="Release details"
+                        aria-label="Release details"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm text-slate-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                    >
+                        ⋮
+                    </Link>
+                </div>
             </td>
         </tr>
     );
@@ -1126,6 +1109,21 @@ function MiniStat({
                 {value}
             </div>
         </div>
+    );
+}
+
+function FilterField({
+    label,
+    children,
+}) {
+    return (
+        <label className="block">
+            <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                {label}
+            </span>
+
+            {children}
+        </label>
     );
 }
 
