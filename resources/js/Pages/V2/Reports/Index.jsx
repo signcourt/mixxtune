@@ -196,16 +196,38 @@ function ReportTable({
                                                     />
                                                 </a>
 
-                                                <button
-                                                    type="button"
-                                                    title="PDF export will be added next"
-                                                    disabled
-                                                    className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 text-slate-300"
+                                                <a
+                                                    href={
+                                                        report.status ===
+                                                        'completed'
+                                                            ? `/v2/generated-reports/${report.id}/pdf`
+                                                            : undefined
+                                                    }
+                                                    title="Download PDF"
+                                                    aria-disabled={
+                                                        report.status !==
+                                                        'completed'
+                                                    }
+                                                    onClick={(event) => {
+                                                        if (
+                                                            report.status !==
+                                                            'completed'
+                                                        ) {
+                                                            event.preventDefault();
+                                                        }
+                                                    }}
+                                                    className={[
+                                                        'inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200',
+                                                        report.status ===
+                                                        'completed'
+                                                            ? 'text-slate-600 hover:bg-slate-50'
+                                                            : 'cursor-not-allowed text-slate-300',
+                                                    ].join(' ')}
                                                 >
                                                     <FileText
                                                         size={16}
                                                     />
-                                                </button>
+                                                </a>
 
                                                 <button
                                                     type="button"
@@ -228,25 +250,59 @@ function ReportTable({
                                             </>
                                         ) : (
                                             <>
-                                                <button
-                                                    type="button"
-                                                    title="Download CSV / Excel"
-                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                                                >
-                                                    <Download
-                                                        size={16}
-                                                    />
-                                                </button>
+                                                {periodToMonth(
+                                                    report.period
+                                                ) ? (
+                                                    <>
+                                                        <a
+                                                            href={`/v2/reports/automatic/${periodToMonth(
+                                                                report.period
+                                                            )}/download`}
+                                                            title="Download Excel"
+                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                                        >
+                                                            <Download
+                                                                size={16}
+                                                            />
+                                                        </a>
 
-                                                <button
-                                                    type="button"
-                                                    title="Download PDF"
-                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                                                >
-                                                    <FileText
-                                                        size={16}
-                                                    />
-                                                </button>
+                                                        <a
+                                                            href={`/v2/reports/automatic/${periodToMonth(
+                                                                report.period
+                                                            )}/pdf`}
+                                                            title="Download PDF"
+                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                                        >
+                                                            <FileText
+                                                                size={16}
+                                                            />
+                                                        </a>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            disabled
+                                                            title="Invalid reporting period"
+                                                            className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 text-slate-300"
+                                                        >
+                                                            <Download
+                                                                size={16}
+                                                            />
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            disabled
+                                                            title="Invalid reporting period"
+                                                            className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 text-slate-300"
+                                                        >
+                                                            <FileText
+                                                                size={16}
+                                                            />
+                                                        </button>
+                                                    </>
+                                                )}
                                             </>
                                         )}
                                     </div>
@@ -258,6 +314,48 @@ function ReportTable({
             </div>
         </div>
     );
+}
+
+function periodToMonth(period) {
+    if (!period) {
+        return null;
+    }
+
+    const match = String(period)
+        .trim()
+        .match(
+            /^([A-Za-z]+)\s+(\d{4})$/
+        );
+
+    if (!match) {
+        return null;
+    }
+
+    const months = {
+        january: '01',
+        february: '02',
+        march: '03',
+        april: '04',
+        may: '05',
+        june: '06',
+        july: '07',
+        august: '08',
+        september: '09',
+        october: '10',
+        november: '11',
+        december: '12',
+    };
+
+    const month =
+        months[
+            match[1].toLowerCase()
+        ];
+
+    if (!month) {
+        return null;
+    }
+
+    return `${match[2]}-${month}`;
 }
 
 function StepHeader({ step, currentStep, title }) {

@@ -2189,6 +2189,31 @@ Route::middleware(['auth'])->group(function () {
         [GeneratedReportController::class, 'download']
     )->name('v2.generated-reports.download');
 
+    Route::get(
+        '/v2/generated-reports/{publicId}/pdf',
+        [GeneratedReportController::class, 'pdf']
+    )->name('v2.generated-reports.pdf');
+
+    Route::get(
+        '/v2/reports/automatic/{month}/download',
+        [GeneratedReportController::class, 'automaticDownload']
+    )
+        ->where(
+            'month',
+            '\\d{4}-\\d{2}'
+        )
+        ->name('v2.reports.automatic.download');
+
+    Route::get(
+        '/v2/reports/automatic/{month}/pdf',
+        [GeneratedReportController::class, 'automaticPdf']
+    )
+        ->where(
+            'month',
+            '\\d{4}-\\d{2}'
+        )
+        ->name('v2.reports.automatic.pdf');
+
     Route::delete(
         '/v2/generated-reports/{publicId}',
         [GeneratedReportController::class, 'destroy']
