@@ -560,8 +560,7 @@ class GeneratedReportService
                     $row->label_id
                         ? (int) $row->label_id
                         : null,
-                    $row->sale_date
-                        ?? null
+                    $this->shareResolutionDate($row)
                 );
 
             $percent =
@@ -621,8 +620,7 @@ class GeneratedReportService
                         'artist',
                         (int) $row->artist_id,
                         (int) $row->label_id,
-                        $row->sale_date
-                            ?? null
+                        $this->shareResolutionDate($row)
                     );
             }
 
@@ -674,6 +672,42 @@ class GeneratedReportService
             'share' => 100.0,
             'net' => $gross,
         ];
+    }
+
+    private function shareResolutionDate(
+        $row
+    ): ?string {
+        /*
+         * Revenue-share contracts are resolved
+         * on reporting-month basis.
+         *
+         * Example:
+         * sale_date      = 2026-08-01
+         * sale_month     = 2026-08
+         * effective_from = 2026-08-11
+         *
+         * The August share must apply to the
+         * August royalty period, so resolve
+         * against the final day of sale_month.
+         */
+        if (!empty($row->sale_month)) {
+            return Carbon::createFromFormat(
+                '!Y-m',
+                (string) $row->sale_month
+            )
+                ->endOfMonth()
+                ->toDateString();
+        }
+
+        if (!empty($row->sale_date)) {
+            return Carbon::parse(
+                $row->sale_date
+            )
+                ->endOfMonth()
+                ->toDateString();
+        }
+
+        return null;
     }
 
     private function activeShare(
