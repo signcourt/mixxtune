@@ -231,18 +231,12 @@ export default function Index({
                             <div className="border-t border-slate-100">
                                 <div className="flex flex-wrap gap-3 px-6 py-4 sm:px-8 lg:px-10">
                                     <Link
-                                        href="/v2/invoices"
+                                        href="/v2/withdrawals"
                                         className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                                     >
                                         View invoices
                                     </Link>
 
-                                    <Link
-                                        href="/v2/withdrawals"
-                                        className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                                    >
-                                        Payment requests
-                                    </Link>
                                 </div>
 
                                 <div className="overflow-x-auto border-t border-slate-100">
