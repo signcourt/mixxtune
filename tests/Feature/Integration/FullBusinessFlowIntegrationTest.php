@@ -680,10 +680,64 @@ class FullBusinessFlowIntegrationTest extends TestCase
         ]);
 
         /*
+         * Invoice generation requires a valid company billing
+         * identity. Production receives these values from the
+         * System Settings module; this integration test provides
+         * isolated test-only configuration.
+         */
+        \Illuminate\Support\Facades\DB::table(
+            'system_settings'
+        )->insert([
+            [
+                'group' => 'company',
+                'key' => 'company.legal_name',
+                'value' => 'Mixx Tune Test Company',
+                'type' => 'string',
+                'is_public' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'group' => 'company',
+                'key' => 'company.address',
+                'value' => 'Test Billing Address',
+                'type' => 'string',
+                'is_public' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'group' => 'invoice',
+                'key' => 'invoice.gst_percent',
+                'value' => '18',
+                'type' => 'decimal',
+                'is_public' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'group' => 'invoice',
+                'key' => 'invoice.tds_percent',
+                'value' => '10',
+                'type' => 'decimal',
+                'is_public' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        /*
          * =========================================================
          * 18. CREATE WITHDRAWAL
          * =========================================================
          */
+
+        $wallet->update([
+            'available_balance' => 5300,
+            'lifetime_credits' => 5300,
+        ]);
+
+        $wallet->refresh();
 
         $withdrawalService =
             app(WithdrawalService::class);
@@ -692,7 +746,7 @@ class FullBusinessFlowIntegrationTest extends TestCase
             $withdrawalService
                 ->create(
                     $artistUser,
-                    1500,
+                    5000,
                     'bank',
                     'Full business flow withdrawal.'
                 );
@@ -711,7 +765,7 @@ class FullBusinessFlowIntegrationTest extends TestCase
         );
 
         $this->assertEquals(
-            1500,
+            5000,
             (float) $wallet
                 ->pending_balance
         );
@@ -776,7 +830,7 @@ class FullBusinessFlowIntegrationTest extends TestCase
         );
 
         $this->assertEquals(
-            1500,
+            5000,
             (float) $wallet
                 ->lifetime_debits
         );

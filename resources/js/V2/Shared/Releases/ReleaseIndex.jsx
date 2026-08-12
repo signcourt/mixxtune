@@ -115,7 +115,7 @@ export default function ReleaseIndex({
         `mixxtune-release-view:${role}:${accountId}`;
 
     const [viewMode, setViewMode] =
-        useState('grid');
+        useState('list');
 
     const [searchValue, setSearchValue] =
         useState(filters.search ?? '');
@@ -559,15 +559,19 @@ export default function ReleaseIndex({
                                 <thead className="bg-slate-50">
                                     <tr className="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
                                             <th className="px-5 py-4">
+                                                Release
+                                            </th>
+
+                                            <th className="px-5 py-4">
+                                                Artist
+                                            </th>
+
+                                            <th className="px-5 py-4">
                                                 Tracks
                                             </th>
 
                                             <th className="px-5 py-4">
                                                 Status
-                                            </th>
-
-                                            <th className="px-5 py-4">
-                                                Release
                                             </th>
 
                                             <th className="px-5 py-4">
@@ -579,7 +583,7 @@ export default function ReleaseIndex({
                                             </th>
 
                                             <th className="px-5 py-4 text-right">
-                                                Action
+                                                Actions
                                             </th>
                                         </tr>
                                 </thead>
@@ -803,9 +807,35 @@ function ReleaseRow({
         0
     );
 
-    const openPath = editable
-        ? `${basePath}/${release.id}/edit`
-        : `${basePath}/${release.id}`;
+    const artwork =
+        release.artwork_url
+        || release.artwork_path
+        || release.cover_art_url
+        || release.cover_art_path
+        || release.cover_path
+        || null;
+
+    const artworkSrc =
+        artwork
+            ? (
+                String(artwork).startsWith('http://')
+                || String(artwork).startsWith('https://')
+                || String(artwork).startsWith('/')
+                    ? artwork
+                    : `/storage/${artwork}`
+            )
+            : null;
+
+    const displayReleaseDate =
+        release.digital_release_date
+        || release.original_release_date
+        || null;
+
+    const viewPath =
+        `${basePath}/${release.id}`;
+
+    const editPath =
+        `${basePath}/${release.id}/edit`;
 
     const deleteDraft = () => {
         if (!isDraft) {
@@ -830,7 +860,68 @@ function ReleaseRow({
 
     return (
         <tr className="transition hover:bg-slate-50">
-            <td className="px-5 py-4">
+            <td className="px-5 py-3.5">
+                <div className="flex min-w-[290px] items-center gap-3">
+                    <Link
+                        href={viewPath}
+                        className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm"
+                    >
+                        {artworkSrc ? (
+                            <img
+                                src={artworkSrc}
+                                alt={
+                                    release.title
+                                    || 'Release artwork'
+                                }
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                            />
+                        ) : (
+                            <span className="text-2xl text-violet-600">
+                                ♫
+                            </span>
+                        )}
+                    </Link>
+
+                    <div className="min-w-0">
+                        <Link
+                            href={viewPath}
+                            className="block max-w-[260px] truncate text-sm font-semibold text-slate-900 transition hover:text-violet-700"
+                        >
+                            {release.title
+                                || 'Untitled Release'}
+                        </Link>
+
+                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                            <span className="capitalize">
+                                {release.release_type
+                                    || 'Single'}
+                            </span>
+
+                            {release.label_name && (
+                                <>
+                                    <span>·</span>
+
+                                    <span className="max-w-[150px] truncate">
+                                        {release.label_name}
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </td>
+
+            <td className="px-5 py-3.5">
+                <div className="min-w-[150px]">
+                    <div className="max-w-[190px] truncate text-sm font-medium text-slate-700">
+                        {release.primary_artist_name
+                            || 'Artist'}
+                    </div>
+                </div>
+            </td>
+
+            <td className="px-5 py-3.5">
                 <div className="inline-flex items-center gap-2 whitespace-nowrap">
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-sm text-violet-600">
                         ♫
@@ -846,89 +937,53 @@ function ReleaseRow({
                 </div>
             </td>
 
-            <td className="px-5 py-4">
+            <td className="px-5 py-3.5">
                 <StatusBadge
                     status={status}
                 />
             </td>
 
-            <td className="px-5 py-4">
-                <div className="flex items-center gap-4">
-                    <Link
-                        href={openPath}
-                        className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100"
-                    >
-                        {release.artwork_path ? (
-                            <img
-                                src={`/storage/${release.artwork_path}`}
-                                alt={release.title}
-                                className="h-full w-full object-cover"
-                            />
-                        ) : (
-                            <span className="text-2xl text-violet-600">
-                                ♫
-                            </span>
-                        )}
-                    </Link>
+            <td className="px-5 py-3.5">
+                <span className="whitespace-nowrap text-sm text-slate-600">
+                    {displayReleaseDate
+                        ? formatDate(
+                            displayReleaseDate
+                        )
+                        : 'Not scheduled'}
+                </span>
+            </td>
 
-                    <div className="min-w-0">
-                        <Link
-                            href={openPath}
-                            className="block max-w-64 truncate font-semibold text-slate-900 transition hover:text-violet-700"
-                        >
-                            {release.title
-                                || 'Untitled Release'}
-                        </Link>
+            <td className="px-5 py-3.5">
+                <div className="min-w-[130px]">
+                    <span className="whitespace-nowrap text-sm font-medium text-slate-700">
+                        {release.upc
+                            || 'Pending'}
+                    </span>
 
-                        <div className="mt-1 max-w-64 truncate text-sm text-slate-500">
-                            {release.primary_artist_name
-                                || 'Artist'}
-
-                            {' · '}
-
-                            {release.release_type
-                                || 'release'}
-                        </div>
-                    </div>
                 </div>
             </td>
 
-            <td className="px-5 py-4 text-sm text-slate-600">
-                {formatDate(
-                    release.digital_release_date
-                )}
-            </td>
-
-            <td className="px-5 py-4 text-sm font-medium text-slate-600">
-                {release.upc || 'Pending'}
-            </td>
-
-            <td className="px-5 py-4">
-                <div className="flex items-center justify-end gap-2">
+            <td className="px-5 py-3.5">
+                <div className="flex items-center justify-end gap-1.5">
                     <Link
-                        href={openPath}
-                        title={
-                            editable
-                                ? 'Edit release'
-                                : 'View release'
-                        }
-                        aria-label={
-                            editable
-                                ? 'Edit release'
-                                : 'View release'
-                        }
-                        className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                            editable
-                                ? 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
-                                : 'border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700'
-                        }`}
+                        href={viewPath}
+                        title="View release"
+                        aria-label="View release"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
                     >
-                        {editable ? (
-                            <PencilIcon />
-                        ) : (
-                            <EyeIcon />
-                        )}
+                        <EyeIcon />
                     </Link>
+
+                    {editable && (
+                        <Link
+                            href={editPath}
+                            title="Edit release"
+                            aria-label="Edit release"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700 transition hover:bg-violet-100"
+                        >
+                            <PencilIcon />
+                        </Link>
+                    )}
 
                     {isDraft && (
                         <button

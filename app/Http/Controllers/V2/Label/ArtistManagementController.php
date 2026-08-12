@@ -731,7 +731,7 @@ class ArtistManagementController extends Controller
             ->count();
 
         $wallet = DB::table(
-            'wallet_accounts'
+            'wallets'
         )
             ->where(
                 'user_id',
@@ -748,7 +748,7 @@ class ArtistManagementController extends Controller
                 ->count();
 
         $withdrawalCount =
-            DB::table('withdrawal_requests')
+            DB::table('withdrawals')
                 ->where(
                     'user_id',
                     $user->id

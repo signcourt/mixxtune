@@ -347,6 +347,7 @@ export default function Show({
 
                                                 <Cell>
                                                     {release.digital_release_date
+                                                        ?? release.original_release_date
                                                         ?? 'Not set'}
                                                 </Cell>
                                             </tr>

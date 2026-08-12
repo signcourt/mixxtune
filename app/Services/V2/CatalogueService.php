@@ -159,6 +159,10 @@ class CatalogueService
                                     $release
                                         ->digital_release_date,
 
+                                'original_release_date' =>
+                                    $release
+                                        ->original_release_date,
+
                                 'release_status' =>
                                     $release->status,
 

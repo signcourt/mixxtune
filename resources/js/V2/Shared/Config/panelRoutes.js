@@ -110,6 +110,8 @@ export const PANEL_ROUTES = {
 
         withdrawals: "/v2/admin/withdrawals",
 
+        kycReviews: "/v2/admin/kyc",
+
         support: "/v2/admin/support",
 
         notifications: "/v2/notifications",
@@ -162,6 +164,8 @@ export const PANEL_ROUTES = {
         wallet: "/v2/admin/wallet",
 
         withdrawals: "/v2/admin/withdrawals",
+
+        kycReviews: "/v2/admin/kyc",
 
         support: "/v2/admin/support",
 

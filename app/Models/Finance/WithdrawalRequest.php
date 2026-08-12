@@ -77,6 +77,14 @@ class WithdrawalRequest extends Model
         );
     }
 
+    public function invoice()
+    {
+        return $this->hasOne(
+            Invoice::class,
+            'withdrawal_id'
+        );
+    }
+
     public function getRequestNumberAttribute(): ?string
     {
         return $this->withdrawal_number;

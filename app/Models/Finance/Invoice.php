@@ -2,6 +2,8 @@
 
 namespace App\Models\Finance;
 
+use App\Models\Finance\WithdrawalRequest;
+
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
@@ -61,4 +63,13 @@ class Invoice extends Model
             InvoiceItem::class
         );
     }
+
+    public function withdrawal()
+    {
+        return $this->belongsTo(
+            WithdrawalRequest::class,
+            'withdrawal_id'
+        );
+    }
+
 }

@@ -18,6 +18,50 @@ class WithdrawalWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        DB::table('system_settings')->insert([
+            [
+                'group' => 'company',
+                'key' => 'company.legal_name',
+                'value' => 'Test Distribution Company',
+                'type' => 'string',
+                'is_public' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'group' => 'company',
+                'key' => 'company.address',
+                'value' => 'Test Company Address',
+                'type' => 'string',
+                'is_public' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'group' => 'invoice',
+                'key' => 'invoice.gst_percent',
+                'value' => '18',
+                'type' => 'decimal',
+                'is_public' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'group' => 'invoice',
+                'key' => 'invoice.tds_percent',
+                'value' => '10',
+                'type' => 'decimal',
+                'is_public' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+    }
+
     private function service(): WithdrawalService
     {
         return app(WithdrawalService::class);
@@ -830,7 +874,7 @@ class WithdrawalWorkflowTest extends TestCase
         );
     }
 
-    public function test_mark_paid_posts_hold_and_creates_paid_transaction(): void
+    public function test_mark_paid_posts_existing_hold_without_second_debit(): void
     {
         [
             ,
@@ -869,6 +913,12 @@ class WithdrawalWorkflowTest extends TestCase
                 'transaction_type' =>
                     'withdrawal_hold',
 
+                'direction' =>
+                    'debit',
+
+                'reference_type' =>
+                    'withdrawal',
+
                 'reference_id' =>
                     $withdrawal->id,
 
@@ -877,7 +927,7 @@ class WithdrawalWorkflowTest extends TestCase
             ]
         );
 
-        $this->assertDatabaseHas(
+        $this->assertDatabaseMissing(
             'wallet_transactions',
             [
                 'wallet_id' =>
@@ -886,19 +936,16 @@ class WithdrawalWorkflowTest extends TestCase
                 'transaction_type' =>
                     'withdrawal_paid',
 
-                'direction' =>
-                    'debit',
+                'reference_type' =>
+                    'withdrawal',
 
                 'reference_id' =>
                     $withdrawal->id,
-
-                'status' =>
-                    'posted',
             ]
         );
 
         $this->assertSame(
-            2,
+            1,
             WalletTransaction::query()
                 ->where(
                     'wallet_id',

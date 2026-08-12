@@ -97,12 +97,6 @@ const releaseChildren = (
             href: routes.releasesAll,
         },
         {
-            id: 'releases-live',
-            label: 'Live on Stores',
-            href: routes.releasesLive,
-            queryStatus: 'live',
-        },
-        {
             id: 'releases-review',
             label: 'In Review',
             href: routes.releasesReview,
@@ -136,6 +130,58 @@ const ownerNavigation = (
             permission: 'dashboard.view',
             exact: true,
         },
+        {
+            id: 'create-release',
+            label: 'Create Release',
+            icon: icons.createRelease,
+            href: routes.createRelease,
+            permission: 'releases.create',
+        },
+        {
+            id: 'releases',
+            label:
+                role === 'artist'
+                    ? 'My Releases'
+                    : 'Releases',
+            icon: icons.releases,
+            href: routes.releases,
+            permission: 'releases.view',
+            children: releaseChildren(
+                routes,
+                role
+            ),
+        },
+        {
+            id: 'financial',
+            label: 'Financial',
+            icon: icons.wallet,
+            children: [
+                {
+                    id: 'financial-wallet',
+                    label: 'Wallet',
+                    href: routes.wallet,
+                    permission: 'wallet.view',
+                },
+                {
+                    id: 'financial-royalties',
+                    label: 'Royalties',
+                    href: routes.royalties,
+                    permission: 'royalties.view',
+                },
+                {
+                    id: 'financial-withdrawals',
+                    label: 'Withdrawals',
+                    href: routes.withdrawals,
+                    permission: 'withdrawals.view',
+                },
+                {
+                    id: 'financial-reports',
+                    label: 'Reports',
+                    href: routes.reports,
+                    permission: 'reports.view',
+                },
+            ],
+        },
     ];
 
     if (role === 'label') {
@@ -164,62 +210,6 @@ const ownerNavigation = (
     }
 
     items.push(
-        {
-            id: 'releases',
-            label:
-                role === 'artist'
-                    ? 'My Releases'
-                    : 'Releases',
-            icon: icons.releases,
-            href: routes.releases,
-            permission: 'releases.view',
-            children: releaseChildren(
-                routes,
-                role
-            ),
-        },
-        {
-            id: 'create-release',
-            label: 'Create Release',
-            icon: icons.createRelease,
-            href: routes.createRelease,
-            permission: 'releases.create',
-        },
-        {
-            id: 'catalogue',
-            label: 'Catalogue',
-            icon: icons.catalogue,
-            href: routes.catalogue,
-            permission: 'catalogue.view',
-        },
-        {
-            id: 'royalties',
-            label: 'Royalties',
-            icon: icons.royalties,
-            href: routes.royalties,
-            permission: 'royalties.view',
-        },
-        {
-            id: 'wallet',
-            label: 'Wallet',
-            icon: icons.wallet,
-            href: routes.wallet,
-            permission: 'wallet.view',
-        },
-        {
-            id: 'withdrawals',
-            label: 'Withdrawals',
-            icon: icons.withdrawals,
-            href: routes.withdrawals,
-            permission: 'withdrawals.view',
-        },
-        {
-            id: 'reports',
-            label: 'Reports',
-            icon: icons.reports,
-            href: routes.reports,
-            permission: 'reports.view',
-        },
         {
             id: 'kyc-profile',
             label: 'KYC & Profile',
@@ -407,6 +397,13 @@ const adminNavigation = (
             label: 'Withdraw Requests',
             icon: icons.withdrawals,
             href: routes.withdrawals,
+            permission: 'withdrawals.manage',
+        },
+        {
+            id: 'kyc-reviews',
+            label: 'KYC Reviews',
+            icon: icons.kyc,
+            href: routes.kycReviews,
             permission: 'withdrawals.manage',
         },
         {

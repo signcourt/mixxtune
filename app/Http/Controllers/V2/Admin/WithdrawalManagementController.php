@@ -219,6 +219,98 @@ class WithdrawalManagementController extends Controller
         );
     }
 
+    public function kycIndex(
+        Request $request,
+        PermissionService $permissions
+    ): Response {
+        $this->authorizeAdmin(
+            $request,
+            $permissions
+        );
+
+        $status = trim(
+            (string) $request->input(
+                'status',
+                'submitted'
+            )
+        );
+
+        $allowedStatuses = [
+            'submitted',
+            'verified',
+            'rejected',
+        ];
+
+        if (
+            $status !== '' &&
+            !in_array(
+                $status,
+                $allowedStatuses,
+                true
+            )
+        ) {
+            $status = 'submitted';
+        }
+
+        $query = PayoutProfile::query()
+            ->with([
+                'user:id,name,email',
+            ]);
+
+        if ($status !== '') {
+            $query->where(
+                'kyc_status',
+                $status
+            );
+        }
+
+        $countBase =
+            PayoutProfile::query();
+
+        return Inertia::render(
+            'V2/Admin/Kyc/Index',
+            [
+                'filters' => [
+                    'status' => $status,
+                ],
+
+                'counts' => [
+                    'submitted' =>
+                        (clone $countBase)
+                            ->where(
+                                'kyc_status',
+                                'submitted'
+                            )
+                            ->count(),
+
+                    'verified' =>
+                        (clone $countBase)
+                            ->where(
+                                'kyc_status',
+                                'verified'
+                            )
+                            ->count(),
+
+                    'rejected' =>
+                        (clone $countBase)
+                            ->where(
+                                'kyc_status',
+                                'rejected'
+                            )
+                            ->count(),
+                ],
+
+                'profiles' =>
+                    $query
+                        ->orderByDesc(
+                            'updated_at'
+                        )
+                        ->paginate(30)
+                        ->withQueryString(),
+            ]
+        );
+    }
+
     public function verifyKyc(
         Request $request,
         PayoutProfile $profile,

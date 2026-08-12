@@ -32,7 +32,7 @@ export default function Index({
     wallet = {},
     profile = null,
     withdrawals = {},
-    minimumAmount = 1000,
+    minimumAmount = 0,
 }) {
     const { flash = {} } = usePage().props;
 
@@ -54,7 +54,7 @@ export default function Index({
     );
 
     const minimum = Number(
-        minimumAmount ?? 1000
+        minimumAmount ?? 0
     );
 
     const profileExists = Boolean(profile);
@@ -468,6 +468,7 @@ export default function Index({
                                         'Method',
                                         'Status',
                                         'Reference',
+                                        'Document',
                                     ].map((heading) => (
                                         <th
                                             key={heading}
@@ -529,6 +530,39 @@ export default function Index({
                                             {item.payment_reference ||
                                                 '—'}
                                         </Cell>
+
+                                        <Cell>
+                                            {item.invoice ? (
+                                                <div className="flex min-w-[190px] flex-col items-start gap-2">
+                                                    <div>
+                                                        <p className="font-semibold text-slate-900">
+                                                            {
+                                                                item.invoice
+                                                                    .invoice_number
+                                                            }
+                                                        </p>
+
+                                                        <p className="mt-0.5 text-xs text-slate-500">
+                                                            {documentLabel(
+                                                                item.invoice
+                                                                    .invoice_type
+                                                            )}
+                                                        </p>
+                                                    </div>
+
+                                                    <a
+                                                        href={`/v2/invoices/${item.invoice.id}/download`}
+                                                        className="inline-flex items-center rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100"
+                                                    >
+                                                        Download PDF
+                                                    </a>
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-400">
+                                                    —
+                                                </span>
+                                            )}
+                                        </Cell>
                                     </tr>
                                 ))}
 
@@ -536,7 +570,7 @@ export default function Index({
                                     .length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan="6"
+                                            colSpan="7"
                                             className="px-6 py-14 text-center"
                                         >
                                             <p className="font-semibold text-slate-700">
@@ -631,6 +665,22 @@ function StatusBadge({ status }) {
             {normalized.replaceAll('_', ' ')}
         </span>
     );
+}
+
+function documentLabel(type) {
+    if (type === 'royalty_payment_statement') {
+        return 'Royalty Payment Statement';
+    }
+
+    if (type === 'gst_tax_invoice') {
+        return 'GST Tax Invoice';
+    }
+
+    if (type === 'tax_invoice') {
+        return 'Tax Invoice';
+    }
+
+    return 'Financial Document';
 }
 
 function formatDate(value) {

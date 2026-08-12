@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\V2\LabelAccess\LabelFinancialContextService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\WalletService;
+use App\Services\V2\WithdrawalService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -16,9 +17,11 @@ class WalletController extends Controller
         Request $request,
         PermissionService $permissions,
         WalletService $walletService,
-        LabelFinancialContextService $financialContext
+        LabelFinancialContextService $financialContext,
+        WithdrawalService $withdrawalService
     ): Response {
         $actor = $request->user();
+        $role = $permissions->role($actor);
 
         /*
          * Authorization is always evaluated against the
@@ -39,11 +42,27 @@ class WalletController extends Controller
             $financialOwner
         );
 
+
+        /*
+         * Use the same canonical minimum-withdrawal
+         * resolver as the withdrawal backend.
+         *
+         * For Label Team users, $financialOwner is the
+         * effective label owner.
+         */
+        $minimumWithdrawal =
+            $withdrawalService->minimumAmountFor(
+                $financialOwner
+            );
+
         return Inertia::render(
             'V2/Wallet/Index',
             [
                 'role' =>
-                    $permissions->role($actor),
+                    $role,
+
+                'minimumWithdrawal' =>
+                    $minimumWithdrawal,
 
                 'wallet' =>
                     $wallet,

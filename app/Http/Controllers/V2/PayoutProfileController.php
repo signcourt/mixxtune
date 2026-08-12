@@ -64,7 +64,8 @@ class PayoutProfileController extends Controller
             'ifsc_code' => [
                 'nullable',
                 'string',
-                'max:30',
+                'max:11',
+                'regex:/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/',
             ],
 
             'branch_name' => [
@@ -77,18 +78,21 @@ class PayoutProfileController extends Controller
                 'nullable',
                 'string',
                 'max:255',
+                'regex:/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$/',
             ],
 
             'pan_number' => [
                 'nullable',
                 'string',
-                'max:20',
+                'size:10',
+                'regex:/^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/',
             ],
 
             'gst_number' => [
                 'nullable',
                 'string',
-                'max:30',
+                'size:15',
+                'regex:/^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][1-9A-Za-z]Z[0-9A-Za-z]$/',
             ],
 
             'address_line_1' => [

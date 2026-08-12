@@ -2511,18 +2511,13 @@ $oldValues = [
                     }
                 
                     /*
-                     * KYC status remains controlled by the existing
-                     * Super Admin account-status/KYC-status workflow.
+                     * IMPORTANT:
+                     * payout_profiles.kyc_status is controlled only by
+                     * the dedicated KYC submission/review workflow.
+                     *
+                     * Editing a user must never reset Submitted,
+                     * Verified or Rejected payout KYC state.
                      */
-                    if (
-                        array_key_exists(
-                            'kyc_status',
-                            $validated
-                        )
-                    ) {
-                        $payoutData['kyc_status'] =
-                            $validated['kyc_status'];
-                    }
                 
                     \App\Models\Finance\PayoutProfile::query()
                         ->updateOrCreate(

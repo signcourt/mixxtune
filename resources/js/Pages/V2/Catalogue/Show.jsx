@@ -95,18 +95,12 @@ export default function Show({
                                     }
                                 />
 
-                                <Info
-                                    label="Catalogue Number"
-                                    value={
-                                        catalogueItem.catalog_number ||
-                                        '—'
-                                    }
-                                />
 
                                 <Info
                                     label="Release Date"
                                     value={
                                         catalogueItem.digital_release_date ||
+                                        catalogueItem.original_release_date ||
                                         '—'
                                     }
                                 />

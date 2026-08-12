@@ -706,7 +706,7 @@ function CatalogueTable({
                         </TableHeading>
 
                         <TableHeading>
-                            UPC / Catalogue
+                            UPC
                         </TableHeading>
 
                         <TableHeading>
@@ -810,16 +810,6 @@ function CatalogueRow({
                         </span>
                     </div>
 
-                    <div className="mt-1.5 flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase text-slate-400">
-                            CAT
-                        </span>
-
-                        <span className="max-w-[130px] truncate text-xs text-slate-500">
-                            {item.catalog_number ||
-                                '—'}
-                        </span>
-                    </div>
                 </div>
             </td>
 
@@ -847,7 +837,7 @@ function CatalogueRow({
             <td className="px-5 py-3">
                 <span className="whitespace-nowrap text-xs font-semibold text-slate-700">
                     {formatDate(
-                        item.digital_release_date
+                        item.digital_release_date || item.original_release_date
                     )}
                 </span>
             </td>
@@ -1019,7 +1009,7 @@ function CatalogueCard({
                 <div className="mt-4 flex items-center justify-between gap-3">
                     <span className="text-xs font-medium text-slate-500">
                         {formatDate(
-                            item.digital_release_date
+                            item.digital_release_date || item.original_release_date
                         )}
                     </span>
 

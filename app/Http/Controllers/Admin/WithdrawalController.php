@@ -547,39 +547,10 @@ class WithdrawalController extends Controller
                     'updated_at' => now(),
                 ]);
 
-            DB::table('wallet_transactions')->insert([
-                'public_id' => (string) Str::ulid(),
-                'wallet_id' => $wallet->id,
-                'user_id' => $withdrawal->user_id
-                    ?? $request->user()?->id
-                    ?? 1,
-                'artist_id' => $withdrawal->artist_id,
-                'label_id' => $withdrawal->label_id,
-                'transaction_type' => 'withdrawal_paid',
-                'direction' => 'debit',
-                'amount' => $amount,
-                'currency' => $withdrawal->currency,
-                'balance_before' => $available,
-                'balance_after' => $available,
-                'reference_type' => 'withdrawal',
-                'reference_id' => $withdrawal->id,
-                'description' => sprintf(
-                    'Withdrawal %s paid',
-                    $withdrawal->withdrawal_number
-                ),
-                'status' => 'posted',
-                'effective_at' => now(),
-                'posted_at' => now(),
-                'metadata' => json_encode([
-                    'withdrawal_number' =>
-                        $withdrawal->withdrawal_number,
-                    'payment_reference' =>
-                        $validated['payment_reference'],
-                ]),
-                'created_by' => $request->user()?->id,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            /*
+             * Settlement does not create a second monetary debit.
+             * withdrawal_hold remains the canonical wallet debit.
+             */
 
             DB::table('withdrawals')
                 ->where('id', $withdrawal->id)

@@ -171,7 +171,7 @@ export default function Index({ releases }) {
                                         </div>
 
                                         <div className="text-sm text-slate-600">
-                                            {formatDate(release.digital_release_date)}
+                                            {formatDate(release.digital_release_date || release.original_release_date)}
                                         </div>
 
                                         <div className="text-sm text-slate-600">
@@ -186,9 +186,6 @@ export default function Index({ releases }) {
                                                 UPC: {release.upc || 'empty'}
                                             </div>
 
-                                            <div className="mt-1 truncate">
-                                                Cat#: {release.catalog_number || 'empty'}
-                                            </div>
                                         </div>
 
                                         <div className="flex items-center justify-end gap-1">

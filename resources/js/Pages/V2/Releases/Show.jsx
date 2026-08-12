@@ -384,7 +384,7 @@ export default function Show({
                                 <Info
                                     label="Release Date"
                                     value={formatDate(
-                                        release.digital_release_date
+                                        release.digital_release_date || release.original_release_date
                                     )}
                                 />
 

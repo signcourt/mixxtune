@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\V2\GeneratedReportController;
+
 use App\Http\Controllers\Admin\AdminManagementController;
 use App\Http\Controllers\Admin\RevenueImportController;
 
@@ -1650,6 +1652,14 @@ Route::middleware(['auth', 'verified'])
 
 
 Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/admin/kyc',
+        [\App\Http\Controllers\V2\Admin\WithdrawalManagementController::class, 'kycIndex']
+    )
+    ->name('v2.admin.kyc.index');
+
+
+Route::middleware(['auth', 'verified'])
     ->post(
         '/v2/admin/kyc/{profile}/verify',
         [\App\Http\Controllers\V2\Admin\WithdrawalManagementController::class, 'verifyKyc']
@@ -2161,4 +2171,26 @@ Route::middleware('auth')->group(function () {
         '/v2/admin/notification-management',
         [NotificationManagementController::class, 'store']
     )->name('v2.admin.notification-management.store');
+});
+
+Route::middleware(['auth'])->group(function () {
+    Route::get(
+        '/v2/generated-reports',
+        [GeneratedReportController::class, 'index']
+    )->name('v2.generated-reports.index');
+
+    Route::post(
+        '/v2/generated-reports',
+        [GeneratedReportController::class, 'store']
+    )->name('v2.generated-reports.store');
+
+    Route::get(
+        '/v2/generated-reports/{publicId}/download',
+        [GeneratedReportController::class, 'download']
+    )->name('v2.generated-reports.download');
+
+    Route::delete(
+        '/v2/generated-reports/{publicId}',
+        [GeneratedReportController::class, 'destroy']
+    )->name('v2.generated-reports.destroy');
 });

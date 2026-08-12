@@ -2,6 +2,7 @@
 
 namespace App\Services\V2;
 
+use App\Services\Invoices\InvoiceGenerationService;
 use App\Models\Finance\PayoutProfile;
 use App\Models\Finance\WithdrawalRequest;
 use App\Models\User;
@@ -11,10 +12,11 @@ use Illuminate\Validation\ValidationException;
 
 class WithdrawalService
 {
-    public const MINIMUM_AMOUNT = 1000;
+    public const DEFAULT_MINIMUM_AMOUNT = 1000;
 
     public function __construct(
-        private readonly WalletService $walletService
+        private readonly WalletService $walletService,
+        private readonly InvoiceGenerationService $invoiceGenerationService
     ) {
     }
 
@@ -39,11 +41,21 @@ class WithdrawalService
 
         $amount = round($amount, 8);
 
-        if ($amount < self::MINIMUM_AMOUNT) {
+        $minimumAmount =
+            $this->minimumAmountFor(
+                $user
+            );
+
+        if ($amount < $minimumAmount) {
             throw ValidationException::withMessages([
                 'amount' =>
                     'Minimum withdrawal amount is ₹'
-                    . self::MINIMUM_AMOUNT
+                    . number_format(
+                        $minimumAmount,
+                        2,
+                        '.',
+                        ','
+                    )
                     . '.',
             ]);
         }
@@ -664,83 +676,12 @@ class WithdrawalService
                         now(),
                 ]);
 
-            DB::table('wallet_transactions')
-                ->insert([
-                    'public_id' =>
-                        (string) Str::ulid(),
-
-                    'wallet_id' =>
-                        $wallet->id,
-
-                    'user_id' =>
-                        $withdrawal->user_id,
-
-                    'artist_id' =>
-                        $withdrawal->artist_id,
-
-                    'label_id' =>
-                        $withdrawal->label_id,
-
-                    'transaction_type' =>
-                        'withdrawal_paid',
-
-                    'direction' =>
-                        'debit',
-
-                    'amount' =>
-                        $amount,
-
-                    'currency' =>
-                        $withdrawal->currency,
-
-                    'balance_before' =>
-                        (float) $wallet
-                            ->available_balance,
-
-                    'balance_after' =>
-                        (float) $wallet
-                            ->available_balance,
-
-                    'reference_type' =>
-                        'withdrawal',
-
-                    'reference_id' =>
-                        $withdrawal->id,
-
-                    'description' =>
-                        'Withdrawal '
-                        . $withdrawal
-                            ->withdrawal_number
-                        . ' paid',
-
-                    'status' =>
-                        'posted',
-
-                    'effective_at' =>
-                        now(),
-
-                    'posted_at' =>
-                        now(),
-
-                    'metadata' =>
-                        json_encode([
-                            'withdrawal_number' =>
-                                $withdrawal
-                                    ->withdrawal_number,
-
-                            'payment_reference' =>
-                                $paymentReference,
-                        ]),
-
-                    'created_by' =>
-                        $admin->id,
-
-                    'created_at' =>
-                        now(),
-
-                    'updated_at' =>
-                        now(),
-                ]);
+            /*
+             * Settlement does not create a second monetary debit.
+             * The withdrawal_hold transaction is the canonical debit.
+             * On payment, that hold is posted and pending balance is
+             * released from reservation into completed payout state.
+             */
 
             $metadata = $withdrawal->metadata
                 ?? [];
@@ -767,7 +708,93 @@ class WithdrawalService
                     $metadata,
             ]);
 
+            /*
+             * AUTO FINANCIAL DOCUMENT
+             *
+             * This executes inside the same logical
+             * payment transaction.
+             *
+             * If document generation fails, the
+             * exception bubbles up and the withdrawal
+             * payment transaction is rolled back.
+             *
+             * InvoiceGenerationService is idempotent
+             * by withdrawal_id and the database also
+             * has a UNIQUE constraint on that field.
+             */
+            $this->invoiceGenerationService
+                ->generateFromWithdrawal(
+                    $withdrawal->id,
+                    $admin->id
+                );
+
             return $withdrawal->fresh();
         });
     }
+
+    public function minimumAmountFor(
+        User $user
+    ): float {
+        /*
+         * Label accounts use their own configured
+         * minimum withdrawal amount.
+         */
+        $labelMinimum = DB::table('labels')
+            ->where(
+                'user_id',
+                $user->id
+            )
+            ->whereNull('deleted_at')
+            ->value(
+                'minimum_withdrawal_amount'
+            );
+
+        if ($labelMinimum !== null) {
+            return max(
+                0,
+                (float) $labelMinimum
+            );
+        }
+
+        /*
+         * Artist accounts inherit the minimum from
+         * their parent/master label when available.
+         */
+        $artist = DB::table('artists')
+            ->where(
+                'user_id',
+                $user->id
+            )
+            ->whereNull('deleted_at')
+            ->first([
+                'id',
+                'label_id',
+            ]);
+
+        if (
+            $artist &&
+            $artist->label_id
+        ) {
+            $artistMinimum = DB::table('labels')
+                ->where(
+                    'id',
+                    $artist->label_id
+                )
+                ->whereNull('deleted_at')
+                ->value(
+                    'minimum_withdrawal_amount'
+                );
+
+            if ($artistMinimum !== null) {
+                return max(
+                    0,
+                    (float) $artistMinimum
+                );
+            }
+        }
+
+        return (float)
+            self::DEFAULT_MINIMUM_AMOUNT;
+    }
+
 }

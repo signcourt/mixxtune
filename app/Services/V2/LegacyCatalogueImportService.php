@@ -327,6 +327,7 @@ class LegacyCatalogueImportService
                     'original_release_date' =>
                         $this->dateOrNull(
                             $raw['original_release_date']
+                                ?? $raw['release_date']
                                 ?? null
                         ),
 

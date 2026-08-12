@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V2;
 
 use App\Http\Controllers\Controller;
 use App\Models\Finance\Invoice;
+use App\Services\V2\LabelAccess\LabelFinancialContextService;
 use App\Services\V2\PermissionService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -15,11 +16,12 @@ class InvoiceController extends Controller
 {
     public function index(
         Request $request,
-        PermissionService $permissions
+        PermissionService $permissions,
+        LabelFinancialContextService $financialContext
     ): Response {
-        $role = $permissions->role(
-            $request->user()
-        );
+        $actor = $request->user();
+
+        $role = $permissions->role($actor);
 
         $query = Invoice::query()
             ->with('statement');
@@ -31,9 +33,11 @@ class InvoiceController extends Controller
                 true
             )
         ) {
+            $owner = $financialContext->owner($actor);
+
             $query->where(
                 'user_id',
-                $request->user()->id
+                $owner->id
             );
         }
 
@@ -42,10 +46,9 @@ class InvoiceController extends Controller
             [
                 'role' => $role,
 
-                'invoices' =>
-                    $query
-                        ->orderByDesc('id')
-                        ->paginate(25),
+                'invoices' => $query
+                    ->orderByDesc('id')
+                    ->paginate(25),
             ]
         );
     }
@@ -53,22 +56,28 @@ class InvoiceController extends Controller
     public function download(
         Request $request,
         Invoice $invoice,
-        PermissionService $permissions
+        PermissionService $permissions,
+        LabelFinancialContextService $financialContext
     ): HttpResponse {
-        $role = $permissions->role(
-            $request->user()
-        );
+        $actor = $request->user();
 
-        abort_unless(
-            in_array(
+        $role = $permissions->role($actor);
+
+        if (
+            !in_array(
                 $role,
                 ['admin', 'super_admin'],
                 true
             )
-            || $invoice->user_id ===
-                $request->user()->id,
-            403
-        );
+        ) {
+            $owner = $financialContext->owner($actor);
+
+            abort_unless(
+                (int) $invoice->user_id ===
+                    (int) $owner->id,
+                403
+            );
+        }
 
         $invoice->load([
             'items',
@@ -79,12 +88,10 @@ class InvoiceController extends Controller
         return Pdf::loadView(
             'pdf.invoice',
             [
-                'invoice' =>
-                    $invoice,
+                'invoice' => $invoice,
             ]
         )->download(
-            $invoice->invoice_number
-            . '.pdf'
+            $invoice->invoice_number . '.pdf'
         );
     }
 }

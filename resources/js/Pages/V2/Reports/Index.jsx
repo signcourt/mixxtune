@@ -1,738 +1,1293 @@
+import { Head } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-    Head,
-    Link,
-    router,
-} from '@inertiajs/react';
-
-import {
-    BarChart3,
-    Coins,
-    Globe2,
-    Music2,
+    Check,
+    ChevronRight,
+    Download,
+    FileSpreadsheet,
+    FileText,
+    Trash2,
 } from 'lucide-react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
-import AnalyticsCard from '@/V2/Shared/Components/Analytics/AnalyticsCard';
-import TrendChart from '@/V2/Shared/Components/Analytics/TrendChart';
-import TopListCard from '@/V2/Shared/Components/Analytics/TopListCard';
 
-const numberFormatter = new Intl.NumberFormat('en-IN', {
-    maximumFractionDigits: 0,
-});
+const automaticReports = [
+    {
+        id: 1,
+        period: 'June 2026',
+        type: 'Full catalogue single report',
+        amount: '₹0.00',
+        generatedAt: '12 Aug 2026',
+        status: 'ready',
+    },
+    {
+        id: 2,
+        period: 'May 2026',
+        type: 'Full catalogue single report',
+        amount: '₹0.00',
+        generatedAt: '12 Aug 2026',
+        status: 'ready',
+    },
+    {
+        id: 3,
+        period: 'April 2026',
+        type: 'Full catalogue single report',
+        amount: '₹0.00',
+        generatedAt: '12 Aug 2026',
+        status: 'ready',
+    },
+];
 
-const decimalFormatter = new Intl.NumberFormat('en-IN', {
-    maximumFractionDigits: 2,
-});
+const defaultColumns = [
+    'Reporting Month',
+    'Sales Month',
+    'Track Artist',
+    'Track Title',
+    'Album Title',
+    'Album Artist',
+    'Label',
+    'ISRC',
+    'UPC',
+    'Platform',
+    'Country / Region',
+    'CMS',
+    'Sale Type',
+    'Quantity / Streams',
+    'Currency',
+    'Gross Revenue',
+    'Revenue Share %',
+    'Net Revenue',
+];
 
-const formatNumber = (value) =>
-    numberFormatter.format(Number(value ?? 0));
-
-const formatDecimal = (value) =>
-    decimalFormatter.format(Number(value ?? 0));
-
-const formatCurrency = (value, currency = 'INR') => {
-    try {
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency,
-            maximumFractionDigits: 2,
-        }).format(Number(value ?? 0));
-    } catch {
-        return `${currency} ${formatDecimal(value)}`;
-    }
-};
-
-const revenueMoney = (value) =>
-    new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 2,
-    }).format(Number(value ?? 0));
-
-export default function Index({
-    role = 'artist',
-    revenueSummary = null,
-    filters = {},
-    summary = {},
-    rows = {},
-    platforms = [],
-    months = [],
-    countries = [],
-    monthlyTrend = [],
-    topPlatforms = [],
-    topCountries = [],
-    topTracks = [],
-    currencySummary = [],
+function ReportTable({
+    reports,
+    requested = false,
+    onDelete,
+    deletingId = null,
 }) {
-    const data = rows.data ?? [];
+    if (reports.length === 0) {
+        return (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+                <FileSpreadsheet
+                    size={34}
+                    className="mx-auto text-slate-300"
+                />
 
-    const title =
-        role === 'artist'
-            ? 'My Reports'
-            : role === 'label'
-              ? 'Label Reports'
-              : role === 'admin'
-                ? 'Managed Reports'
-                : 'Global Reports';
+                <div className="mt-3 text-sm font-bold text-slate-800">
+                    {requested
+                        ? 'No requested reports yet'
+                        : 'No automatic reports available'}
+                </div>
 
-    const update = (changes) => {
-        router.get(
-            '/v2/reports',
-            {
-                ...filters,
-                ...changes,
-            },
-            {
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            }
+                <div className="mt-1 text-sm text-slate-500">
+                    {requested
+                        ? 'Generate a report below and it will appear here.'
+                        : 'Automatic reports will appear here when available.'}
+                </div>
+            </div>
         );
-    };
+    }
 
     return (
-        <PanelLayout
-            role={role}
-            title={title}
-            subtitle="Streams, sales, stores and earnings analytics"
-        >
-            <Head title={title} />
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+                <table className="min-w-full">
+                    <thead className="bg-slate-50">
+                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <th className="px-5 py-4">
+                                Period
+                            </th>
 
-            <div className="space-y-6">
-                <header className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
-                        <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-violet-700">
-                                    Mixx Tune Analytics
-                                </span>
+                            <th className="px-5 py-4">
+                                Report Type
+                            </th>
 
-                                <span className="text-xs font-medium text-slate-500">
-                                    Reporting Dashboard
-                                </span>
-                            </div>
+                            <th className="px-5 py-4">
+                                Royalty Amount
+                            </th>
 
-                            <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                                {title}
-                            </h1>
+                            <th className="px-5 py-4">
+                                Generation Date
+                            </th>
 
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                                Track revenue, streams, sales,
-                                territories and store performance
-                                from one reporting workspace.
-                            </p>
-                        </div>
+                            <th className="px-5 py-4">
+                                Status
+                            </th>
 
-                        <div className="flex flex-wrap gap-3">
-                            <Link
-                                href="/v2/royalties"
-                                className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-700"
-                            >
-                                View Royalties
-                            </Link>
+                            <th className="px-5 py-4 text-right">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
 
-                            <Link
-                                href="/v2/statements"
-                                className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                            >
-                                Statements
-                            </Link>
-                        </div>
-                    </div>
-                </header>
+                    <tbody className="divide-y divide-slate-100">
+                        {reports.map((report) => (
+                            <tr key={report.id}>
+                                <td className="px-5 py-4 text-sm font-medium text-slate-900">
+                                    {report.period}
+                                </td>
 
+                                <td className="px-5 py-4 text-sm text-slate-600">
+                                    {report.type}
+                                </td>
 
-            {role === 'label' && revenueSummary && (
-                <section className="mb-6 space-y-5">
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-950">
-                            Revenue Allocation
-                        </h2>
+                                <td className="px-5 py-4 text-sm font-semibold text-slate-900">
+                                    {report.amount}
+                                </td>
 
-                        <p className="mt-1 text-sm text-slate-500">
-                            {revenueSummary.is_master
-                                ? 'Managed revenue, direct child allocations and your retained share for the selected reporting period.'
-                                : 'Your allocated and payable revenue for the selected reporting period.'}
-                        </p>
-                    </div>
+                                <td className="px-5 py-4 text-sm text-slate-600">
+                                    {report.generatedAt}
+                                </td>
 
-                    {revenueSummary.is_master ? (
-                        <>
-                            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                                <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                        Managed Revenue
-                                    </p>
+                                <td className="px-5 py-4">
+                                    {report.status === 'completed' ||
+                                    report.status === 'ready' ? (
+                                        <span
+                                            title="Ready"
+                                            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"
+                                        >
+                                            <Check size={16} />
+                                        </span>
+                                    ) : report.status === 'failed' ? (
+                                        <span className="inline-flex rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600">
+                                            Failed
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                                            Processing
+                                        </span>
+                                    )}
+                                </td>
 
-                                    <p className="mt-2 text-2xl font-black text-slate-950">
-                                        {revenueMoney(
-                                            revenueSummary.managed_revenue
-                                        )}
-                                    </p>
-                                </article>
+                                <td className="px-5 py-4">
+                                    <div className="flex justify-end gap-2">
+                                        {requested ? (
+                                            <>
+                                                <a
+                                                    href={
+                                                        report.status ===
+                                                        'completed'
+                                                            ? `/v2/generated-reports/${report.id}/download`
+                                                            : undefined
+                                                    }
+                                                    title="Download Excel"
+                                                    aria-disabled={
+                                                        report.status !==
+                                                        'completed'
+                                                    }
+                                                    onClick={(event) => {
+                                                        if (
+                                                            report.status !==
+                                                            'completed'
+                                                        ) {
+                                                            event.preventDefault();
+                                                        }
+                                                    }}
+                                                    className={[
+                                                        'inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200',
+                                                        report.status ===
+                                                        'completed'
+                                                            ? 'text-slate-600 hover:bg-slate-50'
+                                                            : 'cursor-not-allowed text-slate-300',
+                                                    ].join(' ')}
+                                                >
+                                                    <Download
+                                                        size={16}
+                                                    />
+                                                </a>
 
-                                <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                        Child Allocation
-                                    </p>
+                                                <button
+                                                    type="button"
+                                                    title="PDF export will be added next"
+                                                    disabled
+                                                    className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 text-slate-300"
+                                                >
+                                                    <FileText
+                                                        size={16}
+                                                    />
+                                                </button>
 
-                                    <p className="mt-2 text-2xl font-black text-slate-950">
-                                        {revenueMoney(
-                                            revenueSummary.allocated_revenue
-                                        )}
-                                    </p>
-                                </article>
-
-                                <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                        Retained Revenue
-                                    </p>
-
-                                    <p className="mt-2 text-2xl font-black text-slate-950">
-                                        {revenueMoney(
-                                            revenueSummary.retained_revenue
-                                        )}
-                                    </p>
-                                </article>
-
-                                <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                        Master Payable
-                                    </p>
-
-                                    <p className="mt-2 text-2xl font-black text-slate-950">
-                                        {revenueMoney(
-                                            revenueSummary.payable_revenue
-                                        )}
-                                    </p>
-                                </article>
-                            </div>
-
-                            {revenueSummary.children?.length > 0 && (
-                                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                                    <div className="border-b border-slate-200 px-5 py-4">
-                                        <h3 className="font-bold text-slate-950">
-                                            Sub-Label Allocation
-                                        </h3>
-
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            Allocation is a revenue split, not additional source revenue.
-                                        </p>
-                                    </div>
-
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-slate-200">
-                                            <thead className="bg-slate-50">
-                                                <tr>
-                                                    {[
-                                                        'Sub-Label',
-                                                        'Managed Revenue',
-                                                        'Share',
-                                                        'Child Payable',
-                                                        'Master Retained',
-                                                    ].map(
-                                                        (heading) => (
-                                                            <th
-                                                                key={heading}
-                                                                className="whitespace-nowrap px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
-                                                            >
-                                                                {heading}
-                                                            </th>
+                                                <button
+                                                    type="button"
+                                                    title="Delete report"
+                                                    disabled={
+                                                        deletingId ===
+                                                        report.id
+                                                    }
+                                                    onClick={() =>
+                                                        onDelete?.(
+                                                            report
                                                         )
-                                                    )}
-                                                </tr>
-                                            </thead>
+                                                    }
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <Trash2
+                                                        size={16}
+                                                    />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    title="Download CSV / Excel"
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                                >
+                                                    <Download
+                                                        size={16}
+                                                    />
+                                                </button>
 
-                                            <tbody className="divide-y divide-slate-100">
-                                                {revenueSummary.children.map(
-                                                    (child) => (
-                                                        <tr
-                                                            key={child.id}
-                                                            className="hover:bg-slate-50"
-                                                        >
-                                                            <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-900">
-                                                                {child.name}
-                                                            </td>
-
-                                                            <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-700">
-                                                                {revenueMoney(
-                                                                    child.managed_revenue
-                                                                )}
-                                                            </td>
-
-                                                            <td className="whitespace-nowrap px-5 py-4 text-sm font-semibold text-slate-700">
-                                                                {Number(
-                                                                    child.share_percent ?? 0
-                                                                ).toLocaleString(
-                                                                    'en-IN'
-                                                                )}
-                                                                %
-                                                            </td>
-
-                                                            <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-900">
-                                                                {revenueMoney(
-                                                                    child.allocated_revenue
-                                                                )}
-                                                            </td>
-
-                                                            <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-900">
-                                                                {revenueMoney(
-                                                                    child.master_retained
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    )
-                                                )}
-                                            </tbody>
-                                        </table>
+                                                <button
+                                                    type="button"
+                                                    title="Download PDF"
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                                >
+                                                    <FileText
+                                                        size={16}
+                                                    />
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                    Your Revenue
-                                </p>
-
-                                <p className="mt-2 text-2xl font-black text-slate-950">
-                                    {revenueMoney(
-                                        revenueSummary.allocated_revenue
-                                    )}
-                                </p>
-                            </article>
-
-                            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                    Payable Revenue
-                                </p>
-
-                                <p className="mt-2 text-2xl font-black text-slate-950">
-                                    {revenueMoney(
-                                        revenueSummary.payable_revenue
-                                    )}
-                                </p>
-                            </article>
-
-                            {revenueSummary.share_visible &&
-                                revenueSummary.share_percent !== null && (
-                                    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                            Revenue Share
-                                        </p>
-
-                                        <p className="mt-2 text-2xl font-black text-slate-950">
-                                            {Number(
-                                                revenueSummary.share_percent
-                                            ).toLocaleString('en-IN')}
-                                            %
-                                        </p>
-                                    </article>
-                                )}
-                        </div>
-                    )}
-                </section>
-            )}
-
-                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <AnalyticsCard
-                        label="Total Earnings"
-                        value={formatCurrency(
-                            summary.earnings ?? 0
-                        )}
-                        description="Revenue in selected filters"
-                        icon={<Coins size={20} />}
-                        tone="violet"
-                    />
-
-                    <AnalyticsCard
-                        label="Streams"
-                        value={formatNumber(
-                            summary.streams ?? 0
-                        )}
-                        description="Total reported streams"
-                        icon={<BarChart3 size={20} />}
-                        tone="blue"
-                    />
-
-                    <AnalyticsCard
-                        label="Sale Units"
-                        value={formatNumber(
-                            summary.sale_units ?? 0
-                        )}
-                        description="Downloads and sale units"
-                        icon={<Music2 size={20} />}
-                        tone="emerald"
-                    />
-
-                    <AnalyticsCard
-                        label="Report Rows"
-                        value={formatNumber(
-                            summary.rows ?? 0
-                        )}
-                        description="Imported reporting records"
-                        icon={<Globe2 size={20} />}
-                        tone="amber"
-                    />
-                </section>
-
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-                        <input
-                            type="search"
-                            defaultValue={filters.search ?? ''}
-                            placeholder="Track, artist, UPC, ISRC..."
-                            onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                    update({
-                                        search:
-                                            event.currentTarget
-                                                .value,
-                                    });
-                                }
-                            }}
-                            className="rounded-xl border border-slate-300 px-4 py-3 text-sm xl:col-span-2"
-                        />
-
-                        <select
-                            value={filters.month ?? ''}
-                            onChange={(event) =>
-                                update({
-                                    month:
-                                        event.target.value,
-                                })
-                            }
-                            className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        >
-                            <option value="">
-                                All Sale Months
-                            </option>
-
-                            {months.map((month) => (
-                                <option
-                                    key={month}
-                                    value={month}
-                                >
-                                    {month}
-                                </option>
-                            ))}
-                        </select>
-
-                        <select
-                            value={filters.platform ?? ''}
-                            onChange={(event) =>
-                                update({
-                                    platform:
-                                        event.target.value,
-                                })
-                            }
-                            className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        >
-                            <option value="">
-                                All Platforms
-                            </option>
-
-                            {platforms.map((platform) => (
-                                <option
-                                    key={platform}
-                                    value={platform}
-                                >
-                                    {platform}
-                                </option>
-                            ))}
-                        </select>
-
-                        <select
-                            value={filters.country ?? ''}
-                            onChange={(event) =>
-                                update({
-                                    country:
-                                        event.target.value,
-                                })
-                            }
-                            className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        >
-                            <option value="">
-                                All Countries
-                            </option>
-
-                            {countries.map((country) => (
-                                <option
-                                    key={country}
-                                    value={country}
-                                >
-                                    {country}
-                                </option>
-                            ))}
-                        </select>
-
-                        <button
-                            type="button"
-                            onClick={() =>
-                                router.get('/v2/reports')
-                            }
-                            className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                        >
-                            Clear Filters
-                        </button>
-                    </div>
-                </section>
-
-                <section className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.7fr)]">
-                    <TrendChart
-                        rows={monthlyTrend}
-                        metric="earnings"
-                        title="Monthly Revenue Trend"
-                    />
-
-                    <TopListCard
-                        title="Top Platforms"
-                        subtitle="Stores ranked by earnings"
-                        rows={topPlatforms}
-                        valueKey="earnings"
-                        formatter={(value) =>
-                            formatCurrency(value)
-                        }
-                    />
-                </section>
-
-                <section className="grid gap-6 lg:grid-cols-2">
-                    <TopListCard
-                        title="Top Countries"
-                        subtitle="Territories ranked by earnings"
-                        rows={topCountries}
-                        valueKey="earnings"
-                        formatter={(value) =>
-                            formatCurrency(value)
-                        }
-                    />
-
-                    <TopListCard
-                        title="Currencies"
-                        subtitle="Reported earnings by currency"
-                        rows={currencySummary.map(
-                            (item) => ({
-                                name: item.currency,
-                                earnings: item.earnings,
-                            })
-                        )}
-                        valueKey="earnings"
-                        formatter={(value) =>
-                            formatDecimal(value)
-                        }
-                    />
-                </section>
-
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <h2 className="text-lg font-bold text-slate-950">
-                                Top Tracks
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Best-performing catalogue by earnings
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="mt-5 divide-y divide-slate-100">
-                        {topTracks.length > 0 ? (
-                            topTracks.map((track, index) => (
-                                <div
-                                    key={`${track.track_id}-${track.isrc}-${index}`}
-                                    className="grid gap-3 py-4 sm:grid-cols-[auto_1fr_auto] sm:items-center"
-                                >
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-sm font-black text-violet-700">
-                                        {index + 1}
-                                    </div>
-
-                                    <div className="min-w-0">
-                                        <p className="truncate font-bold text-slate-900">
-                                            {track.title}
-                                        </p>
-
-                                        <p className="mt-1 truncate text-sm text-slate-500">
-                                            {track.artist}
-                                            {track.isrc
-                                                ? ` · ${track.isrc}`
-                                                : ''}
-                                        </p>
-                                    </div>
-
-                                    <div className="text-left sm:text-right">
-                                        <p className="font-black text-slate-950">
-                                            {formatCurrency(
-                                                track.earnings
-                                            )}
-                                        </p>
-
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            {formatNumber(
-                                                track.streams
-                                            )}{' '}
-                                            streams
-                                        </p>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="rounded-xl bg-slate-50 px-4 py-12 text-center text-sm text-slate-500">
-                                No top-track data available.
-                            </div>
-                        )}
-                    </div>
-                </section>
-
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 px-5 py-4">
-                        <h2 className="text-lg font-bold text-slate-950">
-                            Detailed Report Rows
-                        </h2>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                            Individual imported royalty records
-                        </p>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                            <thead className="bg-slate-50">
-                                <tr>
-                                    {[
-                                        'Month',
-                                        'Track',
-                                        'Artist',
-                                        'ISRC',
-                                        'UPC',
-                                        'Platform',
-                                        'Country',
-                                        'Streams',
-                                        'Units',
-                                        'Currency',
-                                        'Earnings',
-                                    ].map((heading) => (
-                                        <th
-                                            key={heading}
-                                            className="whitespace-nowrap px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
-                                        >
-                                            {heading}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-
-                            <tbody className="divide-y divide-slate-100">
-                                {data.length > 0 ? (
-                                    data.map((row) => (
-                                        <tr
-                                            key={row.id}
-                                            className="transition hover:bg-slate-50"
-                                        >
-                                            <Cell>
-                                                {row.sale_month || '—'}
-                                            </Cell>
-
-                                            <Cell>
-                                                {row.track_title ||
-                                                    row.album_title ||
-                                                    '—'}
-                                            </Cell>
-
-                                            <Cell>
-                                                {row.track_artist ||
-                                                    row.album_artist ||
-                                                    '—'}
-                                            </Cell>
-
-                                            <Cell>
-                                                {row.isrc || '—'}
-                                            </Cell>
-
-                                            <Cell>
-                                                {row.upc || '—'}
-                                            </Cell>
-
-                                            <Cell>
-                                                {row.platform || '—'}
-                                            </Cell>
-
-                                            <Cell>
-                                                {row.country_code || '—'}
-                                            </Cell>
-
-                                            <Cell>
-                                                {formatNumber(
-                                                    row.streams
-                                                )}
-                                            </Cell>
-
-                                            <Cell>
-                                                {formatNumber(
-                                                    row.sale_units
-                                                )}
-                                            </Cell>
-
-                                            <Cell>
-                                                {row.currency || '—'}
-                                            </Cell>
-
-                                            <Cell>
-                                                {formatDecimal(
-                                                    row.earnings
-                                                )}
-                                            </Cell>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td
-                                            colSpan="11"
-                                            className="px-5 py-16 text-center text-sm text-slate-500"
-                                        >
-                                            No report data found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                {rows.links && (
-                    <div className="flex flex-wrap justify-center gap-2">
-                        {rows.links.map((link, index) => (
-                            <Link
-                                key={index}
-                                href={link.url ?? '#'}
-                                preserveScroll
-                                preserveState
-                                className={[
-                                    'rounded-xl border px-3 py-2 text-sm font-semibold',
-                                    link.active
-                                        ? 'border-violet-600 bg-violet-600 text-white'
-                                        : 'border-slate-300 bg-white text-slate-700',
-                                    !link.url
-                                        ? 'pointer-events-none opacity-40'
-                                        : '',
-                                ].join(' ')}
-                                dangerouslySetInnerHTML={{
-                                    __html: link.label,
-                                }}
-                            />
+                                </td>
+                            </tr>
                         ))}
-                    </div>
-                )}
+                    </tbody>
+                </table>
             </div>
-        </PanelLayout>
+        </div>
     );
 }
 
-function Cell({ children }) {
+function StepHeader({ step, currentStep, title }) {
+    const complete = currentStep > step;
+    const active = currentStep === step;
+
     return (
-        <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
-            {children}
-        </td>
+        <div
+            className={[
+                'flex min-h-14 items-center gap-3 rounded-xl border px-4',
+                active
+                    ? 'border-violet-300 bg-violet-50'
+                    : 'border-slate-200 bg-white',
+            ].join(' ')}
+        >
+            <span
+                className={[
+                    'inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold',
+                    complete
+                        ? 'bg-slate-700 text-white'
+                        : active
+                          ? 'bg-violet-600 text-white'
+                          : 'bg-slate-100 text-slate-500',
+                ].join(' ')}
+            >
+                {complete ? <Check size={16} /> : step}
+            </span>
+
+            <span className="text-sm font-semibold text-slate-800">
+                {title}
+            </span>
+        </div>
+    );
+}
+
+export default function ReportsIndex({ months = [] }) {
+    const [tab, setTab] = useState('automatic');
+    const [step, setStep] = useState(1);
+
+    const reportingPeriods = useMemo(() => {
+        return [...months]
+            .filter((value) =>
+                /^\d{4}-\d{2}$/.test(String(value))
+            )
+            .sort()
+            .map((value) => {
+                const [year, month] = String(value)
+                    .split('-')
+                    .map(Number);
+
+                const label = new Intl.DateTimeFormat(
+                    'en-US',
+                    {
+                        month: 'long',
+                        year: 'numeric',
+                        timeZone: 'UTC',
+                    }
+                ).format(
+                    new Date(
+                        Date.UTC(
+                            year,
+                            month - 1,
+                            1
+                        )
+                    )
+                );
+
+                return {
+                    value: String(value),
+                    label,
+                };
+            });
+    }, [months]);
+
+    const latestPeriod =
+        reportingPeriods.length > 0
+            ? reportingPeriods[
+                  reportingPeriods.length - 1
+              ].value
+            : '';
+
+    const [fromPeriod, setFromPeriod] =
+        useState(latestPeriod);
+
+    const [toPeriod, setToPeriod] =
+        useState(latestPeriod);
+
+    useEffect(() => {
+        if (reportingPeriods.length === 0) {
+            setFromPeriod('');
+            setToPeriod('');
+            return;
+        }
+
+        const values = reportingPeriods.map(
+            (item) => item.value
+        );
+
+        const latest =
+            values[values.length - 1];
+
+        if (!values.includes(fromPeriod)) {
+            setFromPeriod(latest);
+            setToPeriod(latest);
+            return;
+        }
+
+        if (!values.includes(toPeriod)) {
+            setToPeriod(fromPeriod);
+        }
+    }, [reportingPeriods, fromPeriod, toPeriod]);
+
+    const monthSerial = (value) => {
+        const [year, month] = String(value)
+            .split('-')
+            .map(Number);
+
+        return year * 12 + (month - 1);
+    };
+
+    const availableToPeriods = useMemo(() => {
+        if (!fromPeriod) {
+            return [];
+        }
+
+        const fromSerial =
+            monthSerial(fromPeriod);
+
+        return reportingPeriods.filter(
+            (item) => {
+                const difference =
+                    monthSerial(item.value)
+                    - fromSerial;
+
+                return (
+                    difference >= 0
+                    && difference <= 2
+                );
+            }
+        );
+    }, [reportingPeriods, fromPeriod]);
+
+    const period = useMemo(() => {
+        const fromLabel = reportingPeriods.find(
+            (item) => item.value === fromPeriod
+        )?.label;
+
+        const toLabel = reportingPeriods.find(
+            (item) => item.value === toPeriod
+        )?.label;
+
+        if (!fromLabel || !toLabel) {
+            return 'No reporting data available';
+        }
+
+        return fromPeriod === toPeriod
+            ? fromLabel
+            : `${fromLabel} to ${toLabel}`;
+    }, [
+        reportingPeriods,
+        fromPeriod,
+        toPeriod,
+    ]);
+    const [reportMode, setReportMode] = useState('single');
+    const [scope, setScope] = useState('full_catalogue');
+
+    const [selectedColumns, setSelectedColumns] =
+        useState(defaultColumns);
+
+    const [requestedReports, setRequestedReports] =
+        useState([]);
+
+    const [reportsLoading, setReportsLoading] =
+        useState(true);
+
+    const [generating, setGenerating] =
+        useState(false);
+
+    const [deletingId, setDeletingId] =
+        useState(null);
+
+    const [reportMessage, setReportMessage] =
+        useState(null);
+
+    const reports = useMemo(
+        () =>
+            tab === 'automatic'
+                ? automaticReports
+                : requestedReports,
+        [tab, requestedReports]
+    );
+
+    const toggleColumn = (column) => {
+        setSelectedColumns((current) =>
+            current.includes(column)
+                ? current.filter((item) => item !== column)
+                : [...current, column]
+        );
+    };
+
+    const monthLabel = (value) => {
+        if (!value || !/^\d{4}-\d{2}$/.test(value)) {
+            return value || '—';
+        }
+
+        const [year, month] = value
+            .split('-')
+            .map(Number);
+
+        return new Intl.DateTimeFormat(
+            'en-US',
+            {
+                month: 'long',
+                year: 'numeric',
+                timeZone: 'UTC',
+            }
+        ).format(
+            new Date(
+                Date.UTC(
+                    year,
+                    month - 1,
+                    1
+                )
+            )
+        );
+    };
+
+    const formatAmount = (
+        amount,
+        currency
+    ) => {
+        const numeric =
+            Number(amount || 0);
+
+        if (
+            currency &&
+            currency !== 'MULTI'
+        ) {
+            try {
+                return new Intl.NumberFormat(
+                    'en-IN',
+                    {
+                        style: 'currency',
+                        currency,
+                        maximumFractionDigits: 2,
+                    }
+                ).format(numeric);
+            } catch {
+                // Fall through to generic formatting.
+            }
+        }
+
+        const formatted =
+            new Intl.NumberFormat(
+                'en-IN',
+                {
+                    maximumFractionDigits: 2,
+                }
+            ).format(numeric);
+
+        return currency === 'MULTI'
+            ? `${formatted} (Multiple currencies)`
+            : formatted;
+    };
+
+    const mapRequestedReport = (
+        report
+    ) => {
+        const from =
+            monthLabel(
+                report.from_month
+            );
+
+        const to =
+            monthLabel(
+                report.to_month
+            );
+
+        const mode =
+            report.report_mode === 'multiple'
+                ? 'Multiple reports'
+                : 'Single report';
+
+        const scopeLabel =
+            report.scope === 'full_catalogue'
+                ? 'Full catalogue'
+                : report.scope === 'labels'
+                  ? 'Selected labels'
+                  : report.scope === 'platforms'
+                    ? 'Selected platforms'
+                    : report.scope;
+
+        const dateValue =
+            report.generated_at ||
+            report.created_at;
+
+        return {
+            ...report,
+
+            period:
+                report.from_month ===
+                report.to_month
+                    ? from
+                    : `${from} to ${to}`,
+
+            type:
+                `${scopeLabel} ${mode}`,
+
+            amount:
+                formatAmount(
+                    report.net_amount,
+                    report.currency
+                ),
+
+            generatedAt:
+                dateValue
+                    ? new Intl.DateTimeFormat(
+                          'en-GB',
+                          {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                          }
+                      ).format(
+                          new Date(
+                              dateValue
+                          )
+                      )
+                    : '—',
+        };
+    };
+
+    const loadRequestedReports =
+        async () => {
+            try {
+                setReportsLoading(true);
+
+                const response =
+                    await window.axios.get(
+                        '/v2/generated-reports'
+                    );
+
+                setRequestedReports(
+                    (
+                        response.data.reports ||
+                        []
+                    ).map(
+                        mapRequestedReport
+                    )
+                );
+            } catch (error) {
+                console.error(
+                    'Unable to load requested reports.',
+                    error
+                );
+            } finally {
+                setReportsLoading(false);
+            }
+        };
+
+    useEffect(() => {
+        loadRequestedReports();
+    }, []);
+
+    const generateReport =
+        async () => {
+            if (
+                generating ||
+                !fromPeriod ||
+                !toPeriod ||
+                selectedColumns.length === 0
+            ) {
+                return;
+            }
+
+            setGenerating(true);
+            setReportMessage(null);
+
+            try {
+                const response =
+                    await window.axios.post(
+                        '/v2/generated-reports',
+                        {
+                            from_month:
+                                fromPeriod,
+
+                            to_month:
+                                toPeriod,
+
+                            scope,
+
+                            report_mode:
+                                reportMode,
+
+                            selected_columns:
+                                selectedColumns,
+                        }
+                    );
+
+                const generated =
+                    mapRequestedReport(
+                        response.data.report
+                    );
+
+                setRequestedReports(
+                    (current) => [
+                        generated,
+                        ...current.filter(
+                            (item) =>
+                                item.id !==
+                                generated.id
+                        ),
+                    ]
+                );
+
+                setReportMessage({
+                    type: 'success',
+                    text:
+                        'Report generated successfully. It is ready in Requested Reports.',
+                });
+
+                setTab('requested');
+            } catch (error) {
+                const validation =
+                    error?.response?.data
+                        ?.errors;
+
+                const firstValidation =
+                    validation
+                        ? Object.values(
+                              validation
+                          )
+                              .flat()
+                              .find(Boolean)
+                        : null;
+
+                setReportMessage({
+                    type: 'error',
+                    text:
+                        firstValidation ||
+                        error?.response?.data
+                            ?.message ||
+                        'Unable to generate report.',
+                });
+            } finally {
+                setGenerating(false);
+            }
+        };
+
+    const deleteRequestedReport =
+        async (report) => {
+            if (
+                !window.confirm(
+                    'Delete this requested report?'
+                )
+            ) {
+                return;
+            }
+
+            setDeletingId(report.id);
+            setReportMessage(null);
+
+            try {
+                await window.axios.delete(
+                    `/v2/generated-reports/${report.id}`
+                );
+
+                setRequestedReports(
+                    (current) =>
+                        current.filter(
+                            (item) =>
+                                item.id !==
+                                report.id
+                        )
+                );
+
+                setReportMessage({
+                    type: 'success',
+                    text:
+                        'Report deleted successfully.',
+                });
+            } catch (error) {
+                setReportMessage({
+                    type: 'error',
+                    text:
+                        error?.response?.data
+                            ?.message ||
+                        'Unable to delete report.',
+                });
+            } finally {
+                setDeletingId(null);
+            }
+        };
+
+    return (
+        <PanelLayout>
+            <Head title="Financial Reports" />
+
+            <div className="space-y-6">
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600">
+                            Financial
+                        </p>
+
+                        <h1 className="mt-2 text-2xl font-black text-slate-950">
+                            Financial Reports
+                        </h1>
+
+                        <p className="mt-2 text-sm text-slate-500">
+                            View automatic royalty reports or generate custom reports.
+                        </p>
+                    </div>
+                </section>
+
+                <section>
+                    <div className="mb-3">
+                        <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">
+                            Available Reports
+                        </h2>
+                    </div>
+
+                    <div className="mb-4 flex gap-2 border-b border-slate-200">
+                        <button
+                            type="button"
+                            onClick={() => setTab('automatic')}
+                            className={[
+                                'border-b-2 px-4 py-3 text-sm font-semibold',
+                                tab === 'automatic'
+                                    ? 'border-violet-600 text-violet-600'
+                                    : 'border-transparent text-slate-500',
+                            ].join(' ')}
+                        >
+                            Automatic Reports
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setTab('requested')}
+                            className={[
+                                'border-b-2 px-4 py-3 text-sm font-semibold',
+                                tab === 'requested'
+                                    ? 'border-violet-600 text-violet-600'
+                                    : 'border-transparent text-slate-500',
+                            ].join(' ')}
+                        >
+                            Requested Reports
+                        </button>
+                    </div>
+
+                    {tab === 'requested' &&
+                    reportsLoading ? (
+                        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-semibold text-slate-500">
+                            Loading requested reports...
+                        </div>
+                    ) : (
+                        <ReportTable
+                            reports={reports}
+                            requested={
+                                tab ===
+                                'requested'
+                            }
+                            onDelete={
+                                deleteRequestedReport
+                            }
+                            deletingId={
+                                deletingId
+                            }
+                        />
+                    )}
+
+                    {reportMessage && (
+                        <div
+                            className={[
+                                'mt-4 rounded-xl border px-4 py-3 text-sm font-semibold',
+                                reportMessage.type ===
+                                'success'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-rose-200 bg-rose-50 text-rose-700',
+                            ].join(' ')}
+                        >
+                            {reportMessage.text}
+                        </div>
+                    )}
+                </section>
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="mb-6">
+                        <h2 className="text-lg font-black text-slate-950">
+                            Generate Your Report
+                        </h2>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                            Create a custom royalty report in four steps.
+                        </p>
+                    </div>
+
+                    <div className="grid gap-3 lg:grid-cols-4">
+                        <StepHeader
+                            step={1}
+                            currentStep={step}
+                            title="Period"
+                        />
+                        <StepHeader
+                            step={2}
+                            currentStep={step}
+                            title="Report Type"
+                        />
+                        <StepHeader
+                            step={3}
+                            currentStep={step}
+                            title="Columns"
+                        />
+                        <StepHeader
+                            step={4}
+                            currentStep={step}
+                            title="Generate"
+                        />
+                    </div>
+
+                    <div className="mt-8 min-h-[320px]">
+                        {step === 1 && (
+                            <div className="max-w-4xl">
+                                <h3 className="text-base font-bold text-slate-900">
+                                    Select reporting period
+                                </h3>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Select a reporting range of up to 3 months.
+                                </p>
+
+                                <div className="mt-5 grid gap-5 md:grid-cols-2">
+                                    <div>
+                                        <label className="mb-2 block text-sm font-semibold text-slate-700">
+                                            From Month
+                                        </label>
+
+                                        <select
+                                            value={fromPeriod}
+                                            onChange={(e) => {
+                                                const nextFrom =
+                                                    e.target.value;
+
+                                                setFromPeriod(nextFrom);
+
+                                                const difference =
+                                                    toPeriod
+                                                        ? monthSerial(
+                                                              toPeriod
+                                                          )
+                                                          - monthSerial(
+                                                              nextFrom
+                                                          )
+                                                        : -1;
+
+                                                if (
+                                                    difference < 0 ||
+                                                    difference > 2
+                                                ) {
+                                                    setToPeriod(
+                                                        nextFrom
+                                                    );
+                                                }
+                                            }}
+                                            className="w-full rounded-xl border-slate-300 bg-white"
+                                        >
+                                            {reportingPeriods.map(
+                                                (item) => (
+                                                    <option
+                                                        key={item.value}
+                                                        value={item.value}
+                                                    >
+                                                        {item.label}
+                                                    </option>
+                                                )
+                                            )}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-semibold text-slate-700">
+                                            To Month
+                                        </label>
+
+                                        <select
+                                            value={toPeriod}
+                                            onChange={(e) =>
+                                                setToPeriod(
+                                                    e.target.value
+                                                )
+                                            }
+                                            className="w-full rounded-xl border-slate-300 bg-white"
+                                        >
+                                            {availableToPeriods.map(
+                                                (item) => (
+                                                    <option
+                                                        key={item.value}
+                                                        value={item.value}
+                                                    >
+                                                        {item.label}
+                                                    </option>
+                                                )
+                                            )}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <span className="text-sm text-slate-500">
+                                        Selected Period:
+                                    </span>
+
+                                    <span className="ml-2 text-sm font-bold text-slate-900">
+                                        {period}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        {step === 2 && (
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900">
+                                    Select the report type
+                                </h3>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Choose the report format and report scope.
+                                </p>
+
+                                <div className="mt-6 grid gap-5 lg:grid-cols-2">
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                        <label className="mb-2 block text-sm font-bold text-slate-800">
+                                            Report Type
+                                        </label>
+
+                                        <select
+                                            value={reportMode}
+                                            onChange={(e) =>
+                                                setReportMode(
+                                                    e.target.value
+                                                )
+                                            }
+                                            className="w-full rounded-xl border-slate-300 bg-white"
+                                        >
+                                            <option value="single">
+                                                Single Report
+                                            </option>
+
+                                            <option value="multiple">
+                                                Multiple Reports
+                                            </option>
+                                        </select>
+
+                                        <p className="mt-3 text-sm text-slate-500">
+                                            {reportMode === 'single'
+                                                ? 'Generate one combined report.'
+                                                : 'Generate separate reports based on the selected scope.'}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                        <label className="mb-2 block text-sm font-bold text-slate-800">
+                                            Report Scope
+                                        </label>
+
+                                        <select
+                                            value={scope}
+                                            onChange={(e) =>
+                                                setScope(
+                                                    e.target.value
+                                                )
+                                            }
+                                            className="w-full rounded-xl border-slate-300 bg-white"
+                                        >
+                                            <option value="full_catalogue">
+                                                Full Catalogue
+                                            </option>
+
+                                            <option value="labels">
+                                                Selected Labels
+                                            </option>
+
+                                            <option value="artists">
+                                                Selected Artists
+                                            </option>
+
+                                            <option value="releases">
+                                                Selected Releases
+                                            </option>
+
+                                            <option value="tracks">
+                                                Selected Tracks
+                                            </option>
+
+                                            <option value="platforms">
+                                                Selected Platforms
+                                            </option>
+
+                                            <option value="countries">
+                                                Selected Countries
+                                            </option>
+                                        </select>
+
+                                        <p className="mt-3 text-sm text-slate-500">
+                                            Select which catalogue data should be included in the report.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {step === 3 && (
+                            <div>
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <h3 className="text-base font-bold text-slate-900">
+                                            Select report columns
+                                        </h3>
+
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            Choose which fields should appear in the generated report.
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setSelectedColumns(
+                                                defaultColumns
+                                            )
+                                        }
+                                        className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold"
+                                    >
+                                        Default Columns
+                                    </button>
+                                </div>
+
+                                <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                    {defaultColumns.map((column) => (
+                                        <label
+                                            key={column}
+                                            className="flex items-center gap-3 rounded-xl border border-slate-200 p-4"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedColumns.includes(
+                                                    column
+                                                )}
+                                                onChange={() =>
+                                                    toggleColumn(column)
+                                                }
+                                            />
+
+                                            <span className="text-sm font-medium text-slate-700">
+                                                {column}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {step === 4 && (
+                            <div>
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-950">
+                                        Review & Generate
+                                    </h3>
+
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Review your report settings before generating the report.
+                                    </p>
+                                </div>
+
+                                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                            Reporting Period
+                                        </div>
+
+                                        <div className="mt-2 text-base font-bold text-slate-900">
+                                            {period}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                            Report Type
+                                        </div>
+
+                                        <div className="mt-2 text-base font-bold text-slate-900">
+                                            {reportMode === 'single'
+                                                ? 'Single Report'
+                                                : 'Multiple Reports'}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                            Report Scope
+                                        </div>
+
+                                        <div className="mt-2 text-base font-bold text-slate-900">
+                                            {scope === 'full_catalogue'
+                                                ? 'Full Catalogue'
+                                                : scope === 'labels'
+                                                  ? 'Selected Labels'
+                                                  : scope === 'platforms'
+                                                    ? 'Selected Platforms'
+                                                    : scope}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                            Selected Columns
+                                        </div>
+
+                                        <div className="mt-2 text-base font-bold text-slate-900">
+                                            {selectedColumns.length} fields
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                            <div className="text-sm font-bold text-slate-900">
+                                                Report Columns
+                                            </div>
+
+                                            <div className="mt-1 text-xs text-slate-500">
+                                                These fields will be included in the generated report.
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm ring-1 ring-slate-200">
+                                            {selectedColumns.length} selected
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        {selectedColumns.map((column) => (
+                                            <span
+                                                key={column}
+                                                className="inline-flex rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                                            >
+                                                {column}
+                                            </span>
+                                        ))}
+                                    </div>
+
+                                    {selectedColumns.length === 0 && (
+                                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
+                                            Select at least one report column before generating.
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-6 flex items-center justify-between gap-4 rounded-2xl border border-violet-100 bg-violet-50 p-5">
+                                    <div>
+                                        <div className="text-sm font-bold text-slate-900">
+                                            Ready to generate
+                                        </div>
+
+                                        <div className="mt-1 text-sm text-slate-600">
+                                            Your report will use the selected period, scope and columns above.
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={
+                                            generateReport
+                                        }
+                                        disabled={
+                                            generating ||
+                                            !fromPeriod ||
+                                            !toPeriod ||
+                                            selectedColumns.length ===
+                                                0
+                                        }
+                                        className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        {generating
+                                            ? 'Generating...'
+                                            : 'Generate Report'}
+
+                                        {!generating && (
+                                            <ChevronRight
+                                                size={16}
+                                            />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mt-6 flex justify-between border-t border-slate-200 pt-5">
+                        <button
+                            type="button"
+                            disabled={step === 1}
+                            onClick={() =>
+                                setStep((current) =>
+                                    Math.max(1, current - 1)
+                                )
+                            }
+                            className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold disabled:opacity-40"
+                        >
+                            Back
+                        </button>
+
+                        {step < 4 && (
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setStep((current) =>
+                                        Math.min(4, current + 1)
+                                    )
+                                }
+                                className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white"
+                            >
+                                Next
+                                <ChevronRight size={16} />
+                            </button>
+                        )}
+                    </div>
+                </section>
+            </div>
+        </PanelLayout>
     );
 }

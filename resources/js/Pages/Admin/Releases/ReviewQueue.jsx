@@ -247,9 +247,6 @@ export default function ReviewQueue({
                                         <div className="mt-1 truncate text-xs text-slate-500">
                                             {release.primary_artist_name || 'Unknown Artist'}
                                         </div>
-                                        <div className="mt-2 text-xs text-slate-400">
-                                            Cat#: {release.catalog_number || '—'}
-                                        </div>
                                     </div>
 
                                     <div className="min-w-0">

@@ -122,9 +122,6 @@ export default function DeliveryStatus({
                                         </div>
                                     </div>
 
-                                    <div className="text-sm text-slate-600">
-                                        Cat#: {release.catalog_number || '—'}
-                                    </div>
 
                                     <div className="text-sm text-slate-600">
                                         {release.store_deliveries_count} DSPs

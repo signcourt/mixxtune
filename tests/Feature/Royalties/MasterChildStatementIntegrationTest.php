@@ -63,6 +63,7 @@ class MasterChildStatementIntegrationTest extends TestCase
         DB::table('report_rows')->insert([
             'report_import_id' => $importId,
             'row_hash' => hash('sha256', 'master-child-statement-test'),
+            'sale_date' => '2026-07-15',
             'sale_month' => '2026-07',
             'track_title' => 'Integration Test Track',
             'track_artist' => 'Integration Test Artist',

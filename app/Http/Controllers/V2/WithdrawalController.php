@@ -20,7 +20,8 @@ class WithdrawalController extends Controller
         Request $request,
         PermissionService $permissions,
         WalletService $walletService,
-        LabelFinancialContextService $financialContext
+        LabelFinancialContextService $financialContext,
+        WithdrawalService $withdrawalService
     ): Response {
         $actor = $request->user();
 
@@ -55,10 +56,15 @@ class WithdrawalController extends Controller
                     $profile,
 
                 'minimumAmount' =>
-                    WithdrawalService::MINIMUM_AMOUNT,
+                    $withdrawalService->minimumAmountFor(
+                        $financialOwner
+                    ),
 
                 'withdrawals' =>
                     WithdrawalRequest::query()
+                        ->with([
+                            'invoice:id,withdrawal_id,invoice_number,invoice_type,tax_treatment,status,tds_amount,net_payable',
+                        ])
                         ->where(
                             'user_id',
                             $financialOwner->id

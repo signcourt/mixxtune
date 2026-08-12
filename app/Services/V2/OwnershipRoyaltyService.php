@@ -139,36 +139,57 @@ class OwnershipRoyaltyService
                         ->revenue_owner_id
             );
 
-            $share =
-                $this->activeShareForBeneficiary(
+            /*
+             * Revenue-share agreements can begin or end
+             * during a month. Discover the master owner
+             * from the actual sale dates represented in
+             * this month's report rows.
+             */
+            $saleDates = DB::table('report_rows')
+                ->where('sale_month', $month)
+                ->where('mapping_status', 'mapped')
+                ->where(
+                    'revenue_owner_type',
                     (string)
                         $owner
-                            ->revenue_owner_type,
+                            ->revenue_owner_type
+                )
+                ->where(
+                    'revenue_owner_id',
                     (int)
                         $owner
-                            ->revenue_owner_id,
-                    $month
+                            ->revenue_owner_id
+                )
+                ->whereNotNull('sale_date')
+                ->select('sale_date')
+                ->distinct()
+                ->pluck('sale_date');
+
+            foreach ($saleDates as $saleDate) {
+                $share =
+                    $this->activeShareForBeneficiary(
+                        (string)
+                            $owner
+                                ->revenue_owner_type,
+                        (int)
+                            $owner
+                                ->revenue_owner_id,
+                        (string) $saleDate
+                    );
+
+                if (!$share) {
+                    continue;
+                }
+
+                $this->addOwner(
+                    $owners,
+                    $seen,
+                    'label',
+                    (int)
+                        $share
+                            ->master_label_id
                 );
-
-            if (!$share) {
-                continue;
             }
-
-            /*
-             * A configured child creates a second
-             * statement beneficiary:
-             *
-             * Child  = configured percentage
-             * Master = remaining percentage
-             */
-            $this->addOwner(
-                $owners,
-                $seen,
-                'label',
-                (int)
-                    $share
-                        ->master_label_id
-            );
         }
 
         return $owners;
@@ -426,6 +447,7 @@ class OwnershipRoyaltyService
                 'release_id',
                 'track_id',
                 'earnings',
+                'sale_date',
                 'revenue_owner_type',
                 'revenue_owner_id',
             ])
@@ -450,7 +472,9 @@ class OwnershipRoyaltyService
                                         ->revenue_owner_id,
                                 $statementOwnerType,
                                 $statementOwnerId,
-                                $month
+                                (string)
+                                    $row
+                                        ->sale_date
                             );
 
                         if (
@@ -531,13 +555,13 @@ class OwnershipRoyaltyService
         int $sourceOwnerId,
         string $statementOwnerType,
         int $statementOwnerId,
-        string $month
+        string $saleDate
     ): float {
         $share =
             $this->activeShareForBeneficiary(
                 $sourceOwnerType,
                 $sourceOwnerId,
-                $month
+                $saleDate
             );
 
         /*
@@ -598,10 +622,15 @@ class OwnershipRoyaltyService
     private function activeShareForBeneficiary(
         string $beneficiaryType,
         int $beneficiaryId,
-        string $month
+        string $saleDate
     ): ?object {
+        $periodDate =
+            Carbon::parse(
+                $saleDate
+            )->toDateString();
+
         $key =
-            $month
+            $periodDate
             .'|'
             .$beneficiaryType
             .'|'
@@ -634,14 +663,6 @@ class OwnershipRoyaltyService
                     $key
                 ] = null;
         }
-
-        $periodDate =
-            Carbon::createFromFormat(
-                'Y-m',
-                $month
-            )
-                ->endOfMonth()
-                ->toDateString();
 
         $share = DB::table(
             'label_revenue_shares'
