@@ -103,7 +103,15 @@ class OwnershipRoyaltyService
         $owners = [];
         $seen = [];
 
-        $sourceOwners = DB::table(
+        $periodDate =
+            Carbon::createFromFormat(
+                '!Y-m',
+                $month
+            )
+                ->endOfMonth()
+                ->toDateString();
+
+        $rows = DB::table(
             'report_rows'
         )
             ->where(
@@ -123,70 +131,94 @@ class OwnershipRoyaltyService
             ->select([
                 'revenue_owner_type',
                 'revenue_owner_id',
+                'artist_id',
+                'label_id',
             ])
             ->distinct()
             ->get();
 
-        foreach ($sourceOwners as $owner) {
+        foreach ($rows as $row) {
+            $sourceOwnerType =
+                (string)
+                    $row
+                        ->revenue_owner_type;
+
+            $sourceOwnerId =
+                (int)
+                    $row
+                        ->revenue_owner_id;
+
+            /*
+             * Canonical catalogue owner remains
+             * a statement owner.
+             */
             $this->addOwner(
                 $owners,
                 $seen,
-                (string)
-                    $owner
-                        ->revenue_owner_type,
-                (int)
-                    $owner
-                        ->revenue_owner_id
+                $sourceOwnerType,
+                $sourceOwnerId
             );
 
             /*
-             * Revenue-share agreements can begin or end
-             * during a month. Discover the master owner
-             * from the actual sale dates represented in
-             * this month's report rows.
+             * Catalogue can remain owned by a
+             * master label while a direct artist
+             * has a beneficiary revenue split.
              */
-            $saleDates = DB::table('report_rows')
-                ->where('sale_month', $month)
-                ->where('mapping_status', 'mapped')
-                ->where(
-                    'revenue_owner_type',
-                    (string)
-                        $owner
-                            ->revenue_owner_type
+            if (
+                $sourceOwnerType === 'label'
+                && !empty(
+                    $row->artist_id
                 )
-                ->where(
-                    'revenue_owner_id',
-                    (int)
-                        $owner
-                            ->revenue_owner_id
+                && !empty(
+                    $row->label_id
                 )
-                ->whereNotNull('sale_date')
-                ->select('sale_date')
-                ->distinct()
-                ->pluck('sale_date');
-
-            foreach ($saleDates as $saleDate) {
-                $share =
+                && (int)
+                    $row->label_id
+                    === $sourceOwnerId
+            ) {
+                $artistShare =
                     $this->activeShareForBeneficiary(
-                        (string)
-                            $owner
-                                ->revenue_owner_type,
+                        'artist',
                         (int)
-                            $owner
-                                ->revenue_owner_id,
-                        (string) $saleDate
+                            $row->artist_id,
+                        $periodDate
                     );
 
-                if (!$share) {
-                    continue;
+                if (
+                    $artistShare
+                    && (int)
+                        $artistShare
+                            ->master_label_id
+                        === $sourceOwnerId
+                ) {
+                    $this->addOwner(
+                        $owners,
+                        $seen,
+                        'artist',
+                        (int)
+                            $row->artist_id
+                    );
                 }
+            }
 
+            /*
+             * Existing child-label / beneficiary
+             * source ownership support.
+             */
+            $sourceShare =
+                $this->activeShareForBeneficiary(
+                    $sourceOwnerType,
+                    $sourceOwnerId,
+                    $periodDate
+                );
+
+            if ($sourceShare) {
                 $this->addOwner(
                     $owners,
                     $seen,
                     'label',
                     (int)
-                        $share
+                        $sourceShare
                             ->master_label_id
                 );
             }
@@ -448,6 +480,8 @@ class OwnershipRoyaltyService
                 'track_id',
                 'earnings',
                 'sale_date',
+                'artist_id',
+                'label_id',
                 'revenue_owner_type',
                 'revenue_owner_id',
             ])
@@ -464,18 +498,29 @@ class OwnershipRoyaltyService
                     foreach ($rows as $row) {
                         $sharePercent =
                             $this->shareForStatement(
-                                (string)
-                                    $row
-                                        ->revenue_owner_type,
-                                (int)
-                                    $row
-                                        ->revenue_owner_id,
-                                $statementOwnerType,
-                                $statementOwnerId,
-                                (string)
-                                    $row
-                                        ->sale_date
-                            );
+                            (string)
+                                $row
+                                    ->revenue_owner_type,
+                            (int)
+                                $row
+                                    ->revenue_owner_id,
+                            $row->artist_id
+                                ? (int)
+                                    $row->artist_id
+                                : null,
+                            $row->label_id
+                                ? (int)
+                                    $row->label_id
+                                : null,
+                            $statementOwnerType,
+                            $statementOwnerId,
+                            Carbon::createFromFormat(
+                                '!Y-m',
+                                $month
+                            )
+                                ->endOfMonth()
+                                ->toDateString()
+                        );
 
                         if (
                             $sharePercent
@@ -553,22 +598,98 @@ class OwnershipRoyaltyService
     private function shareForStatement(
         string $sourceOwnerType,
         int $sourceOwnerId,
+        ?int $rowArtistId,
+        ?int $rowLabelId,
         string $statementOwnerType,
         int $statementOwnerId,
-        string $saleDate
+        string $periodDate
     ): float {
+        /*
+         * Master-label catalogue ownership with
+         * a direct artist beneficiary.
+         *
+         * Example:
+         *
+         * DSP gross = 2500
+         * Artist    = 70%
+         * Master    = 30%
+         *
+         * Catalogue ownership remains label.
+         */
+        if (
+            $sourceOwnerType === 'label'
+            && $rowArtistId !== null
+            && $rowLabelId !== null
+            && $rowLabelId
+                === $sourceOwnerId
+        ) {
+            $artistShare =
+                $this->activeShareForBeneficiary(
+                    'artist',
+                    $rowArtistId,
+                    $periodDate
+                );
+
+            if (
+                $artistShare
+                && (int)
+                    $artistShare
+                        ->master_label_id
+                    === $sourceOwnerId
+            ) {
+                $artistPercent =
+                    max(
+                        0.0,
+                        min(
+                            100.0,
+                            (float)
+                                $artistShare
+                                    ->revenue_share_percent
+                        )
+                    );
+
+                if (
+                    $statementOwnerType
+                        === 'artist'
+                    && $statementOwnerId
+                        === $rowArtistId
+                ) {
+                    return round(
+                        $artistPercent,
+                        4
+                    );
+                }
+
+                if (
+                    $statementOwnerType
+                        === 'label'
+                    && $statementOwnerId
+                        === $sourceOwnerId
+                ) {
+                    return round(
+                        100.0
+                            - $artistPercent,
+                        4
+                    );
+                }
+
+                return 0.0;
+            }
+        }
+
+        /*
+         * Existing source-beneficiary split.
+         */
         $share =
             $this->activeShareForBeneficiary(
                 $sourceOwnerType,
                 $sourceOwnerId,
-                $saleDate
+                $periodDate
             );
 
         /*
-         * No explicit master/child share:
-         * preserve existing behaviour.
-         *
-         * Source owner receives 100%.
+         * No agreement means canonical owner
+         * receives full revenue.
          */
         if (!$share) {
             return (
@@ -582,26 +703,28 @@ class OwnershipRoyaltyService
         }
 
         $childPercent =
-            (float)
-                $share
-                    ->revenue_share_percent;
+            max(
+                0.0,
+                min(
+                    100.0,
+                    (float)
+                        $share
+                            ->revenue_share_percent
+                )
+            );
 
-        /*
-         * Source child gets configured share.
-         */
         if (
             $sourceOwnerType
                 === $statementOwnerType
             && $sourceOwnerId
                 === $statementOwnerId
         ) {
-            return $childPercent;
+            return round(
+                $childPercent,
+                4
+            );
         }
 
-        /*
-         * Master label receives only
-         * the retained difference.
-         */
         if (
             $statementOwnerType === 'label'
             && $statementOwnerId
