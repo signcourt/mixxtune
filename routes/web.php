@@ -851,6 +851,12 @@ Route::middleware([
                 );
             })->name('finance.index');
 
+            Route::get('/profit', function () {
+                return redirect()->route(
+                    'v2.admin.profit.index'
+                );
+            })->name('profit.index');
+
             Route::get('/distribution', function () {
                 return redirect()->route(
                     'v2.admin.delivery-management.index'
@@ -1568,6 +1574,32 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.admin.wallet.index');
 
+
+
+/*
+|--------------------------------------------------------------------------
+| Super Admin Business Profit
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/admin/profit',
+        [
+            \App\Http\Controllers\V2\Admin\SuperAdminProfitController::class,
+            'index',
+        ]
+    )
+    ->name('v2.admin.profit.index');
+
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/admin/profit/export',
+        [
+            \App\Http\Controllers\V2\Admin\SuperAdminProfitController::class,
+            'export',
+        ]
+    )
+    ->name('v2.admin.profit.export');
 
 
 Route::middleware(['auth', 'verified'])

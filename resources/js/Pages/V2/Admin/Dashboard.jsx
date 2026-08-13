@@ -150,6 +150,17 @@ export default function Dashboard({
     };
 
     const quickActions = [
+        ...(isSuperAdmin
+            ? [
+                  {
+                      label: 'Business Profit',
+                      description:
+                          'View retained revenue and account earnings',
+                      href: '/v2/admin/profit',
+                      icon: Landmark,
+                  },
+              ]
+            : []),
         {
             label: 'Review Queue',
             description: 'Approve or reject releases',
@@ -177,6 +188,17 @@ export default function Dashboard({
     ];
 
     const dashboardLinks = [
+        ...(isSuperAdmin
+            ? [
+                  {
+                      title: 'Business Profit',
+                      description:
+                          'Collected revenue, account earnings and retained Mixx Tune profit.',
+                      href: '/v2/admin/profit',
+                      icon: Landmark,
+                  },
+              ]
+            : []),
         {
             title: 'Release Reviews',
             description:
