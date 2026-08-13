@@ -9,6 +9,7 @@ use App\Models\Distribution\Track;
 use App\Models\DistributionStore;
 use App\Models\Finance\PayoutProfile;
 use App\Models\Finance\RoyaltyStatement;
+use App\Models\Reports\ReportRow;
 use App\Models\Finance\WalletAccount;
 use App\Models\ReleaseStoreDelivery;
 use App\Models\User;
@@ -45,15 +46,25 @@ class FullBusinessFlowIntegrationTest extends TestCase
             'email_verified_at' => now(),
         ]);
 
+        /*
+         * Canonical ownership fixture:
+         *
+         * The integration flow below validates an Artist royalty
+         * statement, wallet, invoice and withdrawal. Therefore the
+         * Artist account must be the canonical revenue owner.
+         *
+         * A Label can still be attached to release metadata without
+         * incorrectly making the Artist login the Label account owner.
+         */
         $label = Label::factory()->create([
-            'user_id' => $artistUser->id,
-            'created_by' => $artistUser->id,
+            'user_id' => null,
+            'created_by' => $admin->id,
         ]);
 
         $artist = Artist::factory()->create([
             'user_id' => $artistUser->id,
             'label_id' => $label->id,
-            'created_by' => $artistUser->id,
+            'created_by' => $admin->id,
         ]);
 
         /*
@@ -74,9 +85,17 @@ class FullBusinessFlowIntegrationTest extends TestCase
          * =========================================================
          */
 
+        /*
+         * This E2E specifically validates the direct Artist finance flow:
+         * Report -> Artist Statement -> Wallet -> Invoice -> Withdrawal.
+         *
+         * Canonical ownership rule:
+         * label_id present = Label financial owner
+         * label_id null    = Artist financial owner
+         */
         $release = Release::factory()->create([
             'artist_id' => $artist->id,
-            'label_id' => $label->id,
+            'label_id' => null,
 
             'catalog_number' =>
                 'MXT-E2E-'.uniqid(),
@@ -486,6 +505,62 @@ class FullBusinessFlowIntegrationTest extends TestCase
 
                 'sale_month' =>
                     $month,
+            ]
+        );
+
+        /*
+         * Canonicalize imported catalogue ownership before royalty
+         * generation.
+         *
+         * ReportImportService imports and matches catalogue metadata.
+         * The royalty engine consumes canonical mapped ownership.
+         *
+         * This E2E represents direct Artist-owned catalogue because
+         * the Release itself has label_id = null.
+         */
+        ReportRow::query()
+            ->where(
+                'sale_month',
+                $month
+            )
+            ->where(
+                'release_id',
+                $release->id
+            )
+            ->update([
+                'mapping_status' =>
+                    'mapped',
+
+                'mapped_at' =>
+                    now(),
+
+                'revenue_owner_type' =>
+                    'artist',
+
+                'revenue_owner_id' =>
+                    $artist->id,
+            ]);
+
+        $this->assertDatabaseHas(
+            'report_rows',
+            [
+                'release_id' =>
+                    $release->id,
+
+                'artist_id' =>
+                    $artist->id,
+
+                'label_id' =>
+                    null,
+
+                'mapping_status' =>
+                    'mapped',
+
+                'revenue_owner_type' =>
+                    'artist',
+
+                'revenue_owner_id' =>
+                    $artist->id,
             ]
         );
 
