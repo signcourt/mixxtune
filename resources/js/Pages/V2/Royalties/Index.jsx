@@ -266,50 +266,6 @@ export default function Index({
             <Head title={title} />
 
             <div className="space-y-6">
-                <header className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
-                        <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-violet-700">
-                                    Mixx Tune Finance
-                                </span>
-
-                                <span className="text-xs font-medium text-slate-500">
-                                    Royalty Dashboard
-                                </span>
-                            </div>
-
-                            <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                                {title}
-                            </h1>
-
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                                Review earnings,
-                                monthly statements,
-                                deductions, wallet
-                                availability and payment
-                                progress.
-                            </p>
-                        </div>
-
-                        <div className="flex flex-wrap gap-3">
-                            <Link
-                                href="/v2/statements"
-                                className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-violet-700"
-                            >
-                                View Statements
-                            </Link>
-
-                            <Link
-                                href="/v2/wallet"
-                                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                            >
-                                Open Wallet
-                            </Link>
-                        </div>
-                    </div>
-                </header>
-
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                     {summaryCards.map(
                         (card) => (
@@ -330,7 +286,7 @@ export default function Index({
                     )}
                 </section>
 
-                <section className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.7fr)]">
+                <section className="grid gap-6">
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
@@ -419,57 +375,6 @@ export default function Index({
                         )}
                     </div>
 
-                    <div className="rounded-2xl border border-slate-200 bg-slate-950 p-6 text-white shadow-sm">
-                        <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-violet-200">
-                            Payable Overview
-                        </span>
-
-                        <div className="mt-7">
-                            <div className="text-sm text-slate-400">
-                                Available Balance
-                            </div>
-
-                            <div className="mt-2 text-3xl font-black tracking-tight">
-                                {formatAmount(
-                                    summary.available,
-                                    'INR'
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="mt-7 space-y-4 border-t border-white/10 pt-6">
-                            <OverviewRow
-                                label="Pending"
-                                value={formatAmount(
-                                    summary.pending,
-                                    'INR'
-                                )}
-                            />
-
-                            <OverviewRow
-                                label="Approved"
-                                value={formatAmount(
-                                    summary.approved,
-                                    'INR'
-                                )}
-                            />
-
-                            <OverviewRow
-                                label="Paid"
-                                value={formatAmount(
-                                    summary.paid,
-                                    'INR'
-                                )}
-                            />
-                        </div>
-
-                        <Link
-                            href="/v2/withdrawals"
-                            className="mt-8 flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-violet-100"
-                        >
-                            Request Withdrawal
-                        </Link>
-                    </div>
                 </section>
 
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

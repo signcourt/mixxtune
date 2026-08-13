@@ -278,6 +278,14 @@ class UserManagementController extends Controller
                 'in:active,pending,suspended',
             ],
 
+            'revenue_share_percentage' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'numeric',
+                'min:0',
+                'max:100',
+            ],
+
             'send_invitation' => [
                 'required',
                 'boolean',
@@ -866,6 +874,11 @@ class UserManagementController extends Controller
                         'currency' =>
                             'INR',
 
+                        'revenue_share_percentage' =>
+                            (float) $validated[
+                                'revenue_share_percentage'
+                            ],
+
                         'account_status' =>
                             $validated[
                                 'account_status'
@@ -1042,6 +1055,11 @@ class UserManagementController extends Controller
                                     'user_id' =>
                                         $user->id,
 
+                                    'revenue_share_percentage' =>
+                                        (float) $validated[
+                                            'revenue_share_percentage'
+                                        ],
+
                                     'updated_by' =>
                                         $request
                                             ->user()
@@ -1141,6 +1159,11 @@ class UserManagementController extends Controller
 
                                     'currency' =>
                                         'INR',
+
+                                    'revenue_share_percentage' =>
+                                        (float) $validated[
+                                            'revenue_share_percentage'
+                                        ],
 
                                     'status' =>
                                         'active',
@@ -1378,6 +1401,31 @@ class UserManagementController extends Controller
                 ->where('user_id', $user->id)
                 ->first();
 
+        $assignedRevenueRate = null;
+
+        if ($user->role === 'artist') {
+            $assignedRevenueRate =
+                Artist::query()
+                    ->where(
+                        'user_id',
+                        $user->id
+                    )
+                    ->value(
+                        'revenue_share_percentage'
+                    );
+        } elseif ($user->role === 'label') {
+            $assignedRevenueRate =
+                Label::query()
+                    ->where(
+                        'user_id',
+                        $user->id
+                    )
+                    ->orderBy('id')
+                    ->value(
+                        'revenue_share_percentage'
+                    );
+        }
+
 return Inertia::render(
             'V2/Admin/Users/Edit',
             [
@@ -1404,6 +1452,11 @@ return Inertia::render(
                         $user->invitation_expires_at,
                     'last_login_at' =>
                         $user->last_login_at,
+
+                    'revenue_share_percentage' =>
+                        $assignedRevenueRate !== null
+                            ? (float) $assignedRevenueRate
+                            : null,
                 ],
 
                 'permissions' =>
@@ -1598,6 +1651,14 @@ $validated = $request->validate([
                 'required',
                 'string',
                 'in:active,pending,suspended',
+            ],
+
+            'revenue_share_percentage' => [
+                'nullable',
+                'required_if:role,label,artist',
+                'numeric',
+                'min:0',
+                'max:100',
             ],
 
             'kyc_status' => [
@@ -1876,6 +1937,43 @@ $oldValues = [
                         ?? $user->kyc_status,
                 ]);
 
+                /*
+                 * Assigned Revenue Rate is commercial
+                 * configuration controlled only through
+                 * this Super Admin endpoint.
+                 */
+                if ($validated['role'] === 'artist') {
+                    Artist::query()
+                        ->where(
+                            'user_id',
+                            $user->id
+                        )
+                        ->update([
+                            'revenue_share_percentage' =>
+                                (float) $validated[
+                                    'revenue_share_percentage'
+                                ],
+
+                            'updated_by' =>
+                                $request->user()->id,
+                        ]);
+                } elseif ($validated['role'] === 'label') {
+                    Label::query()
+                        ->where(
+                            'user_id',
+                            $user->id
+                        )
+                        ->update([
+                            'revenue_share_percentage' =>
+                                (float) $validated[
+                                    'revenue_share_percentage'
+                                ],
+
+                            'updated_by' =>
+                                $request->user()->id,
+                        ]);
+                }
+
                 if (
                     $validated['role'] === 'admin'
                 ) {
@@ -2055,6 +2153,16 @@ $oldValues = [
                             $label->save();
                         }
 
+                        $label->forceFill([
+                            'revenue_share_percentage' =>
+                                (float) $validated[
+                                    'revenue_share_percentage'
+                                ],
+
+                            'updated_by' =>
+                                $request->user()->id,
+                        ])->save();
+
                         $labelSync[
                             (int) $label->id
                         ] = $ownerPivot;
@@ -2212,6 +2320,11 @@ $oldValues = [
                                     'currency' =>
                                         'INR',
 
+                                    'revenue_share_percentage' =>
+                                        (float) $validated[
+                                            'revenue_share_percentage'
+                                        ],
+
                                     'status' =>
                                         'active',
 
@@ -2240,6 +2353,16 @@ $oldValues = [
 
                             $label->save();
                         }
+
+                        $label->forceFill([
+                            'revenue_share_percentage' =>
+                                (float) $validated[
+                                    'revenue_share_percentage'
+                                ],
+
+                            'updated_by' =>
+                                $request->user()->id,
+                        ])->save();
 
                         $labelSync[
                             (int) $label->id

@@ -447,6 +447,18 @@ Route::middleware([
             'v2.label.revenue-sharing.update'
         );
 
+    \Illuminate\Support\Facades\Route::delete(
+        '/v2/label/revenue-sharing/{share}',
+        [
+            \App\Http\Controllers\V2\Label\RevenueSharingController::class,
+            'destroy',
+        ]
+    )
+        ->whereNumber('share')
+        ->name(
+            'v2.label.revenue-sharing.destroy'
+        );
+
     \Illuminate\Support\Facades\Route::patch(
         '/v2/label/revenue-sharing/{share}/toggle',
         [

@@ -76,7 +76,7 @@ class RevenueSharingWorkflowTest extends TestCase
             );
     }
 
-    public function test_page_contains_only_direct_sub_labels_and_direct_artists(): void
+    public function test_unconfigured_accounts_are_available_but_not_beneficiaries(): void
     {
         $user = $this->labelUser();
         $master = $this->masterLabel($user);
@@ -97,7 +97,10 @@ class RevenueSharingWorkflowTest extends TestCase
             'Nested Artist'
         );
 
-        $otherUser = $this->labelUser('Other Master User');
+        $otherUser = $this->labelUser(
+            'Other Master User'
+        );
+
         $otherMaster = $this->masterLabel(
             $otherUser,
             'Other Master'
@@ -114,39 +117,66 @@ class RevenueSharingWorkflowTest extends TestCase
 
         $response->assertOk();
 
+        $props =
+            $response->viewData('page')['props'];
+
         $beneficiaries = collect(
-            $response->viewData('page')['props']['beneficiaries']
+            $props['beneficiaries']
         );
 
+        $availableSubLabels = collect(
+            $props['availableSubLabels']
+        );
+
+        $availableArtists = collect(
+            $props['availableArtists']
+        );
+
+        /*
+         * Nothing is a beneficiary until the Master
+         * explicitly creates a revenue-share assignment.
+         */
+        $this->assertCount(
+            0,
+            $beneficiaries
+        );
+
+        /*
+         * Direct eligible accounts are offered through
+         * the Add Sub-Label / Add Artist selectors.
+         */
         $this->assertTrue(
-            $beneficiaries->contains(
+            $availableSubLabels->contains(
                 fn ($item) =>
-                    $item['type'] === 'label'
-                    && $item['id'] === $directChild->id
+                    $item['id']
+                        === $directChild->id
             )
         );
 
         $this->assertTrue(
-            $beneficiaries->contains(
+            $availableArtists->contains(
                 fn ($item) =>
-                    $item['type'] === 'artist'
-                    && $item['id'] === $directArtist->id
+                    $item['id']
+                        === $directArtist->id
+            )
+        );
+
+        /*
+         * Nested/foreign accounts must never be offered.
+         */
+        $this->assertFalse(
+            $availableArtists->contains(
+                fn ($item) =>
+                    $item['id']
+                        === $nestedArtist->id
             )
         );
 
         $this->assertFalse(
-            $beneficiaries->contains(
+            $availableSubLabels->contains(
                 fn ($item) =>
-                    $item['type'] === 'artist'
-                    && $item['id'] === $nestedArtist->id
-            )
-        );
-
-        $this->assertFalse(
-            $beneficiaries->contains(
-                fn ($item) =>
-                    $item['type'] === 'label'
-                    && $item['id'] === $otherChild->id
+                    $item['id']
+                        === $otherChild->id
             )
         );
     }
@@ -337,6 +367,68 @@ class RevenueSharingWorkflowTest extends TestCase
             ]
         );
     }
+
+    public function test_master_can_remove_revenue_beneficiary_without_deleting_account(): void
+    {
+        $user = $this->labelUser();
+        $master = $this->masterLabel($user);
+
+        $artist = $this->artist(
+            $master,
+            'Removable Artist'
+        );
+
+        $share = LabelRevenueShare::query()
+            ->create([
+                'master_label_id' =>
+                    $master->id,
+
+                'beneficiary_type' =>
+                    'artist',
+
+                'beneficiary_id' =>
+                    $artist->id,
+
+                'revenue_share_percent' =>
+                    70,
+
+                'show_revenue_share' =>
+                    true,
+
+                'is_active' =>
+                    true,
+
+                'effective_from' =>
+                    now()->toDateString(),
+
+                'created_by' =>
+                    $user->id,
+
+                'updated_by' =>
+                    $user->id,
+            ]);
+
+        $this->actingAs($user)
+            ->delete(
+                "/v2/label/revenue-sharing/{$share->id}"
+            )
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing(
+            'label_revenue_shares',
+            [
+                'id' => $share->id,
+            ]
+        );
+
+        $this->assertDatabaseHas(
+            'artists',
+            [
+                'id' => $artist->id,
+            ]
+        );
+    }
+
 
     public function test_master_cannot_toggle_another_masters_share(): void
     {

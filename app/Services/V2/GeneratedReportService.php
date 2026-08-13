@@ -31,9 +31,9 @@ class GeneratedReportService
         'Sale Type' => 'sale_type',
         'Quantity / Streams' => '__quantity',
         'Currency' => 'currency',
-        'Gross Revenue' => '__gross',
-        'Revenue Share %' => '__share',
-        'Net Revenue' => '__net',
+        'Collected Revenue' => '__gross',
+        'Assigned Rate' => '__share',
+        'User Revenue' => '__net',
     ];
 
     public function __construct(
@@ -283,7 +283,10 @@ class GeneratedReportService
                     $index + 1,
                     1,
                 ],
-                $column
+                $this->exportHeading(
+                    $column,
+                    $user
+                )
             );
         }
 
@@ -431,6 +434,43 @@ class GeneratedReportService
         ];
     }
 
+    private function exportHeading(
+        string $column,
+        User $user
+    ): string {
+        $role =
+            $this->permissions
+                ->role(
+                    $user
+                );
+
+        if ($column === 'Assigned Rate') {
+            return match ($role) {
+                'label' =>
+                    'Label Rate',
+
+                'artist' =>
+                    'Artist Rate',
+
+                default =>
+                    'Assigned Rate',
+            };
+        }
+
+        if ($column === 'User Revenue') {
+            return match ($role) {
+                'label',
+                'artist' =>
+                    'Earning',
+
+                default =>
+                    'User Revenue',
+            };
+        }
+
+        return $column;
+    }
+
     private function columnValue(
         string $column,
         $row,
@@ -482,13 +522,13 @@ class GeneratedReportService
             'Currency' =>
                 $row->currency,
 
-            'Gross Revenue' =>
+            'Collected Revenue' =>
                 $revenue['gross'],
 
-            'Revenue Share %' =>
+            'Assigned Rate' =>
                 $revenue['share'],
 
-            'Net Revenue' =>
+            'User Revenue' =>
                 $revenue['net'],
 
             default =>
@@ -519,7 +559,7 @@ class GeneratedReportService
         $row,
         User $user
     ): array {
-        $gross =
+        $collected =
             round(
                 (float) (
                     $row->earnings
@@ -535,142 +575,154 @@ class GeneratedReportService
                 );
 
         /*
-         * Super Admin sees source/gross revenue.
+         * Super Admin / Admin operational reports:
+         * show source economics without account deductions.
          */
-        if ($role === 'super_admin') {
+        if (
+            $role === 'super_admin'
+            || $role === 'admin'
+        ) {
             return [
-                'gross' => $gross,
+                'gross' => $collected,
                 'share' => 100.0,
-                'net' => $gross,
+                'net' => $collected,
             ];
         }
 
         /*
-         * Artist beneficiary:
-         * use active direct revenue-share contract.
+         * Resolve the fixed commercial rate assigned by
+         * Super Admin to this account.
+         *
+         * IMPORTANT:
+         * Negative report rows do not modify this stored
+         * rate. They only use an effective 100% rate for
+         * that individual report row.
          */
-        if (
-            $role === 'artist'
-            && $row->artist_id
-        ) {
-            $share =
-                $this->activeShare(
-                    'artist',
-                    (int) $row->artist_id,
-                    $row->label_id
-                        ? (int) $row->label_id
-                        : null,
-                    $this->shareResolutionDate($row)
-                );
+        $accountRate = 100.0;
 
-            $percent =
-                $share
-                    ? (float)
-                        $share->revenue_share_percent
-                    : 100.0;
+        if ($role === 'artist') {
+            $rate =
+                DB::table('artists')
+                    ->where(
+                        'user_id',
+                        $user->id
+                    )
+                    ->value(
+                        'revenue_share_percentage'
+                    );
 
-            $net =
-                round(
-                    $gross
+            if ($rate !== null) {
+                $accountRate =
+                    (float) $rate;
+            }
+        } elseif ($role === 'label') {
+            /*
+             * Prefer the label attached to this report row
+             * when it belongs to the authenticated label
+             * account. This keeps multi-label accounts
+             * deterministic.
+             */
+            $rateQuery =
+                DB::table('labels')
+                    ->where(
+                        'user_id',
+                        $user->id
+                    );
+
+            if (!empty($row->label_id)) {
+                $rowRate =
+                    (clone $rateQuery)
+                        ->where(
+                            'id',
+                            (int) $row->label_id
+                        )
+                        ->value(
+                            'revenue_share_percentage'
+                        );
+
+                if ($rowRate !== null) {
+                    $accountRate =
+                        (float) $rowRate;
+                } else {
+                    $fallbackRate =
+                        $rateQuery
+                            ->orderBy('id')
+                            ->value(
+                                'revenue_share_percentage'
+                            );
+
+                    if ($fallbackRate !== null) {
+                        $accountRate =
+                            (float) $fallbackRate;
+                    }
+                }
+            } else {
+                $fallbackRate =
+                    $rateQuery
+                        ->orderBy('id')
+                        ->value(
+                            'revenue_share_percentage'
+                        );
+
+                if ($fallbackRate !== null) {
+                    $accountRate =
+                        (float) $fallbackRate;
+                }
+            }
+        }
+
+        $accountRate =
+            max(
+                0.0,
+                min(
+                    100.0,
+                    $accountRate
+                )
+            );
+
+        /*
+         * FINAL REVENUE RULE
+         * ------------------
+         *
+         * Positive / zero:
+         * Collected Revenue × Assigned Account Rate.
+         *
+         * Negative:
+         * 100% of the negative adjustment belongs to
+         * the user. Therefore effective Assigned Rate
+         * shown in that row becomes 100%.
+         *
+         * Example:
+         * +100 @ 80% = +80
+         *  -10 @100% = -10
+         * User Revenue = 70
+         */
+        $effectiveRate =
+            $collected < 0
+                ? 100.0
+                : $accountRate;
+
+        $userRevenue =
+            $collected < 0
+                ? $collected
+                : round(
+                    $collected
                     * (
-                        $percent
+                        $effectiveRate
                         / 100
                     ),
                     8
                 );
 
-            return [
-                /*
-                 * Beneficiary must not receive
-                 * master gross economics as its
-                 * payable amount.
-                 */
-                'gross' => $gross,
-                'share' =>
-                    $share
-                    && (bool)
-                        $share->show_revenue_share
-                        ? $percent
-                        : null,
-
-                'net' => $net,
-            ];
-        }
-
-        /*
-         * Label/master view:
-         *
-         * The master manages the full source
-         * revenue. If the row belongs to a direct
-         * artist beneficiary, its retained amount
-         * is gross minus beneficiary allocation.
-         *
-         * Rows without a beneficiary contract stay
-         * at 100% for the owning label.
-         */
-        if (
-            $role === 'label'
-            && $row->label_id
-        ) {
-            $share = null;
-
-            if ($row->artist_id) {
-                $share =
-                    $this->activeShare(
-                        'artist',
-                        (int) $row->artist_id,
-                        (int) $row->label_id,
-                        $this->shareResolutionDate($row)
-                    );
-            }
-
-            if ($share) {
-                $childPercent =
-                    (float)
-                        $share
-                            ->revenue_share_percent;
-
-                $retainedPercent =
-                    max(
-                        0,
-                        100
-                        - $childPercent
-                    );
-
-                return [
-                    'gross' =>
-                        $gross,
-
-                    'share' =>
-                        $retainedPercent,
-
-                    'net' =>
-                        round(
-                            $gross
-                            * (
-                                $retainedPercent
-                                / 100
-                            ),
-                            8
-                        ),
-                ];
-            }
-
-            return [
-                'gross' => $gross,
-                'share' => 100.0,
-                'net' => $gross,
-            ];
-        }
-
-        /*
-         * Admin reports are operational views.
-         * They do not alter financial ownership.
-         */
         return [
-            'gross' => $gross,
-            'share' => 100.0,
-            'net' => $gross,
+            'gross' =>
+                $collected,
+
+            'share' =>
+                $effectiveRate,
+
+            'net' =>
+                $userRevenue,
         ];
     }
 

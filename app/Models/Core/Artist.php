@@ -30,6 +30,7 @@ class Artist extends Model
         'country',
         'timezone',
         'currency',
+        'revenue_share_percentage',
         'profile_image_path',
         'bio',
         'account_status',
@@ -43,6 +44,7 @@ class Artist extends Model
     protected function casts(): array
     {
         return [
+            'revenue_share_percentage' => 'decimal:2',
             'deleted_at' => 'datetime',
         ];
     }

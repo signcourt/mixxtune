@@ -81,6 +81,32 @@ function ShareRow({
         );
     };
 
+    const remove = () => {
+        if (!item.share_id) {
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `Remove ${item.name} from Revenue Sharing? This will not delete the account.`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setProcessing(true);
+
+        router.delete(
+            `/v2/label/revenue-sharing/${item.share_id}`,
+            {
+                preserveScroll: true,
+
+                onFinish: () =>
+                    setProcessing(false),
+            }
+        );
+    };
+
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
@@ -202,15 +228,27 @@ function ShareRow({
                     </button>
 
                     {item.share_id && (
-                        <button
-                            type="button"
-                            onClick={toggle}
-                            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            {item.is_active
-                                ? 'Disable'
-                                : 'Enable'}
-                        </button>
+                        <>
+                            <button
+                                type="button"
+                                onClick={toggle}
+                                disabled={processing}
+                                className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            >
+                                {item.is_active
+                                    ? 'Disable'
+                                    : 'Enable'}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={remove}
+                                disabled={processing}
+                                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                            >
+                                Remove
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -234,6 +272,234 @@ function ShareRow({
     );
 }
 
+function AddBeneficiary({
+    type,
+    items = [],
+}) {
+    const [
+        open,
+        setOpen,
+    ] = useState(false);
+
+    const [
+        beneficiaryId,
+        setBeneficiaryId,
+    ] = useState('');
+
+    const [
+        percent,
+        setPercent,
+    ] = useState('');
+
+    const [
+        showShare,
+        setShowShare,
+    ] = useState(true);
+
+    const [
+        processing,
+        setProcessing,
+    ] = useState(false);
+
+    const safePercent = Math.min(
+        100,
+        Math.max(
+            0,
+            Number(percent) || 0
+        )
+    );
+
+    const masterPercent =
+        100 - safePercent;
+
+    const isLabel =
+        type === 'label';
+
+    const title = isLabel
+        ? 'Sub-Label'
+        : 'Artist';
+
+    const reset = () => {
+        setBeneficiaryId('');
+        setPercent('');
+        setShowShare(true);
+        setOpen(false);
+    };
+
+    const save = () => {
+        if (!beneficiaryId) {
+            return;
+        }
+
+        setProcessing(true);
+
+        router.patch(
+            `/v2/label/revenue-sharing/${type}/${beneficiaryId}`,
+            {
+                revenue_share_percent:
+                    safePercent,
+
+                show_revenue_share:
+                    showShare,
+            },
+            {
+                preserveScroll: true,
+
+                onSuccess: () =>
+                    reset(),
+
+                onFinish: () =>
+                    setProcessing(false),
+            }
+        );
+    };
+
+    if (!open) {
+        return (
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                disabled={!items.length}
+                className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+                + Add {title}
+            </button>
+        );
+    }
+
+    return (
+        <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-5">
+            <div className="flex flex-col gap-4">
+                <div>
+                    <h3 className="font-bold text-slate-900">
+                        Add {title} Revenue Share
+                    </h3>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                        Select an eligible {title.toLowerCase()} and assign its revenue percentage.
+                    </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="xl:col-span-2">
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {title}
+                        </label>
+
+                        <select
+                            value={beneficiaryId}
+                            onChange={(event) =>
+                                setBeneficiaryId(
+                                    event.target.value
+                                )
+                            }
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500"
+                        >
+                            <option value="">
+                                Select {title}
+                            </option>
+
+                            {items.map((item) => (
+                                <option
+                                    key={item.id}
+                                    value={item.id}
+                                >
+                                    {item.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {title} Share
+                        </label>
+
+                        <div className="relative">
+                            <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={percent}
+                                onChange={(event) =>
+                                    setPercent(
+                                        event.target.value
+                                    )
+                                }
+                                placeholder="0"
+                                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-10 text-sm font-semibold outline-none focus:border-violet-500"
+                            />
+
+                            <span className="absolute right-4 top-3 text-sm font-semibold text-slate-400">
+                                %
+                            </span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Master Keeps
+                        </label>
+
+                        <div className="rounded-xl bg-white px-4 py-3 text-sm font-bold text-violet-700">
+                            {masterPercent.toFixed(2)}%
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-3 border-t border-violet-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setShowShare(
+                                (current) =>
+                                    !current
+                            )
+                        }
+                        className={[
+                            'w-fit rounded-xl border px-4 py-2.5 text-sm font-semibold',
+                            showShare
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : 'border-slate-300 bg-white text-slate-600',
+                        ].join(' ')}
+                    >
+                        {showShare
+                            ? 'Percentage visible to beneficiary'
+                            : 'Percentage hidden from beneficiary'}
+                    </button>
+
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={reset}
+                            disabled={processing}
+                            className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={save}
+                            disabled={
+                                processing ||
+                                !beneficiaryId ||
+                                percent === ''
+                            }
+                            className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {processing
+                                ? 'Saving...'
+                                : 'Save Revenue Share'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 const revenueMoney = (
     value,
     currency = 'INR'
@@ -252,6 +518,8 @@ const revenueNumber = (value) =>
 export default function Index({
     master,
     beneficiaries = [],
+    availableSubLabels = [],
+    availableArtists = [],
     revenueReport = {
         summary: {},
         beneficiaries: [],
@@ -291,7 +559,7 @@ export default function Index({
 
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Direct Sub-Labels
+                            Configured Sub-Labels
                         </p>
 
                         <p className="mt-2 text-3xl font-bold text-violet-700">
@@ -301,7 +569,7 @@ export default function Index({
 
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Direct Artists
+                            Configured Artists
                         </p>
 
                         <p className="mt-2 text-3xl font-bold text-violet-700">
@@ -618,14 +886,21 @@ export default function Index({
 
 
                 <section>
-                    <div className="mb-4">
-                        <h2 className="text-lg font-bold text-slate-900">
-                            Sub-Labels
-                        </h2>
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-900">
+                                Sub-Labels
+                            </h2>
 
-                        <p className="text-sm text-slate-500">
-                            Revenue shares for direct child labels.
-                        </p>
+                            <p className="text-sm text-slate-500">
+                                Only manually configured Sub-Labels appear here.
+                            </p>
+                        </div>
+
+                        <AddBeneficiary
+                            type="label"
+                            items={availableSubLabels}
+                        />
                     </div>
 
                     <div className="space-y-3">
@@ -639,22 +914,35 @@ export default function Index({
                                 )
                             )
                         ) : (
-                            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
-                                No direct Sub-Labels found.
+                            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+                                <p className="font-semibold text-slate-700">
+                                    None configured
+                                </p>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                    No Sub-Label currently has a revenue sharing assignment.
+                                </p>
                             </div>
                         )}
                     </div>
                 </section>
 
                 <section>
-                    <div className="mb-4">
-                        <h2 className="text-lg font-bold text-slate-900">
-                            Artists
-                        </h2>
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-900">
+                                Artists
+                            </h2>
 
-                        <p className="text-sm text-slate-500">
-                            Revenue shares for artists directly owned by this master.
-                        </p>
+                            <p className="text-sm text-slate-500">
+                                Only manually configured Artists appear here.
+                            </p>
+                        </div>
+
+                        <AddBeneficiary
+                            type="artist"
+                            items={availableArtists}
+                        />
                     </div>
 
                     <div className="space-y-3">
@@ -668,8 +956,14 @@ export default function Index({
                                 )
                             )
                         ) : (
-                            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
-                                No direct Artists found.
+                            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+                                <p className="font-semibold text-slate-700">
+                                    None configured
+                                </p>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                    No Artist currently has a revenue sharing assignment.
+                                </p>
                             </div>
                         )}
                     </div>

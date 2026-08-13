@@ -148,6 +148,22 @@ class ReportAnalyticsService
                 'sale_month',
                 $filters['month']
             );
+        } else {
+            if (!empty($filters['from_month'])) {
+                $query->where(
+                    'sale_month',
+                    '>=',
+                    $filters['from_month']
+                );
+            }
+
+            if (!empty($filters['to_month'])) {
+                $query->where(
+                    'sale_month',
+                    '<=',
+                    $filters['to_month']
+                );
+            }
         }
 
         if (!empty($filters['platform'])) {
@@ -281,6 +297,207 @@ class ReportAnalyticsService
             ])
             ->all();
     }
+
+
+    public function growthSummary(
+        array $monthlyTrend,
+        ?string $selectedMonth = null
+    ): array {
+        if (empty($monthlyTrend)) {
+            return [
+                'current_month' => null,
+                'previous_month' => null,
+                'current_earnings' => 0.0,
+                'previous_earnings' => 0.0,
+                'earnings_change' => 0.0,
+                'earnings_percent' => null,
+                'current_streams' => 0.0,
+                'previous_streams' => 0.0,
+                'streams_change' => 0.0,
+                'streams_percent' => null,
+                'direction' => 'neutral',
+                'has_previous' => false,
+            ];
+        }
+
+        $rows = collect($monthlyTrend)
+            ->sortBy('month')
+            ->values();
+
+        $currentIndex = null;
+
+        if ($selectedMonth) {
+            $currentIndex = $rows->search(
+                fn ($row) =>
+                    ($row['month'] ?? null)
+                    === $selectedMonth
+            );
+        }
+
+        if (
+            $currentIndex === null
+            || $currentIndex === false
+        ) {
+            $currentIndex =
+                $rows->count() - 1;
+        }
+
+        $current =
+            $rows->get($currentIndex);
+
+        $previous =
+            $currentIndex > 0
+                ? $rows->get(
+                    $currentIndex - 1
+                )
+                : null;
+
+        $currentEarnings =
+            (float) (
+                $current['earnings']
+                ?? 0
+            );
+
+        $currentStreams =
+            (float) (
+                $current['streams']
+                ?? 0
+            );
+
+        if (!$previous) {
+            return [
+                'current_month' =>
+                    $current['month']
+                    ?? null,
+
+                'previous_month' => null,
+
+                'current_earnings' =>
+                    $currentEarnings,
+
+                'previous_earnings' => 0.0,
+
+                'earnings_change' => 0.0,
+
+                'earnings_percent' => null,
+
+                'current_streams' =>
+                    $currentStreams,
+
+                'previous_streams' => 0.0,
+
+                'streams_change' => 0.0,
+
+                'streams_percent' => null,
+
+                'direction' => 'neutral',
+
+                'has_previous' => false,
+            ];
+        }
+
+        $previousEarnings =
+            (float) (
+                $previous['earnings']
+                ?? 0
+            );
+
+        $previousStreams =
+            (float) (
+                $previous['streams']
+                ?? 0
+            );
+
+        $earningsChange =
+            $currentEarnings
+            - $previousEarnings;
+
+        $streamsChange =
+            $currentStreams
+            - $previousStreams;
+
+        $earningsPercent =
+            $previousEarnings != 0.0
+                ? round(
+                    (
+                        $earningsChange
+                        / abs($previousEarnings)
+                    ) * 100,
+                    2
+                )
+                : (
+                    $currentEarnings == 0.0
+                        ? 0.0
+                        : null
+                );
+
+        $streamsPercent =
+            $previousStreams != 0.0
+                ? round(
+                    (
+                        $streamsChange
+                        / abs($previousStreams)
+                    ) * 100,
+                    2
+                )
+                : (
+                    $currentStreams == 0.0
+                        ? 0.0
+                        : null
+                );
+
+        return [
+            'current_month' =>
+                $current['month']
+                ?? null,
+
+            'previous_month' =>
+                $previous['month']
+                ?? null,
+
+            'current_earnings' =>
+                $currentEarnings,
+
+            'previous_earnings' =>
+                $previousEarnings,
+
+            'earnings_change' =>
+                round(
+                    $earningsChange,
+                    8
+                ),
+
+            'earnings_percent' =>
+                $earningsPercent,
+
+            'current_streams' =>
+                $currentStreams,
+
+            'previous_streams' =>
+                $previousStreams,
+
+            'streams_change' =>
+                round(
+                    $streamsChange,
+                    4
+                ),
+
+            'streams_percent' =>
+                $streamsPercent,
+
+            'direction' =>
+                $earningsChange > 0
+                    ? 'up'
+                    : (
+                        $earningsChange < 0
+                            ? 'down'
+                            : 'neutral'
+                    ),
+
+            'has_previous' => true,
+        ];
+    }
+
 
     public function topPlatforms(
         Builder $query,
@@ -424,6 +641,156 @@ class ReportAnalyticsService
             ])
             ->all();
     }
+
+    public function topArtists(
+        Builder $query,
+        int $limit = 10
+    ): array {
+        return (clone $query)
+            ->where(function ($builder) {
+                $builder
+                    ->whereNotNull('track_artist')
+                    ->orWhereNotNull('album_artist');
+            })
+            ->selectRaw(
+                "COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), 'Unknown Artist') as name"
+            )
+            ->selectRaw(
+                'COALESCE(SUM(streams), 0) as streams'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(sale_units), 0) as sale_units'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(earnings), 0) as earnings'
+            )
+            ->groupByRaw(
+                "COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), 'Unknown Artist')"
+            )
+            ->orderByDesc('earnings')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($row) => [
+                'name' => $row->name,
+                'streams' => (float) $row->streams,
+                'sale_units' => (float) $row->sale_units,
+                'earnings' => (float) $row->earnings,
+            ])
+            ->all();
+    }
+
+    public function topAlbums(
+        Builder $query,
+        int $limit = 10
+    ): array {
+        return (clone $query)
+            ->whereNotNull('album_title')
+            ->where('album_title', '!=', '')
+            ->select([
+                'album_title',
+                'album_artist',
+                'upc',
+            ])
+            ->selectRaw(
+                'COALESCE(SUM(streams), 0) as streams'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(sale_units), 0) as sale_units'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(earnings), 0) as earnings'
+            )
+            ->groupBy([
+                'album_title',
+                'album_artist',
+                'upc',
+            ])
+            ->orderByDesc('earnings')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($row) => [
+                'name' =>
+                    $row->album_title
+                    ?: 'Unknown Album',
+
+                'artist' =>
+                    $row->album_artist
+                    ?: 'Unknown Artist',
+
+                'upc' => $row->upc,
+
+                'streams' =>
+                    (float) $row->streams,
+
+                'sale_units' =>
+                    (float) $row->sale_units,
+
+                'earnings' =>
+                    (float) $row->earnings,
+            ])
+            ->all();
+    }
+
+    public function topLabels(
+        Builder $query,
+        int $limit = 10
+    ): array {
+        return (clone $query)
+            ->whereNotNull('label_name')
+            ->where('label_name', '!=', '')
+            ->select('label_name')
+            ->selectRaw(
+                'COALESCE(SUM(streams), 0) as streams'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(sale_units), 0) as sale_units'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(earnings), 0) as earnings'
+            )
+            ->groupBy('label_name')
+            ->orderByDesc('earnings')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($row) => [
+                'name' => $row->label_name,
+                'streams' => (float) $row->streams,
+                'sale_units' => (float) $row->sale_units,
+                'earnings' => (float) $row->earnings,
+            ])
+            ->all();
+    }
+
+    public function saleTypeSummary(
+        Builder $query,
+        int $limit = 10
+    ): array {
+        return (clone $query)
+            ->whereNotNull('sale_type')
+            ->where('sale_type', '!=', '')
+            ->select('sale_type')
+            ->selectRaw(
+                'COALESCE(SUM(streams), 0) as streams'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(sale_units), 0) as sale_units'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(earnings), 0) as earnings'
+            )
+            ->groupBy('sale_type')
+            ->orderByDesc('earnings')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($row) => [
+                'name' => $row->sale_type,
+                'streams' => (float) $row->streams,
+                'sale_units' => (float) $row->sale_units,
+                'earnings' => (float) $row->earnings,
+            ])
+            ->all();
+    }
+
 
     public function currencySummary(
         Builder $query

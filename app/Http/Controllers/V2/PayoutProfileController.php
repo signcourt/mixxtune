@@ -5,9 +5,7 @@ namespace App\Http\Controllers\V2;
 use App\Http\Controllers\Controller;
 use App\Models\Finance\PayoutProfile;
 use App\Services\V2\PermissionService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,200 +30,72 @@ class PayoutProfileController extends Controller
                         $request->user()
                     ),
 
-                'profile' =>
-                    $profile,
+                /*
+                 * USER_READ_ONLY_KYC
+                 *
+                 * KYC/Payout information is provisioned and managed
+                 * exclusively by Super Admin.
+                 *
+                 * Never expose raw encrypted Bank Account or PAN
+                 * values to the user-facing profile.
+                 */
+                'profile' => $profile
+                    ? [
+                        'public_id' =>
+                            $profile->public_id,
+
+                        'account_holder_name' =>
+                            $profile->account_holder_name,
+
+                        'masked_bank_account' =>
+                            $profile->masked_bank_account,
+
+                        'bank_name' =>
+                            $profile->bank_name,
+
+                        'ifsc_code' =>
+                            $profile->ifsc_code,
+
+                        'branch_name' =>
+                            $profile->branch_name,
+
+                        'upi_id' =>
+                            $profile->upi_id,
+
+                        'masked_pan' =>
+                            $profile->masked_pan,
+
+                        'gst_number' =>
+                            $profile->gst_number,
+
+                        'address_line_1' =>
+                            $profile->address_line_1,
+
+                        'address_line_2' =>
+                            $profile->address_line_2,
+
+                        'city' =>
+                            $profile->city,
+
+                        'state' =>
+                            $profile->state,
+
+                        'postal_code' =>
+                            $profile->postal_code,
+
+                        'country_code' =>
+                            $profile->country_code,
+
+                        'kyc_status' =>
+                            $profile->kyc_status,
+
+                        'verified_at' =>
+                            optional(
+                                $profile->verified_at
+                            )?->toDateTimeString(),
+                    ]
+                    : null,
             ]
-        );
-    }
-
-    public function update(
-        Request $request
-    ): RedirectResponse {
-        $validated = $request->validate([
-            'account_holder_name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'bank_account_number' => [
-                'nullable',
-                'string',
-                'min:6',
-                'max:40',
-            ],
-
-            'bank_name' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'ifsc_code' => [
-                'nullable',
-                'string',
-                'max:11',
-                'regex:/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/',
-            ],
-
-            'branch_name' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'upi_id' => [
-                'nullable',
-                'string',
-                'max:255',
-                'regex:/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$/',
-            ],
-
-            'pan_number' => [
-                'nullable',
-                'string',
-                'size:10',
-                'regex:/^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/',
-            ],
-
-            'gst_number' => [
-                'nullable',
-                'string',
-                'size:15',
-                'regex:/^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][1-9A-Za-z]Z[0-9A-Za-z]$/',
-            ],
-
-            'address_line_1' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'address_line_2' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-
-            'city' => [
-                'required',
-                'string',
-                'max:100',
-            ],
-
-            'state' => [
-                'required',
-                'string',
-                'max:100',
-            ],
-
-            'postal_code' => [
-                'required',
-                'string',
-                'max:20',
-            ],
-
-            'country_code' => [
-                'required',
-                'string',
-                'size:2',
-            ],
-        ]);
-
-        $existing = PayoutProfile::query()
-            ->where(
-                'user_id',
-                $request->user()->id
-            )
-            ->first();
-
-        if (
-            empty(
-                $validated[
-                    'bank_account_number'
-                ]
-            )
-            && $existing
-        ) {
-            unset(
-                $validated[
-                    'bank_account_number'
-                ]
-            );
-        }
-
-        if (
-            empty(
-                $validated[
-                    'pan_number'
-                ]
-            )
-            && $existing
-        ) {
-            unset(
-                $validated[
-                    'pan_number'
-                ]
-            );
-        }
-
-        PayoutProfile::query()
-            ->updateOrCreate(
-                [
-                    'user_id' =>
-                        $request->user()->id,
-                ],
-                [
-                    'public_id' =>
-                        $existing?->public_id
-                        ?: (string) Str::ulid(),
-
-                    ...$validated,
-
-                    'country_code' =>
-                        strtoupper(
-                            $validated[
-                                'country_code'
-                            ]
-                        ),
-
-                    'ifsc_code' =>
-                        isset(
-                            $validated[
-                                'ifsc_code'
-                            ]
-                        )
-                            ? strtoupper(
-                                $validated[
-                                    'ifsc_code'
-                                ]
-                            )
-                            : null,
-
-                    'pan_number' =>
-                        isset(
-                            $validated[
-                                'pan_number'
-                            ]
-                        )
-                            ? strtoupper(
-                                $validated[
-                                    'pan_number'
-                                ]
-                            )
-                            : null,
-
-                    'kyc_status' =>
-                        $existing?->kyc_status
-                            === 'verified'
-                            ? 'verified'
-                            : 'submitted',
-                ]
-            );
-
-        return back()->with(
-            'success',
-            'Payout and KYC profile saved.'
         );
     }
 }

@@ -34,6 +34,7 @@ class Label extends Model
         'payout_cycle',
         'minimum_withdrawal_amount',
         'royalty_share_percentage',
+        'revenue_share_percentage',
         'parent_commission_percentage',
         'status',
         'can_access_catalogue',
@@ -50,6 +51,7 @@ class Label extends Model
         return [
             'minimum_withdrawal_amount' => 'decimal:2',
             'royalty_share_percentage' => 'decimal:2',
+            'revenue_share_percentage' => 'decimal:2',
             'parent_commission_percentage' => 'decimal:2',
             'can_access_catalogue' => 'boolean',
             'can_access_royalties' => 'boolean',

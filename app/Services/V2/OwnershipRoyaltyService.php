@@ -534,11 +534,65 @@ class OwnershipRoyaltyService
                                 $row
                                     ->earnings;
 
+                        /*
+                         * Direct account commercial rate.
+                         *
+                         * When the statement belongs to the same
+                         * canonical Label/Artist that owns the source
+                         * revenue, use the rate assigned by Super Admin
+                         * on that account.
+                         *
+                         * Cross-owner master/child beneficiary splits
+                         * continue to use shareForStatement().
+                         */
+                        if (
+                            (string) $row->revenue_owner_type
+                                === $statementOwnerType
+                            && (int) $row->revenue_owner_id
+                                === $statementOwnerId
+                        ) {
+                            $accountRate =
+                                $this->accountRevenueRate(
+                                    $statementOwnerType,
+                                    $statementOwnerId
+                                );
+
+                            if ($accountRate !== null) {
+                                $sharePercent =
+                                    $accountRate;
+                            }
+                        }
+
+                        /*
+                         * MIXX TUNE FINANCIAL RULE
+                         * -------------------------
+                         * Positive revenue:
+                         *   apply beneficiary's normal assigned rate.
+                         *
+                         * Negative revenue / adjustment:
+                         *   charge 100% of the negative amount to the
+                         *   beneficiary instead of reducing it by the
+                         *   assigned revenue-share percentage.
+                         *
+                         * Example:
+                         *   +100 @ 80% = +80
+                         *    -10 @ 80% = -10 (effective rate 100%)
+                         *   payable     = +70
+                         *
+                         * This is an allocation-time override only.
+                         * The beneficiary's persisted assigned rate
+                         * remains unchanged.
+                         */
+                        $effectiveSharePercent =
+                            $sourceGross < 0
+                                ? 100.0
+                                : $sharePercent;
+
                         $allocatedGross =
                             round(
                                 $sourceGross
                                 * (
-                                    $sharePercent
+                                    $effectiveSharePercent
                                     / 100
                                 ),
                                 8
@@ -583,7 +637,7 @@ class OwnershipRoyaltyService
 
                             'share_percentage' =>
                                 round(
-                                    $sharePercent,
+                                    $effectiveSharePercent,
                                     4
                                 ),
                         ];
@@ -593,6 +647,44 @@ class OwnershipRoyaltyService
             );
 
         return $allocations;
+    }
+
+    private function accountRevenueRate(
+        string $ownerType,
+        int $ownerId
+    ): ?float {
+        if ($ownerType === 'label') {
+            $rate =
+                DB::table('labels')
+                    ->where('id', $ownerId)
+                    ->value(
+                        'revenue_share_percentage'
+                    );
+        } elseif ($ownerType === 'artist') {
+            $rate =
+                DB::table('artists')
+                    ->where('id', $ownerId)
+                    ->value(
+                        'revenue_share_percentage'
+                    );
+        } else {
+            return null;
+        }
+
+        if ($rate === null) {
+            return null;
+        }
+
+        return round(
+            max(
+                0.0,
+                min(
+                    100.0,
+                    (float) $rate
+                )
+            ),
+            4
+        );
     }
 
     private function shareForStatement(

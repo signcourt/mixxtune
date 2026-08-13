@@ -1498,6 +1498,21 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.reports.index');
 
+
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/analytics',
+        [\App\Http\Controllers\V2\AnalyticsController::class, 'index']
+    )
+    ->name('v2.analytics.index');
+
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/analytics/export',
+        [\App\Http\Controllers\V2\AnalyticsController::class, 'export']
+    )
+    ->name('v2.analytics.export');
+
 Route::middleware(['auth','verified'])
     ->get(
         '/v2/admin/reports',
@@ -1594,13 +1609,6 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.kyc-profile.edit');
 
-
-Route::middleware(['auth', 'verified'])
-    ->patch(
-        '/v2/kyc-profile',
-        [\App\Http\Controllers\V2\PayoutProfileController::class, 'update']
-    )
-    ->name('v2.kyc-profile.update');
 
 
 Route::middleware(['auth', 'verified'])

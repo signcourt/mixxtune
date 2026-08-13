@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\Royalties;
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
 use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\Distribution\Release;
@@ -51,7 +54,17 @@ class RoyaltyStatementWorkflowTest extends TestCase
 
         $release = Release::factory()->create([
             'artist_id' => $artist->id,
-            'label_id' => $label->id,
+
+            /*
+             * Legacy workflow tests represent
+             * direct artist-owned catalogue.
+             *
+             * The label object still exists for
+             * relationship/context coverage, but
+             * financial catalogue ownership here
+             * belongs directly to the artist.
+             */
+            'label_id' => null,
             'catalog_number' =>
                 'MXT-ROY-'.uniqid(),
             'title' =>
@@ -137,6 +150,41 @@ class RoyaltyStatementWorkflowTest extends TestCase
                 $file,
                 $admin
             );
+
+        /*
+         * Canonical ownership fixture.
+         *
+         * ReportImportService is responsible for
+         * importing/matching catalogue metadata.
+         * Ownership repair normally canonicalizes
+         * these fields before royalty generation.
+         *
+         * These legacy workflow tests call the
+         * royalty generator directly, so make that
+         * canonical ownership state explicit here.
+         */
+        ReportRow::query()
+            ->where(
+                'sale_month',
+                $month
+            )
+            ->where(
+                'release_id',
+                $release->id
+            )
+            ->update([
+                'mapping_status' =>
+                    'mapped',
+
+                'mapped_at' =>
+                    now(),
+
+                'revenue_owner_type' =>
+                    'artist',
+
+                'revenue_owner_id' =>
+                    $artist->id,
+            ]);
 
         return [
             $artistUser,
@@ -911,8 +959,32 @@ class RoyaltyStatementWorkflowTest extends TestCase
             $month,
         ] = $this->createContext();
 
+        /*
+         * Canonical unmatched state.
+         *
+         * Catalogue relationship fields such as
+         * artist_id are metadata only. Royalty
+         * generation is controlled by canonical
+         * mapping + revenue ownership fields.
+         */
         ReportRow::query()->update([
-            'artist_id' => null,
+            'artist_id' =>
+                null,
+
+            'label_id' =>
+                null,
+
+            'mapping_status' =>
+                'unmapped',
+
+            'mapped_at' =>
+                null,
+
+            'revenue_owner_type' =>
+                null,
+
+            'revenue_owner_id' =>
+                null,
         ]);
 
         $result = $this
@@ -1040,4 +1112,424 @@ class RoyaltyStatementWorkflowTest extends TestCase
                 ->gross_earnings
         );
     }
+
+    public function test_canonical_label_owned_catalogue_can_split_revenue_with_direct_artist(): void
+    {
+        $month = '2026-08';
+
+        $labelOwner =
+            User::factory()->create([
+                'role' => 'label',
+                'account_status' => 'active',
+                'email_verified_at' => now(),
+            ]);
+
+        $artistUser =
+            User::factory()->create([
+                'role' => 'artist',
+                'account_status' => 'active',
+                'email_verified_at' => now(),
+            ]);
+
+        $labelId =
+            DB::table('labels')
+                ->insertGetId([
+                    'public_id' =>
+                        (string) Str::ulid(),
+
+                    'name' =>
+                        'Canonical Master Label',
+
+                    'slug' =>
+                        'canonical-master-label',
+
+                    'user_id' =>
+                        $labelOwner->id,
+
+                    'created_at' =>
+                        now(),
+
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $artistId =
+            DB::table('artists')
+                ->insertGetId([
+                    'public_id' =>
+                        (string) Str::ulid(),
+
+                    'stage_name' =>
+                        'Canonical Direct Artist',
+
+                    'slug' =>
+                        'canonical-direct-artist',
+
+                    'user_id' =>
+                        $artistUser->id,
+
+                    'label_id' =>
+                        $labelId,
+
+                    'created_at' =>
+                        now(),
+
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        DB::table(
+            'label_revenue_shares'
+        )->insert([
+            'master_label_id' =>
+                $labelId,
+
+            'beneficiary_type' =>
+                'artist',
+
+            'beneficiary_id' =>
+                $artistId,
+
+            'revenue_share_percent' =>
+                70,
+
+            'show_revenue_share' =>
+                false,
+
+            'is_active' =>
+                true,
+
+            'effective_from' =>
+                '2026-08-01',
+
+            'effective_to' =>
+                null,
+
+            'created_at' =>
+                now(),
+
+            'updated_at' =>
+                now(),
+        ]);
+
+        $importId =
+            DB::table('report_imports')
+                ->insertGetId([
+                    'public_id' =>
+                        (string)
+                            \Illuminate\Support\Str::ulid(),
+
+                    'original_filename' =>
+                        'canonical-split.csv',
+
+                    'stored_path' =>
+                        'tests/canonical-split.csv',
+
+                    'status' =>
+                        'completed',
+
+                    'total_rows' =>
+                        1,
+
+                    'imported_rows' =>
+                        1,
+
+                    'duplicate_rows' =>
+                        0,
+
+                    'failed_rows' =>
+                        0,
+
+                    'started_at' =>
+                        now(),
+
+                    'completed_at' =>
+                        now(),
+
+                    'created_at' =>
+                        now(),
+
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $reportRowId =
+            DB::table('report_rows')
+                ->insertGetId([
+                    'row_hash' =>
+                        hash(
+                            'sha256',
+                            'canonical-label-artist-split'
+                        ),
+
+                    'report_import_id' =>
+                        $importId,
+
+                    'artist_id' =>
+                        $artistId,
+
+                    'label_id' =>
+                        $labelId,
+
+                    'track_artist' =>
+                        'Canonical Direct Artist',
+
+                    'album_title' =>
+                        'Canonical Album',
+
+                    'album_artist' =>
+                        'Canonical Direct Artist',
+
+                    'label_name' =>
+                        'Canonical Master Label',
+
+                    'track_title' =>
+                        'Canonical Track',
+
+                    'platform' =>
+                        'Spotify',
+
+                    'currency' =>
+                        'INR',
+
+                    'sale_date' =>
+                        '2026-08-15',
+
+                    'sale_month' =>
+                        $month,
+
+                    'earnings' =>
+                        2500,
+
+                    'mapping_status' =>
+                        'mapped',
+
+                    'mapped_at' =>
+                        now(),
+
+                    /*
+                     * Critical invariant:
+                     * catalogue ownership remains
+                     * with the master label.
+                     */
+                    'revenue_owner_type' =>
+                        'label',
+
+                    'revenue_owner_id' =>
+                        $labelId,
+
+                    'created_at' =>
+                        now(),
+
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $result =
+            $this
+                ->royalty()
+                ->generateMonthlyStatements(
+                    $month,
+                    0,
+                    'INR'
+                );
+
+        $this->assertSame(
+            2,
+            $result['created']
+        );
+
+        $this->assertSame(
+            0,
+            $result['failed_count']
+        );
+
+        $labelStatement =
+            DB::table('royalty_statements')
+                ->where(
+                    'statement_month',
+                    $month
+                )
+                ->where(
+                    'label_id',
+                    $labelId
+                )
+                ->whereNull(
+                    'artist_id'
+                )
+                ->first();
+
+        $artistStatement =
+            DB::table('royalty_statements')
+                ->where(
+                    'statement_month',
+                    $month
+                )
+                ->where(
+                    'artist_id',
+                    $artistId
+                )
+                ->whereNull(
+                    'label_id'
+                )
+                ->first();
+
+        $this->assertNotNull(
+            $labelStatement
+        );
+
+        $this->assertNotNull(
+            $artistStatement
+        );
+
+        /*
+         * Master retains 30%.
+         */
+        $this->assertEquals(
+            750.00,
+            (float)
+                $labelStatement
+                    ->gross_earnings
+        );
+
+        $this->assertEquals(
+            750.00,
+            (float)
+                $labelStatement
+                    ->net_payable
+        );
+
+        /*
+         * Direct artist receives 70%.
+         */
+        $this->assertEquals(
+            1750.00,
+            (float)
+                $artistStatement
+                    ->gross_earnings
+        );
+
+        $this->assertEquals(
+            1750.00,
+            (float)
+                $artistStatement
+                    ->net_payable
+        );
+
+        /*
+         * Financial conservation:
+         * split must never duplicate DSP gross.
+         */
+        $this->assertEquals(
+            2500.00,
+            (float)
+                $labelStatement
+                    ->gross_earnings
+            +
+            (float)
+                $artistStatement
+                    ->gross_earnings
+        );
+
+        $labelAllocation =
+            DB::table('royalty_allocations')
+                ->where(
+                    'royalty_statement_id',
+                    $labelStatement->id
+                )
+                ->where(
+                    'report_row_id',
+                    $reportRowId
+                )
+                ->first();
+
+        $artistAllocation =
+            DB::table('royalty_allocations')
+                ->where(
+                    'royalty_statement_id',
+                    $artistStatement->id
+                )
+                ->where(
+                    'report_row_id',
+                    $reportRowId
+                )
+                ->first();
+
+        $this->assertNotNull(
+            $labelAllocation
+        );
+
+        $this->assertNotNull(
+            $artistAllocation
+        );
+
+        $this->assertEquals(
+            30.00,
+            (float)
+                $labelAllocation
+                    ->share_percentage
+        );
+
+        $this->assertEquals(
+            750.00,
+            (float)
+                $labelAllocation
+                    ->gross_amount
+        );
+
+        $this->assertEquals(
+            70.00,
+            (float)
+                $artistAllocation
+                    ->share_percentage
+        );
+
+        $this->assertEquals(
+            1750.00,
+            (float)
+                $artistAllocation
+                    ->gross_amount
+        );
+
+        /*
+         * Catalogue ownership must NOT be
+         * rewritten to artist ownership.
+         */
+        $sourceRow =
+            DB::table('report_rows')
+                ->where(
+                    'id',
+                    $reportRowId
+                )
+                ->first();
+
+        $this->assertSame(
+            'label',
+            $sourceRow
+                ->revenue_owner_type
+        );
+
+        $this->assertSame(
+            $labelId,
+            (int)
+                $sourceRow
+                    ->revenue_owner_id
+        );
+
+        /*
+         * Allocation conservation.
+         */
+        $this->assertEquals(
+            2500.00,
+            (float)
+                $labelAllocation
+                    ->gross_amount
+            +
+            (float)
+                $artistAllocation
+                    ->gross_amount
+        );
+    }
+
+
 }

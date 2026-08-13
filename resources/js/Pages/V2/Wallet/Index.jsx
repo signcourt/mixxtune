@@ -135,7 +135,7 @@ export default function Index({
 
                             {canRequestPayment ? (
                                 <Link
-                                    href="/v2/withdrawals"
+                                    href="/v2/invoices"
                                     className="mt-8 inline-flex min-h-12 items-center justify-center rounded-lg bg-violet-600 px-6 text-[15px] font-semibold text-white shadow-sm transition hover:bg-violet-700 focus:outline-none focus:ring-4 focus:ring-violet-100"
                                 >
                                     Request my payment
@@ -231,7 +231,7 @@ export default function Index({
                             <div className="border-t border-slate-100">
                                 <div className="flex flex-wrap gap-3 px-6 py-4 sm:px-8 lg:px-10">
                                     <Link
-                                        href="/v2/withdrawals"
+                                        href="/v2/invoices"
                                         className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                                     >
                                         View invoices

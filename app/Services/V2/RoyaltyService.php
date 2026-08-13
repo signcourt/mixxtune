@@ -15,7 +15,8 @@ use Illuminate\Validation\ValidationException;
 class RoyaltyService
 {
     public function __construct(
-        private readonly WalletService $wallet
+        private readonly WalletService $wallet,
+        private readonly OwnershipRoyaltyService $ownershipRoyalty
     ) {
     }
 
@@ -24,44 +25,26 @@ class RoyaltyService
         float $commissionPercent = 0,
         string $currency = 'INR'
     ): array {
-        $artistIds = ReportRow::query()
-            ->where('sale_month', $month)
-            ->whereNotNull('artist_id')
-            ->select('artist_id')
-            ->distinct()
-            ->orderBy('artist_id')
-            ->pluck('artist_id');
-
-        $created = 0;
-        $updated = 0;
-        $failed = [];
-
-        foreach ($artistIds as $artistId) {
-            try {
-                $statement = $this->generateArtistStatement(
-                    (int) $artistId,
-                    $month,
-                    $commissionPercent,
-                    $currency
-                );
-
-                $statement->wasRecentlyCreated
-                    ? $created++
-                    : $updated++;
-            } catch (\Throwable $exception) {
-                $failed[] = [
-                    'artist_id' => (int) $artistId,
-                    'message' => $exception->getMessage(),
-                ];
-            }
-        }
-
-        return [
-            'created' => $created,
-            'updated' => $updated,
-            'failed_count' => count($failed),
-            'failed' => $failed,
-        ];
+        /*
+         * Canonical V2 royalty engine.
+         *
+         * Catalogue ownership remains independent
+         * from beneficiary revenue allocation.
+         *
+         * Supports:
+         * - canonical label owner
+         * - direct artist beneficiary
+         * - direct sub-label beneficiary
+         * - master retained difference
+         * - effective-dated revenue shares
+         */
+        return $this
+            ->ownershipRoyalty
+            ->generateMonthlyStatements(
+                $month,
+                $commissionPercent,
+                $currency
+            );
     }
 
     public function approve(

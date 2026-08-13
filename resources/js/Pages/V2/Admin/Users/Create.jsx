@@ -71,6 +71,7 @@ export default function Create({
         state_code: "DL",
         role: "admin",
         account_status: "active",
+        revenue_share_percentage: "",
         send_invitation: true,
 
         account_holder_name: "",
@@ -358,6 +359,22 @@ export default function Create({
                                 <option value="artist">Artist</option>
                             </select>
                         </label>
+
+                        {["label", "artist"].includes(data.role) && (
+                            <Field
+                                label="Assigned Revenue Rate (%)"
+                                type="number"
+                                value={data.revenue_share_percentage}
+                                error={errors.revenue_share_percentage}
+                                required
+                                onChange={(value) =>
+                                    setData(
+                                        "revenue_share_percentage",
+                                        value,
+                                    )
+                                }
+                            />
+                        )}
 
                         <label>
                             <span className="text-sm font-semibold text-slate-700">

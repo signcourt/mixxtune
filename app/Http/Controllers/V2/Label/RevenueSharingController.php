@@ -22,73 +22,163 @@ class RevenueSharingController extends Controller
             $request
         );
 
+        /*
+         * Revenue Sharing is opt-in.
+         *
+         * A direct Sub-Label / Artist does NOT become a
+         * revenue beneficiary merely because the account exists.
+         *
+         * Only records explicitly stored in
+         * label_revenue_shares are shown as beneficiaries.
+         */
         $shares = LabelRevenueShare::query()
             ->where(
                 'master_label_id',
                 $master->id
             )
-            ->get()
-            ->keyBy(
-                fn (LabelRevenueShare $share) =>
-                    $share->beneficiary_type
-                    .':'
-                    .$share->beneficiary_id
-            );
+            ->orderBy('beneficiary_type')
+            ->orderBy('id')
+            ->get();
 
-        $labels = Label::query()
+        $configuredLabelIds = $shares
+            ->where('beneficiary_type', 'label')
+            ->pluck('beneficiary_id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $configuredArtistIds = $shares
+            ->where('beneficiary_type', 'artist')
+            ->pluck('beneficiary_id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $configuredLabels = Label::query()
             ->where(
                 'parent_label_id',
                 $master->id
             )
             ->whereNull('deleted_at')
-            ->orderBy('name')
+            ->whereIn(
+                'id',
+                $configuredLabelIds
+            )
             ->get()
-            ->map(function (
-                Label $label
-            ) use ($shares) {
-                $share = $shares->get(
-                    'label:'.$label->id
-                );
+            ->keyBy('id');
 
-                return $this->row(
-                    'label',
-                    $label->id,
-                    $label->name,
-                    $label->status,
-                    $share
-                );
-            })
-            ->values();
-
-        $artists = Artist::query()
+        $configuredArtists = Artist::query()
             ->where(
                 'label_id',
                 $master->id
             )
             ->whereNull('deleted_at')
-            ->orderBy('stage_name')
+            ->whereIn(
+                'id',
+                $configuredArtistIds
+            )
             ->get()
-            ->map(function (
-                Artist $artist
-            ) use ($shares) {
-                $share = $shares->get(
-                    'artist:'.$artist->id
-                );
+            ->keyBy('id');
 
-                return $this->row(
-                    'artist',
-                    $artist->id,
-                    $artist->stage_name,
-                    $artist->account_status,
-                    $share
-                );
+        $beneficiaries = $shares
+            ->map(function (
+                LabelRevenueShare $share
+            ) use (
+                $configuredLabels,
+                $configuredArtists
+            ) {
+                if (
+                    $share->beneficiary_type === 'label'
+                ) {
+                    $label = $configuredLabels->get(
+                        (int) $share->beneficiary_id
+                    );
+
+                    if (! $label) {
+                        return null;
+                    }
+
+                    return $this->row(
+                        'label',
+                        $label->id,
+                        $label->name,
+                        $label->status,
+                        $share
+                    );
+                }
+
+                if (
+                    $share->beneficiary_type === 'artist'
+                ) {
+                    $artist = $configuredArtists->get(
+                        (int) $share->beneficiary_id
+                    );
+
+                    if (! $artist) {
+                        return null;
+                    }
+
+                    return $this->row(
+                        'artist',
+                        $artist->id,
+                        $artist->stage_name,
+                        $artist->account_status,
+                        $share
+                    );
+                }
+
+                return null;
             })
+            ->filter()
             ->values();
 
-        $beneficiaries =
-            $labels
-                ->concat($artists)
-                ->values();
+        /*
+         * Eligible accounts for the Add controls.
+         * Already-configured beneficiaries are excluded.
+         */
+        $availableSubLabels = Label::query()
+            ->where(
+                'parent_label_id',
+                $master->id
+            )
+            ->whereNull('deleted_at')
+            ->whereNotIn(
+                'id',
+                $configuredLabelIds
+            )
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'status',
+            ])
+            ->map(fn (Label $label) => [
+                'id' => $label->id,
+                'name' => $label->name,
+                'status' => $label->status,
+            ])
+            ->values();
+
+        $availableArtists = Artist::query()
+            ->where(
+                'label_id',
+                $master->id
+            )
+            ->whereNull('deleted_at')
+            ->whereNotIn(
+                'id',
+                $configuredArtistIds
+            )
+            ->orderBy('stage_name')
+            ->get([
+                'id',
+                'stage_name',
+                'account_status',
+            ])
+            ->map(fn (Artist $artist) => [
+                'id' => $artist->id,
+                'name' => $artist->stage_name,
+                'status' => $artist->account_status,
+            ])
+            ->values();
 
         $revenueReport =
             $this->buildRevenueReport(
@@ -109,6 +199,12 @@ class RevenueSharingController extends Controller
 
                 'beneficiaries' =>
                     $beneficiaries,
+
+                'availableSubLabels' =>
+                    $availableSubLabels,
+
+                'availableArtists' =>
+                    $availableArtists,
 
                 'revenueReport' =>
                     $revenueReport,
@@ -1017,6 +1113,28 @@ class RevenueSharingController extends Controller
         return back()->with(
             'success',
             'Revenue share updated.'
+        );
+    }
+
+    public function destroy(
+        Request $request,
+        LabelRevenueShare $share
+    ): RedirectResponse {
+        $master = $this->masterLabel(
+            $request
+        );
+
+        abort_unless(
+            (int) $share->master_label_id
+                === (int) $master->id,
+            403
+        );
+
+        $share->delete();
+
+        return back()->with(
+            'success',
+            'Revenue beneficiary removed.'
         );
     }
 

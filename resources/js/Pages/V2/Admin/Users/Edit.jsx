@@ -62,6 +62,9 @@ export default function Edit({
 
         account_status: managedUser?.account_status ?? "pending",
 
+        revenue_share_percentage:
+            managedUser?.revenue_share_percentage ?? "",
+
         kyc_status: managedUser?.kyc_status ?? "pending",
 
         account_holder_name:
@@ -345,6 +348,22 @@ export default function Edit({
                                 ["artist", "Artist"],
                             ]}
                         />
+
+                        {["label", "artist"].includes(data.role) && (
+                            <Field
+                                label="Assigned Revenue Rate (%)"
+                                type="number"
+                                value={data.revenue_share_percentage}
+                                error={errors.revenue_share_percentage}
+                                required
+                                onChange={(value) =>
+                                    setData(
+                                        "revenue_share_percentage",
+                                        value,
+                                    )
+                                }
+                            />
+                        )}
 
                         <SelectField
                             label="Account Status"

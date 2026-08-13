@@ -65,6 +65,7 @@ export const PANEL_ROUTES = {
         withdrawals: "/v2/withdrawals",
 
         reports: "/v2/reports",
+        analytics: "/v2/analytics",
 
         kyc: "/v2/kyc-profile",
 
@@ -105,6 +106,7 @@ export const PANEL_ROUTES = {
         royalties: "/v2/admin/royalties",
 
         reports: "/v2/admin/reports",
+        analytics: "/v2/analytics",
 
         wallet: "/v2/admin/wallet",
 
@@ -154,6 +156,7 @@ export const PANEL_ROUTES = {
         royalties: "/v2/admin/royalties",
 
         reports: "/v2/admin/reports",
+        analytics: "/v2/analytics",
 
         finance: "/v2/admin/finance",
 

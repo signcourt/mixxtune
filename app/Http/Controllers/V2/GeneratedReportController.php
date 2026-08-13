@@ -413,9 +413,9 @@ class GeneratedReportController extends Controller
                 'Sale Type',
                 'Quantity / Streams',
                 'Currency',
-                'Gross Revenue',
-                'Revenue Share %',
-                'Net Revenue',
+                'Collected Revenue',
+                'Assigned Rate',
+                'User Revenue',
             ],
         ];
     }
