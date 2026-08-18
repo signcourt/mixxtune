@@ -178,19 +178,17 @@ class LabelRevenueShareService
             ]);
         }
 
-        $rootId = app(
-            LabelHierarchyService::class
-        )->rootLabelId(
-            (int) $child->id
-        );
-
+        /*
+         * STRICT TWO-TIER:
+         * beneficiary label must be a DIRECT child.
+         */
         if (
-            (int) $rootId
+            (int) $child->parent_label_id
             !== (int) $master->id
         ) {
             throw ValidationException::withMessages([
                 'label' =>
-                    'This catalogue level is outside the selected master hierarchy.',
+                    'Revenue share can only be assigned to a direct child label of the selected master.',
             ]);
         }
     }
@@ -213,19 +211,20 @@ class LabelRevenueShareService
             ]);
         }
 
-        $rootId = app(
-            LabelHierarchyService::class
-        )->rootLabelId(
-            (int) $artist->label_id
-        );
-
+        /*
+         * STRICT TWO-TIER:
+         *
+         * Artist may belong directly to the master
+         * catalogue only. It cannot sit below a
+         * child label for financial splitting.
+         */
         if (
-            (int) $rootId
+            (int) $artist->label_id
             !== (int) $master->id
         ) {
             throw ValidationException::withMessages([
                 'artist' =>
-                    'This artist is outside the selected master hierarchy.',
+                    'Revenue share can only be assigned to an artist directly attached to the selected master label.',
             ]);
         }
     }

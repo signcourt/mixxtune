@@ -1201,10 +1201,11 @@ class OwnershipRoyaltyService
                 return false;
             }
 
-            return (int)
-                $hierarchy->rootLabelId(
-                    (int) $beneficiary->id
-                )
+            /*
+             * STRICT TWO-TIER:
+             * label beneficiary must be direct child.
+             */
+            return (int) $beneficiary->parent_label_id
                 === (int) $master->id;
         }
 
@@ -1230,10 +1231,11 @@ class OwnershipRoyaltyService
                 return false;
             }
 
-            return (int)
-                $hierarchy->rootLabelId(
-                    (int) $artist->label_id
-                )
+            /*
+             * STRICT TWO-TIER:
+             * artist must be directly attached to master.
+             */
+            return (int) $artist->label_id
                 === (int) $master->id;
         }
 

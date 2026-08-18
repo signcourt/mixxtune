@@ -154,6 +154,19 @@ class LabelHierarchyController extends Controller
             ->firstOrFail();
 
         /*
+         * STRICT TWO-TIER RULE:
+         *
+         * Only a root/master label can receive
+         * a direct child label.
+         */
+        if ($parent->parent_label_id !== null) {
+            return back()->withErrors([
+                'parent_label_id' =>
+                    'A child label cannot contain another child label.',
+            ]);
+        }
+
+        /*
          * Levels are hierarchy nodes.
          *
          * They do NOT receive an independent login
@@ -304,6 +317,14 @@ class LabelHierarchyController extends Controller
 
             $hierarchy->assertValidParent(
                 (int) $label->id,
+                $newParentId
+            );
+
+            /*
+             * STRICT TWO-TIER RULE:
+             * the new parent must itself be a root/master.
+             */
+            $hierarchy->assertRootParent(
                 $newParentId
             );
 

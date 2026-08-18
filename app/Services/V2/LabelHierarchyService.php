@@ -214,6 +214,56 @@ class LabelHierarchyService
     }
 
     /**
+     * Strict two-tier hierarchy:
+     *
+     * Root/Master
+     *   -> direct Child Label
+     *
+     * A child label can never become a parent.
+     */
+    public function assertRootParent(
+        int $parentLabelId
+    ): void {
+        $parent = DB::table('labels')
+            ->where('id', $parentLabelId)
+            ->whereNull('deleted_at')
+            ->first([
+                'id',
+                'parent_label_id',
+            ]);
+
+        if (!$parent) {
+            throw ValidationException::withMessages([
+                'parent_label_id' => [
+                    'The selected master label does not exist.',
+                ],
+            ]);
+        }
+
+        if ($parent->parent_label_id !== null) {
+            throw ValidationException::withMessages([
+                'parent_label_id' => [
+                    'A child label cannot contain another child label. Only a master label can create direct children.',
+                ],
+            ]);
+        }
+    }
+
+    public function isDirectChildOf(
+        int $masterLabelId,
+        int $childLabelId
+    ): bool {
+        return DB::table('labels')
+            ->where('id', $childLabelId)
+            ->whereNull('deleted_at')
+            ->where(
+                'parent_label_id',
+                $masterLabelId
+            )
+            ->exists();
+    }
+
+    /**
      * Prevent self-parenting and circular trees.
      */
     public function assertValidParent(

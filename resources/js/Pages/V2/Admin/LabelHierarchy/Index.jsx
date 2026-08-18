@@ -198,10 +198,10 @@ export default function Index({
     return (
         <PanelLayout
             role={role}
-            title="Level Management"
-            subtitle="Manage master labels and unlimited catalogue hierarchy levels"
+            title="Label Hierarchy"
+            subtitle="Manage master labels and their direct sub-labels"
         >
-            <Head title="Level Management" />
+            <Head title="Label Hierarchy" />
 
             <div className="space-y-6">
                 <section className="grid gap-4 md:grid-cols-3">
@@ -212,7 +212,7 @@ export default function Index({
                     />
 
                     <StatCard
-                        title="Child Levels"
+                        title="Sub-Labels"
                         value={totalLevels}
                         icon={Layers3}
                     />
@@ -362,7 +362,7 @@ function TreeNode({
 
         if (
             !window.confirm(
-                `Delete level "${node.name}"?\n\nA level containing child levels, releases or artists cannot be deleted.`,
+                `Delete sub-label "${node.name}"?\n\nA sub-label containing releases or artists cannot be deleted.`,
             )
         ) {
             return;
@@ -440,7 +440,7 @@ function TreeNode({
                             >
                                 {isRoot
                                     ? 'Master'
-                                    : `Level ${node.depth}`}
+                                    : 'Sub-Label'}
                             </span>
 
                             <StatusBadge
@@ -467,14 +467,16 @@ function TreeNode({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">
-                    <button
-                        type="button"
-                        onClick={() => onAdd(node)}
-                        title="Add child level"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50"
-                    >
-                        <CirclePlus size={18} />
-                    </button>
+                    {isRoot && (
+                        <button
+                            type="button"
+                            onClick={() => onAdd(node)}
+                            title="Add Sub-Label"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50"
+                        >
+                            <CirclePlus size={18} />
+                        </button>
+                    )}
 
                     <button
                         type="button"
@@ -541,8 +543,8 @@ function CreateLevelModal({
 
     return (
         <Modal
-            title="Add Child Level"
-            subtitle={`Parent: ${parent.name}`}
+            title="Add Sub-Label"
+            subtitle={`Master Label: ${parent.name}`}
             onClose={onClose}
         >
             <form
@@ -550,7 +552,7 @@ function CreateLevelModal({
                 className="space-y-4"
             >
                 <Field
-                    label="Level Name"
+                    label="Sub-Label Name"
                     error={form.errors.name}
                 >
                     <input
@@ -562,7 +564,7 @@ function CreateLevelModal({
                                 event.target.value,
                             )
                         }
-                        placeholder="Example: X Level"
+                        placeholder="Example: Mixx Tune"
                         className="w-full rounded-xl border border-slate-300 px-4 py-3"
                     />
                 </Field>
@@ -595,7 +597,7 @@ function CreateLevelModal({
                         form.processing
                     }
                     onClose={onClose}
-                    submitLabel="Create Level"
+                    submitLabel="Create Sub-Label"
                 />
             </form>
         </Modal>
@@ -622,7 +624,8 @@ function EditLevelModal({
     const sameRootParents = labels
         .filter(
             (candidate) =>
-                Number(candidate.root_id) ===
+                candidate.parent_label_id === null &&
+                Number(candidate.id) ===
                     Number(label.root_id) &&
                 !excludedIds.has(
                     Number(candidate.id),
@@ -658,7 +661,7 @@ function EditLevelModal({
             title={
                 isRoot
                     ? 'Edit Master Label'
-                    : 'Edit Level'
+                    : 'Edit Sub-Label'
             }
             subtitle={label.name}
             onClose={onClose}
@@ -685,7 +688,7 @@ function EditLevelModal({
 
                 {!isRoot && (
                     <Field
-                        label="Parent Level"
+                        label="Master Label"
                         error={
                             form.errors
                                 .parent_label_id
