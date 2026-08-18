@@ -5,6 +5,7 @@ namespace App\Http\Controllers\V2\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Core\Label;
 use App\Services\V2\LabelHierarchyService;
+use App\Services\V2\LabelRevenueShareService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,8 @@ class LabelHierarchyController extends Controller
 
     public function index(
         Request $request,
-        LabelHierarchyService $hierarchy
+        LabelHierarchyService $hierarchy,
+        LabelRevenueShareService $revenueShares
     ): Response {
         $this->authorizeAdmin($request);
 
@@ -53,7 +55,10 @@ class LabelHierarchyController extends Controller
             ]);
 
         $rows = $labels->map(
-            function (Label $label) use ($hierarchy) {
+            function (Label $label) use (
+                $hierarchy,
+                $revenueShares
+            ) {
                 $ancestorIds = $hierarchy
                     ->ancestorIds(
                         (int) $label->id,
@@ -64,6 +69,24 @@ class LabelHierarchyController extends Controller
                     0,
                     $ancestorIds->count() - 1
                 );
+
+                $canonicalShare = null;
+
+                if ($label->parent_label_id !== null) {
+                    $master = $labels->firstWhere(
+                        'id',
+                        (int) $label->parent_label_id
+                    );
+
+                    if ($master instanceof Label) {
+                        $canonicalShare =
+                            $revenueShares->resolve(
+                                $master,
+                                'label',
+                                (int) $label->id
+                            );
+                    }
+                }
 
                 return [
                     'id' => (int) $label->id,
@@ -95,11 +118,15 @@ class LabelHierarchyController extends Controller
                                 ->count() - 1
                         ),
                     'revenue_share_percentage' =>
-                        $label
-                            ->revenue_share_percentage,
+                        $canonicalShare
+                            ? (float) $canonicalShare
+                                ->revenue_share_percent
+                            : null,
                     'parent_commission_percentage' =>
-                        $label
-                            ->parent_commission_percentage,
+                        $canonicalShare
+                            ? 100 - (float) $canonicalShare
+                                ->revenue_share_percent
+                            : null,
                 ];
             }
         )->values();
@@ -114,7 +141,8 @@ class LabelHierarchyController extends Controller
     }
 
     public function store(
-        Request $request
+        Request $request,
+        LabelRevenueShareService $revenueShares
     ): RedirectResponse {
         abort_unless(
             (string) $request->user()?->role === 'super_admin',
@@ -135,6 +163,12 @@ class LabelHierarchyController extends Controller
                 'integer',
                 Rule::exists('labels', 'id')
                     ->whereNull('deleted_at'),
+            ],
+            'revenue_share_percent' => [
+                'required',
+                'numeric',
+                'min:0',
+                'max:100',
             ],
             'status' => [
                 'nullable',
@@ -177,7 +211,8 @@ class LabelHierarchyController extends Controller
             function () use (
                 $request,
                 $data,
-                $parent
+                $parent,
+                $revenueShares
             ) {
                 $slugBase = Str::slug(
                     $data['name']
@@ -200,13 +235,13 @@ class LabelHierarchyController extends Controller
                     $counter++;
                 }
 
-                Label::query()->create([
+                $child = Label::query()->create([
                     'user_id' => null,
                     'parent_label_id' =>
                         (int) $parent->id,
                     'label_type' => 'label',
                     'public_id' =>
-                        (string) Str::uuid(),
+                        (string) Str::ulid(),
                     'name' => trim(
                         $data['name']
                     ),
@@ -235,6 +270,16 @@ class LabelHierarchyController extends Controller
                     'updated_by' =>
                         $request->user()->id,
                 ]);
+
+                $revenueShares->saveForLabel(
+                    $parent,
+                    $child,
+                    (float) $data[
+                        'revenue_share_percent'
+                    ],
+                    true,
+                    $request->user()
+                );
             }
         );
 
@@ -247,7 +292,8 @@ class LabelHierarchyController extends Controller
     public function update(
         Request $request,
         Label $label,
-        LabelHierarchyService $hierarchy
+        LabelHierarchyService $hierarchy,
+        LabelRevenueShareService $revenueShares
     ): RedirectResponse {
         abort_unless(
             (string) $request->user()?->role === 'super_admin',
@@ -281,6 +327,15 @@ class LabelHierarchyController extends Controller
                     'inactive',
                     'suspended',
                 ]),
+            ],
+            'revenue_share_percent' => [
+                Rule::requiredIf(
+                    $label->parent_label_id !== null
+                ),
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:100',
             ],
         ]);
 
@@ -355,14 +410,41 @@ class LabelHierarchyController extends Controller
             }
         }
 
-        $label->forceFill([
-            'name' => trim($data['name']),
-            'parent_label_id' =>
+        DB::transaction(
+            function () use (
+                $request,
+                $data,
+                $label,
                 $newParentId,
-            'status' => $data['status'],
-            'updated_by' =>
-                $request->user()->id,
-        ])->save();
+                $revenueShares
+            ) {
+                $label->forceFill([
+                    'name' => trim($data['name']),
+                    'parent_label_id' =>
+                        $newParentId,
+                    'status' => $data['status'],
+                    'updated_by' =>
+                        $request->user()->id,
+                ])->save();
+
+                if ($newParentId !== null) {
+                    $master = Label::query()
+                        ->whereKey($newParentId)
+                        ->whereNull('deleted_at')
+                        ->firstOrFail();
+
+                    $revenueShares->saveForLabel(
+                        $master,
+                        $label,
+                        (float) $data[
+                            'revenue_share_percent'
+                        ],
+                        true,
+                        $request->user()
+                    );
+                }
+            }
+        );
 
         return back()->with(
             'success',

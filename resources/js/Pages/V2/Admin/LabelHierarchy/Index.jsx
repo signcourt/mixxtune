@@ -526,6 +526,7 @@ function CreateLevelModal({
     const form = useForm({
         name: '',
         parent_label_id: parent.id,
+        revenue_share_percent: '100',
         status: 'active',
     });
 
@@ -567,6 +568,39 @@ function CreateLevelModal({
                         placeholder="Example: Mixx Tune"
                         className="w-full rounded-xl border border-slate-300 px-4 py-3"
                     />
+                </Field>
+
+                <Field
+                    label="Sub-Label Revenue Share (%)"
+                    error={
+                        form.errors
+                            .revenue_share_percent
+                    }
+                >
+                    <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={
+                            form.data
+                                .revenue_share_percent
+                        }
+                        onChange={(event) =>
+                            form.setData(
+                                'revenue_share_percent',
+                                event.target.value,
+                            )
+                        }
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-800"
+                        required
+                    />
+
+                    <p className="mt-1.5 text-xs text-slate-500">
+                        The sub-label receives this
+                        percentage. The master label
+                        retains the remaining share.
+                    </p>
                 </Field>
 
                 <Field label="Status">
@@ -641,6 +675,9 @@ function EditLevelModal({
         name: label.name ?? '',
         parent_label_id:
             label.parent_label_id ?? '',
+        revenue_share_percent:
+            label.revenue_share_percentage ??
+            '100',
         status: label.status ?? 'active',
     });
 
@@ -731,6 +768,41 @@ function EditLevelModal({
                                 ),
                             )}
                         </select>
+                    </Field>
+                )}
+
+                {!isRoot && (
+                    <Field
+                        label="Sub-Label Revenue Share (%)"
+                        error={
+                            form.errors
+                                .revenue_share_percent
+                        }
+                    >
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={
+                                form.data
+                                    .revenue_share_percent
+                            }
+                            onChange={(event) =>
+                                form.setData(
+                                    'revenue_share_percent',
+                                    event.target.value,
+                                )
+                            }
+                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-800"
+                            required
+                        />
+
+                        <p className="mt-1.5 text-xs text-slate-500">
+                            The sub-label receives this
+                            percentage. The master label
+                            retains the remaining share.
+                        </p>
                     </Field>
                 )}
 
