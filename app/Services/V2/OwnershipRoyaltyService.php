@@ -535,6 +535,7 @@ class OwnershipRoyaltyService
                 'id',
                 'release_id',
                 'track_id',
+                'collected_revenue',
                 'earnings',
                 'sale_date',
                 'artist_id',
@@ -612,10 +613,52 @@ class OwnershipRoyaltyService
                             continue;
                         }
 
-                        $sourceGross =
-                            (float)
-                                $row
-                                    ->earnings;
+                        /*
+                         * FINANCIAL SOURCE BASE
+                         * =====================
+                         *
+                         * report_rows.earnings can already contain the
+                         * account/import commercial rate. Applying a
+                         * hierarchy beneficiary percentage to earnings
+                         * would therefore apply a second rate.
+                         *
+                         * Cross-owner / beneficiary allocations must start
+                         * from collected_revenue (DSP/source gross).
+                         *
+                         * Direct canonical ownership preserves the existing
+                         * earnings base because its account commercial rate
+                         * flow is handled below.
+                         *
+                         * Legacy rows with NULL collected_revenue safely
+                         * fall back to earnings.
+                         */
+                        $isDirectCanonicalOwner =
+                            (string) $row->revenue_owner_type
+                                === $statementOwnerType
+                            && (int) $row->revenue_owner_id
+                                === $statementOwnerId;
+
+                        $hasBeneficiarySplit =
+                            !$isDirectCanonicalOwner
+                            || abs(
+                                (float) $sharePercent
+                                - 100.0
+                            ) >= 0.0001;
+
+                        if (
+                            $hasBeneficiarySplit
+                            && $row->collected_revenue !== null
+                        ) {
+                            $sourceGross =
+                                (float)
+                                    $row
+                                        ->collected_revenue;
+                        } else {
+                            $sourceGross =
+                                (float)
+                                    $row
+                                        ->earnings;
+                        }
 
                         /*
                          * Direct account commercial rate.
