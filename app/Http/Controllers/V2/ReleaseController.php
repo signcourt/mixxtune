@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\V2;
 
+use App\Services\V2\LabelHierarchyService;
 use App\Services\V2\UpcService;
 
 use App\Http\Controllers\Controller;
@@ -27,6 +28,129 @@ use Inertia\Response;
 
 class ReleaseController extends Controller
 {
+
+    /**
+     * Resolve catalogue levels that the current
+     * authenticated account may assign to releases.
+     *
+     * Label account:
+     *   own root label + every descendant.
+     *
+     * Artist account:
+     *   only the artist's assigned label.
+     *
+     * Admin / Super Admin:
+     *   all active catalogue levels.
+     */
+    private function selectableCatalogueLabels(
+        \Illuminate\Http\Request $request,
+        LabelHierarchyService $hierarchy
+    ): \Illuminate\Support\Collection {
+        $user = $request->user();
+
+        abort_unless($user, 401);
+
+        $role = (string) $user->role;
+
+        if (
+            in_array(
+                $role,
+                ['admin', 'super_admin'],
+                true
+            )
+        ) {
+            return \App\Models\Core\Label::query()
+                ->whereNull('deleted_at')
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get();
+        }
+
+        if ($role === 'label') {
+            $root = \App\Models\Core\Label::query()
+                ->where('user_id', $user->id)
+                ->whereNull('parent_label_id')
+                ->whereNull('deleted_at')
+                ->first();
+
+            if (!$root) {
+                return collect();
+            }
+
+            $ids = $hierarchy->visibleLabelIds(
+                (int) $root->id
+            );
+
+            return \App\Models\Core\Label::query()
+                ->whereIn('id', $ids->all())
+                ->whereNull('deleted_at')
+                ->where('status', 'active')
+                ->get()
+                ->sortBy(function ($label) use ($hierarchy) {
+                    return sprintf(
+                        '%05d-%s',
+                        $hierarchy
+                            ->ancestorIds(
+                                (int) $label->id,
+                                true
+                            )
+                            ->count(),
+                        strtolower((string) $label->name)
+                    );
+                })
+                ->values();
+        }
+
+        if ($role === 'artist') {
+            $artist = \App\Models\Core\Artist::query()
+                ->where('user_id', $user->id)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if (!$artist || !$artist->label_id) {
+                return collect();
+            }
+
+            return \App\Models\Core\Label::query()
+                ->whereKey((int) $artist->label_id)
+                ->whereNull('deleted_at')
+                ->where('status', 'active')
+                ->get();
+        }
+
+        return collect();
+    }
+
+
+    /**
+     * Server-side protection for release catalogue
+     * assignment.
+     *
+     * Never trust the frontend label selector.
+     */
+    private function assertCatalogueLabelAllowed(
+        \Illuminate\Http\Request $request,
+        int $labelId,
+        LabelHierarchyService $hierarchy
+    ): void {
+        $allowed = $this
+            ->selectableCatalogueLabels(
+                $request,
+                $hierarchy
+            )
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+
+        if (!$allowed->contains($labelId)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'label_id' => [
+                    'You cannot assign this release to the selected catalogue level.',
+                ],
+            ]);
+        }
+    }
+
+
     public function index(
         Request $request,
         PermissionService $permissions
@@ -1619,10 +1743,57 @@ class ReleaseController extends Controller
         }
 
         if ($role === 'label') {
+            $hierarchy = app(
+                LabelHierarchyService::class
+            );
+
+            /*
+             * Exact catalogue placement.
+             *
+             * A Master Label login may place a release
+             * on its own root or any authorized
+             * descendant catalogue level.
+             *
+             * Never trust label_id from the browser.
+             */
+            $labelId =
+                $validated['label_id']
+                ?? $release?->label_id;
+
+            /*
+             * Backward compatibility:
+             * existing single/root-label forms may
+             * omit label_id.
+             */
+            if (! $labelId) {
+                $selectable =
+                    $this->selectableCatalogueLabels(
+                        $request,
+                        $hierarchy
+                    );
+
+                if ($selectable->count() === 1) {
+                    $labelId =
+                        $selectable->first()->id;
+                }
+            }
+
+            abort_unless(
+                $labelId,
+                422,
+                'Select a catalogue level.'
+            );
+
+            $this->assertCatalogueLabelAllowed(
+                $request,
+                (int) $labelId,
+                $hierarchy
+            );
+
             $label = Label::query()
                 ->where(
-                    'user_id',
-                    $request->user()->id
+                    'id',
+                    (int) $labelId
                 )
                 ->whereNull('deleted_at')
                 ->firstOrFail();
@@ -1632,36 +1803,73 @@ class ReleaseController extends Controller
                 ?? $release?->artist_id;
 
             /*
-             * A label with exactly one available artist should not fail
-             * merely because the frontend omitted artist_id.
+             * Artist and catalogue level must agree.
+             *
+             * This prevents combinations such as:
+             *
+             *   Catalogue Level = X1
+             *   Artist          = artist from Y
              */
             if (! $artistId) {
                 $labelArtistIds = Artist::query()
-                    ->where('label_id', $label->id)
+                    ->where(
+                        'label_id',
+                        $label->id
+                    )
                     ->whereNull('deleted_at')
-                    ->where('account_status', 'active')
+                    ->where(
+                        'account_status',
+                        'active'
+                    )
+                    ->where(
+                        'can_create_releases',
+                        true
+                    )
                     ->limit(2)
                     ->pluck('id');
 
-                if ($labelArtistIds->count() === 1) {
-                    $artistId = $labelArtistIds->first();
+                if (
+                    $labelArtistIds->count()
+                    === 1
+                ) {
+                    $artistId =
+                        $labelArtistIds->first();
                 }
             }
 
             abort_unless(
                 $artistId,
                 422,
-                'Select an artist.'
+                'Select an artist for this catalogue level.'
             );
 
             $artist = Artist::query()
-                ->where('id', $artistId)
+                ->where(
+                    'id',
+                    (int) $artistId
+                )
                 ->where(
                     'label_id',
                     $label->id
                 )
                 ->whereNull('deleted_at')
-                ->firstOrFail();
+                ->where(
+                    'account_status',
+                    'active'
+                )
+                ->where(
+                    'can_create_releases',
+                    true
+                )
+                ->first();
+
+            if (! $artist) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'artist_id' => [
+                        'The selected artist does not belong to the selected catalogue level.',
+                    ],
+                ]);
+            }
 
             return [$artist, $label];
         }
@@ -1882,13 +2090,21 @@ class ReleaseController extends Controller
         }
 
         if ($role === 'label') {
+            $hierarchy = app(
+                LabelHierarchyService::class
+            );
+
             /*
-             * A single Label login may own/operate
-             * multiple labels.
+             * RELEASE CATALOGUE LEVELS
+             * ========================
              *
-             * Prefer explicit assignedLabels pivot,
-             * while also retaining legacy labels
-             * linked directly by labels.user_id.
+             * A Label login can have:
+             *
+             * 1. explicit assigned labels
+             * 2. legacy direct labels via labels.user_id
+             *
+             * Every accessible root/base label expands
+             * to its full descendant catalogue tree.
              */
             $assignedLabelIds =
                 $request
@@ -1913,10 +2129,36 @@ class ReleaseController extends Controller
                             (int) $id
                     );
 
-            $labelIds =
+            $baseLabelIds =
                 $assignedLabelIds
                     ->merge(
                         $directLabelIds
+                    )
+                    ->unique()
+                    ->values();
+
+            $expandedLabelIds =
+                collect();
+
+            foreach (
+                $baseLabelIds
+                as $baseLabelId
+            ) {
+                $expandedLabelIds =
+                    $expandedLabelIds
+                        ->merge(
+                            $hierarchy
+                                ->visibleLabelIds(
+                                    (int) $baseLabelId
+                                )
+                        );
+            }
+
+            $labelIds =
+                $expandedLabelIds
+                    ->map(
+                        fn ($id) =>
+                            (int) $id
                     )
                     ->unique()
                     ->values();
@@ -1928,26 +2170,51 @@ class ReleaseController extends Controller
                     Label::query()
                         ->whereIn(
                             'id',
-                            $labelIds
+                            $labelIds->all()
                         )
                         ->whereNull(
                             'deleted_at'
                         )
-                        ->orderBy(
-                            'name'
+                        ->where(
+                            'status',
+                            'active'
                         )
                         ->get([
                             'id',
                             'name',
-                        ]);
+                            'parent_label_id',
+                            'label_type',
+                        ])
+                        ->sortBy(
+                            function ($item)
+                            use ($hierarchy) {
+                                $depth =
+                                    $hierarchy
+                                        ->ancestorIds(
+                                            (int) $item->id,
+                                            true
+                                        )
+                                        ->count();
+
+                                return sprintf(
+                                    '%05d-%s',
+                                    $depth,
+                                    strtolower(
+                                        (string)
+                                            $item->name
+                                    )
+                                );
+                            }
+                        )
+                        ->values();
 
                 /*
-                 * Preserve existing single-label
-                 * behaviour for old UI/defaults.
+                 * Preserve legacy default when only
+                 * one catalogue level is available.
                  */
                 if (
                     $availableLabels->count()
-                        === 1
+                    === 1
                 ) {
                     $label =
                         $availableLabels
@@ -1955,14 +2222,17 @@ class ReleaseController extends Controller
                 }
 
                 /*
-                 * Artists from every label assigned
-                 * to this Label login.
+                 * Artists are supplied for every
+                 * selectable catalogue level.
+                 *
+                 * Frontend will filter these by
+                 * selected label_id.
                  */
                 $availableArtists =
                     Artist::query()
                         ->whereIn(
                             'label_id',
-                            $labelIds
+                            $labelIds->all()
                         )
                         ->where(
                             'account_status',

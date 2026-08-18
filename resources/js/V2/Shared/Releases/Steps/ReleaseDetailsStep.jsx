@@ -368,6 +368,103 @@ export default function ReleaseDetailsStep({
         return list;
     }, [availableLabels, label]);
 
+    /*
+     * Human-readable hierarchy path.
+     *
+     * Example:
+     * Sanatan Records
+     *   ↳ X
+     *     ↳ X1
+     */
+    const labelDepth = (item) => {
+        let depth = 0;
+        let current = item;
+        const visited = new Set();
+
+        while (
+            current?.parent_label_id
+            && !visited.has(
+                String(current.id)
+            )
+        ) {
+            visited.add(
+                String(current.id)
+            );
+
+            const parent = labels.find(
+                (candidate) =>
+                    String(candidate.id)
+                    === String(
+                        current.parent_label_id
+                    )
+            );
+
+            if (!parent) {
+                break;
+            }
+
+            depth += 1;
+            current = parent;
+
+            if (depth > 20) {
+                break;
+            }
+        }
+
+        return depth;
+    };
+
+    const labelOptionName = (item) => {
+        const name =
+            item.name
+            ?? item.label_name
+            ?? `Label #${item.id}`;
+
+        const depth =
+            labelDepth(item);
+
+        if (depth === 0) {
+            return name;
+        }
+
+        return `${'— '.repeat(depth)}${name}`;
+    };
+
+    const changeCatalogueLevel = (
+        nextLabelId
+    ) => {
+        setData(
+            'label_id',
+            nextLabelId
+        );
+
+        const currentArtist =
+            availableArtists.find(
+                (item) =>
+                    String(item.id)
+                    === String(
+                        data.artist_id
+                        ?? ''
+                    )
+            );
+
+        if (
+            currentArtist
+            && String(
+                currentArtist.label_id
+                ?? ''
+            )
+                !== String(
+                    nextLabelId
+                )
+        ) {
+            setData(
+                'artist_id',
+                ''
+            );
+        }
+    };
+
     return (
         <div className="mixx-release-details-v7">
             {isOperator && (
@@ -388,51 +485,21 @@ export default function ReleaseDetailsStep({
 
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         <Field
-                            label="Catalog Label"
+                            label="Catalogue Level"
                             required
                             error={errors.label_id}
                         >
                             <select
                                 className={selectClass}
                                 value={data.label_id ?? ''}
-                                onChange={(event) => {
-                                    const nextLabelId =
-                                        event.target.value;
-
-                                    setData(
-                                        'label_id',
-                                        nextLabelId
-                                    );
-
-                                    const currentArtist =
-                                        availableArtists.find(
-                                            (item) =>
-                                                String(item.id)
-                                                === String(
-                                                    data.artist_id
-                                                    ?? ''
-                                                )
-                                        );
-
-                                    if (
-                                        currentArtist
-                                        && String(
-                                            currentArtist.label_id
-                                            ?? ''
-                                        )
-                                            !== String(
-                                                nextLabelId
-                                            )
-                                    ) {
-                                        setData(
-                                            'artist_id',
-                                            ''
-                                        );
-                                    }
-                                }}
+                                onChange={(event) =>
+                                    changeCatalogueLevel(
+                                        event.target.value
+                                    )
+                                }
                             >
                                 <option value="">
-                                    Select catalog label
+                                    Select catalogue level
                                 </option>
 
                                 {labels.map(
@@ -441,8 +508,9 @@ export default function ReleaseDetailsStep({
                                             key={item.id}
                                             value={item.id}
                                         >
-                                            {item.name
-                                                ?? `Label #${item.id}`}
+                                            {labelOptionName(
+                                                item
+                                            )}
                                         </option>
                                     )
                                 )}
@@ -682,37 +750,94 @@ export default function ReleaseDetailsStep({
 
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {!isOperator && (
-                <Field
-                    label="Label"
-                    required
-                    error={errors.label_id}
-                >
-                    <select
-                        className={selectClass}
-                        value={data.label_id ?? ''}
-                        onChange={(event) =>
-                            setData(
-                                'label_id',
-                                event.target.value
-                            )
-                        }
+                    <Field
+                        label="Catalogue Level"
+                        required
+                        error={errors.label_id}
                     >
-                        <option value="">
-                            Select label
-                        </option>
-
-                        {labels.map((item) => (
-                            <option
-                                key={item.id}
-                                value={item.id}
-                            >
-                                {item.name
-                                    ?? item.label_name
-                                    ?? `Label #${item.id}`}
+                        <select
+                            className={selectClass}
+                            value={
+                                data.label_id
+                                ?? ''
+                            }
+                            onChange={(event) =>
+                                changeCatalogueLevel(
+                                    event.target.value
+                                )
+                            }
+                        >
+                            <option value="">
+                                Select catalogue level
                             </option>
-                        ))}
-                    </select>
-                </Field>
+
+                            {labels.map(
+                                (item) => (
+                                    <option
+                                        key={item.id}
+                                        value={item.id}
+                                    >
+                                        {labelOptionName(
+                                            item
+                                        )}
+                                    </option>
+                                )
+                            )}
+                        </select>
+
+                        {labels.length > 1 && (
+                            <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
+                                Select the exact catalogue level that owns this release.
+                            </p>
+                        )}
+                    </Field>
+                )}
+
+                {!isOperator && (
+                    <Field
+                        label="Account Artist"
+                        required
+                        error={errors.artist_id}
+                    >
+                        <select
+                            className={selectClass}
+                            value={
+                                data.artist_id
+                                ?? ''
+                            }
+                            onChange={(event) =>
+                                setData(
+                                    'artist_id',
+                                    event.target.value
+                                )
+                            }
+                        >
+                            <option value="">
+                                Select artist account
+                            </option>
+
+                            {accountArtists.map(
+                                (item) => (
+                                    <option
+                                        key={item.id}
+                                        value={item.id}
+                                    >
+                                        {item.stage_name
+                                            || item.legal_name
+                                            || `Artist #${item.id}`}
+                                    </option>
+                                )
+                            )}
+                        </select>
+
+                        {data.label_id
+                            && accountArtists.length === 0
+                            && (
+                                <p className="mt-1.5 text-[11px] leading-4 text-amber-600">
+                                    No active release-enabled artist exists on this catalogue level.
+                                </p>
+                            )}
+                    </Field>
                 )}
 
                 <Field

@@ -276,16 +276,32 @@ class ReleaseAccessService
 
         if ($role === 'label') {
             /*
-             * Mixx Tune hierarchy is strictly two-tier.
+             * MIXX TUNE RECURSIVE LABEL ACCESS
+             * ---------------------------------
              *
-             * A Label login may access:
-             * - releases of labels directly owned by it
-             * - releases of direct child/sub-labels
+             * A label login owns one or more account/root labels.
+             * For every owned label, catalogue visibility includes
+             * that label plus every descendant level at any depth.
              *
-             * Grandchildren and unrelated labels remain
-             * outside the access boundary.
+             * Example:
+             *
+             * Sanatan
+             * ├── X
+             * │   └── X1
+             * │       └── X2
+             * ├── Y
+             * └── Z
+             *
+             * Sanatan login sees:
+             * Sanatan + X + X1 + X2 + Y + Z.
+             *
+             * A future scoped X-level account can use the same
+             * descendant resolver and will see only the X branch.
+             *
+             * Sibling branches never become descendants of each
+             * other, preventing cross-branch catalogue leakage.
              */
-            $rootLabelIds = Label::query()
+            $ownedLabelIds = Label::query()
                 ->where(
                     'user_id',
                     $user->id
@@ -296,24 +312,32 @@ class ReleaseAccessService
                     fn ($id) => (int) $id
                 );
 
-            if ($rootLabelIds->isEmpty()) {
+            if ($ownedLabelIds->isEmpty()) {
                 return false;
             }
 
-            $childLabelIds = Label::query()
-                ->whereIn(
-                    'parent_label_id',
-                    $rootLabelIds
-                )
-                ->whereNull('deleted_at')
-                ->pluck('id')
-                ->map(
-                    fn ($id) => (int) $id
-                );
+            $hierarchy = app(
+                LabelHierarchyService::class
+            );
 
             $accessibleLabelIds =
-                $rootLabelIds
-                    ->merge($childLabelIds)
+                collect();
+
+            foreach ($ownedLabelIds as $labelId) {
+                $accessibleLabelIds =
+                    $accessibleLabelIds->merge(
+                        $hierarchy->descendantIds(
+                            (int) $labelId,
+                            true
+                        )
+                    );
+            }
+
+            $accessibleLabelIds =
+                $accessibleLabelIds
+                    ->map(
+                        fn ($id) => (int) $id
+                    )
                     ->unique()
                     ->values();
 
