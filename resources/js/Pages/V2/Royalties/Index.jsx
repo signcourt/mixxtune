@@ -223,15 +223,51 @@ export default function Index({
 
     const chartRows =
         useMemo(() => {
-            return [...rows]
+            const monthlyTotals =
+                new Map();
+
+            rows.forEach((item) => {
+                const month =
+                    item.statement_month ??
+                    '';
+
+                if (!month) {
+                    return;
+                }
+
+                const existing =
+                    monthlyTotals.get(
+                        month
+                    ) ?? {
+                        statement_month:
+                            month,
+                        net_payable: 0,
+                        currency:
+                            item.currency ??
+                            'INR',
+                    };
+
+                existing.net_payable +=
+                    Number(
+                        item.net_payable ??
+                            0
+                    );
+
+                monthlyTotals.set(
+                    month,
+                    existing
+                );
+            });
+
+            return Array.from(
+                monthlyTotals.values()
+            )
                 .sort((a, b) =>
                     String(
-                        a.statement_month ??
-                            ''
+                        a.statement_month
                     ).localeCompare(
                         String(
-                            b.statement_month ??
-                                ''
+                            b.statement_month
                         )
                     )
                 )
