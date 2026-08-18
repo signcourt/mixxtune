@@ -115,7 +115,7 @@ class OwnershipRoyaltyService
             'report_rows'
         )
             ->where(
-                'sale_month',
+                'reporting_month',
                 $month
             )
             ->where(
@@ -197,6 +197,63 @@ class OwnershipRoyaltyService
                         'artist',
                         (int)
                             $row->artist_id
+                    );
+                }
+            }
+
+            /*
+             * RECURSIVE CATALOGUE LEVEL OWNER DISCOVERY
+             * ==========================================
+             *
+             * Exact catalogue level lives in label_id.
+             * Financial owner lives in revenue_owner_id.
+             *
+             * Example:
+             *
+             * Sanatan -> X -> X1
+             *
+             * report row:
+             *   label_id         = X1
+             *   revenue_owner_id = Sanatan
+             *
+             * If X1 has an active revenue agreement,
+             * X1 must become a statement owner.
+             */
+            if (
+                $sourceOwnerType === 'label'
+                && !empty($row->label_id)
+                && (int) $row->label_id
+                    !== $sourceOwnerId
+            ) {
+                $levelShare =
+                    $this->activeShareForBeneficiary(
+                        'label',
+                        (int) $row->label_id,
+                        $periodDate
+                    );
+
+                if (
+                    $levelShare
+                    && (int)
+                        $levelShare->master_label_id
+                        === $sourceOwnerId
+                ) {
+                    $this->addOwner(
+                        $owners,
+                        $seen,
+                        'label',
+                        (int) $row->label_id
+                    );
+
+                    /*
+                     * Root/master should also remain
+                     * available for its retained share.
+                     */
+                    $this->addOwner(
+                        $owners,
+                        $seen,
+                        'label',
+                        $sourceOwnerId
                     );
                 }
             }
@@ -461,7 +518,7 @@ class OwnershipRoyaltyService
 
         DB::table('report_rows')
             ->where(
-                'sale_month',
+                'reporting_month',
                 $month
             )
             ->where(
@@ -496,31 +553,57 @@ class OwnershipRoyaltyService
                     &$allocations
                 ) {
                     foreach ($rows as $row) {
-                        $sharePercent =
-                            $this->shareForStatement(
-                            (string)
-                                $row
-                                    ->revenue_owner_type,
-                            (int)
-                                $row
-                                    ->revenue_owner_id,
-                            $row->artist_id
-                                ? (int)
-                                    $row->artist_id
-                                : null,
-                            $row->label_id
-                                ? (int)
-                                    $row->label_id
-                                : null,
-                            $statementOwnerType,
-                            $statementOwnerId,
-                            Carbon::createFromFormat(
-                                '!Y-m',
-                                $month
-                            )
-                                ->endOfMonth()
-                                ->toDateString()
-                        );
+                        /*
+                         * Canonical owner fast-path.
+                         *
+                         * Manually mapped revenue can legitimately have
+                         * no catalogue release/track/artist/label IDs and
+                         * no sale_date. In that case revenue_owner_type +
+                         * revenue_owner_id remain the authoritative
+                         * financial ownership fields.
+                         *
+                         * Direct canonical ownership therefore must not
+                         * depend on catalogue metadata being present.
+                         *
+                         * Child/master cross-owner allocations continue
+                         * through shareForStatement().
+                         */
+                        if (
+                            (string) $row->revenue_owner_type
+                                === $statementOwnerType
+                            && (int) $row->revenue_owner_id
+                                === $statementOwnerId
+                            && $row->artist_id === null
+                            && $row->label_id === null
+                        ) {
+                            $sharePercent = 100.0;
+                        } else {
+                            $sharePercent =
+                                $this->shareForStatement(
+                                (string)
+                                    $row
+                                        ->revenue_owner_type,
+                                (int)
+                                    $row
+                                        ->revenue_owner_id,
+                                $row->artist_id
+                                    ? (int)
+                                        $row->artist_id
+                                    : null,
+                                $row->label_id
+                                    ? (int)
+                                        $row->label_id
+                                    : null,
+                                $statementOwnerType,
+                                $statementOwnerId,
+                                Carbon::createFromFormat(
+                                    '!Y-m',
+                                    $month
+                                )
+                                    ->endOfMonth()
+                                    ->toDateString()
+                            );
+                        }
 
                         if (
                             $sharePercent
@@ -545,11 +628,34 @@ class OwnershipRoyaltyService
                          * Cross-owner master/child beneficiary splits
                          * continue to use shareForStatement().
                          */
+                        /*
+                         * DIRECT ACCOUNT RATE
+                         * ===================
+                         *
+                         * Apply the account commercial rate only when
+                         * no beneficiary split has already changed the
+                         * canonical 100% ownership result.
+                         *
+                         * Example nested hierarchy:
+                         *
+                         * X1 = 70%
+                         * Root = 30%
+                         *
+                         * The 30% root result MUST NOT be overwritten
+                         * by the root account rate (normally 100%).
+                         *
+                         * The same protection also applies to Artist
+                         * beneficiary splits.
+                         */
                         if (
                             (string) $row->revenue_owner_type
                                 === $statementOwnerType
                             && (int) $row->revenue_owner_id
                                 === $statementOwnerId
+                            && abs(
+                                (float) $sharePercent
+                                - 100.0
+                            ) < 0.0001
                         ) {
                             $accountRate =
                                 $this->accountRevenueRate(
@@ -696,6 +802,88 @@ class OwnershipRoyaltyService
         int $statementOwnerId,
         string $periodDate
     ): float {
+        /*
+         * RECURSIVE CATALOGUE LEVEL SPLIT
+         * ===============================
+         *
+         * report_rows.label_id keeps the exact
+         * catalogue level while revenue_owner_id
+         * keeps the root/master financial owner.
+         *
+         * Example:
+         *
+         * Sanatan(root) -> X -> X1
+         *
+         * report row:
+         *   label_id         = X1
+         *   revenue_owner_id = Sanatan
+         *
+         * If X1 has a 70% agreement against
+         * Sanatan:
+         *
+         *   X1      = 70%
+         *   Sanatan = 30%
+         *
+         * This is NOT compounded through X.
+         */
+        if (
+            $sourceOwnerType === 'label'
+            && $rowLabelId !== null
+            && $rowLabelId !== $sourceOwnerId
+        ) {
+            $levelShare =
+                $this->activeShareForBeneficiary(
+                    'label',
+                    $rowLabelId,
+                    $periodDate
+                );
+
+            if (
+                $levelShare
+                && (int) $levelShare->master_label_id
+                    === $sourceOwnerId
+            ) {
+                $levelPercent =
+                    max(
+                        0.0,
+                        min(
+                            100.0,
+                            (float)
+                                $levelShare
+                                    ->revenue_share_percent
+                        )
+                    );
+
+                /*
+                 * Exact level statement.
+                 */
+                if (
+                    $statementOwnerType === 'label'
+                    && $statementOwnerId === $rowLabelId
+                ) {
+                    return round(
+                        $levelPercent,
+                        4
+                    );
+                }
+
+                /*
+                 * Root/master retains difference.
+                 */
+                if (
+                    $statementOwnerType === 'label'
+                    && $statementOwnerId === $sourceOwnerId
+                ) {
+                    return round(
+                        100.0 - $levelPercent,
+                        4
+                    );
+                }
+
+                return 0.0;
+            }
+        }
+
         /*
          * Master-label catalogue ownership with
          * a direct artist beneficiary.
@@ -939,7 +1127,7 @@ class OwnershipRoyaltyService
          * No child-of-child split.
          */
         if (
-            !$this->isValidDirectChildShare(
+            !$this->isValidHierarchyShare(
                 $share
             )
         ) {
@@ -955,78 +1143,98 @@ class OwnershipRoyaltyService
             ] = $share;
     }
 
-    private function isValidDirectChildShare(
+    private function isValidHierarchyShare(
         object $share
     ): bool {
-        $master = DB::table(
-            'labels'
-        )
+        $master = DB::table('labels')
             ->where(
                 'id',
-                $share
-                    ->master_label_id
+                $share->master_label_id
             )
-            ->whereNull(
-                'deleted_at'
-            )
+            ->whereNull('deleted_at')
             ->first([
                 'id',
                 'parent_label_id',
             ]);
 
+        /*
+         * Financial contracts may only originate
+         * from a root/master label.
+         */
         if (
             !$master
-            || $master
-                ->parent_label_id
-                !== null
+            || $master->parent_label_id !== null
         ) {
             return false;
         }
 
+        $hierarchy = app(
+            LabelHierarchyService::class
+        );
+
         if (
-            $share
-                ->beneficiary_type
+            $share->beneficiary_type
             === 'label'
         ) {
-            return DB::table(
-                'labels'
-            )
+            $beneficiary = DB::table('labels')
                 ->where(
                     'id',
-                    $share
-                        ->beneficiary_id
+                    $share->beneficiary_id
                 )
-                ->where(
+                ->whereNull('deleted_at')
+                ->first([
+                    'id',
                     'parent_label_id',
-                    $master->id
+                ]);
+
+            if (!$beneficiary) {
+                return false;
+            }
+
+            /*
+             * Master cannot be its own beneficiary.
+             */
+            if (
+                (int) $beneficiary->id
+                === (int) $master->id
+            ) {
+                return false;
+            }
+
+            return (int)
+                $hierarchy->rootLabelId(
+                    (int) $beneficiary->id
                 )
-                ->whereNull(
-                    'deleted_at'
-                )
-                ->exists();
+                === (int) $master->id;
         }
 
         if (
-            $share
-                ->beneficiary_type
+            $share->beneficiary_type
             === 'artist'
         ) {
-            return DB::table(
-                'artists'
-            )
+            $artist = DB::table('artists')
                 ->where(
                     'id',
-                    $share
-                        ->beneficiary_id
+                    $share->beneficiary_id
                 )
-                ->where(
+                ->whereNull('deleted_at')
+                ->first([
+                    'id',
                     'label_id',
-                    $master->id
+                ]);
+
+            if (
+                !$artist
+                || !$artist->label_id
+            ) {
+                return false;
+            }
+
+            return (int)
+                $hierarchy->rootLabelId(
+                    (int) $artist->label_id
                 )
-                ->whereNull(
-                    'deleted_at'
-                )
-                ->exists();
+                === (int) $master->id;
         }
 
         return false;

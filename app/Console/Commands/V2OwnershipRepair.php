@@ -26,8 +26,15 @@ class V2OwnershipRepair extends Command
             'Starting V2 ownership repair...'
         );
 
+        $month = trim(
+            (string) $this->option('month')
+        );
+
         $result =
-            $ownership->remapReports();
+            $ownership->remapReports(
+                true,
+                $month !== '' ? $month : null
+            );
 
         $this->line(
             'Mapped rows: '
@@ -76,10 +83,6 @@ class V2OwnershipRepair extends Command
                 'Pending/generated statements cleared.'
             );
         }
-
-        $month = trim(
-            (string) $this->option('month')
-        );
 
         $months = $month !== ''
             ? collect([$month])

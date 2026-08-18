@@ -145,13 +145,13 @@ class ReportAnalyticsService
     ): Builder {
         if (!empty($filters['month'])) {
             $query->where(
-                'sale_month',
+                'reporting_month',
                 $filters['month']
             );
         } else {
             if (!empty($filters['from_month'])) {
                 $query->where(
-                    'sale_month',
+                    'reporting_month',
                     '>=',
                     $filters['from_month']
                 );
@@ -159,11 +159,18 @@ class ReportAnalyticsService
 
             if (!empty($filters['to_month'])) {
                 $query->where(
-                    'sale_month',
+                    'reporting_month',
                     '<=',
                     $filters['to_month']
                 );
             }
+        }
+
+        if (!empty($filters['sale_month'])) {
+            $query->where(
+                'sale_month',
+                $filters['sale_month']
+            );
         }
 
         if (!empty($filters['platform'])) {
@@ -185,6 +192,62 @@ class ReportAnalyticsService
                 'isrc',
                 'like',
                 '%' . $filters['isrc'] . '%'
+            );
+        }
+
+        /*
+         * MIXX_TUNE_HIERARCHY_REPORT_FILTERS
+         *
+         * master_label_id:
+         *     complete hierarchy owned by that root.
+         *
+         * level_id:
+         *     selected level + complete descendant subtree.
+         *
+         * artist_id:
+         *     exact artist only.
+         *
+         * These filters operate on canonical report-row
+         * ownership fields and never duplicate revenue.
+         */
+        if (!empty($filters['master_label_id'])) {
+            $masterLabelId =
+                (int) $filters['master_label_id'];
+
+            $masterTreeIds = app(
+                \App\Services\V2\LabelHierarchyService::class
+            )->descendantIds(
+                $masterLabelId,
+                true
+            );
+
+            $query->whereIn(
+                'label_id',
+                $masterTreeIds
+            );
+        }
+
+        if (!empty($filters['level_id'])) {
+            $levelId =
+                (int) $filters['level_id'];
+
+            $levelTreeIds = app(
+                \App\Services\V2\LabelHierarchyService::class
+            )->descendantIds(
+                $levelId,
+                true
+            );
+
+            $query->whereIn(
+                'label_id',
+                $levelTreeIds
+            );
+        }
+
+        if (!empty($filters['artist_id'])) {
+            $query->where(
+                'artist_id',
+                (int) $filters['artist_id']
             );
         }
 
@@ -265,8 +328,8 @@ class ReportAnalyticsService
         int $limit = 12
     ): array {
         return (clone $query)
-            ->whereNotNull('sale_month')
-            ->select('sale_month')
+            ->whereNotNull('reporting_month')
+            ->select('reporting_month')
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
             )
@@ -276,15 +339,15 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(earnings), 0) as earnings'
             )
-            ->groupBy('sale_month')
-            ->orderByDesc('sale_month')
+            ->groupBy('reporting_month')
+            ->orderByDesc('reporting_month')
             ->limit($limit)
             ->get()
             ->reverse()
             ->values()
             ->map(fn ($row) => [
                 'month' =>
-                    $row->sale_month,
+                    $row->reporting_month,
 
                 'streams' =>
                     (float) $row->streams,

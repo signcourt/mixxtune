@@ -69,21 +69,44 @@ class MasterRevenueVisibilityService
         $managed = 0.0;
 
         /*
-         * Direct child labels only.
+         * Recursive hierarchy.
          *
-         * A sub-label cannot itself become a
-         * source of another hierarchy level.
+         * The master manages its complete catalogue
+         * tree. Revenue rows are NOT duplicated;
+         * descendants are discovered only for
+         * visibility and beneficiary summaries.
          */
-        $childLabels = DB::table('labels')
-            ->where(
-                'parent_label_id',
-                $label->id
+        $hierarchy = app(
+            LabelHierarchyService::class
+        );
+
+        $treeIds = $hierarchy
+            ->descendantIds(
+                (int) $label->id,
+                true
+            );
+
+        $descendantIds = $treeIds
+            ->reject(
+                fn ($id) =>
+                    (int) $id === (int) $label->id
             )
-            ->whereNull('deleted_at')
-            ->get([
-                'id',
-                'name',
-            ]);
+            ->values();
+
+        $childLabels = $descendantIds->isEmpty()
+            ? collect()
+            : DB::table('labels')
+                ->whereIn(
+                    'id',
+                    $descendantIds
+                )
+                ->whereNull('deleted_at')
+                ->orderBy('id')
+                ->get([
+                    'id',
+                    'name',
+                    'parent_label_id',
+                ]);
 
         foreach ($childLabels as $child) {
             $row = $this->beneficiarySummary(
@@ -104,22 +127,20 @@ class MasterRevenueVisibilityService
         }
 
         /*
-         * Artists directly assigned to the
-         * master label are also first-level
-         * beneficiaries.
-         *
-         * Artists belonging to a child label
-         * are intentionally excluded here.
+         * Artists anywhere inside the master's
+         * recursive catalogue tree are visible
+         * to the master.
          */
         $directArtists = DB::table('artists')
-            ->where(
+            ->whereIn(
                 'label_id',
-                $label->id
+                $treeIds
             )
             ->whereNull('deleted_at')
             ->get([
                 'id',
                 'stage_name',
+                'label_id',
             ]);
 
         foreach ($directArtists as $artist) {

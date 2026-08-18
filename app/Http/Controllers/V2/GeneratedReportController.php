@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Reports\GeneratedReport;
 use App\Services\V2\GeneratedReportService;
 use App\Services\V2\PermissionService;
+use App\Services\V2\ReportAnalyticsService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Writer\Html;
@@ -63,6 +64,24 @@ class GeneratedReportController extends Controller
                 'nullable',
                 'array',
             ],
+
+            'filters.master_label_id' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+
+            'filters.level_id' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+
+            'filters.artist_id' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
         ]);
 
         $report = $service->generate(
@@ -82,7 +101,9 @@ class GeneratedReportController extends Controller
     }
 
     public function index(
-        Request $request
+        Request $request,
+        ReportAnalyticsService $analytics,
+        PermissionService $permissions
     ): JsonResponse {
         $reports =
             GeneratedReport::query()
@@ -102,7 +123,13 @@ class GeneratedReportController extends Controller
                         GeneratedReport $report
                     ) =>
                         $this->serializeReport(
-                            $report
+                            $report,
+                            $this->staleState(
+                                $request,
+                                $report,
+                                $analytics,
+                                $permissions
+                            )
                         )
                 )
                 ->values();
@@ -114,13 +141,27 @@ class GeneratedReportController extends Controller
 
     public function download(
         Request $request,
-        string $publicId
+        string $publicId,
+        ReportAnalyticsService $analytics,
+        PermissionService $permissions
     ): BinaryFileResponse {
         $report =
             $this->ownedReport(
                 $request,
                 $publicId
             );
+
+        abort_if(
+            $this->staleState(
+                $request,
+                $report,
+                $analytics,
+                $permissions
+            )['is_stale'],
+            409,
+            'This report is outdated. Generate a new report.'
+        );
+
 
         abort_unless(
             $report->status === 'completed',
@@ -164,13 +205,27 @@ class GeneratedReportController extends Controller
 
     public function pdf(
         Request $request,
-        string $publicId
+        string $publicId,
+        ReportAnalyticsService $analytics,
+        PermissionService $permissions
     ) {
         $report =
             $this->ownedReport(
                 $request,
                 $publicId
             );
+
+        abort_if(
+            $this->staleState(
+                $request,
+                $report,
+                $analytics,
+                $permissions
+            )['is_stale'],
+            409,
+            'This report is outdated. Generate a new report.'
+        );
+
 
         abort_unless(
             $report->status === 'completed',
@@ -275,7 +330,7 @@ class GeneratedReportController extends Controller
     public function automaticPdf(
         Request $request,
         string $month,
-        GeneratedReportService $service,
+        ReportAnalyticsService $analytics,
         PermissionService $permissions
     ) {
         $this->validateMonth(
@@ -287,55 +342,156 @@ class GeneratedReportController extends Controller
             'reports.view'
         );
 
-        $report =
-            $service->generate(
+        $query =
+            $analytics->scopedQuery(
                 $request->user(),
-                $this->automaticPayload(
-                    $month
-                )
+                $permissions
             );
 
-        abort_unless(
-            $report->status === 'completed'
-                && $report->file_path
-                && Storage::disk('local')
-                    ->exists(
-                        $report->file_path
-                    ),
-            404,
-            'Automatic report file not found.'
+        $query->where(
+            'reporting_month',
+            $month
         );
 
-        $absolutePath =
-            Storage::disk('local')
-                ->path(
-                    $report->file_path
+        $totalRows =
+            (clone $query)->count();
+
+        $grossRevenue =
+            (float)
+            (clone $query)->sum(
+                'earnings'
+            );
+
+        $mappedRevenue =
+            (float)
+            (clone $query)
+                ->where(
+                    'mapping_status',
+                    'mapped'
+                )
+                ->sum(
+                    'earnings'
                 );
 
-        try {
-            return $this->pdfFromWorkbook(
-                $absolutePath,
-                'royalty-report-'
-                    .$month
-                    .'.pdf'
-            );
-        } finally {
-            if (
-                $report->file_path
-                && Storage::disk('local')
-                    ->exists(
-                        $report->file_path
-                    )
-            ) {
-                Storage::disk('local')
-                    ->delete(
-                        $report->file_path
-                    );
-            }
+        $unmappedRevenue =
+            (float)
+            (clone $query)
+                ->where(
+                    'mapping_status',
+                    'unmapped'
+                )
+                ->sum(
+                    'earnings'
+                );
 
-            $report->delete();
-        }
+        $summaryRows =
+            (clone $query)
+                ->leftJoin(
+                    'labels as pdf_labels',
+                    function ($join) {
+                        $join
+                            ->on(
+                                'pdf_labels.id',
+                                '=',
+                                'report_rows.revenue_owner_id'
+                            )
+                            ->where(
+                                'report_rows.revenue_owner_type',
+                                '=',
+                                'label'
+                            );
+                    }
+                )
+                ->select(
+                    'report_rows.revenue_owner_type',
+                    'report_rows.revenue_owner_id',
+                    'report_rows.mapping_status',
+                    'pdf_labels.name as owner_name'
+                )
+                ->selectRaw(
+                    'COUNT(*) AS rows_count'
+                )
+                ->selectRaw(
+                    'COALESCE(SUM(report_rows.earnings), 0) AS gross'
+                )
+                ->groupBy(
+                    'report_rows.revenue_owner_type',
+                    'report_rows.revenue_owner_id',
+                    'report_rows.mapping_status',
+                    'pdf_labels.name'
+                )
+                ->orderByDesc(
+                    'gross'
+                )
+                ->get();
+
+        $mappingPercentage =
+            abs($grossRevenue) > 0.00000001
+                ? (
+                    $mappedRevenue
+                    / $grossRevenue
+                ) * 100
+                : 0.0;
+
+        $periodLabel =
+            \Carbon\Carbon::createFromFormat(
+                'Y-m',
+                $month
+            )->format(
+                'F Y'
+            );
+
+        return Pdf::loadView(
+            'pdf.monthly-report-summary',
+            [
+                'periodLabel' =>
+                    $periodLabel,
+
+                'currency' =>
+                    'INR',
+
+                'grossRevenue' =>
+                    $grossRevenue,
+
+                'mappedRevenue' =>
+                    $mappedRevenue,
+
+                'unmappedRevenue' =>
+                    $unmappedRevenue,
+
+                'mappingPercentage' =>
+                    $mappingPercentage,
+
+                'summaryRows' =>
+                    $summaryRows,
+
+                'totalRows' =>
+                    $totalRows,
+
+                'generatedAt' =>
+                    now()
+                        ->timezone(
+                            config(
+                                'app.timezone',
+                                'UTC'
+                            )
+                        )
+                        ->format(
+                            'd M Y, h:i A'
+                        ),
+            ]
+        )
+            ->setPaper(
+                'a4',
+                'portrait'
+            )
+            ->download(
+                'royalty-report-'
+                .$month
+                .'.pdf'
+            );
     }
+
 
     public function destroy(
         Request $request,
@@ -487,6 +643,78 @@ class GeneratedReportController extends Controller
         }
     }
 
+    private function staleState(
+        Request $request,
+        GeneratedReport $report,
+        ReportAnalyticsService $analytics,
+        PermissionService $permissions
+    ): array {
+        $query =
+            $analytics->scopedQuery(
+                $request->user(),
+                $permissions
+            );
+
+        $query->whereBetween(
+            'reporting_month',
+            [
+                $report->from_month,
+                $report->to_month,
+            ]
+        );
+
+        $filters =
+            is_array($report->filters)
+                ? $report->filters
+                : [];
+
+        $query =
+            $analytics->applyFilters(
+                $query,
+                $filters
+            );
+
+        $currentRows =
+            (clone $query)->count();
+
+        $currentGross =
+            round(
+                (float)
+                (clone $query)->sum(
+                    'earnings'
+                ),
+                8
+            );
+
+        $savedRows =
+            (int) $report->rows_count;
+
+        $savedGross =
+            round(
+                (float)
+                $report->gross_amount,
+                8
+            );
+
+        $isStale =
+            $savedRows !== $currentRows
+            || abs(
+                $savedGross
+                - $currentGross
+            ) > 0.0001;
+
+        return [
+            'is_stale' =>
+                $isStale,
+
+            'reason' =>
+                $isStale
+                    ? 'Current authorised data differs from this saved report. Generate a new report.'
+                    : null,
+        ];
+    }
+
+
     private function ownedReport(
         Request $request,
         string $publicId
@@ -508,7 +736,8 @@ class GeneratedReportController extends Controller
     }
 
     private function serializeReport(
-        GeneratedReport $report
+        GeneratedReport $report,
+        ?array $staleState = null
     ): array {
         return [
             'id' =>
@@ -547,6 +776,16 @@ class GeneratedReportController extends Controller
 
             'status' =>
                 $report->status,
+
+            'is_stale' =>
+                (bool) (
+                    $staleState['is_stale']
+                    ?? false
+                ),
+
+            'stale_reason' =>
+                $staleState['reason']
+                ?? null,
 
             'file_name' =>
                 $report->file_name,

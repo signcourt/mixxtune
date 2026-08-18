@@ -16,7 +16,7 @@ use Throwable;
 class GeneratedReportService
 {
     private const COLUMN_MAP = [
-        'Reporting Month' => 'sale_month',
+        'Reporting Month' => 'reporting_month',
         'Sales Month' => 'sale_month',
         'Track Artist' => 'track_artist',
         'Track Title' => 'track_title',
@@ -88,12 +88,13 @@ class GeneratedReportService
                 $this->permissions
             )
             ->whereBetween(
-                'sale_month',
+                'reporting_month',
                 [
                     $fromMonth,
                     $toMonth,
                 ]
             )
+            ->orderBy('reporting_month')
             ->orderBy('sale_month')
             ->orderBy('id');
 
@@ -108,6 +109,62 @@ class GeneratedReportService
          * this scoped query later without bypassing
          * authorization.
          */
+        /*
+         * MIXX_TUNE_GENERATED_HIERARCHY_FILTERS
+         *
+         * IMPORTANT:
+         * $query is already authorization-scoped.
+         * These filters can only narrow that query.
+         */
+        $reportFilters =
+            is_array($data['filters'] ?? null)
+                ? $data['filters']
+                : [];
+
+        if (!empty(
+            $reportFilters['master_label_id']
+        )) {
+            $masterTreeIds = app(
+                \App\Services\V2\LabelHierarchyService::class
+            )->descendantIds(
+                (int)
+                $reportFilters['master_label_id'],
+                true
+            );
+
+            $query->whereIn(
+                'label_id',
+                $masterTreeIds
+            );
+        }
+
+        if (!empty(
+            $reportFilters['level_id']
+        )) {
+            $levelTreeIds = app(
+                \App\Services\V2\LabelHierarchyService::class
+            )->descendantIds(
+                (int)
+                $reportFilters['level_id'],
+                true
+            );
+
+            $query->whereIn(
+                'label_id',
+                $levelTreeIds
+            );
+        }
+
+        if (!empty(
+            $reportFilters['artist_id']
+        )) {
+            $query->where(
+                'artist_id',
+                (int)
+                $reportFilters['artist_id']
+            );
+        }
+
         $scope = (string) (
             $data['scope']
             ?? 'full_catalogue'
@@ -477,7 +534,9 @@ class GeneratedReportService
         array $revenue
     ): mixed {
         return match ($column) {
-            'Reporting Month',
+            'Reporting Month' =>
+                $row->reporting_month,
+
             'Sales Month' =>
                 $row->sale_month,
 
@@ -741,6 +800,32 @@ class GeneratedReportService
          * The August share must apply to the
          * August royalty period, so resolve
          * against the final day of sale_month.
+         */
+        /*
+         * MIXX TUNE FINANCIAL PERIOD RULE
+         * ===============================
+         *
+         * Revenue-share contracts are resolved
+         * against Reporting Month, not Sales Month.
+         *
+         * Sales Month remains DSP transaction
+         * metadata and a secondary drill-down.
+         */
+        if (!empty($row->reporting_month)) {
+            return Carbon::createFromFormat(
+                '!Y-m',
+                (string) $row->reporting_month
+            )
+                ->endOfMonth()
+                ->toDateString();
+        }
+
+        /*
+         * Legacy fallback only.
+         *
+         * Historical rows without reporting_month
+         * can still resolve until controlled
+         * historical backfill is completed.
          */
         if (!empty($row->sale_month)) {
             return Carbon::createFromFormat(

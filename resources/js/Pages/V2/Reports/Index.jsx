@@ -11,33 +11,6 @@ import {
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 
-const automaticReports = [
-    {
-        id: 1,
-        period: 'June 2026',
-        type: 'Full catalogue single report',
-        amount: '₹0.00',
-        generatedAt: '12 Aug 2026',
-        status: 'ready',
-    },
-    {
-        id: 2,
-        period: 'May 2026',
-        type: 'Full catalogue single report',
-        amount: '₹0.00',
-        generatedAt: '12 Aug 2026',
-        status: 'ready',
-    },
-    {
-        id: 3,
-        period: 'April 2026',
-        type: 'Full catalogue single report',
-        amount: '₹0.00',
-        generatedAt: '12 Aug 2026',
-        status: 'ready',
-    },
-];
-
 const defaultColumns = [
     'Reporting Month',
     'Sales Month',
@@ -132,7 +105,17 @@ function ReportTable({
                                 </td>
 
                                 <td className="px-5 py-4 text-sm font-semibold text-slate-900">
-                                    {report.amount}
+                                    {typeof report.amount === 'number'
+                                        ? new Intl.NumberFormat(
+                                              'en-IN',
+                                              {
+                                                  style: 'currency',
+                                                  currency: 'INR',
+                                                  minimumFractionDigits: 2,
+                                                  maximumFractionDigits: 2,
+                                              }
+                                          ).format(report.amount)
+                                        : report.amount}
                                 </td>
 
                                 <td className="px-5 py-4 text-sm text-slate-600">
@@ -140,7 +123,17 @@ function ReportTable({
                                 </td>
 
                                 <td className="px-5 py-4">
-                                    {report.status === 'completed' ||
+                                    {report.stale ? (
+                                        <span
+                                            title={
+                                                report.staleReason ||
+                                                'Generate a new report'
+                                            }
+                                            className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700"
+                                        >
+                                            Outdated
+                                        </span>
+                                    ) : report.status === 'completed' ||
                                     report.status === 'ready' ? (
                                         <span
                                             title="Ready"
@@ -166,19 +159,22 @@ function ReportTable({
                                                 <a
                                                     href={
                                                         report.status ===
-                                                        'completed'
+                                                        'completed' &&
+                                                    !report.stale
                                                             ? `/v2/generated-reports/${report.id}/download`
                                                             : undefined
                                                     }
                                                     title="Download Excel"
                                                     aria-disabled={
                                                         report.status !==
-                                                        'completed'
+                                                        'completed' ||
+                                                            report.stale
                                                     }
                                                     onClick={(event) => {
                                                         if (
                                                             report.status !==
-                                                            'completed'
+                                                                'completed' ||
+                                                            report.stale
                                                         ) {
                                                             event.preventDefault();
                                                         }
@@ -186,7 +182,8 @@ function ReportTable({
                                                     className={[
                                                         'inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200',
                                                         report.status ===
-                                                        'completed'
+                                                        'completed' &&
+                                                    !report.stale
                                                             ? 'text-slate-600 hover:bg-slate-50'
                                                             : 'cursor-not-allowed text-slate-300',
                                                     ].join(' ')}
@@ -199,19 +196,22 @@ function ReportTable({
                                                 <a
                                                     href={
                                                         report.status ===
-                                                        'completed'
+                                                        'completed' &&
+                                                    !report.stale
                                                             ? `/v2/generated-reports/${report.id}/pdf`
                                                             : undefined
                                                     }
                                                     title="Download PDF"
                                                     aria-disabled={
                                                         report.status !==
-                                                        'completed'
+                                                        'completed' ||
+                                                            report.stale
                                                     }
                                                     onClick={(event) => {
                                                         if (
                                                             report.status !==
-                                                            'completed'
+                                                                'completed' ||
+                                                            report.stale
                                                         ) {
                                                             event.preventDefault();
                                                         }
@@ -219,7 +219,8 @@ function ReportTable({
                                                     className={[
                                                         'inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200',
                                                         report.status ===
-                                                        'completed'
+                                                        'completed' &&
+                                                    !report.stale
                                                             ? 'text-slate-600 hover:bg-slate-50'
                                                             : 'cursor-not-allowed text-slate-300',
                                                     ].join(' ')}
@@ -250,12 +251,13 @@ function ReportTable({
                                             </>
                                         ) : (
                                             <>
-                                                {periodToMonth(
+                                                {(report.month ??
+                                                periodToMonth(
                                                     report.period
-                                                ) ? (
+                                                )) ? (
                                                     <>
                                                         <a
-                                                            href={`/v2/reports/automatic/${periodToMonth(
+                                                            href={`/v2/reports/automatic/${report.month ?? periodToMonth(
                                                                 report.period
                                                             )}/download`}
                                                             title="Download Excel"
@@ -267,7 +269,7 @@ function ReportTable({
                                                         </a>
 
                                                         <a
-                                                            href={`/v2/reports/automatic/${periodToMonth(
+                                                            href={`/v2/reports/automatic/${report.month ?? periodToMonth(
                                                                 report.period
                                                             )}/pdf`}
                                                             title="Download PDF"
@@ -391,7 +393,11 @@ function StepHeader({ step, currentStep, title }) {
     );
 }
 
-export default function ReportsIndex({ months = [] }) {
+export default function ReportsIndex({
+    months = [],
+    hierarchyOptions = {},
+    automaticReports = [],
+}) {
     const [tab, setTab] = useState('automatic');
     const [step, setStep] = useState(1);
 
@@ -521,6 +527,165 @@ export default function ReportsIndex({ months = [] }) {
     ]);
     const [reportMode, setReportMode] = useState('single');
     const [scope, setScope] = useState('full_catalogue');
+
+    const masters =
+        hierarchyOptions?.masters || [];
+
+    const levels =
+        hierarchyOptions?.levels || [];
+
+    const artists =
+        hierarchyOptions?.artists || [];
+
+    const [selectedMasterId, setSelectedMasterId] =
+        useState('');
+
+    const [selectedLevelId, setSelectedLevelId] =
+        useState('');
+
+    const [selectedArtistId, setSelectedArtistId] =
+        useState('');
+
+    const filteredLevels = useMemo(() => {
+        if (!selectedMasterId) {
+            return levels;
+        }
+
+        return levels.filter(
+            (level) =>
+                String(level.root_id) ===
+                String(selectedMasterId)
+        );
+    }, [
+        levels,
+        selectedMasterId,
+    ]);
+
+    const selectedLevel = useMemo(
+        () =>
+            levels.find(
+                (level) =>
+                    String(level.id) ===
+                    String(selectedLevelId)
+            ) || null,
+        [
+            levels,
+            selectedLevelId,
+        ]
+    );
+
+    const descendantLevelIds = useMemo(() => {
+        if (!selectedLevel) {
+            return null;
+        }
+
+        const selectedPath =
+            String(selectedLevel.path || '');
+
+        return new Set(
+            levels
+                .filter((level) => {
+                    const path =
+                        String(level.path || '');
+
+                    return (
+                        String(level.id) ===
+                            String(selectedLevel.id)
+                        ||
+                        path.startsWith(
+                            `${selectedPath} › `
+                        )
+                    );
+                })
+                .map(
+                    (level) =>
+                        String(level.id)
+                )
+        );
+    }, [
+        levels,
+        selectedLevel,
+    ]);
+
+    const filteredArtists = useMemo(() => {
+        return artists.filter((artist) => {
+            if (
+                selectedMasterId
+                && artist.label_id
+            ) {
+                const artistLevel =
+                    levels.find(
+                        (level) =>
+                            String(level.id) ===
+                            String(artist.label_id)
+                    );
+
+                if (
+                    !artistLevel
+                    ||
+                    String(
+                        artistLevel.root_id
+                    ) !==
+                        String(
+                            selectedMasterId
+                        )
+                ) {
+                    return false;
+                }
+            }
+
+            if (
+                descendantLevelIds
+                && artist.label_id
+                && !descendantLevelIds.has(
+                    String(artist.label_id)
+                )
+            ) {
+                return false;
+            }
+
+            return true;
+        });
+    }, [
+        artists,
+        levels,
+        selectedMasterId,
+        descendantLevelIds,
+    ]);
+
+    useEffect(() => {
+        if (
+            selectedLevelId
+            && !filteredLevels.some(
+                (level) =>
+                    String(level.id) ===
+                    String(selectedLevelId)
+            )
+        ) {
+            setSelectedLevelId('');
+            setSelectedArtistId('');
+        }
+    }, [
+        selectedMasterId,
+        selectedLevelId,
+        filteredLevels,
+    ]);
+
+    useEffect(() => {
+        if (
+            selectedArtistId
+            && !filteredArtists.some(
+                (artist) =>
+                    String(artist.id) ===
+                    String(selectedArtistId)
+            )
+        ) {
+            setSelectedArtistId('');
+        }
+    }, [
+        selectedArtistId,
+        filteredArtists,
+    ]);
 
     const [selectedColumns, setSelectedColumns] =
         useState(defaultColumns);
@@ -670,6 +835,15 @@ export default function ReportsIndex({ months = [] }) {
                     report.currency
                 ),
 
+            stale:
+                Boolean(
+                    report.is_stale
+                ),
+
+            staleReason:
+                report.stale_reason
+                || null,
+
             generatedAt:
                 dateValue
                     ? new Intl.DateTimeFormat(
@@ -752,6 +926,29 @@ export default function ReportsIndex({ months = [] }) {
 
                             selected_columns:
                                 selectedColumns,
+
+                            filters: {
+                                master_label_id:
+                                    selectedMasterId
+                                        ? Number(
+                                              selectedMasterId
+                                          )
+                                        : null,
+
+                                level_id:
+                                    selectedLevelId
+                                        ? Number(
+                                              selectedLevelId
+                                          )
+                                        : null,
+
+                                artist_id:
+                                    selectedArtistId
+                                        ? Number(
+                                              selectedArtistId
+                                          )
+                                        : null,
+                            },
                         }
                     );
 
@@ -1163,6 +1360,157 @@ export default function ReportsIndex({ months = [] }) {
                                             Select which catalogue data should be included in the report.
                                         </p>
                                     </div>
+
+                                    <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 md:col-span-2">
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                            <div>
+                                                <div className="text-sm font-black text-slate-900">
+                                                    Catalogue Hierarchy
+                                                </div>
+
+                                                <p className="mt-1 text-sm text-slate-500">
+                                                    Filter the report by master account, catalogue level and artist.
+                                                </p>
+                                            </div>
+
+                                            <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-violet-700 ring-1 ring-violet-200">
+                                                Recursive Scope
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                                            <div>
+                                                <label className="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">
+                                                    Master Account
+                                                </label>
+
+                                                <select
+                                                    value={
+                                                        selectedMasterId
+                                                    }
+                                                    onChange={(e) => {
+                                                        setSelectedMasterId(
+                                                            e.target.value
+                                                        );
+                                                        setSelectedLevelId(
+                                                            ''
+                                                        );
+                                                        setSelectedArtistId(
+                                                            ''
+                                                        );
+                                                    }}
+                                                    className="w-full rounded-xl border-slate-300 bg-white"
+                                                >
+                                                    <option value="">
+                                                        All Master Accounts
+                                                    </option>
+
+                                                    {masters.map(
+                                                        (master) => (
+                                                            <option
+                                                                key={
+                                                                    master.id
+                                                                }
+                                                                value={
+                                                                    master.id
+                                                                }
+                                                            >
+                                                                {
+                                                                    master.name
+                                                                }
+                                                            </option>
+                                                        )
+                                                    )}
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">
+                                                    Level
+                                                </label>
+
+                                                <select
+                                                    value={
+                                                        selectedLevelId
+                                                    }
+                                                    onChange={(e) => {
+                                                        setSelectedLevelId(
+                                                            e.target.value
+                                                        );
+                                                        setSelectedArtistId(
+                                                            ''
+                                                        );
+                                                    }}
+                                                    className="w-full rounded-xl border-slate-300 bg-white"
+                                                >
+                                                    <option value="">
+                                                        All Levels
+                                                    </option>
+
+                                                    {filteredLevels.map(
+                                                        (level) => (
+                                                            <option
+                                                                key={
+                                                                    level.id
+                                                                }
+                                                                value={
+                                                                    level.id
+                                                                }
+                                                            >
+                                                                {
+                                                                    level.path ||
+                                                                    level.name
+                                                                }
+                                                            </option>
+                                                        )
+                                                    )}
+                                                </select>
+
+                                                <p className="mt-2 text-xs text-slate-500">
+                                                    A level includes itself and all descendant levels.
+                                                </p>
+                                            </div>
+
+                                            <div>
+                                                <label className="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">
+                                                    Artist
+                                                </label>
+
+                                                <select
+                                                    value={
+                                                        selectedArtistId
+                                                    }
+                                                    onChange={(e) =>
+                                                        setSelectedArtistId(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className="w-full rounded-xl border-slate-300 bg-white"
+                                                >
+                                                    <option value="">
+                                                        All Artists
+                                                    </option>
+
+                                                    {filteredArtists.map(
+                                                        (artist) => (
+                                                            <option
+                                                                key={
+                                                                    artist.id
+                                                                }
+                                                                value={
+                                                                    artist.id
+                                                                }
+                                                            >
+                                                                {
+                                                                    artist.name
+                                                                }
+                                                            </option>
+                                                        )
+                                                    )}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1277,6 +1625,81 @@ export default function ReportsIndex({ months = [] }) {
                                         <div className="mt-2 text-base font-bold text-slate-900">
                                             {selectedColumns.length} fields
                                         </div>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 md:col-span-2">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-violet-500">
+                                            Hierarchy Scope
+                                        </div>
+
+                                        <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                                            <div>
+                                                <div className="text-xs font-semibold text-slate-400">
+                                                    Master
+                                                </div>
+
+                                                <div className="mt-1 text-sm font-bold text-slate-900">
+                                                    {selectedMasterId
+                                                        ? masters.find(
+                                                              (item) =>
+                                                                  String(
+                                                                      item.id
+                                                                  ) ===
+                                                                  String(
+                                                                      selectedMasterId
+                                                                  )
+                                                          )?.name ||
+                                                          'Selected Master'
+                                                        : 'All Masters'}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <div className="text-xs font-semibold text-slate-400">
+                                                    Level
+                                                </div>
+
+                                                <div className="mt-1 text-sm font-bold text-slate-900">
+                                                    {selectedLevelId
+                                                        ? levels.find(
+                                                              (item) =>
+                                                                  String(
+                                                                      item.id
+                                                                  ) ===
+                                                                  String(
+                                                                      selectedLevelId
+                                                                  )
+                                                          )?.path ||
+                                                          'Selected Level'
+                                                        : 'All Levels'}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <div className="text-xs font-semibold text-slate-400">
+                                                    Artist
+                                                </div>
+
+                                                <div className="mt-1 text-sm font-bold text-slate-900">
+                                                    {selectedArtistId
+                                                        ? artists.find(
+                                                              (item) =>
+                                                                  String(
+                                                                      item.id
+                                                                  ) ===
+                                                                  String(
+                                                                      selectedArtistId
+                                                                  )
+                                                          )?.name ||
+                                                          'Selected Artist'
+                                                        : 'All Artists'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <p className="mt-4 text-xs font-semibold text-slate-500">
+                                            Selected level revenue includes that level and its complete descendant subtree.
+                                        </p>
                                     </div>
                                 </div>
 

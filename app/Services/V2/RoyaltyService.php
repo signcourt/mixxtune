@@ -197,7 +197,7 @@ class RoyaltyService
             $currency
         ) {
             $baseQuery = ReportRow::query()
-                ->where('sale_month', $month)
+                ->where('reporting_month', $month)
                 ->where('artist_id', $artistId);
 
             $gross = round(

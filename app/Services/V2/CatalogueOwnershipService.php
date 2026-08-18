@@ -12,9 +12,45 @@ class CatalogueOwnershipService
         object $release
     ): array {
         if (!empty($release->label_id)) {
+            /*
+             * CATALOGUE LEVEL VS FINANCIAL OWNER
+             * -----------------------------------
+             *
+             * release.label_id always identifies the
+             * exact catalogue level.
+             *
+             * Revenue ownership rolls upward to the
+             * root/master label of that hierarchy.
+             *
+             * Example:
+             *
+             * Sanatan (1)
+             *   -> X
+             *      -> X1
+             *
+             * A release stored on X1 keeps:
+             * releases.label_id = X1
+             *
+             * Report rows keep:
+             * report_rows.label_id = X1
+             *
+             * Financial ownership becomes:
+             * revenue_owner_type = label
+             * revenue_owner_id   = Sanatan
+             *
+             * Standalone/root labels remain their
+             * own financial owner.
+             */
+            $rootLabelId =
+                app(
+                    LabelHierarchyService::class
+                )->rootLabelId(
+                    (int) $release->label_id
+                );
+
             return [
                 'type' => 'label',
-                'id' => (int) $release->label_id,
+                'id' => (int) $rootLabelId,
             ];
         }
 
@@ -25,7 +61,8 @@ class CatalogueOwnershipService
     }
 
     public function remapReports(
-        bool $onlyUnmapped = false
+        bool $onlyUnmapped = false,
+        ?string $month = null
     ): array {
         $mapped = 0;
         $unmapped = 0;
@@ -38,6 +75,13 @@ class CatalogueOwnershipService
                 'track_title',
                 'track_artist',
             ])
+            ->when(
+                $month !== null && trim($month) !== '',
+                fn ($query) => $query->where(
+                    'reporting_month',
+                    trim($month)
+                )
+            )
             ->orderBy('id');
 
         if ($onlyUnmapped) {
@@ -58,21 +102,74 @@ class CatalogueOwnershipService
                 &$unmapped
             ) {
                 foreach ($rows as $row) {
-                    $track = $this->findTrack(
+                    /*
+                     * Persistent manual ownership rules have highest
+                     * priority for report rows that do not belong to
+                     * the current catalogue.
+                     */
+                    $rule = $this->persistentRule(
                         $row->isrc
                     );
 
-                    // Controlled fallback:
-                    // only when ISRC did not resolve a track.
-                    // Requires BOTH title + artist and exactly one
-                    // matching active catalogue track.
-                    if (!$track) {
-                        $track =
-                            $this->findTrackByTitleAndArtist(
-                                $row->track_title ?? null,
-                                $row->track_artist ?? null
-                            );
+                    if ($rule) {
+                        DB::table('report_rows')
+                            ->where('id', $row->id)
+                            ->update([
+                                'revenue_owner_type' =>
+                                    $rule->owner_type,
+
+                                'revenue_owner_id' =>
+                                    (int) $rule->owner_id,
+
+                                'label_id' =>
+                                    !empty(
+                                        $rule
+                                            ->catalogue_label_id
+                                    )
+                                        ? (int)
+                                            $rule
+                                                ->catalogue_label_id
+                                        : $row->label_id,
+
+                                'artist_id' =>
+                                    !empty(
+                                        $rule
+                                            ->catalogue_label_id
+                                    )
+                                        ? (
+                                            !empty(
+                                                $rule
+                                                    ->artist_id
+                                            )
+                                                ? (int)
+                                                    $rule
+                                                        ->artist_id
+                                                : null
+                                        )
+                                        : $row->artist_id,
+
+                                'mapping_status' =>
+                                    'mapped',
+
+                                'mapped_at' =>
+                                    now(),
+
+                                'updated_at' =>
+                                    now(),
+                            ]);
+
+                        $mapped++;
+
+                        continue;
                     }
+
+                    /*
+                     * Catalogue revenue ownership is ISRC-only.
+                     * No title/artist/UPC fallback is permitted.
+                     */
+                    $track = $this->findTrack(
+                        $row->isrc
+                    );
 
                     $release = null;
 
@@ -81,21 +178,6 @@ class CatalogueOwnershipService
                             ->where(
                                 'id',
                                 $track->release_id
-                            )
-                            ->whereNull('deleted_at')
-                            ->first();
-                    }
-
-                    if (
-                        !$release
-                        && !empty($row->upc)
-                    ) {
-                        $release = DB::table('releases')
-                            ->where(
-                                'upc',
-                                $this->cleanCode(
-                                    $row->upc
-                                )
                             )
                             ->whereNull('deleted_at')
                             ->first();
@@ -344,11 +426,27 @@ class CatalogueOwnershipService
                     'label_id' =>
                         $newLabelId,
 
+                    /*
+                     * Catalogue location and financial
+                     * ownership are separate concerns.
+                     *
+                     * label_id keeps the exact level,
+                     * while financial ownership resolves
+                     * to the hierarchy root/master.
+                     */
                     'revenue_owner_type' =>
-                        $ownerType,
+                        $newLabelId !== null
+                            ? 'label'
+                            : 'artist',
 
                     'revenue_owner_id' =>
-                        $ownerId,
+                        $newLabelId !== null
+                            ? app(
+                                LabelHierarchyService::class
+                            )->rootLabelId(
+                                (int) $newLabelId
+                            )
+                            : (int) $newArtistId,
 
                     'mapping_status' =>
                         'mapped',
@@ -696,6 +794,26 @@ class CatalogueOwnershipService
         ]);
     }
 
+    private function persistentRule(
+        ?string $isrc
+    ): ?object {
+        $normalized = $this->normalizeIsrc($isrc);
+
+        if (
+            $normalized === ''
+            || !\Illuminate\Support\Facades\Schema::hasTable(
+                'revenue_mapping_rules'
+            )
+        ) {
+            return null;
+        }
+
+        return DB::table('revenue_mapping_rules')
+            ->where('identifier_type', 'isrc')
+            ->where('identifier_value', $normalized)
+            ->first();
+    }
+
     private function findTrack(
         ?string $isrc
     ): ?object {
@@ -706,23 +824,36 @@ class CatalogueOwnershipService
             return null;
         }
 
-        return DB::table('tracks')
+        /*
+         * FAIL-SAFE ISRC RESOLUTION
+         * -------------------------
+         * Revenue ownership requires exactly one active catalogue
+         * track for the normalized ISRC.
+         *
+         * 0 matches  => unmapped
+         * 1 match    => valid catalogue track
+         * 2+ matches => ambiguous, therefore unmapped
+         *
+         * Never select an arbitrary first track for revenue ownership.
+         */
+        $matches = DB::table('tracks')
             ->whereNull('deleted_at')
             ->whereRaw(
                 "
-                REPLACE(
-                    REPLACE(
-                        UPPER(TRIM(isrc)),
-                        '-',
-                        ''
-                    ),
-                    ' ',
+                REGEXP_REPLACE(
+                    UPPER(TRIM(isrc)),
+                    '[^A-Z0-9]',
                     ''
                 ) = ?
                 ",
                 [$normalized]
             )
-            ->first();
+            ->limit(2)
+            ->get();
+
+        return $matches->count() === 1
+            ? $matches->first()
+            : null;
     }
 
     private function findTrackByTitleAndArtist(

@@ -224,6 +224,7 @@ export default function Index({
     role = 'artist',
     filters = {},
     filterOptions = {},
+    hierarchyOptions = {},
     summary = {},
     growth = {},
     monthlyTrend = [],
@@ -248,6 +249,123 @@ export default function Index({
 
     const countries =
         filterOptions?.countries || [];
+
+    const hierarchyMasters =
+        hierarchyOptions?.masters || [];
+
+    const hierarchyLevels =
+        hierarchyOptions?.levels || [];
+
+    const hierarchyArtists =
+        hierarchyOptions?.artists || [];
+
+    const selectedMasterId =
+        filters.master_label_id || '';
+
+    const selectedLevelId =
+        filters.level_id || '';
+
+    const selectedArtistId =
+        filters.artist_id || '';
+
+    const filteredLevels =
+        selectedMasterId
+            ? hierarchyLevels.filter(
+                  (level) =>
+                      String(level.root_id) ===
+                      String(selectedMasterId)
+              )
+            : hierarchyLevels;
+
+    const selectedLevel =
+        hierarchyLevels.find(
+            (level) =>
+                String(level.id) ===
+                String(selectedLevelId)
+        ) || null;
+
+    const descendantLevelIds =
+        selectedLevel
+            ? new Set(
+                  hierarchyLevels
+                      .filter((level) => {
+                          const selectedPath =
+                              String(
+                                  selectedLevel.path ||
+                                  ''
+                              );
+
+                          const path =
+                              String(
+                                  level.path ||
+                                  ''
+                              );
+
+                          return (
+                              String(level.id) ===
+                                  String(
+                                      selectedLevel.id
+                                  )
+                              ||
+                              path.startsWith(
+                                  `${selectedPath} › `
+                              )
+                          );
+                      })
+                      .map(
+                          (level) =>
+                              String(level.id)
+                      )
+              )
+            : null;
+
+    const filteredHierarchyArtists =
+        hierarchyArtists.filter(
+            (artist) => {
+                if (
+                    selectedMasterId
+                    && artist.label_id
+                ) {
+                    const artistLevel =
+                        hierarchyLevels.find(
+                            (level) =>
+                                String(
+                                    level.id
+                                ) ===
+                                String(
+                                    artist.label_id
+                                )
+                        );
+
+                    if (
+                        !artistLevel
+                        ||
+                        String(
+                            artistLevel.root_id
+                        ) !==
+                            String(
+                                selectedMasterId
+                            )
+                    ) {
+                        return false;
+                    }
+                }
+
+                if (
+                    descendantLevelIds
+                    && artist.label_id
+                    && !descendantLevelIds.has(
+                        String(
+                            artist.label_id
+                        )
+                    )
+                ) {
+                    return false;
+                }
+
+                return true;
+            }
+        );
 
     const changeFilter = (key, value) => {
         router.get(
@@ -338,7 +456,12 @@ export default function Index({
                             </div>
 
                             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
-                                <select
+                                <div>
+                                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Reporting Month
+                                    </label>
+
+                                    <select
                                     value={filters.month || ''}
                                     onChange={(e) =>
                                         router.get(
@@ -346,6 +469,7 @@ export default function Index({
                                             {
                                                 ...filters,
                                                 month: e.target.value,
+                                                sale_month: '',
                                                 from_month: '',
                                                 to_month: '',
                                             },
@@ -359,7 +483,7 @@ export default function Index({
                                     className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
                                 >
                                     <option value="">
-                                        All Months
+                                        Select Reporting Month
                                     </option>
 
                                     {months.map((month) => (
@@ -371,6 +495,39 @@ export default function Index({
                                         </option>
                                     ))}
                                 </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Sale Month
+                                    </label>
+
+                                    <select
+                                        value={filters.sale_month || ''}
+                                        onChange={(event) =>
+                                            changeFilter(
+                                                'sale_month',
+                                                event.target.value
+                                            )
+                                        }
+                                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                    >
+                                        <option value="">
+                                            All
+                                        </option>
+
+                                        {(filterOptions.saleMonths || []).map(
+                                            (month) => (
+                                                <option
+                                                    key={month}
+                                                    value={month}
+                                                >
+                                                    {monthFormat(month)}
+                                                </option>
+                                            )
+                                        )}
+                                    </select>
+                                </div>
 
                                 <select
                                     value={filters.from_month || ''}
@@ -507,6 +664,159 @@ export default function Index({
                         </div>
                     </div>
 
+                    <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
+                        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+                            <div>
+                                <div className="text-sm font-black text-slate-950">
+                                    Analytics Hierarchy Scope
+                                </div>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Select a master account, recursive catalogue level, or exact artist.
+                                </p>
+                            </div>
+
+                            <div className="grid flex-1 gap-3 md:grid-cols-3 xl:max-w-4xl">
+                                <select
+                                    value={
+                                        selectedMasterId
+                                    }
+                                    onChange={(e) =>
+                                        router.get(
+                                            window.location.pathname,
+                                            {
+                                                ...filters,
+                                                master_label_id:
+                                                    e.target.value,
+                                                level_id: '',
+                                                artist_id: '',
+                                            },
+                                            {
+                                                preserveScroll: true,
+                                                preserveState: true,
+                                                replace: true,
+                                            }
+                                        )
+                                    }
+                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                                >
+                                    <option value="">
+                                        All Master Accounts
+                                    </option>
+
+                                    {hierarchyMasters.map(
+                                        (master) => (
+                                            <option
+                                                key={
+                                                    master.id
+                                                }
+                                                value={
+                                                    master.id
+                                                }
+                                            >
+                                                {
+                                                    master.name
+                                                }
+                                            </option>
+                                        )
+                                    )}
+                                </select>
+
+                                <select
+                                    value={
+                                        selectedLevelId
+                                    }
+                                    onChange={(e) =>
+                                        router.get(
+                                            window.location.pathname,
+                                            {
+                                                ...filters,
+                                                level_id:
+                                                    e.target.value,
+                                                artist_id: '',
+                                            },
+                                            {
+                                                preserveScroll: true,
+                                                preserveState: true,
+                                                replace: true,
+                                            }
+                                        )
+                                    }
+                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                                >
+                                    <option value="">
+                                        All Levels
+                                    </option>
+
+                                    {filteredLevels.map(
+                                        (level) => (
+                                            <option
+                                                key={
+                                                    level.id
+                                                }
+                                                value={
+                                                    level.id
+                                                }
+                                            >
+                                                {
+                                                    level.path ||
+                                                    level.name
+                                                }
+                                            </option>
+                                        )
+                                    )}
+                                </select>
+
+                                <select
+                                    value={
+                                        selectedArtistId
+                                    }
+                                    onChange={(e) =>
+                                        router.get(
+                                            window.location.pathname,
+                                            {
+                                                ...filters,
+                                                artist_id:
+                                                    e.target.value,
+                                            },
+                                            {
+                                                preserveScroll: true,
+                                                preserveState: true,
+                                                replace: true,
+                                            }
+                                        )
+                                    }
+                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                                >
+                                    <option value="">
+                                        All Artists
+                                    </option>
+
+                                    {filteredHierarchyArtists.map(
+                                        (artist) => (
+                                            <option
+                                                key={
+                                                    artist.id
+                                                }
+                                                value={
+                                                    artist.id
+                                                }
+                                            >
+                                                {
+                                                    artist.name
+                                                }
+                                            </option>
+                                        )
+                                    )}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 text-xs font-semibold text-slate-500">
+                            Selecting a level includes that level and its complete descendant subtree.
+                        </div>
+                    </div>
+
                     {revenueVisibility?.available &&
                         !revenueVisibility?.is_master && (
                         <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm">
@@ -520,7 +830,7 @@ export default function Index({
                                     }
                                     subtitle={
                                         revenueVisibility.is_master
-                                            ? 'Canonical royalty allocation across your direct child labels and artists'
+                                            ? 'Canonical royalty allocation across your complete managed catalogue hierarchy'
                                             : 'Your payable revenue after the configured revenue-share allocation'
                                     }
                                 />
@@ -534,7 +844,7 @@ export default function Index({
                                                     revenueVisibility.managed_revenue,
                                                     primaryCurrency
                                                 )}
-                                                subtitle="Revenue managed across direct beneficiaries"
+                                                subtitle="Revenue managed across the complete hierarchy"
                                                 icon={Layers3}
                                             />
 
@@ -573,11 +883,11 @@ export default function Index({
                                             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                                                 <div className="border-b border-slate-200 px-5 py-4">
                                                     <div className="font-semibold text-slate-950">
-                                                        Direct Revenue Beneficiaries
+                                                        Revenue Beneficiaries
                                                     </div>
 
                                                     <div className="mt-1 text-sm text-slate-500">
-                                                        Direct child labels and artists only. No recursive hierarchy.
+                                                        Catalogue levels and artists within the managed hierarchy.
                                                     </div>
                                                 </div>
 

@@ -747,6 +747,38 @@ Route::middleware([
         ->middleware('role:super_admin')
         ->group(function () {
 
+            Route::get(
+                '/unmapped-revenue',
+                [
+                    \App\Http\Controllers\V2\Admin\UnmappedRevenueController::class,
+                    'index',
+                ]
+            )->name('unmapped-revenue.index');
+
+            Route::post(
+                '/unmapped-revenue',
+                [
+                    \App\Http\Controllers\V2\Admin\UnmappedRevenueController::class,
+                    'store',
+                ]
+            )->name('unmapped-revenue.store');
+            Route::post(
+                '/unmapped-revenue/create-and-map-label',
+                [
+                    \App\Http\Controllers\V2\Admin\UnmappedRevenueController::class,
+                    'createAndMapLabel',
+                ]
+            )->name('unmapped-revenue.create-and-map-label');
+
+            Route::post(
+                '/unmapped-revenue/apply-all',
+                [
+                    \App\Http\Controllers\V2\Admin\UnmappedRevenueController::class,
+                    'applyAll',
+                ]
+            )->name('unmapped-revenue.apply-all');
+
+
             /*
              * Legacy Catalogue Bulk Import
              *
@@ -1546,6 +1578,29 @@ Route::middleware(['auth', 'verified'])
 
 Route::middleware(['auth', 'verified'])
     ->get(
+        '/v2/admin/reports/imports/{reportImport}/download',
+        [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'download']
+    )
+    ->name('v2.admin.reports.imports.download');
+
+
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/v2/admin/reports/imports/{reportImport}',
+        [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'update']
+    )
+    ->name('v2.admin.reports.imports.update');
+
+Route::middleware(['auth', 'verified'])
+    ->delete(
+        '/v2/admin/reports/imports/{reportImport}',
+        [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'destroy']
+    )
+    ->name('v2.admin.reports.imports.destroy');
+
+
+Route::middleware(['auth', 'verified'])
+    ->get(
         '/v2/royalties',
         [\App\Http\Controllers\V2\RoyaltyController::class, 'index']
     )
@@ -2259,3 +2314,41 @@ Route::middleware(['auth'])->group(function () {
         [GeneratedReportController::class, 'destroy']
     )->name('v2.generated-reports.destroy');
 });
+
+
+/* MIXXTUNE_LABEL_HIERARCHY_ROUTES */
+Route::middleware(['auth'])
+    ->prefix('super-admin')
+    ->group(function () {
+        Route::get(
+            '/label-hierarchy',
+            [
+                \App\Http\Controllers\V2\Admin\LabelHierarchyController::class,
+                'index',
+            ]
+        )->name('v2.admin.label-hierarchy.index');
+
+        Route::post(
+            '/label-hierarchy',
+            [
+                \App\Http\Controllers\V2\Admin\LabelHierarchyController::class,
+                'store',
+            ]
+        )->name('v2.admin.label-hierarchy.store');
+
+        Route::put(
+            '/label-hierarchy/{label}',
+            [
+                \App\Http\Controllers\V2\Admin\LabelHierarchyController::class,
+                'update',
+            ]
+        )->name('v2.admin.label-hierarchy.update');
+
+        Route::delete(
+            '/label-hierarchy/{label}',
+            [
+                \App\Http\Controllers\V2\Admin\LabelHierarchyController::class,
+                'destroy',
+            ]
+        )->name('v2.admin.label-hierarchy.destroy');
+    });

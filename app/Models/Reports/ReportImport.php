@@ -9,6 +9,7 @@ class ReportImport extends Model
     protected $fillable = [
         'public_id',
         'original_filename',
+        'reporting_month',
         'stored_path',
         'status',
         'total_rows',

@@ -20,7 +20,7 @@ class SuperAdminProfitService
 
         if ($month !== null && $month !== '') {
             $query->where(
-                'sale_month',
+                'reporting_month',
                 $month
             );
         }
@@ -299,11 +299,11 @@ class SuperAdminProfitService
     public function months(): Collection
     {
         return DB::table('report_rows')
-            ->whereNotNull('sale_month')
-            ->where('sale_month', '<>', '')
+            ->whereNotNull('reporting_month')
+            ->where('reporting_month', '<>', '')
             ->distinct()
-            ->orderByDesc('sale_month')
-            ->pluck('sale_month');
+            ->orderByDesc('reporting_month')
+            ->pluck('reporting_month');
     }
 
     public function platforms(): Collection

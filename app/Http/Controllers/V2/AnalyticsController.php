@@ -22,6 +22,13 @@ class AnalyticsController extends Controller
                 (string) $request->input('month', '')
             ),
 
+            'sale_month' => trim(
+                (string) $request->input(
+                    'sale_month',
+                    ''
+                )
+            ),
+
             'from_month' => trim(
                 (string) $request->input('from_month', '')
             ),
@@ -37,6 +44,33 @@ class AnalyticsController extends Controller
             'country' => trim(
                 (string) $request->input('country', '')
             ),
+
+            'master_label_id' =>
+                $request->filled(
+                    'master_label_id'
+                )
+                    ? (int) $request->input(
+                        'master_label_id'
+                    )
+                    : null,
+
+            'level_id' =>
+                $request->filled(
+                    'level_id'
+                )
+                    ? (int) $request->input(
+                        'level_id'
+                    )
+                    : null,
+
+            'artist_id' =>
+                $request->filled(
+                    'artist_id'
+                )
+                    ? (int) $request->input(
+                        'artist_id'
+                    )
+                    : null,
         ];
     }
 
@@ -62,17 +96,17 @@ class AnalyticsController extends Controller
             'report_rows'
         )
             ->whereNotNull(
-                'sale_month'
+                'reporting_month'
             )
             ->where(
-                'sale_month',
+                'reporting_month',
                 '!=',
                 ''
             );
 
         if (!empty($filters['from_month'])) {
             $query->where(
-                'sale_month',
+                'reporting_month',
                 '>=',
                 $filters['from_month']
             );
@@ -80,7 +114,7 @@ class AnalyticsController extends Controller
 
         if (!empty($filters['to_month'])) {
             $query->where(
-                'sale_month',
+                'reporting_month',
                 '<=',
                 $filters['to_month']
             );
@@ -89,10 +123,10 @@ class AnalyticsController extends Controller
         return $query
             ->distinct()
             ->orderBy(
-                'sale_month'
+                'reporting_month'
             )
             ->pluck(
-                'sale_month'
+                'reporting_month'
             )
             ->values()
             ->all();
@@ -415,12 +449,51 @@ class AnalyticsController extends Controller
         );
 
         $months = (clone $base)
-            ->whereNotNull('sale_month')
-            ->where('sale_month', '!=', '')
+            ->whereNotNull('reporting_month')
+            ->where('reporting_month', '!=', '')
             ->distinct()
-            ->orderByDesc('sale_month')
-            ->pluck('sale_month')
+            ->orderByDesc('reporting_month')
+            ->pluck('reporting_month')
             ->values();
+
+        /*
+         * MIXX TUNE REPORTING PERIOD DEFAULT
+         * ==================================
+         *
+         * Analytics opens on the latest available
+         * Reporting Month.
+         *
+         * Sale Month remains optional and defaults
+         * to All.
+         */
+        if (
+            empty($filters['month'])
+            && empty($filters['from_month'])
+            && empty($filters['to_month'])
+            && $months->isNotEmpty()
+        ) {
+            $filters['month'] =
+                (string) $months->first();
+        }
+
+        $saleMonthBase =
+            clone $base;
+
+        if (!empty($filters['month'])) {
+            $saleMonthBase->where(
+                'reporting_month',
+                $filters['month']
+            );
+        }
+
+        $saleMonths =
+            $saleMonthBase
+                ->whereNotNull('sale_month')
+                ->where('sale_month', '!=', '')
+                ->distinct()
+                ->orderByDesc('sale_month')
+                ->pluck('sale_month')
+                ->values();
 
         $platforms = (clone $base)
             ->whereNotNull('platform')
@@ -442,6 +515,214 @@ class AnalyticsController extends Controller
             clone $base,
             $filters
         );
+
+
+        /*
+         * MIXX_TUNE_ANALYTICS_HIERARCHY_OPTIONS
+         *
+         * Options come only from rows already visible
+         * through scopedQuery(). This prevents the
+         * hierarchy selectors from exposing accounts
+         * outside the authenticated security scope.
+         */
+        $visibleLabelIds = (clone $base)
+            ->whereNotNull('label_id')
+            ->distinct()
+            ->pluck('label_id')
+            ->map(
+                fn ($id) => (int) $id
+            )
+            ->values();
+
+        $visibleArtistIds = (clone $base)
+            ->whereNotNull('artist_id')
+            ->distinct()
+            ->pluck('artist_id')
+            ->map(
+                fn ($id) => (int) $id
+            )
+            ->values();
+
+        $visibleLabels =
+            $visibleLabelIds->isEmpty()
+                ? collect()
+                : DB::table('labels')
+                    ->whereIn(
+                        'id',
+                        $visibleLabelIds
+                    )
+                    ->whereNull('deleted_at')
+                    ->get([
+                        'id',
+                        'name',
+                        'parent_label_id',
+                    ]);
+
+        $hierarchy = app(
+            \App\Services\V2\LabelHierarchyService::class
+        );
+
+        $levelOptions = $visibleLabels
+            ->map(
+                function ($label) use (
+                    $hierarchy
+                ) {
+                    $path = [];
+
+                    $currentId =
+                        (int) $label->id;
+
+                    $visited = [];
+
+                    while (
+                        $currentId
+                        && !isset(
+                            $visited[$currentId]
+                        )
+                    ) {
+                        $visited[$currentId] =
+                            true;
+
+                        $current =
+                            DB::table('labels')
+                                ->where(
+                                    'id',
+                                    $currentId
+                                )
+                                ->whereNull(
+                                    'deleted_at'
+                                )
+                                ->first([
+                                    'id',
+                                    'name',
+                                    'parent_label_id',
+                                ]);
+
+                        if (!$current) {
+                            break;
+                        }
+
+                        array_unshift(
+                            $path,
+                            $current->name
+                        );
+
+                        $currentId =
+                            $current
+                                ->parent_label_id
+                                    ? (int)
+                                        $current
+                                            ->parent_label_id
+                                    : 0;
+                    }
+
+                    return [
+                        'id' =>
+                            (int) $label->id,
+
+                        'name' =>
+                            $label->name,
+
+                        'parent_label_id' =>
+                            $label
+                                ->parent_label_id
+                                    ? (int)
+                                        $label
+                                            ->parent_label_id
+                                    : null,
+
+                        'root_id' =>
+                            (int)
+                            $hierarchy
+                                ->rootLabelId(
+                                    (int)
+                                    $label->id
+                                ),
+
+                        'path' =>
+                            implode(
+                                ' › ',
+                                $path
+                            ),
+                    ];
+                }
+            )
+            ->sortBy('path')
+            ->values();
+
+        $masterIds = $levelOptions
+            ->pluck('root_id')
+            ->unique()
+            ->values();
+
+        $masterOptions =
+            $masterIds->isEmpty()
+                ? collect()
+                : DB::table('labels')
+                    ->whereIn(
+                        'id',
+                        $masterIds
+                    )
+                    ->whereNull('deleted_at')
+                    ->orderBy('name')
+                    ->get([
+                        'id',
+                        'name',
+                    ])
+                    ->map(
+                        fn ($label) => [
+                            'id' =>
+                                (int) $label->id,
+
+                            'name' =>
+                                $label->name,
+                        ]
+                    )
+                    ->values();
+
+        $artistOptions =
+            $visibleArtistIds->isEmpty()
+                ? collect()
+                : DB::table('artists')
+                    ->whereIn(
+                        'id',
+                        $visibleArtistIds
+                    )
+                    ->whereNull('deleted_at')
+                    ->orderBy('stage_name')
+                    ->get([
+                        'id',
+                        'stage_name',
+                        'label_id',
+                    ])
+                    ->map(
+                        fn ($artist) => [
+                            'id' =>
+                                (int) $artist->id,
+
+                            'name' =>
+                                $artist->stage_name,
+
+                            'label_id' =>
+                                $artist->label_id
+                                    ? (int)
+                                        $artist
+                                            ->label_id
+                                    : null,
+                        ]
+                    )
+                    ->values();
+
+        $hierarchyOptions = [
+            'masters' =>
+                $masterOptions,
+
+            'levels' =>
+                $levelOptions,
+
+            'artists' =>
+                $artistOptions,
+        ];
 
         /*
          * Historical trend ignores all month selectors.
@@ -481,8 +762,12 @@ class AnalyticsController extends Controller
 
                 'filters' => $filters,
 
+                'hierarchyOptions' =>
+                    $hierarchyOptions,
+
                 'filterOptions' => [
                     'months' => $months,
+                    'saleMonths' => $saleMonths,
                     'platforms' => $platforms,
                     'countries' => $countries,
                 ],

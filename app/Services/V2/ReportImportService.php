@@ -116,6 +116,18 @@ class ReportImportService
             'rate',
         ],
 
+        'collected_revenue' => [
+            'collected revenue',
+            'collected_revenue',
+            'gross revenue',
+            'gross_revenue',
+            'gross earnings',
+            'gross_earnings',
+            'gross amount',
+            'source revenue',
+            'source_revenue',
+        ],
+
         'earnings' => [
             'earnings',
             'eranings',
@@ -129,7 +141,8 @@ class ReportImportService
 
     public function import(
         UploadedFile $file,
-        User $user
+        User $user,
+        string $reportingMonth
     ): ReportImport {
         $storedPath = $file->store(
             'reports/imports',
@@ -142,6 +155,9 @@ class ReportImportService
 
             'original_filename' =>
                 $file->getClientOriginalName(),
+
+            'reporting_month' =>
+                $reportingMonth,
 
             'stored_path' =>
                 $storedPath,
@@ -371,21 +387,314 @@ class ReportImportService
                 $mapped['upc']
             );
 
-        $track = $isrc
-            ? Track::query()
-                ->where('isrc', $isrc)
+        $normalizedIsrc = $isrc
+            ? strtoupper(
+                preg_replace(
+                    '/[^A-Z0-9]/i',
+                    '',
+                    $isrc
+                )
+            )
+            : null;
+
+        /*
+         * AUTHORITATIVE REVENUE OWNERSHIP POLICY
+         * ----------------------------------------
+         * Revenue is resolved ONLY by normalized ISRC.
+         *
+         * Formatting differences are ignored:
+         * DG-A05-22-22760
+         * DG A05 22 22760
+         * DGA052222760
+         * all normalize to DGA052222760.
+         *
+         * No UPC, label-name, track-title or artist-name fallback
+         * is allowed for automatic revenue ownership.
+         */
+
+        $persistentRule = $normalizedIsrc
+            ? DB::table('revenue_mapping_rules')
+                ->where('identifier_type', 'isrc')
+                ->where(
+                    'identifier_value',
+                    $normalizedIsrc
+                )
                 ->first()
+            : null;
+
+        /*
+         * Find the catalogue track using normalized alphanumeric
+         * ISRC only. REGEXP_REPLACE removes every separator, not
+         * just hyphens/spaces.
+         */
+        /*
+         * FAIL-SAFE ISRC RESOLUTION
+         * -------------------------
+         * Exactly one active catalogue track must match the normalized
+         * ISRC. Zero matches remain unmapped. Multiple matches are also
+         * treated as unmapped so revenue can never be assigned to an
+         * arbitrary catalogue owner.
+         */
+        $trackMatches = $normalizedIsrc
+            ? Track::query()
+                ->whereNull('deleted_at')
+                ->whereRaw(
+                    "REGEXP_REPLACE(
+                        UPPER(TRIM(isrc)),
+                        '[^A-Z0-9]',
+                        ''
+                    ) = ?",
+                    [$normalizedIsrc]
+                )
+                ->limit(2)
+                ->get()
+            : collect();
+
+        $track = $trackMatches->count() === 1
+            ? $trackMatches->first()
             : null;
 
         $release = $track?->release;
 
+        $ownerType = null;
+        $ownerId = null;
+
+        /*
+         * DETERMINISTIC REVENUE OWNERSHIP
+         * ===============================
+         *
+         * Priority:
+         *
+         * 1. Explicit persistent ISRC rule
+         * 2. Catalogue release ownership
+         * 3. Otherwise unmapped
+         *
+         * Catalogue placement and financial
+         * ownership remain separate:
+         *
+         * label_id = exact catalogue label
+         *
+         * revenue_owner_id =
+         * financial/root owner resolved by
+         * CatalogueOwnershipService.
+         */
+        if ($persistentRule) {
+            $ownerType =
+                !empty(
+                    $persistentRule->owner_type
+                )
+                    ? (string)
+                        $persistentRule->owner_type
+                    : null;
+
+            $ownerId =
+                !empty(
+                    $persistentRule->owner_id
+                )
+                    ? (int)
+                        $persistentRule->owner_id
+                    : null;
+
+            /*
+             * A persistent rule may provide
+             * catalogue placement even when
+             * no catalogue track exists.
+             */
+            if (
+                !empty(
+                    $persistentRule
+                        ->catalogue_label_id
+                )
+            ) {
+                $release = (object) [
+                    'id' =>
+                        !empty(
+                            $persistentRule
+                                ->release_id
+                        )
+                            ? (int)
+                                $persistentRule
+                                    ->release_id
+                            : null,
+
+                    'label_id' =>
+                        (int)
+                        $persistentRule
+                            ->catalogue_label_id,
+
+                    'artist_id' =>
+                        !empty(
+                            $persistentRule
+                                ->artist_id
+                        )
+                            ? (int)
+                                $persistentRule
+                                    ->artist_id
+                            : null,
+                ];
+            }
+        } elseif ($release) {
+            $resolvedOwner = app(
+                CatalogueOwnershipService::class
+            )->resolveReleaseOwner(
+                $release
+            );
+
+            $ownerType =
+                !empty(
+                    $resolvedOwner['type']
+                )
+                    ? (string)
+                        $resolvedOwner['type']
+                    : null;
+
+            $ownerId =
+                !empty(
+                    $resolvedOwner['id']
+                )
+                    ? (int)
+                        $resolvedOwner['id']
+                    : null;
+        }
+
+        $mappingStatus =
+            !empty($ownerType)
+            && !empty($ownerId)
+                ? 'mapped'
+                : 'unmapped';
+
+        /*
+         * MIXX TUNE AUTOMATIC REVENUE ENGINE
+         * ==================================
+         *
+         * Source of truth:
+         *
+         *   Collected Revenue = DSP gross amount
+         *   Account Rate      = assigned account %
+         *   Earnings          = gross x rate
+         *
+         * The exact catalogue account is preferred
+         * over the root/master financial owner.
+         *
+         * Example:
+         *
+         *   DSP gross   = 100
+         *   Label rate  = 80%
+         *   Earnings    = 80
+         *
+         * Unmapped rows remain reconciliation rows
+         * and preserve imported financial values.
+         */
+        $collectedRevenue =
+            $this->nullableNumber(
+                $mapped['collected_revenue']
+            );
+
+        $importedRate =
+            $this->nullableNumber(
+                $mapped['label_rate']
+            );
+
+        $importedEarnings =
+            $this->nullableNumber(
+                $mapped['earnings']
+            );
+
+        $assignedRate = null;
+
+        if ($mappingStatus === 'mapped') {
+            if ($release?->label_id) {
+                $assignedRate =
+                    DB::table('labels')
+                        ->where(
+                            'id',
+                            (int) $release->label_id
+                        )
+                        ->value(
+                            'revenue_share_percentage'
+                        );
+            } elseif ($release?->artist_id) {
+                $assignedRate =
+                    DB::table('artists')
+                        ->where(
+                            'id',
+                            (int) $release->artist_id
+                        )
+                        ->value(
+                            'revenue_share_percentage'
+                        );
+            }
+
+            /*
+             * Persistent ISRC rules or legacy catalogue
+             * placement may expose only the financial
+             * owner. Use it strictly as fallback.
+             */
+            if ($assignedRate === null) {
+                if ($ownerType === 'label') {
+                    $assignedRate =
+                        DB::table('labels')
+                            ->where(
+                                'id',
+                                (int) $ownerId
+                            )
+                            ->value(
+                                'revenue_share_percentage'
+                            );
+                } elseif ($ownerType === 'artist') {
+                    $assignedRate =
+                        DB::table('artists')
+                            ->where(
+                                'id',
+                                (int) $ownerId
+                            )
+                            ->value(
+                                'revenue_share_percentage'
+                            );
+                }
+            }
+        }
+
+        if ($assignedRate !== null) {
+            $assignedRate = max(
+                0.0,
+                min(
+                    100.0,
+                    (float) $assignedRate
+                )
+            );
+        }
+
+        /*
+         * report_rows.label_rate uses decimal ratio:
+         *
+         *   80% => 0.80
+         *   70% => 0.70
+         *  100% => 1.00
+         */
         if (
-            !$release
-            && $upc
+            $mappingStatus === 'mapped'
+            && $collectedRevenue !== null
+            && $assignedRate !== null
         ) {
-            $release = Release::query()
-                ->where('upc', $upc)
-                ->first();
+            $effectiveLabelRate =
+                round(
+                    $assignedRate / 100,
+                    8
+                );
+
+            $effectiveEarnings =
+                round(
+                    $collectedRevenue
+                    * $effectiveLabelRate,
+                    8
+                );
+        } else {
+            $effectiveLabelRate =
+                $importedRate ?? 0.0;
+
+            $effectiveEarnings =
+                $importedEarnings ?? 0.0;
         }
 
         ReportRow::query()->create([
@@ -394,6 +703,9 @@ class ReportImportService
 
             'report_import_id' =>
                 $import->id,
+
+            'reporting_month' =>
+                $import->reporting_month,
 
             'release_id' =>
                 $release?->id,
@@ -406,6 +718,20 @@ class ReportImportService
 
             'label_id' =>
                 $release?->label_id,
+
+            'revenue_owner_type' =>
+                $ownerType,
+
+            'revenue_owner_id' =>
+                $ownerId,
+
+            'mapping_status' =>
+                $mappingStatus,
+
+            'mapped_at' =>
+                $mappingStatus === 'mapped'
+                    ? now()
+                    : null,
 
             'track_artist' =>
                 $mapped['track_artist'],
@@ -465,18 +791,32 @@ class ReportImportService
                 ),
 
             'label_rate' =>
-                $this->number(
-                    $mapped['label_rate']
-                ),
+                $effectiveLabelRate,
+
+            'collected_revenue' =>
+                $collectedRevenue,
 
             'earnings' =>
-                $this->number(
-                    $mapped['earnings']
-                ),
+                $effectiveEarnings,
 
             'raw_data' =>
                 $raw,
         ]);
+    }
+
+    private function normalizeMappingText(
+        ?string $value
+    ): string {
+        $value = mb_strtolower(
+            trim((string) $value),
+            'UTF-8'
+        );
+
+        return preg_replace(
+            '/\\s+/u',
+            ' ',
+            $value
+        ) ?? '';
     }
 
     private function normaliseUpc(
@@ -701,17 +1041,76 @@ class ReportImportService
         }
     }
 
+    private function nullableNumber(
+        mixed $value
+    ): ?float {
+        if (
+            $value === null
+            || trim((string) $value) === ''
+        ) {
+            return null;
+        }
+
+        /*
+         * Preserve scientific notation.
+         *
+         * Valid examples:
+         *   9.97728E-06
+         *   1.23e-05
+         *   -4.5E+03
+         *   0.00000997728
+         *
+         * Removing E/e would catastrophically
+         * change the numeric scale.
+         */
+        $normalized = trim(
+            (string) $value
+        );
+
+        /*
+         * Allow spreadsheet-style formatting
+         * without modifying exponent syntax.
+         */
+        $normalized = str_replace(
+            [
+                ',',
+                '₹',
+                '$',
+                '€',
+                '£',
+            ],
+            '',
+            $normalized
+        );
+
+        if (
+            $normalized === ''
+            || !preg_match(
+                '/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/',
+                $normalized
+            )
+            || !is_numeric($normalized)
+        ) {
+            return null;
+        }
+
+        return (float) $normalized;
+    }
+
     private function number(
         mixed $value
     ): float {
-        if ($value === null) {
-            return 0;
-        }
-
-        return (float) preg_replace(
-            '/[^0-9.\-]/',
-            '',
-            (string) $value
-        );
+        /*
+         * All numeric CSV values must pass through
+         * the scientific-notation-safe parser.
+         *
+         * Examples:
+         *   9.97728E-06 => 0.00000997728
+         *   1.25E+03    => 1250
+         *   1,234.50    => 1234.50
+         */
+        return $this->nullableNumber(
+            $value
+        ) ?? 0.0;
     }
 }
