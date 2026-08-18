@@ -117,6 +117,28 @@ export default function Index({
                         </tbody>
                     </table>
                 </section>
+
+                {(labels.links ?? []).length > 3 && (
+                    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                        <div className="text-sm text-slate-500">
+                            Showing{' '}
+                            <span className="font-semibold text-slate-700">
+                                {labels.from ?? 0}
+                            </span>
+                            {' '}to{' '}
+                            <span className="font-semibold text-slate-700">
+                                {labels.to ?? 0}
+                            </span>
+                            {' '}of{' '}
+                            <span className="font-semibold text-slate-700">
+                                {labels.total ?? 0}
+                            </span>
+                            {' '}labels
+                        </div>
+
+                        <Pagination links={labels.links ?? []} />
+                    </div>
+                )}
             </div>
         </PanelLayout>
     );
@@ -127,5 +149,51 @@ function Cell({ children }) {
         <td className="px-5 py-4 text-sm text-slate-600">
             {children}
         </td>
+    );
+}
+
+function Pagination({ links = [] }) {
+    if (links.length <= 3) {
+        return null;
+    }
+
+    return (
+        <nav
+            className="flex flex-wrap items-center gap-1"
+            aria-label="Labels pagination"
+        >
+            {links.map((link, index) => {
+                const label = String(link.label ?? '')
+                    .replace('&laquo;', '«')
+                    .replace('&raquo;', '»');
+
+                return link.url ? (
+                    <button
+                        key={`${label}-${index}`}
+                        type="button"
+                        onClick={() =>
+                            router.visit(link.url, {
+                                preserveScroll: true,
+                                preserveState: true,
+                            })
+                        }
+                        className={`min-w-10 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                            link.active
+                                ? 'border-slate-900 bg-slate-900 text-white'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                    >
+                        {label}
+                    </button>
+                ) : (
+                    <span
+                        key={`${label}-${index}`}
+                        className="min-w-10 cursor-not-allowed rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-center text-sm text-slate-300"
+                    >
+                        {label}
+                    </span>
+                );
+            })}
+        </nav>
     );
 }

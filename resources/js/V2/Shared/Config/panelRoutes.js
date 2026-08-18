@@ -82,6 +82,7 @@ export const PANEL_ROUTES = {
         artists: "/v2/admin/artists",
 
         labels: "/v2/admin/labels",
+        labelHierarchy: "/super-admin/label-hierarchy",
 
         releases: "/v2/admin/release-reviews",
 
@@ -107,6 +108,7 @@ export const PANEL_ROUTES = {
 
         reports: "/v2/admin/reports",
         analytics: "/v2/analytics",
+        unmappedRevenue: "/super-admin/unmapped-revenue",
 
         wallet: "/v2/admin/wallet",
 
@@ -129,6 +131,7 @@ export const PANEL_ROUTES = {
         admins: "/v2/admin/admins",
 
         labels: "/v2/admin/labels",
+        labelHierarchy: "/super-admin/label-hierarchy",
 
         artists: "/v2/admin/artists",
 

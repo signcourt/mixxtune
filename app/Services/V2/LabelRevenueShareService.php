@@ -17,7 +17,7 @@ class LabelRevenueShareService
         bool $showShare,
         User $actor
     ): LabelRevenueShare {
-        $this->assertDirectChildLabel(
+        $this->assertDescendantLabel(
             $masterLabel,
             $childLabel
         );
@@ -39,7 +39,7 @@ class LabelRevenueShareService
         bool $showShare,
         User $actor
     ): LabelRevenueShare {
-        $this->assertDirectArtist(
+        $this->assertDescendantArtist(
             $masterLabel,
             $artist
         );
@@ -153,51 +153,81 @@ class LabelRevenueShareService
             );
     }
 
-    private function assertDirectChildLabel(
+    private function assertDescendantLabel(
         Label $master,
         Label $child
     ): void {
-        if (
-            (int) $child->parent_label_id
-            !== (int) $master->id
-        ) {
-            throw ValidationException::withMessages([
-                'label' =>
-                    'This label is not a direct child of the master label.',
-            ]);
-        }
-
         /*
-         * Strict two-tier hierarchy.
-         * A child label can never act as another master.
+         * Revenue contracts always originate from
+         * the ROOT financial owner.
          */
         if ($master->parent_label_id !== null) {
             throw ValidationException::withMessages([
                 'master_label' =>
-                    'Sub-labels cannot create or manage child accounts.',
+                    'Revenue distribution can only originate from the root master label.',
+            ]);
+        }
+
+        if (
+            (int) $master->id
+            === (int) $child->id
+        ) {
+            throw ValidationException::withMessages([
+                'label' =>
+                    'The master label cannot be its own beneficiary.',
+            ]);
+        }
+
+        $rootId = app(
+            LabelHierarchyService::class
+        )->rootLabelId(
+            (int) $child->id
+        );
+
+        if (
+            (int) $rootId
+            !== (int) $master->id
+        ) {
+            throw ValidationException::withMessages([
+                'label' =>
+                    'This catalogue level is outside the selected master hierarchy.',
             ]);
         }
     }
 
-    private function assertDirectArtist(
+    private function assertDescendantArtist(
         Label $master,
         Artist $artist
     ): void {
-        if (
+        if ($master->parent_label_id !== null) {
+            throw ValidationException::withMessages([
+                'master_label' =>
+                    'Revenue distribution can only originate from the root master label.',
+            ]);
+        }
+
+        if (!$artist->label_id) {
+            throw ValidationException::withMessages([
+                'artist' =>
+                    'This artist is not assigned to a catalogue level.',
+            ]);
+        }
+
+        $rootId = app(
+            LabelHierarchyService::class
+        )->rootLabelId(
             (int) $artist->label_id
+        );
+
+        if (
+            (int) $rootId
             !== (int) $master->id
         ) {
             throw ValidationException::withMessages([
                 'artist' =>
-                    'This artist is not directly assigned to the master label.',
-            ]);
-        }
-
-        if ($master->parent_label_id !== null) {
-            throw ValidationException::withMessages([
-                'master_label' =>
-                    'Sub-labels cannot create or manage child accounts.',
+                    'This artist is outside the selected master hierarchy.',
             ]);
         }
     }
+
 }

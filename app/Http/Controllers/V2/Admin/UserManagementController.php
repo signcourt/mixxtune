@@ -450,7 +450,27 @@ class UserManagementController extends Controller
             ) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'label_ids' => [
-                        'Select an existing label or add at least one new label.',
+                        'Select an existing label or add one new label.',
+                    ],
+                ]);
+            }
+
+            /*
+             * A Label login represents exactly one financial
+             * label identity. Admin users may still manage
+             * multiple labels through manager assignments.
+             */
+            $requestedLabelCount =
+                count($existingLabelIds)
+                + $newLabelNames->count();
+
+            if ($requestedLabelCount !== 1) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'label_ids' => [
+                        'A Label account must be linked to exactly one label.',
+                    ],
+                    'new_labels' => [
+                        'Select one existing label OR add one new label, not multiple labels.',
                     ],
                 ]);
             }
@@ -1819,7 +1839,27 @@ $validated = $request->validate([
             ) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'label_ids' => [
-                        'A Label account must have at least one label.',
+                        'A Label account must have exactly one label.',
+                    ],
+                ]);
+            }
+
+            /*
+             * A Label login represents exactly one financial
+             * label identity. Admin users may still manage
+             * multiple labels through manager assignments.
+             */
+            $requestedLabelCount =
+                count($existingLabelIds)
+                + $newLabelNames->count();
+
+            if ($requestedLabelCount !== 1) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'label_ids' => [
+                        'A Label account must be linked to exactly one label.',
+                    ],
+                    'new_labels' => [
+                        'Select one existing label OR add one new label, not multiple labels.',
                     ],
                 ]);
             }

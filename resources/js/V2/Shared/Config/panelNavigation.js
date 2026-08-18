@@ -287,6 +287,17 @@ const adminNavigation = (
             href: routes.labels,
             permission: 'labels.view',
         },
+        ...(role === 'super_admin'
+            ? [
+                  {
+                      id: 'label-hierarchy',
+                      label: 'Level Management',
+                      icon: icons.labels,
+                      href: routes.labelHierarchy,
+                      permission: 'labels.view',
+                  },
+              ]
+            : []),
         {
             id: 'artists',
             label: 'Artists',
@@ -392,6 +403,13 @@ const adminNavigation = (
             label: 'Revenue Imports',
             icon: icons.reports,
             href: '/v2/admin/reports/imports',
+            permission: 'reports.view',
+        },
+        {
+            id: 'unmapped-revenue',
+            label: 'Unmapped Revenue',
+            icon: icons.reports,
+            href: routes.unmappedRevenue,
             permission: 'reports.view',
         },
         {
