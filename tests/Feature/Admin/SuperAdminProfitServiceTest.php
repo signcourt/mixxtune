@@ -172,10 +172,25 @@ class SuperAdminProfitServiceTest extends TestCase
             $breakdown
         );
 
-        $this->assertEquals(
-            80.0,
+        /*
+         * The group contains:
+         *
+         * positive row => configured 80%
+         * negative row => effective 100%
+         *
+         * Therefore the account breakdown must
+         * be explicitly marked Mixed instead of
+         * presenting a misleading single rate.
+         */
+        $this->assertNull(
             $breakdown[0][
                 'assigned_rate'
+            ]
+        );
+
+        $this->assertTrue(
+            $breakdown[0][
+                'rate_is_mixed'
             ]
         );
 
@@ -351,6 +366,417 @@ class SuperAdminProfitServiceTest extends TestCase
         $this->assertEquals(
             20.0,
             $result[
+                'super_admin_profit'
+            ]
+        );
+    }
+
+
+
+    public function test_month_filter_falls_back_to_sale_month_when_reporting_month_is_missing(): void
+    {
+        $userId =
+            DB::table('users')
+                ->insertGetId([
+                    'name' =>
+                        'Legacy Month Label',
+                    'email' =>
+                        'legacy-month-profit@example.com',
+                    'password' =>
+                        bcrypt('password'),
+                    'role' =>
+                        'label',
+                    'account_status' =>
+                        'active',
+                    'email_verified_at' =>
+                        now(),
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $labelId =
+            DB::table('labels')
+                ->insertGetId([
+                    'public_id' =>
+                        (string) Str::ulid(),
+                    'name' =>
+                        'Legacy Month Label',
+                    'slug' =>
+                        'legacy-month-label',
+                    'user_id' =>
+                        $userId,
+                    'revenue_share_percentage' =>
+                        80,
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $importId =
+            DB::table('report_imports')
+                ->insertGetId([
+                    'public_id' =>
+                        (string) Str::ulid(),
+                    'original_filename' =>
+                        'legacy-month-profit.csv',
+                    'stored_path' =>
+                        'tests/legacy-month-profit.csv',
+                    'status' =>
+                        'completed',
+                    'total_rows' =>
+                        1,
+                    'imported_rows' =>
+                        1,
+                    'duplicate_rows' =>
+                        0,
+                    'failed_rows' =>
+                        0,
+                    'started_at' =>
+                        now(),
+                    'completed_at' =>
+                        now(),
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        DB::table('report_rows')
+            ->insert([
+                'report_import_id' =>
+                    $importId,
+
+                'row_hash' =>
+                    hash(
+                        'sha256',
+                        'legacy-month-profit-row'
+                    ),
+
+                'label_name' =>
+                    'Legacy Month Label',
+
+                'track_title' =>
+                    'Legacy Month Track',
+
+                'platform' =>
+                    'Spotify',
+
+                'currency' =>
+                    'INR',
+
+                'sale_date' =>
+                    '2026-08-15',
+
+                'sale_month' =>
+                    '2026-08',
+
+                'reporting_month' =>
+                    null,
+
+                'earnings' =>
+                    100,
+
+                'mapping_status' =>
+                    'mapped',
+
+                'mapped_at' =>
+                    now(),
+
+                'label_id' =>
+                    $labelId,
+
+                'revenue_owner_type' =>
+                    'label',
+
+                'revenue_owner_id' =>
+                    $labelId,
+
+                'created_at' =>
+                    now(),
+
+                'updated_at' =>
+                    now(),
+            ]);
+
+        $service =
+            app(
+                SuperAdminProfitService::class
+            );
+
+        $summary =
+            $service->summary(
+                $service->baseQuery(
+                    '2026-08'
+                )
+            );
+
+        $this->assertEquals(
+            100.0,
+            $summary[
+                'collected_revenue'
+            ]
+        );
+
+        $this->assertEquals(
+            80.0,
+            $summary[
+                'user_earning'
+            ]
+        );
+
+        $this->assertEquals(
+            20.0,
+            $summary[
+                'super_admin_profit'
+            ]
+        );
+
+        $this->assertTrue(
+            $service
+                ->months()
+                ->contains(
+                    '2026-08'
+                )
+        );
+    }
+
+
+    public function test_breakdown_marks_group_as_mixed_when_effective_rates_differ(): void
+    {
+        $userId =
+            DB::table('users')
+                ->insertGetId([
+                    'name' =>
+                        'Mixed Rate Label',
+                    'email' =>
+                        'mixed-rate-profit@example.com',
+                    'password' =>
+                        bcrypt('password'),
+                    'role' =>
+                        'label',
+                    'account_status' =>
+                        'active',
+                    'email_verified_at' =>
+                        now(),
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $labelId =
+            DB::table('labels')
+                ->insertGetId([
+                    'public_id' =>
+                        (string) Str::ulid(),
+                    'name' =>
+                        'Mixed Rate Label',
+                    'slug' =>
+                        'mixed-rate-profit-label',
+                    'user_id' =>
+                        $userId,
+                    'revenue_share_percentage' =>
+                        80,
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $importId =
+            DB::table('report_imports')
+                ->insertGetId([
+                    'public_id' =>
+                        (string) Str::ulid(),
+                    'original_filename' =>
+                        'mixed-rate-profit.csv',
+                    'stored_path' =>
+                        'tests/mixed-rate-profit.csv',
+                    'status' =>
+                        'completed',
+                    'total_rows' =>
+                        2,
+                    'imported_rows' =>
+                        2,
+                    'duplicate_rows' =>
+                        0,
+                    'failed_rows' =>
+                        0,
+                    'started_at' =>
+                        now(),
+                    'completed_at' =>
+                        now(),
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        DB::table('report_rows')
+            ->insert([
+                [
+                    'report_import_id' =>
+                        $importId,
+
+                    'row_hash' =>
+                        hash(
+                            'sha256',
+                            'mixed-rate-positive'
+                        ),
+
+                    'label_name' =>
+                        'Mixed Rate Label',
+
+                    'track_title' =>
+                        'Mixed Positive',
+
+                    'platform' =>
+                        'Spotify',
+
+                    'currency' =>
+                        'INR',
+
+                    'reporting_month' =>
+                        '2026-08',
+
+                    'sale_month' =>
+                        '2026-08',
+
+                    'sale_date' =>
+                        '2026-08-15',
+
+                    'earnings' =>
+                        100,
+
+                    'mapping_status' =>
+                        'mapped',
+
+                    'mapped_at' =>
+                        now(),
+
+                    'label_id' =>
+                        $labelId,
+
+                    'revenue_owner_type' =>
+                        'label',
+
+                    'revenue_owner_id' =>
+                        $labelId,
+
+                    'created_at' =>
+                        now(),
+
+                    'updated_at' =>
+                        now(),
+                ],
+                [
+                    'report_import_id' =>
+                        $importId,
+
+                    'row_hash' =>
+                        hash(
+                            'sha256',
+                            'mixed-rate-negative'
+                        ),
+
+                    'label_name' =>
+                        'Mixed Rate Label',
+
+                    'track_title' =>
+                        'Mixed Negative',
+
+                    'platform' =>
+                        'Spotify',
+
+                    'currency' =>
+                        'INR',
+
+                    'reporting_month' =>
+                        '2026-08',
+
+                    'sale_month' =>
+                        '2026-08',
+
+                    'sale_date' =>
+                        '2026-08-16',
+
+                    'earnings' =>
+                        -10,
+
+                    'mapping_status' =>
+                        'mapped',
+
+                    'mapped_at' =>
+                        now(),
+
+                    'label_id' =>
+                        $labelId,
+
+                    'revenue_owner_type' =>
+                        'label',
+
+                    'revenue_owner_id' =>
+                        $labelId,
+
+                    'created_at' =>
+                        now(),
+
+                    'updated_at' =>
+                        now(),
+                ],
+            ]);
+
+        $service =
+            app(
+                SuperAdminProfitService::class
+            );
+
+        $row =
+            $service->breakdown(
+                $service->baseQuery(
+                    '2026-08',
+                    null,
+                    'label',
+                    $labelId
+                )
+            )->first();
+
+        $this->assertNotNull(
+            $row
+        );
+
+        $this->assertNull(
+            $row[
+                'assigned_rate'
+            ]
+        );
+
+        $this->assertTrue(
+            $row[
+                'rate_is_mixed'
+            ]
+        );
+
+        $this->assertEquals(
+            90.0,
+            $row[
+                'collected_revenue'
+            ]
+        );
+
+        $this->assertEquals(
+            70.0,
+            $row[
+                'user_earning'
+            ]
+        );
+
+        $this->assertEquals(
+            20.0,
+            $row[
                 'super_admin_profit'
             ]
         );

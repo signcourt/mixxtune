@@ -19,9 +19,43 @@ class SuperAdminProfitService
             ->whereNotNull('revenue_owner_id');
 
         if ($month !== null && $month !== '') {
+            /*
+             * reporting_month is authoritative.
+             *
+             * Legacy/manual rows created before the
+             * reporting-month contract may have only
+             * sale_month populated. Those rows must
+             * remain selectable in the correct month.
+             */
             $query->where(
-                'reporting_month',
-                $month
+                function ($builder) use ($month) {
+                    $builder
+                        ->where(
+                            'reporting_month',
+                            $month
+                        )
+                        ->orWhere(
+                            function ($legacy) use ($month) {
+                                $legacy
+                                    ->where(
+                                        function ($missing) {
+                                            $missing
+                                                ->whereNull(
+                                                    'reporting_month'
+                                                )
+                                                ->orWhere(
+                                                    'reporting_month',
+                                                    ''
+                                                );
+                                        }
+                                    )
+                                    ->where(
+                                        'sale_month',
+                                        $month
+                                    );
+                            }
+                        );
+                }
             );
         }
 
@@ -231,10 +265,9 @@ class SuperAdminProfitService
                             $id
                         ),
                     'assigned_rate' =>
-                        $this->accountRate(
-                            $type,
-                            $id
-                        ),
+                        null,
+                    'rate_values' =>
+                        [],
                     'collected_revenue' =>
                         0.0,
                     'user_earning' =>
@@ -247,6 +280,18 @@ class SuperAdminProfitService
 
             $calc =
                 $this->calculateRow($row);
+
+            $grouped[$key][
+                'rate_values'
+            ][
+                number_format(
+                    (float)
+                        $calc['assigned_rate'],
+                    4,
+                    '.',
+                    ''
+                )
+            ] = true;
 
             foreach (
                 [
@@ -282,6 +327,27 @@ class SuperAdminProfitService
                         8
                     );
             }
+
+            $rates =
+                array_keys(
+                    $item[
+                        'rate_values'
+                    ]
+                );
+
+            $item['assigned_rate'] =
+                count($rates) === 1
+                    ? (float) $rates[0]
+                    : null;
+
+            $item['rate_is_mixed'] =
+                count($rates) > 1;
+
+            unset(
+                $item[
+                    'rate_values'
+                ]
+            );
         }
 
         unset($item);
@@ -297,12 +363,62 @@ class SuperAdminProfitService
 
     public function months(): Collection
     {
+        /*
+         * reporting_month remains authoritative.
+         * sale_month is used only for legacy rows
+         * whose reporting_month is missing.
+         */
         return DB::table('report_rows')
-            ->whereNotNull('reporting_month')
-            ->where('reporting_month', '<>', '')
+            ->selectRaw(
+                "CASE
+                    WHEN reporting_month IS NOT NULL
+                         AND reporting_month <> ''
+                    THEN reporting_month
+                    ELSE sale_month
+                 END AS effective_month"
+            )
+            ->where(function ($query) {
+                $query
+                    ->where(function ($current) {
+                        $current
+                            ->whereNotNull(
+                                'reporting_month'
+                            )
+                            ->where(
+                                'reporting_month',
+                                '<>',
+                                ''
+                            );
+                    })
+                    ->orWhere(function ($legacy) {
+                        $legacy
+                            ->where(function ($missing) {
+                                $missing
+                                    ->whereNull(
+                                        'reporting_month'
+                                    )
+                                    ->orWhere(
+                                        'reporting_month',
+                                        ''
+                                    );
+                            })
+                            ->whereNotNull(
+                                'sale_month'
+                            )
+                            ->where(
+                                'sale_month',
+                                '<>',
+                                ''
+                            );
+                    });
+            })
             ->distinct()
-            ->orderByDesc('reporting_month')
-            ->pluck('reporting_month');
+            ->orderByDesc(
+                'effective_month'
+            )
+            ->pluck(
+                'effective_month'
+            );
     }
 
     public function platforms(): Collection

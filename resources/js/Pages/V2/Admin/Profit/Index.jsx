@@ -374,16 +374,22 @@ export default function ProfitIndex({
                                             </td>
 
                                             <td className="px-5 py-4 text-right">
-                                                <span className="inline-flex items-center gap-1">
-                                                    <Percent
-                                                        size={
-                                                            13
-                                                        }
-                                                    />
-                                                    {rate(
-                                                        item.assigned_rate
-                                                    )}
-                                                </span>
+                                                {item.rate_is_mixed ? (
+                                                    <span className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300">
+                                                        Mixed
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <Percent
+                                                            size={
+                                                                13
+                                                            }
+                                                        />
+                                                        {rate(
+                                                            item.assigned_rate
+                                                        )}
+                                                    </span>
+                                                )}
                                             </td>
 
                                             <td className="px-5 py-4 text-right">
