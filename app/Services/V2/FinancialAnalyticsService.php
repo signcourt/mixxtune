@@ -356,48 +356,145 @@ class FinancialAnalyticsService
     }
 
 
+
+    /**
+     * Build the canonical monetary allocation scope.
+     *
+     * The incoming statement query already contains the
+     * authenticated ownership, hierarchy and statement-month
+     * restrictions.
+     *
+     * Dimension predicates are applied to report_rows here so
+     * financial aggregations include only matching allocations,
+     * never the complete value of a partially matching statement.
+     */
+    private function filteredAllocations(
+        Builder $statementQuery,
+        array $filters
+    ): Builder {
+        $statementIds = (clone $statementQuery)
+            ->select('rs.id');
+
+        $query = DB::table('royalty_allocations as ra')
+            ->join(
+                'report_rows as rr',
+                'rr.id',
+                '=',
+                'ra.report_row_id'
+            )
+            ->whereIn(
+                'ra.royalty_statement_id',
+                $statementIds
+            );
+
+        $dimensionFilters = [
+            'sale_month' => 'sale_month',
+            'platform' => 'platform',
+            'sale_type' => 'sale_type',
+            'currency' => 'currency',
+            'country' => 'country_code',
+            'cms' => 'cms',
+        ];
+
+        foreach (
+            $dimensionFilters
+            as $filterKey => $column
+        ) {
+            if (empty($filters[$filterKey])) {
+                continue;
+            }
+
+            $query->where(
+                'rr.' . $column,
+                $filters[$filterKey]
+            );
+        }
+
+        if (! empty($filters['isrc'])) {
+            $query->where(
+                'rr.isrc',
+                'like',
+                '%' . $filters['isrc'] . '%'
+            );
+        }
+
+        if (! empty($filters['upc'])) {
+            $query->where(
+                'rr.upc',
+                'like',
+                '%' . $filters['upc'] . '%'
+            );
+        }
+
+        return $query;
+    }
+
+
+
+    /**
+     * Financial summary derived from canonical allocations.
+     *
+     * royalty_statements defines the permitted statement scope.
+     * royalty_allocations contains canonical monetary amounts.
+     *
+     * This keeps dimension-filtered analytics allocation-safe:
+     * a statement containing multiple platforms/countries must not
+     * contribute its entire statement total to one filtered slice.
+     */
     public function summary(
-        Builder $query
+        Builder $statementQuery,
+        array $filters = []
     ): array {
-        $row = (clone $query)
-            ->selectRaw(
-                'COALESCE(SUM(rs.gross_earnings), 0) as gross'
+        $row = $this
+            ->filteredAllocations(
+                $statementQuery,
+                $filters
             )
             ->selectRaw(
-                'COALESCE(SUM(rs.commission_amount), 0) as commission'
+                'COALESCE(SUM(ra.gross_amount), 0) as gross'
             )
             ->selectRaw(
-                'COALESCE(SUM(rs.tax_amount), 0) as tax'
+                'COALESCE(SUM(ra.net_amount), 0) as net'
             )
             ->selectRaw(
-                'COALESCE(SUM(rs.other_deductions), 0) as other_deductions'
-            )
-            ->selectRaw(
-                'COALESCE(SUM(rs.net_payable), 0) as net'
-            )
-            ->selectRaw(
-                'COUNT(*) as statements_count'
+                'COUNT(DISTINCT ra.royalty_statement_id) as statements_count'
             )
             ->first();
 
+        $gross = round(
+            (float) $row->gross,
+            8
+        );
+
+        $net = round(
+            (float) $row->net,
+            8
+        );
+
+        /*
+         * Allocation rows persist canonical gross/net only.
+         * Do not fabricate proportional tax or commission.
+         */
+        $derivedDeductions = round(
+            $gross - $net,
+            8
+        );
+
         return [
             'gross_earnings' =>
-                round((float) $row->gross, 8),
+                $gross,
 
             'commission_amount' =>
-                round((float) $row->commission, 8),
+                $derivedDeductions,
 
             'tax_amount' =>
-                round((float) $row->tax, 8),
+                0.0,
 
             'other_deductions' =>
-                round(
-                    (float) $row->other_deductions,
-                    8
-                ),
+                0.0,
 
             'net_payable' =>
-                round((float) $row->net, 8),
+                $net,
 
             'statements_count' =>
                 (int) $row->statements_count,
@@ -412,21 +509,13 @@ class FinancialAnalyticsService
      * report_rows supplies descriptive DSP metadata only.
      */
     public function platformBreakdown(
-        Builder $statementQuery
+        Builder $statementQuery,
+        array $filters = []
     ): array {
-        $statementIds = (clone $statementQuery)
-            ->select('rs.id');
-
-        return DB::table('royalty_allocations as ra')
-            ->join(
-                'report_rows as rr',
-                'rr.id',
-                '=',
-                'ra.report_row_id'
-            )
-            ->whereIn(
-                'ra.royalty_statement_id',
-                $statementIds
+        return $this
+            ->filteredAllocations(
+                $statementQuery,
+                $filters
             )
             ->selectRaw(
                 "COALESCE(NULLIF(TRIM(rr.platform), ''), 'Unknown') as platform"
@@ -479,21 +568,13 @@ class FinancialAnalyticsService
      * Allocation-safe country/region financial breakdown.
      */
     public function countryBreakdown(
-        Builder $statementQuery
+        Builder $statementQuery,
+        array $filters = []
     ): array {
-        $statementIds = (clone $statementQuery)
-            ->select('rs.id');
-
-        return DB::table('royalty_allocations as ra')
-            ->join(
-                'report_rows as rr',
-                'rr.id',
-                '=',
-                'ra.report_row_id'
-            )
-            ->whereIn(
-                'ra.royalty_statement_id',
-                $statementIds
+        return $this
+            ->filteredAllocations(
+                $statementQuery,
+                $filters
             )
             ->selectRaw(
                 "COALESCE(NULLIF(TRIM(rr.country_code), ''), 'Unknown') as country"
@@ -542,53 +623,85 @@ class FinancialAnalyticsService
             ->all();
     }
 
+    /**
+     * Allocation-safe monthly financial series.
+     *
+     * Statement scope remains authoritative for ownership/access.
+     * Monetary totals come from canonical royalty allocations.
+     */
     public function monthly(
-        Builder $query
+        Builder $statementQuery,
+        array $filters = []
     ): array {
-        return (clone $query)
-            ->selectRaw(
-                'rs.statement_month as month'
+        $statementScope = (clone $statementQuery)
+            ->select(
+                'rs.id',
+                'rs.statement_month'
+            );
+
+        return $this
+            ->filteredAllocations(
+                $statementQuery,
+                $filters
+            )
+            ->joinSub(
+                $statementScope,
+                'scoped_rs',
+                function ($join) {
+                    $join->on(
+                        'scoped_rs.id',
+                        '=',
+                        'ra.royalty_statement_id'
+                    );
+                }
             )
             ->selectRaw(
-                'SUM(rs.gross_earnings) as gross_earnings'
+                'scoped_rs.statement_month as month'
             )
             ->selectRaw(
-                'SUM(rs.commission_amount) as commission_amount'
+                'COALESCE(SUM(ra.gross_amount), 0) as gross_earnings'
             )
             ->selectRaw(
-                'SUM(rs.net_payable) as net_payable'
+                'COALESCE(SUM(ra.net_amount), 0) as net_payable'
             )
             ->groupBy(
-                'rs.statement_month'
+                'scoped_rs.statement_month'
             )
             ->orderBy(
-                'rs.statement_month'
+                'scoped_rs.statement_month'
             )
             ->get()
             ->map(
-                fn ($row) => [
-                    'month' =>
-                        $row->month,
+                function ($row) {
+                    $gross = round(
+                        (float) $row->gross_earnings,
+                        8
+                    );
 
-                    'gross_earnings' =>
-                        round(
-                            (float) $row->gross_earnings,
-                            8
-                        ),
+                    $net = round(
+                        (float) $row->net_payable,
+                        8
+                    );
 
-                    'commission_amount' =>
-                        round(
-                            (float) $row->commission_amount,
-                            8
-                        ),
+                    return [
+                        'month' =>
+                            $row->month,
 
-                    'net_payable' =>
-                        round(
-                            (float) $row->net_payable,
-                            8
-                        ),
-                ]
+                        'gross_earnings' =>
+                            $gross,
+
+                        'commission_amount' =>
+                            round(
+                                $gross - $net,
+                                8
+                            ),
+
+                        'net_payable' =>
+                            $net,
+                    ];
+                }
             )
             ->all();
     }
+
 }

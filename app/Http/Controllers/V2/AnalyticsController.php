@@ -828,22 +828,26 @@ class AnalyticsController extends Controller
         $financialData = [
             'summary' =>
                 $financialAnalytics->summary(
-                    clone $financialStatements
+                    clone $financialStatements,
+                    $filters
                 ),
 
             'monthly' =>
                 $financialAnalytics->monthly(
-                    clone $financialStatements
+                    clone $financialStatements,
+                    $filters
                 ),
 
             'platforms' =>
                 $financialAnalytics->platformBreakdown(
-                    clone $financialStatements
+                    clone $financialStatements,
+                    $filters
                 ),
 
             'countries' =>
                 $financialAnalytics->countryBreakdown(
-                    clone $financialStatements
+                    clone $financialStatements,
+                    $filters
                 ),
         ];
 
