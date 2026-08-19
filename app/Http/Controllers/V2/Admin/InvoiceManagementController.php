@@ -5,6 +5,7 @@ namespace App\Http\Controllers\V2\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Finance\Invoice;
 use App\Models\Finance\RoyaltyStatement;
+use App\Services\V2\AdminFinancialAccessService;
 use App\Services\V2\InvoiceService;
 use App\Services\V2\PermissionService;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +17,8 @@ class InvoiceManagementController extends Controller
 {
     public function index(
         Request $request,
-        PermissionService $permissions
+        PermissionService $permissions,
+        AdminFinancialAccessService $financialAccess
     ): Response {
         $role = $permissions->role(
             $request->user()
@@ -31,21 +33,34 @@ class InvoiceManagementController extends Controller
             403
         );
 
+        $statements =
+            RoyaltyStatement::query()
+                ->whereIn(
+                    'status',
+                    [
+                        'approved',
+                        'available',
+                        'paid',
+                    ]
+                );
+
+        $financialAccess
+            ->applyFinancialOwnerScope(
+                $statements,
+                $request->user()
+            );
+
+        $visibleStatementIds =
+            (clone $statements)
+                ->pluck('id');
+
         return Inertia::render(
             'V2/Admin/Invoices/Index',
             [
                 'role' => $role,
 
                 'statements' =>
-                    RoyaltyStatement::query()
-                        ->whereIn(
-                            'status',
-                            [
-                                'approved',
-                                'available',
-                                'paid',
-                            ]
-                        )
+                    $statements
                         ->orderByDesc('id')
                         ->paginate(25),
 
@@ -53,6 +68,10 @@ class InvoiceManagementController extends Controller
                     Invoice::query()
                         ->whereNotNull(
                             'royalty_statement_id'
+                        )
+                        ->whereIn(
+                            'royalty_statement_id',
+                            $visibleStatementIds
                         )
                         ->pluck(
                             'royalty_statement_id'
@@ -65,7 +84,8 @@ class InvoiceManagementController extends Controller
         Request $request,
         RoyaltyStatement $statement,
         PermissionService $permissions,
-        InvoiceService $service
+        InvoiceService $service,
+        AdminFinancialAccessService $financialAccess
     ): RedirectResponse {
         abort_unless(
             in_array(
@@ -76,6 +96,21 @@ class InvoiceManagementController extends Controller
                 true
             ),
             403
+        );
+
+        abort_unless(
+            $financialAccess
+                ->canAccessFinancialOwner(
+                    $request->user(),
+                    $statement->label_id
+                        ? (int) $statement->label_id
+                        : null,
+                    $statement->artist_id
+                        ? (int) $statement->artist_id
+                        : null
+                ),
+            403,
+            'Royalty statement outside assigned scope.'
         );
 
         $invoice =

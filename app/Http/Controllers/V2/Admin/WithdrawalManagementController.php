@@ -5,6 +5,7 @@ namespace App\Http\Controllers\V2\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Finance\PayoutProfile;
 use App\Models\Finance\WithdrawalRequest;
+use App\Services\V2\AdminFinancialAccessService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\WithdrawalService;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +17,8 @@ class WithdrawalManagementController extends Controller
 {
     public function index(
         Request $request,
-        PermissionService $permissions
+        PermissionService $permissions,
+        AdminFinancialAccessService $financialAccess
     ): Response {
         $role = $permissions->role(
             $request->user()
@@ -48,6 +50,12 @@ class WithdrawalManagementController extends Controller
                 'payoutProfile',
             ]);
 
+        $financialAccess
+            ->applyFinancialOwnerScope(
+                $query,
+                $request->user()
+            );
+
         if ($status !== '') {
             $query->where(
                 'status',
@@ -57,6 +65,12 @@ class WithdrawalManagementController extends Controller
 
         $countBase =
             WithdrawalRequest::query();
+
+        $financialAccess
+            ->applyFinancialOwnerScope(
+                $countBase,
+                $request->user()
+            );
 
         return Inertia::render(
             'V2/Admin/Withdrawals/Index',
@@ -115,11 +129,27 @@ class WithdrawalManagementController extends Controller
         Request $request,
         WithdrawalRequest $withdrawal,
         PermissionService $permissions,
-        WithdrawalService $service
+        WithdrawalService $service,
+        AdminFinancialAccessService $financialAccess
     ): RedirectResponse {
         $this->authorizeAdmin(
             $request,
             $permissions
+        );
+
+        abort_unless(
+            $financialAccess
+                ->canAccessFinancialOwner(
+                    $request->user(),
+                    $withdrawal->label_id
+                        ? (int) $withdrawal->label_id
+                        : null,
+                    $withdrawal->artist_id
+                        ? (int) $withdrawal->artist_id
+                        : null
+                ),
+            403,
+            'Financial object outside assigned scope.'
         );
 
         $validated = $request->validate([
@@ -147,11 +177,27 @@ class WithdrawalManagementController extends Controller
         Request $request,
         WithdrawalRequest $withdrawal,
         PermissionService $permissions,
-        WithdrawalService $service
+        WithdrawalService $service,
+        AdminFinancialAccessService $financialAccess
     ): RedirectResponse {
         $this->authorizeAdmin(
             $request,
             $permissions
+        );
+
+        abort_unless(
+            $financialAccess
+                ->canAccessFinancialOwner(
+                    $request->user(),
+                    $withdrawal->label_id
+                        ? (int) $withdrawal->label_id
+                        : null,
+                    $withdrawal->artist_id
+                        ? (int) $withdrawal->artist_id
+                        : null
+                ),
+            403,
+            'Financial object outside assigned scope.'
         );
 
         $validated = $request->validate([
@@ -181,11 +227,27 @@ class WithdrawalManagementController extends Controller
         Request $request,
         WithdrawalRequest $withdrawal,
         PermissionService $permissions,
-        WithdrawalService $service
+        WithdrawalService $service,
+        AdminFinancialAccessService $financialAccess
     ): RedirectResponse {
         $this->authorizeAdmin(
             $request,
             $permissions
+        );
+
+        abort_unless(
+            $financialAccess
+                ->canAccessFinancialOwner(
+                    $request->user(),
+                    $withdrawal->label_id
+                        ? (int) $withdrawal->label_id
+                        : null,
+                    $withdrawal->artist_id
+                        ? (int) $withdrawal->artist_id
+                        : null
+                ),
+            403,
+            'Financial object outside assigned scope.'
         );
 
         $validated = $request->validate([
@@ -221,7 +283,8 @@ class WithdrawalManagementController extends Controller
 
     public function kycIndex(
         Request $request,
-        PermissionService $permissions
+        PermissionService $permissions,
+        AdminFinancialAccessService $financialAccess
     ): Response {
         $this->authorizeAdmin(
             $request,
@@ -257,6 +320,23 @@ class WithdrawalManagementController extends Controller
                 'user:id,name,email',
             ]);
 
+        if (
+            $role =
+                $permissions->role(
+                    $request->user()
+                )
+        ) {
+            if ($role === 'admin') {
+                $query->whereIn(
+                    'user_id',
+                    $financialAccess
+                        ->accessibleUserIds(
+                            $request->user()
+                        )
+                );
+            }
+        }
+
         if ($status !== '') {
             $query->where(
                 'kyc_status',
@@ -266,6 +346,20 @@ class WithdrawalManagementController extends Controller
 
         $countBase =
             PayoutProfile::query();
+
+        if (
+            $permissions->role(
+                $request->user()
+            ) === 'admin'
+        ) {
+            $countBase->whereIn(
+                'user_id',
+                $financialAccess
+                    ->accessibleUserIds(
+                        $request->user()
+                    )
+            );
+        }
 
         return Inertia::render(
             'V2/Admin/Kyc/Index',
@@ -314,11 +408,22 @@ class WithdrawalManagementController extends Controller
     public function verifyKyc(
         Request $request,
         PayoutProfile $profile,
-        PermissionService $permissions
+        PermissionService $permissions,
+        AdminFinancialAccessService $financialAccess
     ): RedirectResponse {
         $this->authorizeAdmin(
             $request,
             $permissions
+        );
+
+        abort_unless(
+            $financialAccess
+                ->canAccessUser(
+                    $request->user(),
+                    (int) $profile->user_id
+                ),
+            403,
+            'KYC profile outside assigned scope.'
         );
 
         $validated = $request->validate([
