@@ -126,17 +126,36 @@ export default function Index({
                                         </Cell>
                                         <Cell>
                                             {role === 'super_admin' ? (
-                                                <a
-                                                    href={`/v2/admin/admins?label_id=${label.id}`}
-                                                    className="inline-flex rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
-                                                    title={`Manage admin assignment for ${label.name}`}
+                                                <select
+                                                    defaultValue={
+                                                        label.assigned_admins?.[0]?.id ?? ''
+                                                    }
+                                                    onChange={(event) => {
+                                                        router.patch(
+                                                            `/v2/admin/labels/${label.id}/admin`,
+                                                            {
+                                                                admin_id:
+                                                                    event.target.value || null,
+                                                            },
+                                                            {
+                                                                preserveScroll: true,
+                                                            }
+                                                        );
+                                                    }}
+                                                    className="min-w-[170px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
                                                 >
-                                                    Assign Admin
-                                                </a>
+                                                    <option value="">Unassigned</option>
+                                                    {admins.map((admin) => (
+                                                        <option
+                                                            key={admin.id}
+                                                            value={admin.id}
+                                                        >
+                                                            {admin.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             ) : (
-                                                <span className="text-xs text-slate-400">
-                                                    —
-                                                </span>
+                                                <span className="text-xs text-slate-400">—</span>
                                             )}
                                         </Cell>
 

@@ -10,6 +10,7 @@ export default function Index({
     artists = {},
     search = '',
     labelId = null,
+    admins = [],
 }) {
     return (
         <PanelLayout
@@ -141,7 +142,44 @@ export default function Index({
                                         </Cell>
 
                                         <Cell>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {role === 'super_admin' && (
+                                                    <select
+                                                        defaultValue={
+                                                            artist.assigned_admins?.[0]?.id ?? ''
+                                                        }
+                                                        onChange={(event) => {
+                                                            router.patch(
+                                                                `/v2/admin/artists/${artist.id}/admin`,
+                                                                {
+                                                                    admin_id:
+                                                                        event.target.value || null,
+                                                                },
+                                                                {
+                                                                    preserveScroll: true,
+                                                                }
+                                                            );
+                                                        }}
+                                                        className="min-w-[170px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                                                        title="Assign Admin"
+                                                    >
+                                                        <option value="">
+                                                            Unassigned
+                                                        </option>
+
+                                                        {admins.map(
+                                                            (admin) => (
+                                                                <option
+                                                                    key={admin.id}
+                                                                    value={admin.id}
+                                                                >
+                                                                    {admin.name}
+                                                                </option>
+                                                            )
+                                                        )}
+                                                    </select>
+                                                )}
+
                                                 <a
                                                     href={`/v2/admin/artists/${artist.id}`}
                                                     title="View"

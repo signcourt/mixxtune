@@ -268,6 +268,154 @@ class AssignmentManagementController extends Controller
         );
     }
 
+    public function assignLabelAdmin(
+        Request $request,
+        Label $label,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $this->authorizeSuperAdmin(
+            $request,
+            $permissions
+        );
+
+        $validated = $request->validate([
+            'admin_id' => [
+                'nullable',
+                'integer',
+                'exists:users,id',
+            ],
+        ]);
+
+        $adminId = isset($validated['admin_id'])
+            && $validated['admin_id']
+            ? (int) $validated['admin_id']
+            : null;
+
+        if ($adminId) {
+            $validAdmin = User::query()
+                ->whereKey($adminId)
+                ->where('role', 'admin')
+                ->where('account_status', 'active')
+                ->exists();
+
+            if (! $validAdmin) {
+                throw ValidationException::withMessages([
+                    'admin_id' =>
+                        'Selected user is not an active Admin.',
+                ]);
+            }
+        }
+
+        DB::transaction(function () use (
+            $label,
+            $adminId,
+            $request
+        ) {
+            DB::table('admin_label_assignments')
+                ->where('label_id', $label->id)
+                ->delete();
+
+            if ($adminId) {
+                DB::table('admin_label_assignments')
+                    ->insert([
+                        'user_id' => $adminId,
+                        'label_id' => $label->id,
+                        'assignment_role' => 'manager',
+                        'can_view' => true,
+                        'can_edit' => true,
+                        'can_manage_releases' => true,
+                        'can_manage_team' => false,
+                        'can_manage_splits' => true,
+                        'assigned_by' =>
+                            $request->user()->id,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+            }
+        });
+
+        return back()->with(
+            'success',
+            $adminId
+                ? 'Label admin assigned.'
+                : 'Label admin unassigned.'
+        );
+    }
+
+    public function assignArtistAdmin(
+        Request $request,
+        Artist $artist,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $this->authorizeSuperAdmin(
+            $request,
+            $permissions
+        );
+
+        $validated = $request->validate([
+            'admin_id' => [
+                'nullable',
+                'integer',
+                'exists:users,id',
+            ],
+        ]);
+
+        $adminId = isset($validated['admin_id'])
+            && $validated['admin_id']
+            ? (int) $validated['admin_id']
+            : null;
+
+        if ($adminId) {
+            $validAdmin = User::query()
+                ->whereKey($adminId)
+                ->where('role', 'admin')
+                ->where('account_status', 'active')
+                ->exists();
+
+            if (! $validAdmin) {
+                throw ValidationException::withMessages([
+                    'admin_id' =>
+                        'Selected user is not an active Admin.',
+                ]);
+            }
+        }
+
+        DB::transaction(function () use (
+            $artist,
+            $adminId,
+            $request
+        ) {
+            DB::table('admin_artist_assignments')
+                ->where('artist_id', $artist->id)
+                ->delete();
+
+            if ($adminId) {
+                DB::table('admin_artist_assignments')
+                    ->insert([
+                        'user_id' => $adminId,
+                        'artist_id' => $artist->id,
+                        'assignment_role' => 'manager',
+                        'can_view' => true,
+                        'can_edit' => true,
+                        'can_manage_releases' => true,
+                        'can_manage_team' => false,
+                        'can_manage_splits' => true,
+                        'assigned_by' =>
+                            $request->user()->id,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+            }
+        });
+
+        return back()->with(
+            'success',
+            $adminId
+                ? 'Artist admin assigned.'
+                : 'Artist admin unassigned.'
+        );
+    }
+
     public function artists(
         Request $request,
         PermissionService $permissions
@@ -363,6 +511,22 @@ class AssignmentManagementController extends Controller
                 'labelId' => $labelId > 0
                     ? $labelId
                     : null,
+
+                'admins' =>
+                    $role === 'super_admin'
+                        ? User::query()
+                            ->where('role', 'admin')
+                            ->where(
+                                'account_status',
+                                'active'
+                            )
+                            ->orderBy('name')
+                            ->get([
+                                'id',
+                                'name',
+                                'email',
+                            ])
+                        : collect(),
 
                 'artists' =>
                     $query
@@ -1214,6 +1378,22 @@ class AssignmentManagementController extends Controller
             [
                 'role' => $role,
                 'search' => $search,
+
+                'admins' =>
+                    $role === 'super_admin'
+                        ? User::query()
+                            ->where('role', 'admin')
+                            ->where(
+                                'account_status',
+                                'active'
+                            )
+                            ->orderBy('name')
+                            ->get([
+                                'id',
+                                'name',
+                                'email',
+                            ])
+                        : collect(),
 
                 'labels' =>
                     $query

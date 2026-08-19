@@ -1977,6 +1977,22 @@ Route::middleware([
 
 
 Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/v2/admin/labels/{label}/admin',
+        [\App\Http\Controllers\V2\Admin\AssignmentManagementController::class, 'assignLabelAdmin']
+    )
+    ->name('v2.admin.labels.assign-admin');
+
+
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/v2/admin/artists/{artist}/admin',
+        [\App\Http\Controllers\V2\Admin\AssignmentManagementController::class, 'assignArtistAdmin']
+    )
+    ->name('v2.admin.artists.assign-admin');
+
+
+Route::middleware(['auth', 'verified'])
     ->get(
         '/v2/admin/labels',
         [\App\Http\Controllers\V2\Admin\AssignmentManagementController::class, 'labels']
