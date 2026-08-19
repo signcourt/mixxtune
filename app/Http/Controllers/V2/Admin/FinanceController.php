@@ -4,7 +4,7 @@ namespace App\Http\Controllers\V2\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Finance\RoyaltyStatement;
-use App\Services\V2\AdminAssignmentService;
+use App\Services\V2\AdminFinancialAccessService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\RoyaltyService;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +18,7 @@ class FinanceController extends Controller
     public function index(
         Request $request,
         PermissionService $permissions,
-        AdminAssignmentService $assignments
+        AdminFinancialAccessService $financialAccess
     ): Response {
         $role = $permissions->role(
             $request->user()
@@ -76,52 +76,13 @@ class FinanceController extends Controller
                 'statements.label_id'
             );
 
-        if ($role === 'admin') {
-            $artistIds =
-                $assignments->artistIds(
-                    $request->user()
-                );
-
-            $labelIds =
-                $assignments->labelIds(
-                    $request->user()
-                );
-
-            if (
-                $artistIds->isEmpty()
-                && $labelIds->isEmpty()
-            ) {
-                $query->whereRaw('1 = 0');
-            } else {
-                $query->where(
-                    function ($builder) use (
-                        $artistIds,
-                        $labelIds
-                    ) {
-                        if ($artistIds->isNotEmpty()) {
-                            $builder->whereIn(
-                                'statements.artist_id',
-                                $artistIds
-                            );
-                        }
-
-                        if ($labelIds->isNotEmpty()) {
-                            if ($artistIds->isNotEmpty()) {
-                                $builder->orWhereIn(
-                                    'statements.label_id',
-                                    $labelIds
-                                );
-                            } else {
-                                $builder->whereIn(
-                                    'statements.label_id',
-                                    $labelIds
-                                );
-                            }
-                        }
-                    }
-                );
-            }
-        }
+        $financialAccess
+            ->applyFinancialOwnerScope(
+                $query,
+                $request->user(),
+                'statements.label_id',
+                'statements.artist_id'
+            );
 
         if ($filters['search'] !== '') {
             $search = $filters['search'];
