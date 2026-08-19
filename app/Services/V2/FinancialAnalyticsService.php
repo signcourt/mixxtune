@@ -624,6 +624,136 @@ class FinancialAnalyticsService
     }
 
     /**
+     * Allocation-safe sale-type financial breakdown.
+     */
+    public function saleTypeBreakdown(
+        Builder $statementQuery,
+        array $filters = []
+    ): array {
+        return $this->dimensionBreakdown(
+            $statementQuery,
+            $filters,
+            'sale_type',
+            'sale_type'
+        );
+    }
+
+    /**
+     * Allocation-safe currency financial breakdown.
+     */
+    public function currencyBreakdown(
+        Builder $statementQuery,
+        array $filters = []
+    ): array {
+        return $this->dimensionBreakdown(
+            $statementQuery,
+            $filters,
+            'currency',
+            'currency'
+        );
+    }
+
+    /**
+     * Allocation-safe CMS financial breakdown.
+     */
+    public function cmsBreakdown(
+        Builder $statementQuery,
+        array $filters = []
+    ): array {
+        return $this->dimensionBreakdown(
+            $statementQuery,
+            $filters,
+            'cms',
+            'cms'
+        );
+    }
+
+    /**
+     * Aggregate canonical allocation money by one report-row
+     * descriptive dimension.
+     *
+     * Monetary values always originate from royalty_allocations.
+     * report_rows supplies grouping metadata only.
+     */
+    private function dimensionBreakdown(
+        Builder $statementQuery,
+        array $filters,
+        string $column,
+        string $outputKey
+    ): array {
+        $allowed = [
+            'sale_type',
+            'currency',
+            'cms',
+        ];
+
+        if (! in_array($column, $allowed, true)) {
+            throw new \InvalidArgumentException(
+                'Unsupported financial dimension.'
+            );
+        }
+
+        $expression =
+            "COALESCE(NULLIF(TRIM(rr.{$column}), ''), 'Unknown')";
+
+        return $this
+            ->filteredAllocations(
+                $statementQuery,
+                $filters
+            )
+            ->selectRaw(
+                "{$expression} as dimension_value"
+            )
+            ->selectRaw(
+                'COUNT(*) as allocation_count'
+            )
+            ->selectRaw(
+                'COUNT(DISTINCT ra.report_row_id) as report_rows'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(ra.gross_amount), 0) as gross_earnings'
+            )
+            ->selectRaw(
+                'COALESCE(SUM(ra.net_amount), 0) as net_payable'
+            )
+            ->groupByRaw(
+                $expression
+            )
+            ->orderByDesc(
+                'gross_earnings'
+            )
+            ->get()
+            ->map(
+                function ($row) use ($outputKey) {
+                    return [
+                        $outputKey =>
+                            $row->dimension_value,
+
+                        'allocation_count' =>
+                            (int) $row->allocation_count,
+
+                        'report_rows' =>
+                            (int) $row->report_rows,
+
+                        'gross_earnings' =>
+                            round(
+                                (float) $row->gross_earnings,
+                                8
+                            ),
+
+                        'net_payable' =>
+                            round(
+                                (float) $row->net_payable,
+                                8
+                            ),
+                    ];
+                }
+            )
+            ->all();
+    }
+
+
+    /**
      * Allocation-safe monthly financial series.
      *
      * Statement scope remains authoritative for ownership/access.
