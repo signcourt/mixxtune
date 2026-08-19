@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\DB;
 
 class SuperAdminProfitService
 {
+    private array $accountRateCache = [];
+    private array $beneficiaryShareCache = [];
+
     public function baseQuery(
         ?string $month = null,
         ?string $platform = null,
@@ -589,28 +592,47 @@ class SuperAdminProfitService
         }
 
         foreach ($candidates as $candidate) {
-            $shares =
-                DB::table(
-                    'label_revenue_shares'
+            $cacheKey =
+                $masterLabelId
+                .':'.$candidate['type']
+                .':'.$candidate['id'];
+
+            if (
+                ! array_key_exists(
+                    $cacheKey,
+                    $this->beneficiaryShareCache
                 )
-                    ->where(
-                        'master_label_id',
-                        $masterLabelId
+            ) {
+                $this->beneficiaryShareCache[
+                    $cacheKey
+                ] =
+                    DB::table(
+                        'label_revenue_shares'
                     )
-                    ->where(
-                        'beneficiary_type',
-                        $candidate['type']
-                    )
-                    ->where(
-                        'beneficiary_id',
-                        $candidate['id']
-                    )
-                    ->where(
-                        'is_active',
-                        true
-                    )
-                    ->orderByDesc('id')
-                    ->get();
+                        ->where(
+                            'master_label_id',
+                            $masterLabelId
+                        )
+                        ->where(
+                            'beneficiary_type',
+                            $candidate['type']
+                        )
+                        ->where(
+                            'beneficiary_id',
+                            $candidate['id']
+                        )
+                        ->where(
+                            'is_active',
+                            true
+                        )
+                        ->orderByDesc('id')
+                        ->get();
+            }
+
+            $shares =
+                $this->beneficiaryShareCache[
+                    $cacheKey
+                ];
 
             foreach ($shares as $share) {
                 if (
@@ -715,6 +737,19 @@ class SuperAdminProfitService
         string $type,
         int $id
     ): float {
+        $cacheKey = $type.':'.$id;
+
+        if (
+            array_key_exists(
+                $cacheKey,
+                $this->accountRateCache
+            )
+        ) {
+            return $this->accountRateCache[
+                $cacheKey
+            ];
+        }
+
         if ($type === 'label') {
             $rate = DB::table('labels')
                 ->where('id', $id)
@@ -731,13 +766,18 @@ class SuperAdminProfitService
             $rate = null;
         }
 
-        if ($rate === null) {
-            return 100.0;
-        }
+        $resolved =
+            $rate === null
+                ? 100.0
+                : $this->normalizeRate(
+                    $rate
+                );
 
-        return $this->normalizeRate(
-            $rate
-        );
+        $this->accountRateCache[
+            $cacheKey
+        ] = $resolved;
+
+        return $resolved;
     }
 
     private function normalizeRate(

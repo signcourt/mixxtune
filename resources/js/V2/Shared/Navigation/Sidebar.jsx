@@ -318,6 +318,55 @@ function SidebarItem({
     }
 
     /*
+     * Dashboard uses a full browser navigation.
+     *
+     * Dashboard routes are valid server-side routes, but
+     * client-side Inertia navigation can fail when moving
+     * back to the dashboard from some panel pages.
+     */
+    if (item.id === "dashboard") {
+        return (
+            <a
+                href={item.href}
+                onClick={(event) => {
+                    event.preventDefault();
+
+                    window.location.assign(item.href);
+                }}
+                title={collapsed ? item.label : undefined}
+                className={[
+                    "group flex items-center rounded-xl py-3 transition-all duration-200",
+                    collapsed ? "justify-center px-2" : "gap-3 px-3",
+                    active
+                        ? "bg-gradient-to-r from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-950/30"
+                        : "text-slate-300 hover:bg-white/10 hover:text-white",
+                ].join(" ")}
+            >
+                <NavIcon
+                    icon={item.icon}
+                    active={active}
+                />
+
+                {!collapsed && (
+                    <>
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                            {item.label}
+                        </span>
+
+                        {Number(badge) > 0 && (
+                            <span className="flex min-w-7 items-center justify-center rounded-full bg-violet-700 px-2 py-1 text-xs font-bold text-white">
+                                {Number(badge) > 99
+                                    ? "99+"
+                                    : badge}
+                            </span>
+                        )}
+                    </>
+                )}
+            </a>
+        );
+    }
+
+    /*
      * Unmapped Revenue uses a full browser navigation.
      * The page itself works correctly when opened directly,
      * but client-side Inertia navigation can fail to enter it.
