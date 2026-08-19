@@ -643,6 +643,20 @@ export default function Index({
                                     ))}
                                 </select>
 
+                                <input
+                                    type="search"
+                                    value={filters.isrc || ''}
+                                    onChange={(e) =>
+                                        changeFilter(
+                                            'isrc',
+                                            e.target.value
+                                        )
+                                    }
+                                    placeholder="Search ISRC"
+                                    autoComplete="off"
+                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                                />
+
                                 <select
                                     value={filters.sale_type || ''}
                                     onChange={(e) =>

@@ -54,6 +54,10 @@ class AnalyticsController extends Controller
                 (string) $request->input('cms', '')
             ),
 
+            'isrc' => trim(
+                (string) $request->input('isrc', '')
+            ),
+
             'master_label_id' =>
                 $request->filled(
                     'master_label_id'
