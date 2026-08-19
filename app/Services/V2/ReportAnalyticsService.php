@@ -265,6 +265,14 @@ class ReportAnalyticsService
             );
         }
 
+        if (!empty($filters['upc'])) {
+            $query->where(
+                'upc',
+                'like',
+                '%' . $filters['upc'] . '%'
+            );
+        }
+
         /*
          * MIXX_TUNE_HIERARCHY_REPORT_FILTERS
          *

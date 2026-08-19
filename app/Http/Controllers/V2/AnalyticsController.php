@@ -58,6 +58,10 @@ class AnalyticsController extends Controller
                 (string) $request->input('isrc', '')
             ),
 
+            'upc' => trim(
+                (string) $request->input('upc', '')
+            ),
+
             'master_label_id' =>
                 $request->filled(
                     'master_label_id'

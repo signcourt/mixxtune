@@ -657,6 +657,20 @@ export default function Index({
                                     className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
                                 />
 
+                                <input
+                                    type="search"
+                                    value={filters.upc || ''}
+                                    onChange={(e) =>
+                                        changeFilter(
+                                            'upc',
+                                            e.target.value
+                                        )
+                                    }
+                                    placeholder="Search UPC"
+                                    autoComplete="off"
+                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                                />
+
                                 <select
                                     value={filters.sale_type || ''}
                                     onChange={(e) =>
