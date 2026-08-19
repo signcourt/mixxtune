@@ -1735,6 +1735,150 @@ export default function Index({
                         </div>
                     </div>
 
+                    {/* SALE TYPE + CURRENCY */}
+                    <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                            <div className="border-b border-slate-100 p-5">
+                                <SectionHeader
+                                    icon={BarChart3}
+                                    title="Revenue by Sale Type"
+                                    subtitle="Reported earnings grouped by transaction / usage type"
+                                />
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full">
+                                    <thead className="bg-slate-50">
+                                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <th className="px-5 py-3">
+                                                Sale Type
+                                            </th>
+
+                                            <th className="px-5 py-3 text-right">
+                                                Streams
+                                            </th>
+
+                                            <th className="px-5 py-3 text-right">
+                                                Units
+                                            </th>
+
+                                            <th className="px-5 py-3 text-right">
+                                                Reported Earnings
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody className="divide-y divide-slate-100">
+                                        {saleTypes.length ? (
+                                            saleTypes.map(
+                                                (row, index) => (
+                                                    <tr
+                                                        key={`${row.name || 'unknown'}-${index}`}
+                                                        className="hover:bg-slate-50"
+                                                    >
+                                                        <td className="px-5 py-4 text-sm font-semibold text-slate-900">
+                                                            {row.name ||
+                                                                'Unknown'}
+                                                        </td>
+
+                                                        <td className="px-5 py-4 text-right text-sm text-slate-700">
+                                                            {numberFormat(
+                                                                row.streams
+                                                            )}
+                                                        </td>
+
+                                                        <td className="px-5 py-4 text-right text-sm text-slate-700">
+                                                            {numberFormat(
+                                                                row.sale_units
+                                                            )}
+                                                        </td>
+
+                                                        <td className="px-5 py-4 text-right text-sm font-bold text-slate-950">
+                                                            {moneyFormat(
+                                                                row.earnings,
+                                                                primaryCurrency
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            )
+                                        ) : (
+                                            <tr>
+                                                <td
+                                                    colSpan="4"
+                                                    className="px-5 py-14 text-center text-sm text-slate-400"
+                                                >
+                                                    No sale type analytics available.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                            <div className="border-b border-slate-100 p-5">
+                                <SectionHeader
+                                    icon={BadgeIndianRupee}
+                                    title="Revenue by Currency"
+                                    subtitle="Reported earnings grouped by statement currency"
+                                />
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full">
+                                    <thead className="bg-slate-50">
+                                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <th className="px-5 py-3">
+                                                Currency
+                                            </th>
+
+                                            <th className="px-5 py-3 text-right">
+                                                Reported Earnings
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody className="divide-y divide-slate-100">
+                                        {currencySummary.length ? (
+                                            currencySummary.map(
+                                                (row, index) => (
+                                                    <tr
+                                                        key={`${row.currency || 'unknown'}-${index}`}
+                                                        className="hover:bg-slate-50"
+                                                    >
+                                                        <td className="px-5 py-4 text-sm font-semibold text-slate-900">
+                                                            {row.currency ||
+                                                                'Unknown'}
+                                                        </td>
+
+                                                        <td className="px-5 py-4 text-right text-sm font-bold text-slate-950">
+                                                            {moneyFormat(
+                                                                row.earnings,
+                                                                row.currency ||
+                                                                    primaryCurrency
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            )
+                                        ) : (
+                                            <tr>
+                                                <td
+                                                    colSpan="2"
+                                                    className="px-5 py-14 text-center text-sm text-slate-400"
+                                                >
+                                                    No currency analytics available.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* TRACK TABLE */}
                     <div className="grid gap-4">
                         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2">
