@@ -611,4 +611,127 @@ class LabelAnalyticsIsolationTest extends TestCase
     }
 
 
+
+    public function test_label_foreign_hierarchy_filters_cannot_escape_scope(): void
+    {
+        $owner = $this->labelUser();
+        $foreignOwner = $this->labelUser();
+
+        $ownLabel = $this->label(
+            $owner,
+            'K33 Label Own Label'
+        );
+
+        $foreignLabel = $this->label(
+            $foreignOwner,
+            'K33 Label Foreign Label'
+        );
+
+        $ownArtist = $this->artist(
+            $ownLabel,
+            'K33 Label Own Artist'
+        );
+
+        $foreignArtist = $this->artist(
+            $foreignLabel,
+            'K33 Label Foreign Artist'
+        );
+
+        $importId = $this->reportImport();
+
+        $this->reportRow(
+            $importId,
+            $ownLabel,
+            $ownArtist,
+            555
+        );
+
+        $this->reportRow(
+            $importId,
+            $foreignLabel,
+            $foreignArtist,
+            987650
+        );
+
+        foreach (
+            ['master_label_id', 'level_id']
+            as $filter
+        ) {
+            $dashboard = $this
+                ->actingAs($owner)
+                ->get(
+                    route(
+                        'v2.analytics.index',
+                        [
+                            'month' =>
+                                '2026-06',
+                            $filter =>
+                                $foreignLabel->id,
+                        ]
+                    )
+                );
+
+            $dashboard->assertOk();
+
+            $content =
+                $dashboard->getContent();
+
+            $this->assertStringNotContainsString(
+                $foreignLabel->name,
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                $foreignArtist->stage_name,
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                '987650',
+                $content
+            );
+
+            $export = $this
+                ->actingAs($owner)
+                ->get(
+                    route(
+                        'v2.analytics.export',
+                        [
+                            'month' =>
+                                '2026-06',
+                            $filter =>
+                                $foreignLabel->id,
+                        ]
+                    )
+                );
+
+            $export->assertOk();
+
+            ob_start();
+
+            $export
+                ->baseResponse
+                ->sendContent();
+
+            $csv =
+                (string) ob_get_clean();
+
+            $this->assertStringNotContainsString(
+                $foreignLabel->name,
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                $foreignArtist->stage_name,
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                '987650',
+                $csv
+            );
+        }
+    }
+
+
 }

@@ -566,4 +566,253 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
     }
 
 
+
+    public function test_admin_foreign_hierarchy_filters_cannot_escape_scope(): void
+    {
+        $admin = $this->user('admin');
+
+        $ownLabel = $this->label(
+            $admin
+        );
+
+        $foreignAdmin = $this->user(
+            'admin'
+        );
+
+        $foreignLabel = $this->label(
+            $foreignAdmin
+        );
+
+        $ownArtist = Artist::factory()->create([
+            'label_id' => $ownLabel->id,
+            'stage_name' =>
+                'K33 Admin Own Artist',
+            'legal_name' =>
+                'K33 Admin Own Artist',
+        ]);
+
+        $foreignArtist =
+            Artist::factory()->create([
+                'label_id' =>
+                    $foreignLabel->id,
+                'stage_name' =>
+                    'K33 Admin Foreign Artist',
+                'legal_name' =>
+                    'K33 Admin Foreign Artist',
+            ]);
+
+        $importId = $this->reportImport();
+
+        DB::table('report_rows')->insert([
+            [
+                'report_import_id' =>
+                    $importId,
+                'row_hash' =>
+                    hash(
+                        'sha256',
+                        Str::uuid()->toString()
+                    ),
+                'reporting_month' =>
+                    '2026-06',
+                'label_id' =>
+                    $ownLabel->id,
+                'artist_id' =>
+                    $ownArtist->id,
+                'revenue_owner_type' =>
+                    'label',
+                'revenue_owner_id' =>
+                    $ownLabel->id,
+                'mapping_status' =>
+                    'mapped',
+                'mapped_at' =>
+                    now(),
+                'label_name' =>
+                    $ownLabel->name,
+                'track_title' =>
+                    'K33 Admin Own Track',
+                'track_artist' =>
+                    $ownArtist->stage_name,
+                'album_title' =>
+                    'K33 Admin Own Album',
+                'album_artist' =>
+                    $ownArtist->stage_name,
+                'platform' =>
+                    'Spotify',
+                'currency' =>
+                    'INR',
+                'country_code' =>
+                    'IN',
+                'sale_type' =>
+                    'Stream',
+                'sale_date' =>
+                    '2026-06-15',
+                'sale_month' =>
+                    '2026-06',
+                'streams' =>
+                    100,
+                'sale_units' =>
+                    100,
+                'label_rate' =>
+                    100,
+                'collected_revenue' =>
+                    444,
+                'earnings' =>
+                    444,
+                'created_at' =>
+                    now(),
+                'updated_at' =>
+                    now(),
+            ],
+            [
+                'report_import_id' =>
+                    $importId,
+                'row_hash' =>
+                    hash(
+                        'sha256',
+                        Str::uuid()->toString()
+                    ),
+                'reporting_month' =>
+                    '2026-06',
+                'label_id' =>
+                    $foreignLabel->id,
+                'artist_id' =>
+                    $foreignArtist->id,
+                'revenue_owner_type' =>
+                    'label',
+                'revenue_owner_id' =>
+                    $foreignLabel->id,
+                'mapping_status' =>
+                    'mapped',
+                'mapped_at' =>
+                    now(),
+                'label_name' =>
+                    $foreignLabel->name,
+                'track_title' =>
+                    'K33 Foreign Hierarchy Secret',
+                'track_artist' =>
+                    $foreignArtist->stage_name,
+                'album_title' =>
+                    'K33 Foreign Hierarchy Album',
+                'album_artist' =>
+                    $foreignArtist->stage_name,
+                'platform' =>
+                    'Spotify',
+                'currency' =>
+                    'INR',
+                'country_code' =>
+                    'IN',
+                'sale_type' =>
+                    'Stream',
+                'sale_date' =>
+                    '2026-06-15',
+                'sale_month' =>
+                    '2026-06',
+                'streams' =>
+                    987651,
+                'sale_units' =>
+                    987651,
+                'label_rate' =>
+                    100,
+                'collected_revenue' =>
+                    987651,
+                'earnings' =>
+                    987651,
+                'created_at' =>
+                    now(),
+                'updated_at' =>
+                    now(),
+            ],
+        ]);
+
+        foreach (
+            ['master_label_id', 'level_id']
+            as $filter
+        ) {
+            $dashboard = $this
+                ->actingAs($admin)
+                ->get(
+                    route(
+                        'v2.analytics.index',
+                        [
+                            'month' =>
+                                '2026-06',
+                            $filter =>
+                                $foreignLabel->id,
+                        ]
+                    )
+                );
+
+            $dashboard->assertOk();
+
+            $content =
+                $dashboard->getContent();
+
+            $this->assertStringNotContainsString(
+                $foreignLabel->name,
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                $foreignArtist->stage_name,
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                'K33 Foreign Hierarchy Secret',
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                '987651',
+                $content
+            );
+
+            $export = $this
+                ->actingAs($admin)
+                ->get(
+                    route(
+                        'v2.analytics.export',
+                        [
+                            'month' =>
+                                '2026-06',
+                            $filter =>
+                                $foreignLabel->id,
+                        ]
+                    )
+                );
+
+            $export->assertOk();
+
+            ob_start();
+
+            $export
+                ->baseResponse
+                ->sendContent();
+
+            $csv =
+                (string) ob_get_clean();
+
+            $this->assertStringNotContainsString(
+                $foreignLabel->name,
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                $foreignArtist->stage_name,
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                'K33 Foreign Hierarchy Secret',
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                '987651',
+                $csv
+            );
+        }
+    }
+
+
 }
