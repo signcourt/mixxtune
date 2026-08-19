@@ -1597,16 +1597,6 @@ return Inertia::render(
         PermissionService $permissions,
         AuditLogService $audit
     ): RedirectResponse {
-        file_put_contents(
-            storage_path('logs/label-save-debug.log'),
-            now()->toDateTimeString()
-            ." UPDATE_ENTER user={$user->id}"
-            ." role=".($request->input('role') ?? 'NULL')
-            ." label_ids=".json_encode($request->input('label_ids', []))
-            ." new_labels=".json_encode($request->input('new_labels', []))
-            .PHP_EOL,
-            FILE_APPEND
-        );
         $this->authorizeSuperAdmin(
             $request,
             $permissions
@@ -1617,19 +1607,6 @@ return Inertia::render(
             && $request->input('role') !== 'super_admin',
             422,
             'You cannot remove your own Super Admin role.'
-        );
-
-                file_put_contents(
-            storage_path('logs/user-update-debug.log'),
-            now()->toDateTimeString()
-            ." UPDATE_REQUEST_PAYLOAD "
-            .json_encode(
-                $request->all(),
-                JSON_UNESCAPED_UNICODE
-                | JSON_UNESCAPED_SLASHES
-            )
-            .PHP_EOL,
-            FILE_APPEND
         );
 
 $validated = $request->validate([
@@ -1907,17 +1884,6 @@ $validated = $request->validate([
         }
 
 
-                file_put_contents(
-            storage_path('logs/label-save-debug.log'),
-            now()->toDateTimeString()
-            ." VALIDATION_PASSED"
-            ." role=".($validated['role'] ?? 'NULL')
-            ." label_ids=".json_encode($validated['label_ids'] ?? [])
-            ." new_labels=".json_encode($validated['new_labels'] ?? [])
-            .PHP_EOL,
-            FILE_APPEND
-        );
-
 $oldValues = [
             'user' => $user->only([
                 'name',
@@ -2070,32 +2036,12 @@ $oldValues = [
                             $artistSync
                         );
 
-                    file_put_contents(
-                        storage_path('logs/label-save-debug.log'),
-                        now()->toDateTimeString()
-                        ." BEFORE_SYNC"
-                        ." user={$user->id}"
-                        ." labelSync=".json_encode($labelSync)
-                        .PHP_EOL,
-                        FILE_APPEND
-                    );
-
                     $user
                         ->assignedLabels()
                         ->sync(
                             $labelSync
                         );
 
-                    file_put_contents(
-                        storage_path('logs/label-save-debug.log'),
-                        now()->toDateTimeString()
-                        ." AFTER_SYNC"
-                        ." pivot_count="
-                        .$user->assignedLabels()
-                            ->count()
-                        .PHP_EOL,
-                        FILE_APPEND
-                    );
                 } elseif (
                     $validated['role'] === 'label'
                 ) {
