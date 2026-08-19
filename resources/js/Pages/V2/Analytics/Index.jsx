@@ -1101,6 +1101,12 @@ export default function Index({
                                         >
                                             <AreaChart
                                                 data={financialMonthly}
+                                                margin={{
+                                                    top: 10,
+                                                    right: 20,
+                                                    left: 24,
+                                                    bottom: 0,
+                                                }}
                                             >
                                                 <CartesianGrid
                                                     vertical={false}
@@ -1115,6 +1121,8 @@ export default function Index({
                                                 />
 
                                                 <YAxis
+                                                    width={88}
+                                                    tickMargin={8}
                                                     tickFormatter={
                                                         numberFormat
                                                     }
@@ -1384,7 +1392,15 @@ export default function Index({
                                         width="100%"
                                         height="100%"
                                     >
-                                        <AreaChart data={monthlyTrend}>
+                                        <AreaChart
+                                            data={monthlyTrend}
+                                            margin={{
+                                                top: 10,
+                                                right: 20,
+                                                left: 24,
+                                                bottom: 0,
+                                            }}
+                                        >
                                             <defs>
                                                 <linearGradient
                                                     id="analyticsRevenue"
@@ -1416,7 +1432,13 @@ export default function Index({
                                                 tickFormatter={monthFormat}
                                             />
 
-                                            <YAxis />
+                                            <YAxis
+                                                width={88}
+                                                tickMargin={8}
+                                                tickFormatter={
+                                                    numberFormat
+                                                }
+                                            />
 
                                             <Tooltip
                                                 labelFormatter={monthFormat}
