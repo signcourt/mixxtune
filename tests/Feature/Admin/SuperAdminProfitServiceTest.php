@@ -201,6 +201,162 @@ class SuperAdminProfitServiceTest extends TestCase
         );
     }
 
+    public function test_active_label_revenue_share_is_canonical_rate(): void
+    {
+        $masterUserId =
+            DB::table('users')
+                ->insertGetId([
+                    'name' =>
+                        'Master Label',
+                    'email' =>
+                        'master-profit@example.com',
+                    'password' =>
+                        bcrypt('password'),
+                    'role' =>
+                        'label',
+                    'account_status' =>
+                        'active',
+                    'email_verified_at' =>
+                        now(),
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $masterLabelId =
+            DB::table('labels')
+                ->insertGetId([
+                    'public_id' =>
+                        (string) Str::ulid(),
+                    'name' =>
+                        'Master Profit Label',
+                    'slug' =>
+                        'master-profit-label',
+                    'user_id' =>
+                        $masterUserId,
+                    'revenue_share_percentage' =>
+                        100,
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $artistUserId =
+            DB::table('users')
+                ->insertGetId([
+                    'name' =>
+                        'Profit Artist',
+                    'email' =>
+                        'profit-artist@example.com',
+                    'password' =>
+                        bcrypt('password'),
+                    'role' =>
+                        'artist',
+                    'account_status' =>
+                        'active',
+                    'email_verified_at' =>
+                        now(),
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $artistId =
+            DB::table('artists')
+                ->insertGetId([
+                    'public_id' =>
+                        (string) Str::ulid(),
+                    'user_id' =>
+                        $artistUserId,
+                    'label_id' =>
+                        $masterLabelId,
+                    'stage_name' =>
+                        'Profit Artist',
+                    'slug' =>
+                        'profit-artist',
+                    'revenue_share_percentage' =>
+                        100,
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        DB::table(
+            'label_revenue_shares'
+        )->insert([
+            'master_label_id' =>
+                $masterLabelId,
+            'beneficiary_type' =>
+                'artist',
+            'beneficiary_id' =>
+                $artistId,
+            'revenue_share_percent' =>
+                80,
+            'show_revenue_share' =>
+                true,
+            'is_active' =>
+                true,
+            'effective_from' =>
+                '2026-08-01',
+            'created_at' =>
+                now(),
+            'updated_at' =>
+                now(),
+        ]);
+
+        $service =
+            app(
+                SuperAdminProfitService::class
+            );
+
+        $row = (object) [
+            'earnings' => 100,
+            'sale_month' =>
+                '2026-08',
+            'sale_date' =>
+                '2026-08-15',
+            'label_id' =>
+                $masterLabelId,
+            'artist_id' =>
+                $artistId,
+            'revenue_owner_type' =>
+                'label',
+            'revenue_owner_id' =>
+                $masterLabelId,
+        ];
+
+        $result =
+            $service->calculateRow(
+                $row
+            );
+
+        $this->assertEquals(
+            80.0,
+            $result[
+                'assigned_rate'
+            ]
+        );
+
+        $this->assertEquals(
+            80.0,
+            $result[
+                'user_earning'
+            ]
+        );
+
+        $this->assertEquals(
+            20.0,
+            $result[
+                'super_admin_profit'
+            ]
+        );
+    }
+
+
     public function test_negative_row_uses_100_percent_effective_rate(): void
     {
         $service =

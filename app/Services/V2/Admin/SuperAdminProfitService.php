@@ -64,9 +64,8 @@ class SuperAdminProfitService
             8
         );
 
-        $storedRate = $this->accountRate(
-            (string) $row->revenue_owner_type,
-            (int) $row->revenue_owner_id
+        $storedRate = $this->canonicalRate(
+            $row
         );
 
         /*
@@ -316,6 +315,210 @@ class SuperAdminProfitService
             ->pluck('platform');
     }
 
+    private function canonicalRate(
+        object $row
+    ): float {
+        $ownerType =
+            (string)
+                ($row->revenue_owner_type ?? '');
+
+        $ownerId =
+            (int)
+                ($row->revenue_owner_id ?? 0);
+
+        /*
+         * MASTER LABEL BENEFICIARY RULE
+         *
+         * report_rows.revenue_owner_id identifies
+         * the master label whose report contains the
+         * revenue.
+         *
+         * A row can then belong to a configured direct
+         * Artist or Sub-Label beneficiary.
+         *
+         * Resolution must match RevenueSharingController:
+         *
+         * 1. Artist takes precedence.
+         * 2. Otherwise direct Sub-Label.
+         * 3. Share must be active for the sale month/date.
+         * 4. If no beneficiary share matches, fall back
+         *    to the report owner's normal account rate.
+         */
+        if (
+            $ownerType === 'label'
+            && $ownerId > 0
+        ) {
+            $share =
+                $this->beneficiaryShare(
+                    $ownerId,
+                    $row
+                );
+
+            if ($share !== null) {
+                return $this->normalizeRate(
+                    $share
+                        ->revenue_share_percent
+                );
+            }
+        }
+
+        return $this->accountRate(
+            $ownerType,
+            $ownerId
+        );
+    }
+
+    private function beneficiaryShare(
+        int $masterLabelId,
+        object $row
+    ): ?object {
+        $candidates = [];
+
+        if (
+            isset($row->artist_id)
+            && (int) $row->artist_id > 0
+        ) {
+            $candidates[] = [
+                'type' => 'artist',
+                'id' =>
+                    (int) $row->artist_id,
+            ];
+        }
+
+        if (
+            isset($row->label_id)
+            && (int) $row->label_id > 0
+        ) {
+            $candidates[] = [
+                'type' => 'label',
+                'id' =>
+                    (int) $row->label_id,
+            ];
+        }
+
+        foreach ($candidates as $candidate) {
+            $shares =
+                DB::table(
+                    'label_revenue_shares'
+                )
+                    ->where(
+                        'master_label_id',
+                        $masterLabelId
+                    )
+                    ->where(
+                        'beneficiary_type',
+                        $candidate['type']
+                    )
+                    ->where(
+                        'beneficiary_id',
+                        $candidate['id']
+                    )
+                    ->where(
+                        'is_active',
+                        true
+                    )
+                    ->orderByDesc('id')
+                    ->get();
+
+            foreach ($shares as $share) {
+                if (
+                    $this->shareAppliesToRow(
+                        $share,
+                        $row
+                    )
+                ) {
+                    return $share;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function shareAppliesToRow(
+        object $share,
+        object $row
+    ): bool {
+        /*
+         * Keep this identical to the existing
+         * RevenueSharingController monthly rule.
+         *
+         * DSP revenue is allocated by sale month where
+         * sale_month is available.
+         */
+        if (! empty($row->sale_month)) {
+            $rowMonth = substr(
+                (string) $row->sale_month,
+                0,
+                7
+            );
+
+            if (! empty($share->effective_from)) {
+                $fromMonth = substr(
+                    (string)
+                        $share->effective_from,
+                    0,
+                    7
+                );
+
+                if ($rowMonth < $fromMonth) {
+                    return false;
+                }
+            }
+
+            if (! empty($share->effective_to)) {
+                $toMonth = substr(
+                    (string)
+                        $share->effective_to,
+                    0,
+                    7
+                );
+
+                if ($rowMonth > $toMonth) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (! empty($row->sale_date)) {
+            $date = substr(
+                (string) $row->sale_date,
+                0,
+                10
+            );
+
+            if (
+                ! empty($share->effective_from)
+                && $date <
+                    substr(
+                        (string)
+                            $share->effective_from,
+                        0,
+                        10
+                    )
+            ) {
+                return false;
+            }
+
+            if (
+                ! empty($share->effective_to)
+                && $date >
+                    substr(
+                        (string)
+                            $share->effective_to,
+                        0,
+                        10
+                    )
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private function accountRate(
         string $type,
         int $id
@@ -340,6 +543,14 @@ class SuperAdminProfitService
             return 100.0;
         }
 
+        return $this->normalizeRate(
+            $rate
+        );
+    }
+
+    private function normalizeRate(
+        mixed $rate
+    ): float {
         return round(
             max(
                 0.0,

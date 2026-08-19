@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V2\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Distribution\Release;
+use App\Services\V2\Admin\SuperAdminProfitService;
 use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReportAnalyticsService;
@@ -18,7 +19,8 @@ class DashboardController extends Controller
         Request $request,
         PermissionService $permissions,
         AdminAssignmentService $assignments,
-        ReportAnalyticsService $analytics
+        ReportAnalyticsService $analytics,
+        SuperAdminProfitService $profit
     ): Response {
         $user = $request->user();
 
@@ -69,6 +71,25 @@ class DashboardController extends Controller
             $analytics->summary(
                 clone $analyticsQuery
             );
+
+        /*
+         * Super Admin dashboard business profit.
+         *
+         * This uses the same canonical calculation as
+         * the Business Profit screen:
+         *
+         * collected revenue - user earning
+         * = retained Mixx Tune profit.
+         *
+         * Admin users continue to use scoped reported
+         * earnings and never receive platform-wide profit.
+         */
+        $profitSummary =
+            $role === 'super_admin'
+                ? $profit->summary(
+                    $profit->baseQuery()
+                )
+                : null;
 
         $recentReleases =
             (clone $releaseQuery)
@@ -389,6 +410,15 @@ class DashboardController extends Controller
                                 'earnings'
                             ] ?? 0
                         ),
+
+                    'profit_earnings' =>
+                        $role === 'super_admin'
+                            ? (float) (
+                                $profitSummary[
+                                    'super_admin_profit'
+                                ] ?? 0
+                            )
+                            : null,
 
                     'sale_units' =>
                         (float) (

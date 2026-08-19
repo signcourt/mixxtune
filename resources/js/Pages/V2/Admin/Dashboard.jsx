@@ -54,20 +54,27 @@ export default function Dashboard({
     const cards = [
         {
             /*
-             * stats.earnings comes directly from the
-             * authenticated ReportAnalyticsService scope.
+             * Super Admin sees retained Mixx Tune profit:
              *
-             * This is reporting/raw earnings, not wallet
-             * balance and not a separate payable ledger.
+             * collected revenue - user earning.
+             *
+             * Normal Admin keeps the existing scoped
+             * reported earnings card.
              */
-            title: 'Reported Earnings',
+            title: isSuperAdmin
+                ? 'Profit Earnings'
+                : 'Reported Earnings',
             value: money(
-                stats.earnings,
+                isSuperAdmin
+                    ? stats.profit_earnings
+                    : stats.earnings,
                 'INR'
             ),
-            note: `${number(
-                stats.streams
-            )} reported streams`,
+            note: isSuperAdmin
+                ? 'Retained Mixx Tune revenue'
+                : `${number(
+                      stats.streams
+                  )} reported streams`,
             icon: BadgeIndianRupee,
             tone: 'emerald',
         },
