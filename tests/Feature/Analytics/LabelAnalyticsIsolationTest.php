@@ -895,4 +895,182 @@ class LabelAnalyticsIsolationTest extends TestCase
     }
 
 
+
+    public function test_label_scalar_filters_cannot_escape_scope(): void
+    {
+        $owner = $this->labelUser();
+        $foreignOwner = $this->labelUser();
+
+        $ownLabel = $this->label(
+            $owner,
+            'K42 Label Own'
+        );
+
+        $foreignLabel = $this->label(
+            $foreignOwner,
+            'K42 Label Foreign'
+        );
+
+        $ownArtist = $this->artist(
+            $ownLabel,
+            'K42 Label Own Artist'
+        );
+
+        $foreignArtist = $this->artist(
+            $foreignLabel,
+            'K42 Label Foreign Artist'
+        );
+
+        $importId = $this->reportImport();
+
+        foreach ([
+            [
+                $ownLabel,
+                $ownArtist,
+                1202,
+            ],
+            [
+                $foreignLabel,
+                $foreignArtist,
+                91202,
+            ],
+        ] as [
+            $label,
+            $artist,
+            $earnings,
+        ]) {
+            DB::table('report_rows')->insert([
+                'report_import_id' => $importId,
+                'row_hash' => hash(
+                    'sha256',
+                    Str::uuid()->toString()
+                ),
+                'reporting_month' => '2026-06',
+                'label_id' => $label->id,
+                'artist_id' => $artist->id,
+                'revenue_owner_type' => 'label',
+                'revenue_owner_id' => $label->id,
+                'mapping_status' => 'mapped',
+                'mapped_at' => now(),
+                'label_name' => $label->name,
+                'track_title' =>
+                    $earnings === 1202
+                        ? 'K42 Label Own Track'
+                        : 'K42 Label Foreign Track',
+                'track_artist' =>
+                    $artist->stage_name,
+                'album_title' =>
+                    'K42 Scalar Album',
+                'album_artist' =>
+                    $artist->stage_name,
+                'isrc' => 'K42LABELISRC',
+                'upc' => 'K42LABELUPC',
+                'platform' =>
+                    'K42 Label Platform',
+                'currency' => 'INR',
+                'country_code' => 'L4',
+                'sale_type' => 'Stream',
+                'sale_date' => '2026-06-15',
+                'sale_month' => '2026-06',
+                'streams' => $earnings,
+                'sale_units' => $earnings,
+                'label_rate' => 100,
+                'collected_revenue' =>
+                    $earnings,
+                'earnings' => $earnings,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $cases = [
+            [
+                'platform' =>
+                    'K42 Label Platform',
+            ],
+            [
+                'country' => 'L4',
+            ],
+            [
+                'isrc' => 'K42LABELISRC',
+            ],
+        ];
+
+        foreach ($cases as $filter) {
+            $params = array_merge(
+                ['month' => '2026-06'],
+                $filter
+            );
+
+            $dashboard = $this
+                ->actingAs($owner)
+                ->get(route(
+                    'v2.analytics.index',
+                    $params
+                ));
+
+            $dashboard
+                ->assertOk()
+                ->assertInertia(
+                    fn (Assert $page) =>
+                        $page
+                            ->where(
+                                'summary.earnings',
+                                fn ($value) =>
+                                    abs(
+                                        (float) $value
+                                        - 1202.0
+                                    ) < 0.000001
+                            )
+                );
+
+            $content =
+                $dashboard->getContent();
+
+            $this->assertStringContainsString(
+                'K42 Label Own Track',
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                'K42 Label Foreign Track',
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                '91202',
+                $content
+            );
+
+            $export = $this
+                ->actingAs($owner)
+                ->get(route(
+                    'v2.analytics.export',
+                    $params
+                ));
+
+            $export->assertOk();
+
+            ob_start();
+            $export->baseResponse->sendContent();
+            $csv = (string) ob_get_clean();
+
+            $this->assertStringContainsString(
+                'K42 Label Own Track',
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                'K42 Label Foreign Track',
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                '91202',
+                $csv
+            );
+        }
+    }
+
+
 }

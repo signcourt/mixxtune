@@ -1027,4 +1027,182 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
     }
 
 
+
+    public function test_admin_scalar_filters_cannot_escape_scope(): void
+    {
+        $super = $this->user('super_admin');
+        $admin = $this->user('admin');
+
+        $ownLabel = $this->label($super);
+        $foreignLabel = $this->label($super);
+
+        $this->assignLabel(
+            $admin,
+            $ownLabel,
+            $super
+        );
+
+        $ownArtist = Artist::factory()->create([
+            'label_id' => $ownLabel->id,
+            'stage_name' => 'K42 Admin Own Artist',
+            'legal_name' => 'K42 Admin Own Artist',
+        ]);
+
+        $foreignArtist = Artist::factory()->create([
+            'label_id' => $foreignLabel->id,
+            'stage_name' => 'K42 Admin Foreign Artist',
+            'legal_name' => 'K42 Admin Foreign Artist',
+        ]);
+
+        $importId = $this->reportImport();
+
+        $rows = [
+            [
+                $ownLabel,
+                $ownArtist,
+                'K42 Admin Own Track',
+                1201,
+            ],
+            [
+                $foreignLabel,
+                $foreignArtist,
+                'K42 Admin Foreign Track',
+                91201,
+            ],
+        ];
+
+        foreach (
+            $rows as [
+                $label,
+                $artist,
+                $title,
+                $earnings,
+            ]
+        ) {
+            DB::table('report_rows')->insert([
+                'report_import_id' => $importId,
+                'row_hash' => hash(
+                    'sha256',
+                    Str::uuid()->toString()
+                ),
+                'reporting_month' => '2026-06',
+                'label_id' => $label->id,
+                'artist_id' => $artist->id,
+                'revenue_owner_type' => 'label',
+                'revenue_owner_id' => $label->id,
+                'mapping_status' => 'mapped',
+                'mapped_at' => now(),
+                'label_name' => $label->name,
+                'track_title' => $title,
+                'track_artist' => $artist->stage_name,
+                'album_title' => $title . ' Album',
+                'album_artist' => $artist->stage_name,
+                'isrc' => 'K42SHAREDISRC',
+                'upc' => 'K42SHAREDUPC',
+                'platform' => 'K42 Shared Platform',
+                'currency' => 'INR',
+                'country_code' => 'K4',
+                'sale_type' => 'Stream',
+                'sale_date' => '2026-06-15',
+                'sale_month' => '2026-06',
+                'streams' => $earnings,
+                'sale_units' => $earnings,
+                'label_rate' => 100,
+                'collected_revenue' => $earnings,
+                'earnings' => $earnings,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $cases = [
+            [
+                'platform' =>
+                    'K42 Shared Platform',
+            ],
+            [
+                'country' => 'K4',
+            ],
+            [
+                'isrc' => 'K42SHAREDISRC',
+            ],
+        ];
+
+        foreach ($cases as $filter) {
+            $params = array_merge(
+                ['month' => '2026-06'],
+                $filter
+            );
+
+            $dashboard = $this
+                ->actingAs($admin)
+                ->get(route(
+                    'v2.analytics.index',
+                    $params
+                ));
+
+            $dashboard
+                ->assertOk()
+                ->assertInertia(
+                    fn (Assert $page) =>
+                        $page
+                            ->where(
+                                'summary.earnings',
+                                fn ($value) =>
+                                    abs(
+                                        (float) $value
+                                        - 1201.0
+                                    ) < 0.000001
+                            )
+                );
+
+            $content =
+                $dashboard->getContent();
+
+            $this->assertStringContainsString(
+                'K42 Admin Own Track',
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                'K42 Admin Foreign Track',
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                '91201',
+                $content
+            );
+
+            $export = $this
+                ->actingAs($admin)
+                ->get(route(
+                    'v2.analytics.export',
+                    $params
+                ));
+
+            $export->assertOk();
+
+            ob_start();
+            $export->baseResponse->sendContent();
+            $csv = (string) ob_get_clean();
+
+            $this->assertStringContainsString(
+                'K42 Admin Own Track',
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                'K42 Admin Foreign Track',
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                '91201',
+                $csv
+            );
+        }
+    }
+
+
 }
