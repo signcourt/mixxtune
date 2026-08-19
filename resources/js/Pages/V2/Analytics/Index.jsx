@@ -255,6 +255,15 @@ export default function Index({
     const financialCountries =
         financialAnalytics?.countries || [];
 
+    const financialSaleTypes =
+        financialAnalytics?.saleTypes || [];
+
+    const financialCurrencies =
+        financialAnalytics?.currencies || [];
+
+    const financialCms =
+        financialAnalytics?.cms || [];
+
     const financialCurrency =
         financialSummary?.currency ||
         primaryCurrency;
@@ -1393,6 +1402,212 @@ export default function Index({
                             ) : (
                                 <EmptyState text="No financial country allocation data available." />
                             )}
+                        </div>
+
+                        {/* CANONICAL FINANCIAL DIMENSIONS */}
+                        <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                                <div className="border-b border-slate-100 p-5">
+                                    <SectionHeader
+                                        icon={BarChart3}
+                                        title="Financial Revenue by Sale Type"
+                                        subtitle="Allocation-safe gross and net payable by usage type"
+                                    />
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full">
+                                        <thead className="bg-slate-50">
+                                            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                <th className="px-5 py-3">
+                                                    Sale Type
+                                                </th>
+                                                <th className="px-5 py-3 text-right">
+                                                    Gross
+                                                </th>
+                                                <th className="px-5 py-3 text-right">
+                                                    Net Payable
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody className="divide-y divide-slate-100">
+                                            {financialSaleTypes.length ? (
+                                                financialSaleTypes.map(
+                                                    (row, index) => (
+                                                        <tr
+                                                            key={`${row.sale_type || 'unknown'}-${index}`}
+                                                            className="hover:bg-slate-50"
+                                                        >
+                                                            <td className="px-5 py-4 text-sm font-semibold text-slate-900">
+                                                                {row.sale_type ||
+                                                                    'Unknown'}
+                                                            </td>
+                                                            <td className="px-5 py-4 text-right text-sm text-slate-700">
+                                                                {moneyFormat(
+                                                                    row.gross_earnings,
+                                                                    financialCurrency
+                                                                )}
+                                                            </td>
+                                                            <td className="px-5 py-4 text-right text-sm font-bold text-violet-700">
+                                                                {moneyFormat(
+                                                                    row.net_payable,
+                                                                    financialCurrency
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
+                                            ) : (
+                                                <tr>
+                                                    <td
+                                                        colSpan="3"
+                                                        className="px-5 py-14 text-center text-sm text-slate-400"
+                                                    >
+                                                        No financial sale type allocation data available.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                                <div className="border-b border-slate-100 p-5">
+                                    <SectionHeader
+                                        icon={BadgeIndianRupee}
+                                        title="Financial Revenue by Currency"
+                                        subtitle="Allocation-safe gross and net payable by report currency"
+                                    />
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full">
+                                        <thead className="bg-slate-50">
+                                            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                <th className="px-5 py-3">
+                                                    Currency
+                                                </th>
+                                                <th className="px-5 py-3 text-right">
+                                                    Gross
+                                                </th>
+                                                <th className="px-5 py-3 text-right">
+                                                    Net Payable
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody className="divide-y divide-slate-100">
+                                            {financialCurrencies.length ? (
+                                                financialCurrencies.map(
+                                                    (row, index) => (
+                                                        <tr
+                                                            key={`${row.currency || 'unknown'}-${index}`}
+                                                            className="hover:bg-slate-50"
+                                                        >
+                                                            <td className="px-5 py-4 text-sm font-semibold text-slate-900">
+                                                                {row.currency ||
+                                                                    'Unknown'}
+                                                            </td>
+                                                            <td className="px-5 py-4 text-right text-sm text-slate-700">
+                                                                {moneyFormat(
+                                                                    row.gross_earnings,
+                                                                    row.currency ||
+                                                                        financialCurrency
+                                                                )}
+                                                            </td>
+                                                            <td className="px-5 py-4 text-right text-sm font-bold text-violet-700">
+                                                                {moneyFormat(
+                                                                    row.net_payable,
+                                                                    row.currency ||
+                                                                        financialCurrency
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )
+                                            ) : (
+                                                <tr>
+                                                    <td
+                                                        colSpan="3"
+                                                        className="px-5 py-14 text-center text-sm text-slate-400"
+                                                    >
+                                                        No financial currency allocation data available.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                            <div className="border-b border-slate-100 p-5">
+                                <SectionHeader
+                                    icon={BarChart3}
+                                    title="Financial Revenue by CMS"
+                                    subtitle="Allocation-safe gross and net payable by CMS"
+                                />
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full">
+                                    <thead className="bg-slate-50">
+                                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <th className="px-5 py-3">
+                                                CMS
+                                            </th>
+                                            <th className="px-5 py-3 text-right">
+                                                Gross
+                                            </th>
+                                            <th className="px-5 py-3 text-right">
+                                                Net Payable
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody className="divide-y divide-slate-100">
+                                        {financialCms.length ? (
+                                            financialCms.map(
+                                                (row, index) => (
+                                                    <tr
+                                                        key={`${row.cms || 'unknown'}-${index}`}
+                                                        className="hover:bg-slate-50"
+                                                    >
+                                                        <td className="px-5 py-4 text-sm font-semibold text-slate-900">
+                                                            {row.cms ||
+                                                                'Unknown'}
+                                                        </td>
+                                                        <td className="px-5 py-4 text-right text-sm text-slate-700">
+                                                            {moneyFormat(
+                                                                row.gross_earnings,
+                                                                financialCurrency
+                                                            )}
+                                                        </td>
+                                                        <td className="px-5 py-4 text-right text-sm font-bold text-violet-700">
+                                                            {moneyFormat(
+                                                                row.net_payable,
+                                                                financialCurrency
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            )
+                                        ) : (
+                                            <tr>
+                                                <td
+                                                    colSpan="3"
+                                                    className="px-5 py-14 text-center text-sm text-slate-400"
+                                                >
+                                                    No financial CMS allocation data available.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
