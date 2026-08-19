@@ -439,34 +439,44 @@ class LabelTeamAccessService
             return collect();
         }
 
-        $hierarchy = app(
-            LabelHierarchyService::class
-        );
-
         /*
-         * The effective label is the user's hierarchy
-         * boundary.
+         * MIXX TUNE STRICT TWO-TIER ACCESS
          *
-         * Owner:
-         *   own level + every descendant recursively.
+         * Master owner / entire-label Team User:
+         *   master + direct children only.
          *
-         * Team User / entire_label:
-         *   complete subtree recursively.
+         * Child-label owner:
+         *   own child label only.
          *
-         * Team User / selected:
-         *   base label + each selected label's complete
-         *   descendant subtree.
+         * Selected Team User:
+         *   master + explicitly selected direct children.
          *
-         * No ancestor or sibling leakage is allowed.
+         * Grandchildren are never inherited.
          */
-        $fullTreeIds = $hierarchy
-            ->descendantIds(
+        if ($label->parent_label_id !== null) {
+            $fullScope = collect([
                 (int) $label->id,
-                true
-            );
+            ]);
+        } else {
+            $directChildren = Label::query()
+                ->where(
+                    'parent_label_id',
+                    $label->id
+                )
+                ->whereNull('deleted_at')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id);
+
+            $fullScope = collect([
+                (int) $label->id,
+            ])
+                ->merge($directChildren)
+                ->unique()
+                ->values();
+        }
 
         if ($this->isOwner($user, $label)) {
-            return $fullTreeIds;
+            return $fullScope;
         }
 
         $member = $this->membership($user);
@@ -479,76 +489,30 @@ class LabelTeamAccessService
             $member->scope_level
             === 'entire_label'
         ) {
-            return $fullTreeIds;
+            return $fullScope;
         }
 
-        $selectedLabelIds = $member->scopes
-            ->filter(
-                fn (LabelTeamScope $scope) =>
-                    $scope->scope_type === 'label'
-            )
-            ->pluck('scope_id')
-            ->map(fn ($id) => (int) $id)
-            ->filter(
-                fn ($id) =>
-                    $fullTreeIds->contains($id)
-            )
-            ->unique()
-            ->values();
-
-        $visible = collect([
-            (int) $label->id,
-        ]);
-
-        foreach ($selectedLabelIds as $selectedId) {
-            $visible = $visible->merge(
-                $hierarchy->descendantIds(
-                    (int) $selectedId,
-                    true
+        $selectedLabelIds =
+            $member->scopes
+                ->filter(
+                    fn (LabelTeamScope $scope) =>
+                        $scope->scope_type === 'label'
                 )
-            );
-        }
+                ->pluck('scope_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(
+                    fn ($id) =>
+                        $fullScope->contains($id)
+                        && (int) $id
+                            !== (int) $label->id
+                )
+                ->unique()
+                ->values();
 
-        /*
-         * MIXX_TUNE_RECURSIVE_LEVEL_ACCESS
-         *
-         * Expand every directly accessible/root label into
-         * itself + all descendants. This is the canonical
-         * report/catalogue visibility boundary.
-         */
-        $directLabelIds = collect($visible
-            ->filter(
-                fn ($id) =>
-                    $fullTreeIds->contains(
-                        (int) $id
-                    )
-            )
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values())
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-
-        $hierarchy = app(
-            \App\Services\V2\LabelHierarchyService::class
-        );
-
-        $recursiveLabelIds = collect();
-
-        foreach ($directLabelIds as $labelId) {
-            $recursiveLabelIds =
-                $recursiveLabelIds->merge(
-                    $hierarchy->descendantIds(
-                        (int) $labelId,
-                        true
-                    )
-                );
-        }
-
-        return $recursiveLabelIds
-            ->map(fn ($id) => (int) $id)
+        return collect([
+            (int) $label->id,
+        ])
+            ->merge($selectedLabelIds)
             ->unique()
             ->values();
     }
@@ -670,12 +634,8 @@ class LabelTeamAccessService
          * validated again against the strict
          * two-tier catalogue.
          */
-        $fullTreeLabelIds = app(
-            LabelHierarchyService::class
-        )->descendantIds(
-            (int) $label->id,
-            true
-        );
+        $fullTreeLabelIds =
+            $this->accessibleLabelIds($user);
 
         $validSelectedArtistIds =
             Artist::query()
@@ -923,12 +883,22 @@ class LabelTeamAccessService
             ->unique()
             ->values();
 
-        $allowedLabelIds = app(
-            LabelHierarchyService::class
-        )->descendantIds(
+        $directChildLabelIds =
+            Label::query()
+                ->where(
+                    'parent_label_id',
+                    $ownerLabel->id
+                )
+                ->whereNull('deleted_at')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id);
+
+        $allowedLabelIds = collect([
             (int) $ownerLabel->id,
-            true
-        );
+        ])
+            ->merge($directChildLabelIds)
+            ->unique()
+            ->values();
 
         /*
          * The owner/root itself is the base context,

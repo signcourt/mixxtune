@@ -276,30 +276,13 @@ class ReleaseAccessService
 
         if ($role === 'label') {
             /*
-             * MIXX TUNE RECURSIVE LABEL ACCESS
-             * ---------------------------------
+             * MIXX TUNE STRICT TWO-TIER LABEL ACCESS
              *
-             * A label login owns one or more account/root labels.
-             * For every owned label, catalogue visibility includes
-             * that label plus every descendant level at any depth.
+             * Each owned master label exposes:
+             *   - itself
+             *   - direct child labels
              *
-             * Example:
-             *
-             * Sanatan
-             * ├── X
-             * │   └── X1
-             * │       └── X2
-             * ├── Y
-             * └── Z
-             *
-             * Sanatan login sees:
-             * Sanatan + X + X1 + X2 + Y + Z.
-             *
-             * A future scoped X-level account can use the same
-             * descendant resolver and will see only the X branch.
-             *
-             * Sibling branches never become descendants of each
-             * other, preventing cross-branch catalogue leakage.
+             * No recursive grandchildren.
              */
             $ownedLabelIds = Label::query()
                 ->where(
@@ -316,28 +299,20 @@ class ReleaseAccessService
                 return false;
             }
 
-            $hierarchy = app(
-                LabelHierarchyService::class
-            );
+            $directChildIds = Label::query()
+                ->whereIn(
+                    'parent_label_id',
+                    $ownedLabelIds
+                )
+                ->whereNull('deleted_at')
+                ->pluck('id')
+                ->map(
+                    fn ($id) => (int) $id
+                );
 
             $accessibleLabelIds =
-                collect();
-
-            foreach ($ownedLabelIds as $labelId) {
-                $accessibleLabelIds =
-                    $accessibleLabelIds->merge(
-                        $hierarchy->descendantIds(
-                            (int) $labelId,
-                            true
-                        )
-                    );
-            }
-
-            $accessibleLabelIds =
-                $accessibleLabelIds
-                    ->map(
-                        fn ($id) => (int) $id
-                    )
+                $ownedLabelIds
+                    ->merge($directChildIds)
                     ->unique()
                     ->values();
 

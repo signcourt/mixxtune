@@ -487,7 +487,8 @@ class FullBusinessFlowIntegrationTest extends TestCase
             ReportImportService::class
         )->import(
             $file,
-            $admin
+            $admin,
+            $month
         );
 
         $this->assertNotNull(
