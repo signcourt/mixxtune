@@ -326,18 +326,16 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
 
     public function test_admin_foreign_artist_id_filter_cannot_escape_scope(): void
     {
+        $super = $this->user('super_admin');
         $admin = $this->user('admin');
 
-        $ownLabel = $this->label(
-            $admin
-        );
+        $ownLabel = $this->label($super);
+        $foreignLabel = $this->label($super);
 
-        $foreignAdmin = $this->user(
-            'admin'
-        );
-
-        $foreignLabel = $this->label(
-            $foreignAdmin
+        $this->assignLabel(
+            $admin,
+            $ownLabel,
+            $super
         );
 
         $ownArtist = Artist::factory()->create([
@@ -481,6 +479,40 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
             ],
         ]);
 
+        /*
+         * Prove the base Admin assignment itself works.
+         */
+        $baseline = $this
+            ->actingAs($admin)
+            ->get(
+                route(
+                    'v2.analytics.index',
+                    ['month' => '2026-06']
+                )
+            );
+
+        $baseline
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component(
+                            'V2/Analytics/Index'
+                        )
+                        ->where(
+                            'role',
+                            'admin'
+                        )
+                        ->where(
+                            'summary.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value
+                                    - 111.0
+                                ) < 0.000001
+                        )
+            );
+
         $dashboard = $this
             ->actingAs($admin)
             ->get(
@@ -495,29 +527,41 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
                 )
             );
 
-        $dashboard->assertOk();
+        $dashboard
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->where(
+                            'summary.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value
+                                ) < 0.000001
+                        )
+            );
 
-        $dashboardContent =
+        $content =
             $dashboard->getContent();
 
         $this->assertStringNotContainsString(
             $foreignLabel->name,
-            $dashboardContent
+            $content
         );
 
         $this->assertStringNotContainsString(
             $foreignArtist->stage_name,
-            $dashboardContent
+            $content
         );
 
         $this->assertStringNotContainsString(
             'K29 Foreign Secret Track',
-            $dashboardContent
+            $content
         );
 
         $this->assertStringNotContainsString(
             '987654',
-            $dashboardContent
+            $content
         );
 
         $export = $this
@@ -542,7 +586,8 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
             ->baseResponse
             ->sendContent();
 
-        $csv = (string) ob_get_clean();
+        $csv =
+            (string) ob_get_clean();
 
         $this->assertStringNotContainsString(
             $foreignLabel->name,
@@ -565,22 +610,23 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
         );
     }
 
-
-
     public function test_admin_foreign_hierarchy_filters_cannot_escape_scope(): void
     {
+        $super = $this->user('super_admin');
         $admin = $this->user('admin');
 
         $ownLabel = $this->label(
-            $admin
-        );
-
-        $foreignAdmin = $this->user(
-            'admin'
+            $super
         );
 
         $foreignLabel = $this->label(
-            $foreignAdmin
+            $super
+        );
+
+        $this->assignLabel(
+            $admin,
+            $ownLabel,
+            $super
         );
 
         $ownArtist = Artist::factory()->create([
@@ -724,6 +770,30 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
             ],
         ]);
 
+        $baseline = $this
+            ->actingAs($admin)
+            ->get(
+                route(
+                    'v2.analytics.index',
+                    ['month' => '2026-06']
+                )
+            );
+
+        $baseline
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->where(
+                            'summary.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value
+                                    - 444.0
+                                ) < 0.000001
+                        )
+            );
+
         foreach (
             ['master_label_id', 'level_id']
             as $filter
@@ -812,6 +882,148 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
                 $csv
             );
         }
+    }
+
+
+
+    public function test_admin_search_filter_cannot_escape_scope(): void
+    {
+        $super = $this->user('super_admin');
+        $admin = $this->user('admin');
+
+        $ownLabel = $this->label($super);
+        $foreignLabel = $this->label($super);
+
+        $this->assignLabel(
+            $admin,
+            $ownLabel,
+            $super
+        );
+
+        $importId = $this->reportImport();
+
+        $this->row(
+            $importId,
+            $ownLabel,
+            'K37-SEARCH-MATCH-OWN',
+            777
+        );
+
+        $this->row(
+            $importId,
+            $foreignLabel,
+            'K37-SEARCH-MATCH-FOREIGN',
+            987647
+        );
+
+        /*
+         * Both rows contain K37-SEARCH-MATCH.
+         * Authorization must still restrict the
+         * result to the assigned label.
+         */
+        $params = [
+            'month' => '2026-06',
+            'search' =>
+                'K37-SEARCH-MATCH',
+        ];
+
+        $dashboard = $this
+            ->actingAs($admin)
+            ->get(
+                route(
+                    'v2.analytics.index',
+                    $params
+                )
+            );
+
+        $dashboard
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component(
+                            'V2/Analytics/Index'
+                        )
+                        ->where(
+                            'role',
+                            'admin'
+                        )
+                        ->where(
+                            'summary.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value
+                                    - 777.0
+                                ) < 0.000001
+                        )
+                        ->has(
+                            'topTracks',
+                            1
+                        )
+            );
+
+        $content =
+            $dashboard->getContent();
+
+        $this->assertStringContainsString(
+            'K37-SEARCH-MATCH-OWN',
+            $content
+        );
+
+        $this->assertStringNotContainsString(
+            'K37-SEARCH-MATCH-FOREIGN',
+            $content
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignLabel->name,
+            $content
+        );
+
+        $this->assertStringNotContainsString(
+            '987647',
+            $content
+        );
+
+        $export = $this
+            ->actingAs($admin)
+            ->get(
+                route(
+                    'v2.analytics.export',
+                    $params
+                )
+            );
+
+        $export->assertOk();
+
+        ob_start();
+
+        $export
+            ->baseResponse
+            ->sendContent();
+
+        $csv =
+            (string) ob_get_clean();
+
+        $this->assertStringContainsString(
+            'K37-SEARCH-MATCH-OWN',
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            'K37-SEARCH-MATCH-FOREIGN',
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignLabel->name,
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            '987647',
+            $csv
+        );
     }
 
 
