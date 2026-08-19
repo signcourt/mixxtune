@@ -1316,7 +1316,7 @@ export default function Index({
                     {/* RAW REPORT KPI CARDS */}
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <Card
-                            title="Revenue"
+                            title="Reported Earnings"
                             value={moneyFormat(
                                 summary.earnings,
                                 primaryCurrency
@@ -1364,7 +1364,7 @@ export default function Index({
                                 <SectionHeader
                                     icon={TrendingUp}
                                     title="Month-wise Business Growth"
-                                    subtitle="Revenue and streams performance over time"
+                                    subtitle="Reported earnings and streams performance over time"
                                 />
 
                                 <div
@@ -1443,7 +1443,7 @@ export default function Index({
                                             <Tooltip
                                                 labelFormatter={monthFormat}
                                                 formatter={(value, name) => [
-                                                    name === 'Revenue'
+                                                    name === 'Reported Earnings'
                                                         ? moneyFormat(
                                                               value,
                                                               primaryCurrency
@@ -1456,7 +1456,7 @@ export default function Index({
                                             <Area
                                                 type="monotone"
                                                 dataKey="earnings"
-                                                name="Revenue"
+                                                name="Reported Earnings"
                                                 stroke="#7c3aed"
                                                 strokeWidth={3}
                                                 fill="url(#analyticsRevenue)"
@@ -1532,7 +1532,7 @@ export default function Index({
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="rounded-xl border border-slate-200 p-4">
                                         <div className="text-xs text-slate-500">
-                                            Revenue Growth
+                                            Reported Earnings Growth
                                         </div>
 
                                         <div
@@ -1592,7 +1592,7 @@ export default function Index({
                             <SectionHeader
                                 icon={Store}
                                 title="Stores"
-                                subtitle="DSP revenue performance"
+                                subtitle="DSP reported earnings performance"
                             />
 
                             {topPlatforms.length ? (
@@ -1616,7 +1616,7 @@ export default function Index({
                                                         value,
                                                         primaryCurrency
                                                     ),
-                                                    'Revenue',
+                                                    'Reported Earnings',
                                                 ]}
                                             />
 
@@ -1637,7 +1637,7 @@ export default function Index({
                             <SectionHeader
                                 icon={MapPinned}
                                 title="Regions"
-                                subtitle="Country-wise revenue performance"
+                                subtitle="Country-wise reported earnings performance"
                             />
 
                             {topCountries.length ? (
@@ -1669,7 +1669,7 @@ export default function Index({
                                                         value,
                                                         primaryCurrency
                                                     ),
-                                                    'Revenue',
+                                                    'Reported Earnings',
                                                 ]}
                                             />
 
@@ -1693,7 +1693,7 @@ export default function Index({
                             <SectionHeader
                                 icon={Users}
                                 title="Top Artists"
-                                subtitle="Highest revenue contributors"
+                                subtitle="Highest reported earnings contributors"
                             />
 
                             <div className="mt-6">
@@ -1723,7 +1723,7 @@ export default function Index({
                             <SectionHeader
                                 icon={Layers3}
                                 title="Top Labels"
-                                subtitle="Revenue performance by label"
+                                subtitle="Reported earnings performance by label"
                             />
 
                             <div className="mt-6">
@@ -1757,7 +1757,7 @@ export default function Index({
                                                 Streams
                                             </th>
                                             <th className="px-5 py-3 text-right">
-                                                Revenue
+                                                Reported Earnings
                                             </th>
                                         </tr>
                                     </thead>
@@ -1824,8 +1824,8 @@ export default function Index({
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <SectionHeader
                             icon={Globe2}
-                            title="Store Revenue Share"
-                            subtitle="Percentage contribution by DSP"
+                            title="Store Reported Earnings Share"
+                            subtitle="Percentage contribution to reported earnings by DSP"
                         />
 
                         {platformPie.length ? (
@@ -1871,7 +1871,7 @@ export default function Index({
                                                     value,
                                                     primaryCurrency
                                                 ),
-                                                'Revenue',
+                                                'Reported Earnings',
                                             ]}
                                         />
                                     </PieChart>
