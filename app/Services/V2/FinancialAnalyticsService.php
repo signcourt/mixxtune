@@ -265,6 +265,97 @@ class FinancialAnalyticsService
     }
 
 
+    /**
+     * Apply report-row dimensions to financial statements
+     * without joining report_rows into the statement query.
+     *
+     * EXISTS keeps each royalty statement cardinality at one
+     * row, preventing statement revenue multiplication when a
+     * statement owns multiple allocations.
+     */
+    public function applyDimensionFilters(
+        Builder $query,
+        array $filters
+    ): Builder {
+        $dimensionFilters = [
+            'sale_month' => 'sale_month',
+            'platform' => 'platform',
+            'sale_type' => 'sale_type',
+            'currency' => 'currency',
+            'country' => 'country_code',
+            'cms' => 'cms',
+        ];
+
+        $hasDimensionFilter = false;
+
+        foreach ($dimensionFilters as $filterKey => $column) {
+            if (! empty($filters[$filterKey])) {
+                $hasDimensionFilter = true;
+                break;
+            }
+        }
+
+        if (
+            ! $hasDimensionFilter
+            && empty($filters['isrc'])
+            && empty($filters['upc'])
+        ) {
+            return $query;
+        }
+
+        return $query->whereExists(
+            function ($subquery) use (
+                $filters,
+                $dimensionFilters
+            ) {
+                $subquery
+                    ->selectRaw('1')
+                    ->from('royalty_allocations as fa')
+                    ->join(
+                        'report_rows as fr',
+                        'fr.id',
+                        '=',
+                        'fa.report_row_id'
+                    )
+                    ->whereColumn(
+                        'fa.royalty_statement_id',
+                        'rs.id'
+                    );
+
+                foreach (
+                    $dimensionFilters
+                    as $filterKey => $column
+                ) {
+                    if (empty($filters[$filterKey])) {
+                        continue;
+                    }
+
+                    $subquery->where(
+                        'fr.' . $column,
+                        $filters[$filterKey]
+                    );
+                }
+
+                if (! empty($filters['isrc'])) {
+                    $subquery->where(
+                        'fr.isrc',
+                        'like',
+                        '%' . $filters['isrc'] . '%'
+                    );
+                }
+
+                if (! empty($filters['upc'])) {
+                    $subquery->where(
+                        'fr.upc',
+                        'like',
+                        '%' . $filters['upc'] . '%'
+                    );
+                }
+            }
+        );
+    }
+
+
     public function summary(
         Builder $query
     ): array {

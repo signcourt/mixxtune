@@ -819,6 +819,12 @@ class AnalyticsController extends Controller
                 $filters
             );
 
+        $financialStatements =
+            $financialAnalytics->applyDimensionFilters(
+                $financialStatements,
+                $filters
+            );
+
         $financialData = [
             'summary' =>
                 $financialAnalytics->summary(
