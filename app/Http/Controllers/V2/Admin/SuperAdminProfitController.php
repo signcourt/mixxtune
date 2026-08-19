@@ -49,6 +49,9 @@ class SuperAdminProfitController extends Controller
 
                 'platforms' =>
                     $profit->platforms(),
+
+                'owners' =>
+                    $profit->owners(),
             ]
         );
     }
@@ -127,7 +130,10 @@ class SuperAdminProfitController extends Controller
                             $handle,
                             [
                                 $row->sale_date,
-                                $row->sale_month,
+                                $profit
+                                    ->effectiveMonth(
+                                        $row
+                                    ),
                                 $row->revenue_owner_type,
                                 $row->revenue_owner_id,
                                 $row->platform,

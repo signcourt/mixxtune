@@ -783,6 +783,200 @@ class SuperAdminProfitServiceTest extends TestCase
     }
 
 
+    public function test_owner_options_and_effective_month_contract(): void
+    {
+        $userId =
+            DB::table('users')
+                ->insertGetId([
+                    'name' =>
+                        'Owner Selector Label',
+                    'email' =>
+                        'owner-selector@example.com',
+                    'password' =>
+                        bcrypt('password'),
+                    'role' =>
+                        'label',
+                    'account_status' =>
+                        'active',
+                    'email_verified_at' =>
+                        now(),
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $labelId =
+            DB::table('labels')
+                ->insertGetId([
+                    'public_id' =>
+                        (string) Str::ulid(),
+                    'name' =>
+                        'Owner Selector Label',
+                    'slug' =>
+                        'owner-selector-label',
+                    'user_id' =>
+                        $userId,
+                    'revenue_share_percentage' =>
+                        80,
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        $importId =
+            DB::table('report_imports')
+                ->insertGetId([
+                    'public_id' =>
+                        (string) Str::ulid(),
+                    'original_filename' =>
+                        'owner-selector.csv',
+                    'stored_path' =>
+                        'tests/owner-selector.csv',
+                    'status' =>
+                        'completed',
+                    'total_rows' =>
+                        1,
+                    'imported_rows' =>
+                        1,
+                    'duplicate_rows' =>
+                        0,
+                    'failed_rows' =>
+                        0,
+                    'started_at' =>
+                        now(),
+                    'completed_at' =>
+                        now(),
+                    'created_at' =>
+                        now(),
+                    'updated_at' =>
+                        now(),
+                ]);
+
+        DB::table('report_rows')
+            ->insert([
+                'report_import_id' =>
+                    $importId,
+                'row_hash' =>
+                    hash(
+                        'sha256',
+                        'owner-selector-row'
+                    ),
+                'label_name' =>
+                    'Owner Selector Label',
+                'track_title' =>
+                    'Owner Selector Track',
+                'platform' =>
+                    'Spotify',
+                'currency' =>
+                    'INR',
+                'sale_date' =>
+                    '2026-08-15',
+                'sale_month' =>
+                    '2026-08',
+                'reporting_month' =>
+                    null,
+                'earnings' =>
+                    100,
+                'mapping_status' =>
+                    'mapped',
+                'mapped_at' =>
+                    now(),
+                'label_id' =>
+                    $labelId,
+                'revenue_owner_type' =>
+                    'label',
+                'revenue_owner_id' =>
+                    $labelId,
+                'created_at' =>
+                    now(),
+                'updated_at' =>
+                    now(),
+            ]);
+
+        $service =
+            app(
+                SuperAdminProfitService::class
+            );
+
+        $owner =
+            $service
+                ->owners()
+                ->first(
+                    fn (array $item) =>
+                        $item['type']
+                            === 'label'
+                        && (int) $item['id']
+                            === $labelId
+                );
+
+        $this->assertNotNull(
+            $owner
+        );
+
+        $this->assertEquals(
+            'Owner Selector Label',
+            $owner['name']
+        );
+
+        $this->assertEquals(
+            '2026-08',
+            $service->effectiveMonth(
+                (object) [
+                    'reporting_month' =>
+                        null,
+                    'sale_month' =>
+                        '2026-08',
+                ]
+            )
+        );
+
+        $this->assertEquals(
+            '2026-06',
+            $service->effectiveMonth(
+                (object) [
+                    'reporting_month' =>
+                        '2026-06',
+                    'sale_month' =>
+                        '2026-08',
+                ]
+            )
+        );
+
+        $summary =
+            $service->summary(
+                $service->baseQuery(
+                    null,
+                    null,
+                    'label',
+                    $labelId
+                )
+            );
+
+        $this->assertEquals(
+            100.0,
+            $summary[
+                'collected_revenue'
+            ]
+        );
+
+        $this->assertEquals(
+            80.0,
+            $summary[
+                'user_earning'
+            ]
+        );
+
+        $this->assertEquals(
+            20.0,
+            $summary[
+                'super_admin_profit'
+            ]
+        );
+    }
+
+
     public function test_negative_row_uses_100_percent_effective_rate(): void
     {
         $service =

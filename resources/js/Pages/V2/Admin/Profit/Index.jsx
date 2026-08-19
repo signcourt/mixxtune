@@ -31,12 +31,20 @@ export default function ProfitIndex({
     filters = {},
     months = [],
     platforms = [],
+    owners = [],
 }) {
     const [form, setForm] = useState({
         month: filters.month || '',
         platform: filters.platform || '',
         owner_type: filters.owner_type || '',
+        owner_id: filters.owner_id || '',
     });
+
+    const visibleOwners = owners.filter(
+        (owner) =>
+            !form.owner_type ||
+            owner.type === form.owner_type
+    );
 
     const applyFilters = (event) => {
         event.preventDefault();
@@ -57,6 +65,7 @@ export default function ProfitIndex({
             month: '',
             platform: '',
             owner_type: '',
+            owner_id: '',
         };
 
         setForm(empty);
@@ -206,13 +215,14 @@ export default function ProfitIndex({
 
                         <p className="mt-1 text-sm text-slate-500">
                             Filter profit by reporting
-                            month, DSP and account type.
+                            month, DSP, account type and
+                            individual account.
                         </p>
                     </div>
 
                     <form
                         onSubmit={applyFilters}
-                        className="grid gap-4 lg:grid-cols-4"
+                        className="grid gap-4 lg:grid-cols-5"
                     >
                         <select
                             value={form.month}
@@ -273,6 +283,7 @@ export default function ProfitIndex({
                                     ...form,
                                     owner_type:
                                         event.target.value,
+                                    owner_id: '',
                                 })
                             }
                             className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white"
@@ -286,6 +297,38 @@ export default function ProfitIndex({
                             <option value="artist">
                                 Artists Only
                             </option>
+                        </select>
+
+                        <select
+                            value={form.owner_id}
+                            onChange={(event) =>
+                                setForm({
+                                    ...form,
+                                    owner_id:
+                                        event.target.value,
+                                })
+                            }
+                            disabled={
+                                !form.owner_type
+                            }
+                            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <option value="">
+                                {form.owner_type
+                                    ? 'All Accounts'
+                                    : 'Select Account Type'}
+                            </option>
+
+                            {visibleOwners.map(
+                                (owner) => (
+                                    <option
+                                        key={`${owner.type}-${owner.id}`}
+                                        value={owner.id}
+                                    >
+                                        {owner.name}
+                                    </option>
+                                )
+                            )}
                         </select>
 
                         <div className="flex gap-2">

@@ -431,6 +431,82 @@ class SuperAdminProfitService
             ->pluck('platform');
     }
 
+    public function owners(): Collection
+    {
+        return DB::table('report_rows')
+            ->whereNotNull(
+                'revenue_owner_type'
+            )
+            ->whereNotNull(
+                'revenue_owner_id'
+            )
+            ->whereIn(
+                'revenue_owner_type',
+                [
+                    'label',
+                    'artist',
+                ]
+            )
+            ->select([
+                'revenue_owner_type',
+                'revenue_owner_id',
+            ])
+            ->distinct()
+            ->get()
+            ->map(
+                function (object $row): array {
+                    $type =
+                        (string)
+                            $row
+                                ->revenue_owner_type;
+
+                    $id =
+                        (int)
+                            $row
+                                ->revenue_owner_id;
+
+                    return [
+                        'type' =>
+                            $type,
+                        'id' =>
+                            $id,
+                        'name' =>
+                            $this->ownerName(
+                                $type,
+                                $id
+                            ),
+                    ];
+                }
+            )
+            ->sortBy(
+                fn (array $owner) =>
+                    strtolower(
+                        (string)
+                            $owner['name']
+                    )
+            )
+            ->values();
+    }
+
+    public function effectiveMonth(
+        object $row
+    ): string {
+        $reportingMonth =
+            trim(
+                (string)
+                    ($row->reporting_month ?? '')
+            );
+
+        if ($reportingMonth !== '') {
+            return $reportingMonth;
+        }
+
+        return trim(
+            (string)
+                ($row->sale_month ?? '')
+        );
+    }
+
     private function canonicalRate(
         object $row
     ): float {
