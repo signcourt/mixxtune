@@ -176,6 +176,95 @@ class FinancialAnalyticsService
         return $query;
     }
 
+    /**
+     * Apply Analytics hierarchy selectors on top of the
+     * authenticated financial statement scope.
+     *
+     * These filters can only narrow scopedStatements();
+     * they can never broaden account visibility.
+     */
+    public function applyHierarchyFilters(
+        Builder $query,
+        array $filters
+    ): Builder {
+        foreach (
+            [
+                'master_label_id',
+                'level_id',
+            ]
+            as $filterKey
+        ) {
+            if (empty($filters[$filterKey])) {
+                continue;
+            }
+
+            $labelId =
+                (int) $filters[$filterKey];
+
+            $labelIds = app(
+                LabelHierarchyService::class
+            )->descendantIds(
+                $labelId,
+                true
+            );
+
+            $artistIds = DB::table('artists')
+                ->whereNull('deleted_at')
+                ->whereIn(
+                    'label_id',
+                    $labelIds
+                )
+                ->pluck('id');
+
+            $query->where(
+                function ($builder) use (
+                    $labelIds,
+                    $artistIds
+                ) {
+                    if ($labelIds->isNotEmpty()) {
+                        $builder->whereIn(
+                            'rs.label_id',
+                            $labelIds
+                        );
+                    }
+
+                    if ($artistIds->isNotEmpty()) {
+                        if ($labelIds->isNotEmpty()) {
+                            $builder->orWhereIn(
+                                'rs.artist_id',
+                                $artistIds
+                            );
+                        } else {
+                            $builder->whereIn(
+                                'rs.artist_id',
+                                $artistIds
+                            );
+                        }
+                    }
+
+                    if (
+                        $labelIds->isEmpty()
+                        && $artistIds->isEmpty()
+                    ) {
+                        $builder->whereRaw(
+                            '1 = 0'
+                        );
+                    }
+                }
+            );
+        }
+
+        if (! empty($filters['artist_id'])) {
+            $query->where(
+                'rs.artist_id',
+                (int) $filters['artist_id']
+            );
+        }
+
+        return $query;
+    }
+
+
     public function summary(
         Builder $query
     ): array {

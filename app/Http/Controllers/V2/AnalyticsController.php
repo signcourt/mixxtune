@@ -777,6 +777,12 @@ class AnalyticsController extends Controller
                 $filters
             );
 
+        $financialStatements =
+            $financialAnalytics->applyHierarchyFilters(
+                $financialStatements,
+                $filters
+            );
+
         $financialData = [
             'summary' =>
                 $financialAnalytics->summary(
