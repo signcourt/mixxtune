@@ -4,7 +4,7 @@ namespace App\Http\Controllers\V2;
 
 use App\Http\Controllers\Controller;
 use App\Models\Finance\RoyaltyStatement;
-use App\Services\V2\AdminAssignmentService;
+use App\Services\V2\AdminFinancialAccessService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\LabelAccess\LabelTeamAccessService;
 use Illuminate\Http\Request;
@@ -17,7 +17,7 @@ class RoyaltyController extends Controller
     public function index(
         Request $request,
         PermissionService $permissions,
-        AdminAssignmentService $assignments
+        AdminFinancialAccessService $financialAccess
     ): Response {
         $permissions->authorize(
             $request->user(),
@@ -93,50 +93,13 @@ class RoyaltyController extends Controller
                 );
             }
         } elseif ($role === 'admin') {
-            $artistIds =
-                $assignments->artistIds(
-                    $request->user()
+            $financialAccess
+                ->applyFinancialOwnerScope(
+                    $query,
+                    $request->user(),
+                    'label_id',
+                    'artist_id'
                 );
-
-            $labelIds =
-                $assignments->labelIds(
-                    $request->user()
-                );
-
-            if (
-                $artistIds->isEmpty()
-                && $labelIds->isEmpty()
-            ) {
-                $query->whereRaw('1 = 0');
-            } else {
-                $query->where(
-                    function ($builder) use (
-                        $artistIds,
-                        $labelIds
-                    ) {
-                        if ($artistIds->isNotEmpty()) {
-                            $builder->whereIn(
-                                'artist_id',
-                                $artistIds
-                            );
-                        }
-
-                        if ($labelIds->isNotEmpty()) {
-                            if ($artistIds->isNotEmpty()) {
-                                $builder->orWhereIn(
-                                    'label_id',
-                                    $labelIds
-                                );
-                            } else {
-                                $builder->whereIn(
-                                    'label_id',
-                                    $labelIds
-                                );
-                            }
-                        }
-                    }
-                );
-            }
         }
 
         $summary = [
