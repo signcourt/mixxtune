@@ -849,6 +849,24 @@ class AnalyticsController extends Controller
                     clone $financialStatements,
                     $filters
                 ),
+
+            'saleTypes' =>
+                $financialAnalytics->saleTypeBreakdown(
+                    clone $financialStatements,
+                    $filters
+                ),
+
+            'currencies' =>
+                $financialAnalytics->currencyBreakdown(
+                    clone $financialStatements,
+                    $filters
+                ),
+
+            'cms' =>
+                $financialAnalytics->cmsBreakdown(
+                    clone $financialStatements,
+                    $filters
+                ),
         ];
 
         return Inertia::render(
