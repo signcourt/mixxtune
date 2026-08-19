@@ -24,6 +24,7 @@ export const PANEL_ROUTES = {
         withdrawals: "/artist/withdrawals",
 
         reports: "/artist/reports",
+        analytics: "/v2/analytics",
 
         kyc: "/artist/kyc",
 
