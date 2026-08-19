@@ -42,6 +42,10 @@ class AnalyticsController extends Controller
                 (string) $request->input('platform', '')
             ),
 
+            'sale_type' => trim(
+                (string) $request->input('sale_type', '')
+            ),
+
             'country' => trim(
                 (string) $request->input('country', '')
             ),
@@ -509,6 +513,14 @@ class AnalyticsController extends Controller
             ->pluck('platform')
             ->values();
 
+        $saleTypeOptions = (clone $base)
+            ->whereNotNull('sale_type')
+            ->where('sale_type', '!=', '')
+            ->distinct()
+            ->orderBy('sale_type')
+            ->pluck('sale_type')
+            ->values();
+
         $countries = (clone $base)
             ->whereNotNull('country_code')
             ->where('country_code', '!=', '')
@@ -835,6 +847,7 @@ class AnalyticsController extends Controller
                     'saleMonths' => $saleMonths,
                     'platforms' => $platforms,
                     'countries' => $countries,
+                    'saleTypes' => $saleTypeOptions,
                     'cms' => $cmsOptions,
                 ],
 

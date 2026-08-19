@@ -268,6 +268,9 @@ export default function Index({
     const countries =
         filterOptions?.countries || [];
 
+    const saleTypeOptions =
+        filterOptions?.saleTypes || [];
+
     const cmsOptions =
         filterOptions?.cms || [];
 
@@ -636,6 +639,30 @@ export default function Index({
                                             value={platform}
                                         >
                                             {platform}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <select
+                                    value={filters.sale_type || ''}
+                                    onChange={(e) =>
+                                        changeFilter(
+                                            'sale_type',
+                                            e.target.value
+                                        )
+                                    }
+                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                                >
+                                    <option value="">
+                                        All Sale Types
+                                    </option>
+
+                                    {saleTypeOptions.map((saleType) => (
+                                        <option
+                                            key={saleType}
+                                            value={saleType}
+                                        >
+                                            {saleType}
                                         </option>
                                     ))}
                                 </select>

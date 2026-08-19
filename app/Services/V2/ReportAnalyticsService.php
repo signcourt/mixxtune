@@ -236,6 +236,13 @@ class ReportAnalyticsService
             );
         }
 
+        if (!empty($filters['sale_type'])) {
+            $query->where(
+                'sale_type',
+                $filters['sale_type']
+            );
+        }
+
         if (!empty($filters['country'])) {
             $query->where(
                 'country_code',
