@@ -568,4 +568,113 @@ class ArtistAnalyticsIsolationTest extends TestCase
     }
 
 
+
+    public function test_artist_foreign_artist_id_filter_cannot_escape_scope(): void
+    {
+        $creator = User::factory()->create([
+            'role' => 'super_admin',
+        ]);
+
+        $owner = $this->artistUser();
+        $foreignOwner =
+            $this->artistUser();
+
+        $label = $this->label(
+            $creator,
+            'K29 Artist Label'
+        );
+
+        $ownArtist = $this->artist(
+            $owner,
+            $label,
+            'K29 Own Artist'
+        );
+
+        $foreignArtist = $this->artist(
+            $foreignOwner,
+            $label,
+            'K29 Foreign Artist'
+        );
+
+        $importId = $this->reportImport();
+
+        $this->reportRow(
+            $importId,
+            $label,
+            $ownArtist,
+            333
+        );
+
+        $this->reportRow(
+            $importId,
+            $label,
+            $foreignArtist,
+            987652
+        );
+
+        $dashboard = $this
+            ->actingAs($owner)
+            ->get(
+                route(
+                    'v2.analytics.index',
+                    [
+                        'month' =>
+                            '2026-06',
+                        'artist_id' =>
+                            $foreignArtist->id,
+                    ]
+                )
+            );
+
+        $dashboard->assertOk();
+
+        $content =
+            $dashboard->getContent();
+
+        $this->assertStringNotContainsString(
+            $foreignArtist->stage_name,
+            $content
+        );
+
+        $this->assertStringNotContainsString(
+            '987652',
+            $content
+        );
+
+        $export = $this
+            ->actingAs($owner)
+            ->get(
+                route(
+                    'v2.analytics.export',
+                    [
+                        'month' =>
+                            '2026-06',
+                        'artist_id' =>
+                            $foreignArtist->id,
+                    ]
+                )
+            );
+
+        $export->assertOk();
+
+        ob_start();
+
+        $export
+            ->baseResponse
+            ->sendContent();
+
+        $csv = (string) ob_get_clean();
+
+        $this->assertStringNotContainsString(
+            $foreignArtist->stage_name,
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            '987652',
+            $csv
+        );
+    }
+
+
 }
