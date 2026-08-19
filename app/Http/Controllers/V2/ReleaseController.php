@@ -455,6 +455,46 @@ class ReleaseController extends Controller
         }
 
         /*
+         * Optional Admin/Super Admin Artist drill-down.
+         *
+         * Existing role scope is applied first. This
+         * additional filter can only narrow that scope.
+         */
+        $artistFilterId =
+            $request->integer('artist_id');
+
+        if (
+            $artistFilterId > 0
+            && in_array(
+                $role,
+                ['admin', 'super_admin'],
+                true
+            )
+        ) {
+            if ($role === 'admin') {
+                $assignedArtistIds =
+                    app(
+                        AdminAssignmentService::class
+                    )->artistIds(
+                        $request->user()
+                    );
+
+                abort_unless(
+                    $assignedArtistIds->contains(
+                        $artistFilterId
+                    ),
+                    403,
+                    'Artist access denied.'
+                );
+            }
+
+            $query->where(
+                'artist_id',
+                $artistFilterId
+            );
+        }
+
+        /*
          * Draft privacy:
          *
          * A draft is a private workspace belonging to its creator.
