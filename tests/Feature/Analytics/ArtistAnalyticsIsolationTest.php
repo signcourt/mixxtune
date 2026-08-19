@@ -1125,4 +1125,244 @@ class ArtistAnalyticsIsolationTest extends TestCase
     }
 
 
+
+    public function test_artist_temporal_filters_cannot_escape_scope(): void
+    {
+        $creator = User::factory()->create([
+            'role' => 'super_admin',
+        ]);
+
+        $owner = $this->artistUser();
+        $foreignOwner = $this->artistUser();
+
+        $label = $this->label(
+            $creator,
+            'K47 Artist Label'
+        );
+
+        $ownArtist = $this->artist(
+            $owner,
+            $label,
+            'K47 Artist Own'
+        );
+
+        $foreignArtist = $this->artist(
+            $foreignOwner,
+            $label,
+            'K47 Artist Foreign'
+        );
+
+        $importId = $this->reportImport();
+
+        foreach ([
+            [
+                $ownArtist,
+                'K47 Artist Own June',
+                '2026-06',
+                '2026-05',
+                1501,
+            ],
+            [
+                $foreignArtist,
+                'K47 Artist Foreign June',
+                '2026-06',
+                '2026-05',
+                91501,
+            ],
+            [
+                $ownArtist,
+                'K47 Artist Own July',
+                '2026-07',
+                '2026-06',
+                1502,
+            ],
+            [
+                $foreignArtist,
+                'K47 Artist Foreign July',
+                '2026-07',
+                '2026-06',
+                91502,
+            ],
+        ] as [
+            $artist,
+            $title,
+            $reportingMonth,
+            $saleMonth,
+            $earnings,
+        ]) {
+            DB::table('report_rows')->insert([
+                'report_import_id' =>
+                    $importId,
+                'row_hash' => hash(
+                    'sha256',
+                    Str::uuid()->toString()
+                ),
+                'reporting_month' =>
+                    $reportingMonth,
+                'label_id' =>
+                    $label->id,
+                'artist_id' =>
+                    $artist->id,
+                'revenue_owner_type' =>
+                    'label',
+                'revenue_owner_id' =>
+                    $label->id,
+                'mapping_status' =>
+                    'mapped',
+                'mapped_at' =>
+                    now(),
+                'label_name' =>
+                    $label->name,
+                'track_title' =>
+                    $title,
+                'track_artist' =>
+                    $artist->stage_name,
+                'album_title' =>
+                    $title . ' Album',
+                'album_artist' =>
+                    $artist->stage_name,
+                'isrc' =>
+                    'K47ARTIST' . $earnings,
+                'upc' =>
+                    'K47ARTISTUPC' . $earnings,
+                'platform' =>
+                    'Spotify',
+                'currency' =>
+                    'INR',
+                'country_code' =>
+                    'IN',
+                'sale_type' =>
+                    'Stream',
+                'sale_date' =>
+                    $saleMonth . '-15',
+                'sale_month' =>
+                    $saleMonth,
+                'streams' =>
+                    $earnings,
+                'sale_units' =>
+                    $earnings,
+                'label_rate' =>
+                    100,
+                'collected_revenue' =>
+                    $earnings,
+                'earnings' =>
+                    $earnings,
+                'created_at' =>
+                    now(),
+                'updated_at' =>
+                    now(),
+            ]);
+        }
+
+        $cases = [
+            [
+                'params' => [
+                    'month' => '2026-06',
+                ],
+                'expected' => 1501.0,
+                'own' =>
+                    'K47 Artist Own June',
+                'foreign' =>
+                    'K47 Artist Foreign June',
+                'foreignMoney' =>
+                    '91501',
+            ],
+            [
+                'params' => [
+                    'from_month' => '2026-06',
+                    'to_month' => '2026-07',
+                ],
+                'expected' => 3003.0,
+                'own' =>
+                    'K47 Artist Own July',
+                'foreign' =>
+                    'K47 Artist Foreign July',
+                'foreignMoney' =>
+                    '91502',
+            ],
+            [
+                'params' => [
+                    'sale_month' => '2026-06',
+                ],
+                'expected' => 1502.0,
+                'own' =>
+                    'K47 Artist Own July',
+                'foreign' =>
+                    'K47 Artist Foreign July',
+                'foreignMoney' =>
+                    '91502',
+            ],
+        ];
+
+        foreach ($cases as $case) {
+            $dashboard = $this
+                ->actingAs($owner)
+                ->get(route(
+                    'v2.analytics.index',
+                    $case['params']
+                ));
+
+            $dashboard
+                ->assertOk()
+                ->assertInertia(
+                    fn (Assert $page) =>
+                        $page->where(
+                            'summary.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value
+                                    - $case['expected']
+                                ) < 0.000001
+                        )
+                );
+
+            $content =
+                $dashboard->getContent();
+
+            $this->assertStringContainsString(
+                $case['own'],
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                $case['foreign'],
+                $content
+            );
+
+            $this->assertStringNotContainsString(
+                $case['foreignMoney'],
+                $content
+            );
+
+            $export = $this
+                ->actingAs($owner)
+                ->get(route(
+                    'v2.analytics.export',
+                    $case['params']
+                ));
+
+            $export->assertOk();
+
+            ob_start();
+            $export->baseResponse->sendContent();
+            $csv = (string) ob_get_clean();
+
+            $this->assertStringContainsString(
+                $case['own'],
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                $case['foreign'],
+                $csv
+            );
+
+            $this->assertStringNotContainsString(
+                $case['foreignMoney'],
+                $csv
+            );
+        }
+    }
+
+
 }
