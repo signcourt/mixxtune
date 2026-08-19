@@ -9,6 +9,7 @@ use App\Services\V2\FinancialAnalyticsService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReportAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -339,4 +340,217 @@ class SuperAdminAnalyticsVisibilityTest extends TestCase
             $ids->contains($statementB)
         );
     }
+
+    public function test_super_admin_http_dashboard_sees_all_analytics(): void
+    {
+        $super = $this->user('super_admin');
+
+        $labelOwnerA = $this->user('label');
+        $labelOwnerB = $this->user('label');
+
+        $artistOwnerA = $this->user('artist');
+        $artistOwnerB = $this->user('artist');
+
+        $labelA = $this->label(
+            $labelOwnerA,
+            'HTTP Super Label A'
+        );
+
+        $labelB = $this->label(
+            $labelOwnerB,
+            'HTTP Super Label B'
+        );
+
+        $artistA = $this->artist(
+            $artistOwnerA,
+            $labelA,
+            'HTTP Super Artist A'
+        );
+
+        $artistB = $this->artist(
+            $artistOwnerB,
+            $labelB,
+            'HTTP Super Artist B'
+        );
+
+        $importId = $this->reportImport();
+
+        $this->reportRow(
+            $importId,
+            $labelA,
+            $artistA,
+            125
+        );
+
+        $this->reportRow(
+            $importId,
+            $labelB,
+            $artistB,
+            875
+        );
+
+        $response = $this
+            ->actingAs($super)
+            ->get(
+                route(
+                    'v2.analytics.index',
+                    ['month' => '2026-06']
+                )
+            );
+
+        $response
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component(
+                            'V2/Analytics/Index'
+                        )
+                        ->where(
+                            'role',
+                            'super_admin'
+                        )
+                        ->where(
+                            'summary.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value - 1000.0
+                                ) < 0.000001
+                        )
+            );
+
+        $content = $response->getContent();
+
+        $this->assertStringContainsString(
+            $labelA->name,
+            $content
+        );
+
+        $this->assertStringContainsString(
+            $labelB->name,
+            $content
+        );
+
+        $this->assertStringContainsString(
+            $artistA->stage_name,
+            $content
+        );
+
+        $this->assertStringContainsString(
+            $artistB->stage_name,
+            $content
+        );
+    }
+
+    public function test_super_admin_http_export_sees_all_analytics(): void
+    {
+        $super = $this->user('super_admin');
+
+        $labelOwnerA = $this->user('label');
+        $labelOwnerB = $this->user('label');
+
+        $artistOwnerA = $this->user('artist');
+        $artistOwnerB = $this->user('artist');
+
+        $labelA = $this->label(
+            $labelOwnerA,
+            'Export Super Label A'
+        );
+
+        $labelB = $this->label(
+            $labelOwnerB,
+            'Export Super Label B'
+        );
+
+        $artistA = $this->artist(
+            $artistOwnerA,
+            $labelA,
+            'Export Super Artist A'
+        );
+
+        $artistB = $this->artist(
+            $artistOwnerB,
+            $labelB,
+            'Export Super Artist B'
+        );
+
+        $importId = $this->reportImport();
+
+        $this->reportRow(
+            $importId,
+            $labelA,
+            $artistA,
+            150
+        );
+
+        $this->reportRow(
+            $importId,
+            $labelB,
+            $artistB,
+            850
+        );
+
+        $response = $this
+            ->actingAs($super)
+            ->get(
+                route(
+                    'v2.analytics.export',
+                    ['month' => '2026-06']
+                )
+            );
+
+        $response->assertOk();
+
+        $this->assertStringContainsString(
+            'text/csv',
+            (string) $response
+                ->headers
+                ->get('Content-Type')
+        );
+
+        ob_start();
+
+        $response
+            ->baseResponse
+            ->sendContent();
+
+        $csv = (string) ob_get_clean();
+
+        $this->assertStringContainsString(
+            $labelA->name,
+            $csv
+        );
+
+        $this->assertStringContainsString(
+            $labelB->name,
+            $csv
+        );
+
+        $this->assertStringContainsString(
+            $artistA->stage_name,
+            $csv
+        );
+
+        $this->assertStringContainsString(
+            $artistB->stage_name,
+            $csv
+        );
+
+        /*
+         * Super Admin export must retain source
+         * economics at 100%, not apply label/artist
+         * account revenue-share reductions.
+         */
+        $this->assertStringContainsString(
+            '150',
+            $csv
+        );
+
+        $this->assertStringContainsString(
+            '850',
+            $csv
+        );
+    }
+
+
 }
