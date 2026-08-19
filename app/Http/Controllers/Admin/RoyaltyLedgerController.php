@@ -4,14 +4,17 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\Royalties\WalletPostingService;
+use App\Services\V2\AdminFinancialAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class RoyaltyLedgerController extends Controller
 {
-    public function index(Request $request)
-    {
+    public function index(
+        Request $request,
+        AdminFinancialAccessService $financialAccess
+    ) {
         $filters = [
             'reporting_month' => trim(
                 (string) $request->input('reporting_month', '')
@@ -54,6 +57,13 @@ class RoyaltyLedgerController extends Controller
                 'royalty_ledgers.created_at',
                 'labels.name as label_name',
             ]);
+
+        $financialAccess->applyFinancialOwnerScope(
+            $query,
+            $request->user(),
+            'royalty_ledgers.label_id',
+            'royalty_ledgers.artist_id'
+        );
 
         if ($filters['reporting_month'] !== '') {
             $query->whereDate(
@@ -154,6 +164,15 @@ class RoyaltyLedgerController extends Controller
                 'labels' => DB::table('labels')
                     ->select('id', 'name')
                     ->where('status', 'active')
+                    ->when(
+                        $request->user()?->role !== 'super_admin',
+                        fn ($builder) => $builder->whereIn(
+                            'id',
+                            $financialAccess->labelIds(
+                                $request->user()
+                            )
+                        )
+                    )
                     ->orderBy('name')
                     ->get(),
 
@@ -170,8 +189,11 @@ class RoyaltyLedgerController extends Controller
         ]);
     }
 
-    public function show(int $id)
-    {
+    public function show(
+        Request $request,
+        int $id,
+        AdminFinancialAccessService $financialAccess
+    ) {
         $ledger = DB::table('royalty_ledgers')
             ->leftJoin(
                 'labels',
@@ -188,6 +210,8 @@ class RoyaltyLedgerController extends Controller
             ->where('royalty_ledgers.id', $id)
             ->select([
                 'royalty_ledgers.id',
+                'royalty_ledgers.label_id',
+                'royalty_ledgers.artist_id',
                 'royalty_ledgers.public_id',
                 'royalty_ledgers.ledger_number',
                 'royalty_ledgers.reporting_month',
@@ -209,6 +233,15 @@ class RoyaltyLedgerController extends Controller
             ->first();
 
         abort_if(!$ledger, 404);
+
+        abort_unless(
+            $financialAccess->canAccessFinancialOwner(
+                $request->user(),
+                $ledger->label_id ?? null,
+                $ledger->artist_id ?? null
+            ),
+            403
+        );
 
         $trackRows = DB::table('revenue_rows')
             ->leftJoin(
@@ -314,13 +347,30 @@ class RoyaltyLedgerController extends Controller
     }
 
 
-    public function approve(Request $request, int $id)
-    {
+    public function approve(
+        Request $request,
+        int $id,
+        AdminFinancialAccessService $financialAccess
+    ) {
         $ledger = DB::table('royalty_ledgers')
             ->where('id', $id)
             ->first();
 
         abort_if(!$ledger, 404);
+
+        abort_unless(
+            $financialAccess->canAccessFinancialOwner(
+                $request->user(),
+                $ledger->label_id
+                    ? (int) $ledger->label_id
+                    : null,
+                $ledger->artist_id
+                    ? (int) $ledger->artist_id
+                    : null
+            ),
+            403,
+            'Royalty ledger outside assigned scope.'
+        );
 
         if (!in_array($ledger->status, ['draft', 'posted'], true)) {
             return back()->withErrors([
@@ -339,13 +389,30 @@ class RoyaltyLedgerController extends Controller
         return back()->with('success', 'Royalty ledger approved.');
     }
 
-    public function cancel(Request $request, int $id)
-    {
+    public function cancel(
+        Request $request,
+        int $id,
+        AdminFinancialAccessService $financialAccess
+    ) {
         $ledger = DB::table('royalty_ledgers')
             ->where('id', $id)
             ->first();
 
         abort_if(!$ledger, 404);
+
+        abort_unless(
+            $financialAccess->canAccessFinancialOwner(
+                $request->user(),
+                $ledger->label_id
+                    ? (int) $ledger->label_id
+                    : null,
+                $ledger->artist_id
+                    ? (int) $ledger->artist_id
+                    : null
+            ),
+            403,
+            'Royalty ledger outside assigned scope.'
+        );
 
         if (in_array($ledger->status, ['wallet_credited', 'paid'], true)) {
             return back()->withErrors([
@@ -367,8 +434,29 @@ class RoyaltyLedgerController extends Controller
     public function creditWallet(
         Request $request,
         int $id,
-        WalletPostingService $service
+        WalletPostingService $service,
+        AdminFinancialAccessService $financialAccess
     ) {
+        $ledger = DB::table('royalty_ledgers')
+            ->where('id', $id)
+            ->first();
+
+        abort_if(!$ledger, 404);
+
+        abort_unless(
+            $financialAccess->canAccessFinancialOwner(
+                $request->user(),
+                $ledger->label_id
+                    ? (int) $ledger->label_id
+                    : null,
+                $ledger->artist_id
+                    ? (int) $ledger->artist_id
+                    : null
+            ),
+            403,
+            'Royalty ledger outside assigned scope.'
+        );
+
         try {
             $result = $service->creditLedger(
                 $id,
