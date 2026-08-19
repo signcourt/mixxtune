@@ -734,4 +734,165 @@ class LabelAnalyticsIsolationTest extends TestCase
     }
 
 
+
+    public function test_label_search_filter_cannot_escape_scope(): void
+    {
+        $owner = $this->labelUser();
+        $foreignOwner = $this->labelUser();
+
+        $ownLabel = $this->label(
+            $owner,
+            'K39 Label Own'
+        );
+
+        $foreignLabel = $this->label(
+            $foreignOwner,
+            'K39 Label Foreign'
+        );
+
+        $ownArtist = $this->artist(
+            $ownLabel,
+            'K39 Label Own Artist'
+        );
+
+        $foreignArtist = $this->artist(
+            $foreignLabel,
+            'K39 Label Foreign Artist'
+        );
+
+        $importId = $this->reportImport();
+
+        $this->reportRow(
+            $importId,
+            $ownLabel,
+            $ownArtist,
+            888
+        );
+
+        $this->reportRow(
+            $importId,
+            $foreignLabel,
+            $foreignArtist,
+            987646
+        );
+
+        /*
+         * reportRow() uses the same searchable
+         * track title for both rows. Therefore
+         * search matches both before authorization
+         * scope is applied.
+         */
+        $params = [
+            'month' => '2026-06',
+            'search' => 'Analytics Test',
+        ];
+
+        $dashboard = $this
+            ->actingAs($owner)
+            ->get(
+                route(
+                    'v2.analytics.index',
+                    $params
+                )
+            );
+
+        $dashboard
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component(
+                            'V2/Analytics/Index'
+                        )
+                        ->where(
+                            'role',
+                            'label'
+                        )
+                        ->where(
+                            'summary.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value
+                                    - 888.0
+                                ) < 0.000001
+                        )
+                        ->has(
+                            'topTracks',
+                            1
+                        )
+            );
+
+        $content = $dashboard->getContent();
+
+        $this->assertStringContainsString(
+            $ownLabel->name,
+            $content
+        );
+
+        $this->assertStringContainsString(
+            $ownArtist->stage_name,
+            $content
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignLabel->name,
+            $content
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignArtist->stage_name,
+            $content
+        );
+
+        $this->assertStringNotContainsString(
+            '987646',
+            $content
+        );
+
+        $export = $this
+            ->actingAs($owner)
+            ->get(
+                route(
+                    'v2.analytics.export',
+                    $params
+                )
+            );
+
+        $export->assertOk();
+
+        ob_start();
+
+        $export
+            ->baseResponse
+            ->sendContent();
+
+        $csv = (string) ob_get_clean();
+
+        $this->assertStringContainsString(
+            $ownLabel->name,
+            $csv
+        );
+
+        $this->assertStringContainsString(
+            $ownArtist->stage_name,
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignLabel->name,
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignArtist->stage_name,
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            '987646',
+            $csv
+        );
+    }
+
+
 }

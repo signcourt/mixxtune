@@ -808,4 +808,145 @@ class ArtistAnalyticsIsolationTest extends TestCase
     }
 
 
+
+    public function test_artist_search_filter_cannot_escape_scope(): void
+    {
+        $creator = User::factory()->create([
+            'role' => 'super_admin',
+        ]);
+
+        $owner = $this->artistUser();
+        $foreignOwner = $this->artistUser();
+
+        $label = $this->label(
+            $creator,
+            'K39 Artist Label'
+        );
+
+        $ownArtist = $this->artist(
+            $owner,
+            $label,
+            'K39 Artist Own'
+        );
+
+        $foreignArtist = $this->artist(
+            $foreignOwner,
+            $label,
+            'K39 Artist Foreign'
+        );
+
+        $importId = $this->reportImport();
+
+        $this->reportRow(
+            $importId,
+            $label,
+            $ownArtist,
+            999
+        );
+
+        $this->reportRow(
+            $importId,
+            $label,
+            $foreignArtist,
+            987645
+        );
+
+        /*
+         * Both report rows use the same searchable
+         * test title. Artist authorization must
+         * remain the outer visibility boundary.
+         */
+        $params = [
+            'month' => '2026-06',
+            'search' => 'Artist Analytics Test',
+        ];
+
+        $dashboard = $this
+            ->actingAs($owner)
+            ->get(
+                route(
+                    'v2.analytics.index',
+                    $params
+                )
+            );
+
+        $dashboard
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component(
+                            'V2/Analytics/Index'
+                        )
+                        ->where(
+                            'role',
+                            'artist'
+                        )
+                        ->where(
+                            'summary.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value
+                                    - 999.0
+                                ) < 0.000001
+                        )
+                        ->has(
+                            'topTracks',
+                            1
+                        )
+            );
+
+        $content = $dashboard->getContent();
+
+        $this->assertStringContainsString(
+            $ownArtist->stage_name,
+            $content
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignArtist->stage_name,
+            $content
+        );
+
+        $this->assertStringNotContainsString(
+            '987645',
+            $content
+        );
+
+        $export = $this
+            ->actingAs($owner)
+            ->get(
+                route(
+                    'v2.analytics.export',
+                    $params
+                )
+            );
+
+        $export->assertOk();
+
+        ob_start();
+
+        $export
+            ->baseResponse
+            ->sendContent();
+
+        $csv = (string) ob_get_clean();
+
+        $this->assertStringContainsString(
+            $ownArtist->stage_name,
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignArtist->stage_name,
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            '987645',
+            $csv
+        );
+    }
+
+
 }
