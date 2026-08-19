@@ -9,6 +9,7 @@ export default function Index({
     role = 'admin',
     labels = {},
     search = '',
+    admins = [],
 }) {
     return (
         <PanelLayout
