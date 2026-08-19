@@ -2,6 +2,7 @@
 
 namespace App\Services\V2;
 
+use Illuminate\Support\Collection;
 use App\Services\V2\LabelAccess\LabelTeamAccessService;
 
 use App\Models\Reports\ReportRow;
@@ -239,6 +240,13 @@ class ReportAnalyticsService
             $query->where(
                 'country_code',
                 $filters['country']
+            );
+        }
+
+        if (!empty($filters['cms'])) {
+            $query->where(
+                'cms',
+                $filters['cms']
             );
         }
 
@@ -940,6 +948,44 @@ class ReportAnalyticsService
                 'earnings' => (float) $row->earnings,
             ])
             ->all();
+    }
+
+    public function cmsSummary(
+        Builder $query,
+        int $limit = 20
+    ): Collection {
+        return $query
+            ->select('cms')
+            ->selectRaw(
+                'SUM(streams) as streams'
+            )
+            ->selectRaw(
+                'SUM(sale_units) as sale_units'
+            )
+            ->selectRaw(
+                'SUM(earnings) as earnings'
+            )
+            ->whereNotNull('cms')
+            ->where('cms', '!=', '')
+            ->groupBy('cms')
+            ->orderByDesc('earnings')
+            ->limit($limit)
+            ->get()
+            ->map(
+                fn ($row) => [
+                    'name' =>
+                        (string) $row->cms,
+
+                    'streams' =>
+                        (int) $row->streams,
+
+                    'sale_units' =>
+                        (int) $row->sale_units,
+
+                    'earnings' =>
+                        (float) $row->earnings,
+                ]
+            );
     }
 
     public function saleTypeSummary(

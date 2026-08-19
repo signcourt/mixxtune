@@ -1103,6 +1103,7 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
                 'currency' => 'INR',
                 'country_code' => 'K4',
                 'sale_type' => 'Stream',
+                'cms' => 'K55 Admin CMS',
                 'sale_date' => '2026-06-15',
                 'sale_month' => '2026-06',
                 'streams' => $earnings,
@@ -1125,6 +1126,9 @@ class AdminAnalyticsHttpIsolationTest extends TestCase
             ],
             [
                 'isrc' => 'K42SHAREDISRC',
+            ],
+            [
+                'cms' => 'K55 Admin CMS',
             ],
         ];
 

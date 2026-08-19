@@ -135,6 +135,9 @@ class SuperAdminAnalyticsVisibilityTest extends TestCase
                 'sale_type' =>
                     'Stream',
 
+                'cms' =>
+                    'K55 Super CMS',
+
                 'sale_date' =>
                     '2026-06-15',
 
@@ -415,6 +418,26 @@ class SuperAdminAnalyticsVisibilityTest extends TestCase
                             fn ($value) =>
                                 abs(
                                     (float) $value - 1000.0
+                                ) < 0.000001
+                        )
+                        ->where(
+                            'filterOptions.cms',
+                            fn ($value) =>
+                                collect($value)
+                                    ->contains(
+                                        'K55 Super CMS'
+                                    )
+                        )
+                        ->where(
+                            'cmsSummary.0.name',
+                            'K55 Super CMS'
+                        )
+                        ->where(
+                            'cmsSummary.0.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value
+                                    - 1000.0
                                 ) < 0.000001
                         )
             );

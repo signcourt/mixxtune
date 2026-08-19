@@ -970,6 +970,7 @@ class LabelAnalyticsIsolationTest extends TestCase
                 'currency' => 'INR',
                 'country_code' => 'L4',
                 'sale_type' => 'Stream',
+                'cms' => 'K55 Label CMS',
                 'sale_date' => '2026-06-15',
                 'sale_month' => '2026-06',
                 'streams' => $earnings,
@@ -993,6 +994,9 @@ class LabelAnalyticsIsolationTest extends TestCase
             ],
             [
                 'isrc' => 'K42LABELISRC',
+            ],
+            [
+                'cms' => 'K55 Label CMS',
             ],
         ];
 

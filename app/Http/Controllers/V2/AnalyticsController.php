@@ -46,6 +46,10 @@ class AnalyticsController extends Controller
                 (string) $request->input('country', '')
             ),
 
+            'cms' => trim(
+                (string) $request->input('cms', '')
+            ),
+
             'master_label_id' =>
                 $request->filled(
                     'master_label_id'
@@ -513,6 +517,14 @@ class AnalyticsController extends Controller
             ->pluck('country_code')
             ->values();
 
+        $cmsOptions = (clone $base)
+            ->whereNotNull('cms')
+            ->where('cms', '!=', '')
+            ->distinct()
+            ->orderBy('cms')
+            ->pluck('cms')
+            ->values();
+
         $filtered = $analytics->applyFilters(
             clone $base,
             $filters
@@ -823,6 +835,7 @@ class AnalyticsController extends Controller
                     'saleMonths' => $saleMonths,
                     'platforms' => $platforms,
                     'countries' => $countries,
+                    'cms' => $cmsOptions,
                 ],
 
                 'summary' => $analytics->summary(
@@ -873,6 +886,11 @@ class AnalyticsController extends Controller
 
                 'currencySummary' =>
                     $analytics->currencySummary(
+                        clone $filtered
+                    ),
+
+                'cmsSummary' =>
+                    $analytics->cmsSummary(
                         clone $filtered
                     ),
 

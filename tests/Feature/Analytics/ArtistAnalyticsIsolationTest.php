@@ -1022,6 +1022,7 @@ class ArtistAnalyticsIsolationTest extends TestCase
                 'currency' => 'INR',
                 'country_code' => 'A4',
                 'sale_type' => 'Stream',
+                'cms' => 'K55 Artist CMS',
                 'sale_date' => '2026-06-15',
                 'sale_month' => '2026-06',
                 'streams' => $earnings,
@@ -1045,6 +1046,9 @@ class ArtistAnalyticsIsolationTest extends TestCase
             ],
             [
                 'isrc' => 'K42ARTISTISRC',
+            ],
+            [
+                'cms' => 'K55 Artist CMS',
             ],
         ];
 
