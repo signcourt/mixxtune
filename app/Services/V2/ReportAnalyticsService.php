@@ -243,6 +243,13 @@ class ReportAnalyticsService
             );
         }
 
+        if (!empty($filters['currency'])) {
+            $query->where(
+                'currency',
+                $filters['currency']
+            );
+        }
+
         if (!empty($filters['country'])) {
             $query->where(
                 'country_code',

@@ -46,6 +46,10 @@ class AnalyticsController extends Controller
                 (string) $request->input('sale_type', '')
             ),
 
+            'currency' => trim(
+                (string) $request->input('currency', '')
+            ),
+
             'country' => trim(
                 (string) $request->input('country', '')
             ),
