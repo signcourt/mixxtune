@@ -72,6 +72,36 @@ class ReportAnalyticsService
                             'label_id',
                             $labelIds
                         );
+
+                        /*
+                         * Legacy financial-only rows may
+                         * have label_id = NULL while still
+                         * carrying authoritative mapped
+                         * ownership in revenue_owner_id.
+                         *
+                         * Include only authorized label
+                         * owners so this can never broaden
+                         * account visibility.
+                         */
+                        $builder->orWhere(
+                            function ($legacy) use (
+                                $labelIds
+                            ) {
+                                $legacy
+                                    ->where(
+                                        'mapping_status',
+                                        'mapped'
+                                    )
+                                    ->where(
+                                        'revenue_owner_type',
+                                        'label'
+                                    )
+                                    ->whereIn(
+                                        'revenue_owner_id',
+                                        $labelIds
+                                    );
+                            }
+                        );
                     }
 
                     if ($artistIds->isNotEmpty()) {
@@ -131,6 +161,31 @@ class ReportAnalyticsService
                                 $labelIds
                             );
                         }
+
+                        /*
+                         * Legacy mapped rows can be
+                         * financial-owner-only and have
+                         * no catalogue label_id.
+                         */
+                        $builder->orWhere(
+                            function ($legacy) use (
+                                $labelIds
+                            ) {
+                                $legacy
+                                    ->where(
+                                        'mapping_status',
+                                        'mapped'
+                                    )
+                                    ->where(
+                                        'revenue_owner_type',
+                                        'label'
+                                    )
+                                    ->whereIn(
+                                        'revenue_owner_id',
+                                        $labelIds
+                                    );
+                            }
+                        );
                     }
                 }
             );
@@ -221,9 +276,41 @@ class ReportAnalyticsService
                 true
             );
 
-            $query->whereIn(
-                'label_id',
-                $masterTreeIds
+            $query->where(
+                function ($builder) use (
+                    $masterTreeIds
+                ) {
+                    $builder->whereIn(
+                        'label_id',
+                        $masterTreeIds
+                    );
+
+                    /*
+                     * Legacy financial-only mapped rows
+                     * may not have catalogue label_id,
+                     * but still have authoritative label
+                     * ownership.
+                     */
+                    $builder->orWhere(
+                        function ($legacy) use (
+                            $masterTreeIds
+                        ) {
+                            $legacy
+                                ->where(
+                                    'mapping_status',
+                                    'mapped'
+                                )
+                                ->where(
+                                    'revenue_owner_type',
+                                    'label'
+                                )
+                                ->whereIn(
+                                    'revenue_owner_id',
+                                    $masterTreeIds
+                                );
+                        }
+                    );
+                }
             );
         }
 
@@ -238,9 +325,40 @@ class ReportAnalyticsService
                 true
             );
 
-            $query->whereIn(
-                'label_id',
-                $levelTreeIds
+            $query->where(
+                function ($builder) use (
+                    $levelTreeIds
+                ) {
+                    $builder->whereIn(
+                        'label_id',
+                        $levelTreeIds
+                    );
+
+                    /*
+                     * Legacy financial-only mapped rows
+                     * follow authoritative mapped owner
+                     * when catalogue placement is absent.
+                     */
+                    $builder->orWhere(
+                        function ($legacy) use (
+                            $levelTreeIds
+                        ) {
+                            $legacy
+                                ->where(
+                                    'mapping_status',
+                                    'mapped'
+                                )
+                                ->where(
+                                    'revenue_owner_type',
+                                    'label'
+                                )
+                                ->whereIn(
+                                    'revenue_owner_id',
+                                    $levelTreeIds
+                                );
+                        }
+                    );
+                }
             );
         }
 
