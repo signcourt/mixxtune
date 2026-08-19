@@ -9,6 +9,7 @@ use App\Services\V2\FinancialAnalyticsService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReportAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -319,4 +320,178 @@ class LabelAnalyticsIsolationTest extends TestCase
         $this->assertSame(0, $rawCount);
         $this->assertSame(0, $financialCount);
     }
+
+    public function test_label_http_dashboard_excludes_foreign_label(): void
+    {
+        $owner = $this->labelUser();
+        $foreignOwner = $this->labelUser();
+
+        $ownLabel = $this->label(
+            $owner,
+            'HTTP Own Label'
+        );
+
+        $foreignLabel = $this->label(
+            $foreignOwner,
+            'HTTP Foreign Label'
+        );
+
+        $ownArtist = $this->artist(
+            $ownLabel,
+            'HTTP Own Artist'
+        );
+
+        $foreignArtist = $this->artist(
+            $foreignLabel,
+            'HTTP Foreign Artist'
+        );
+
+        $importId = $this->reportImport();
+
+        $this->reportRow(
+            $importId,
+            $ownLabel,
+            $ownArtist,
+            125
+        );
+
+        $this->reportRow(
+            $importId,
+            $foreignLabel,
+            $foreignArtist,
+            875
+        );
+
+        $response = $this
+            ->actingAs($owner)
+            ->get(
+                route(
+                    'v2.analytics.index',
+                    ['month' => '2026-06']
+                )
+            );
+
+        $response
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component(
+                            'V2/Analytics/Index'
+                        )
+                        ->where(
+                            'role',
+                            'label'
+                        )
+                        ->where(
+                            'summary.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value - 125.0
+                                ) < 0.000001
+                        )
+            );
+
+        $content = $response->getContent();
+
+        $this->assertStringNotContainsString(
+            $foreignLabel->name,
+            $content
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignArtist->stage_name,
+            $content
+        );
+    }
+
+    public function test_label_http_export_excludes_foreign_label(): void
+    {
+        $owner = $this->labelUser();
+        $foreignOwner = $this->labelUser();
+
+        $ownLabel = $this->label(
+            $owner,
+            'Export Own Label'
+        );
+
+        $foreignLabel = $this->label(
+            $foreignOwner,
+            'Export Foreign Label'
+        );
+
+        $ownArtist = $this->artist(
+            $ownLabel,
+            'Export Own Artist'
+        );
+
+        $foreignArtist = $this->artist(
+            $foreignLabel,
+            'Export Foreign Artist'
+        );
+
+        $importId = $this->reportImport();
+
+        $this->reportRow(
+            $importId,
+            $ownLabel,
+            $ownArtist,
+            210
+        );
+
+        $this->reportRow(
+            $importId,
+            $foreignLabel,
+            $foreignArtist,
+            990
+        );
+
+        $response = $this
+            ->actingAs($owner)
+            ->get(
+                route(
+                    'v2.analytics.export',
+                    ['month' => '2026-06']
+                )
+            );
+
+        $response->assertOk();
+
+        $this->assertStringContainsString(
+            'text/csv',
+            (string) $response
+                ->headers
+                ->get('Content-Type')
+        );
+
+        ob_start();
+
+        $response
+            ->baseResponse
+            ->sendContent();
+
+        $csv = (string) ob_get_clean();
+
+        $this->assertStringContainsString(
+            $ownLabel->name,
+            $csv
+        );
+
+        $this->assertStringContainsString(
+            $ownArtist->stage_name,
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignLabel->name,
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignArtist->stage_name,
+            $csv
+        );
+    }
+
+
 }

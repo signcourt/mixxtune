@@ -9,6 +9,7 @@ use App\Services\V2\FinancialAnalyticsService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReportAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -406,4 +407,165 @@ class ArtistAnalyticsIsolationTest extends TestCase
             $financialCount
         );
     }
+
+    public function test_artist_http_dashboard_excludes_foreign_artist(): void
+    {
+        $creator = User::factory()->create([
+            'role' => 'super_admin',
+        ]);
+
+        $owner = $this->artistUser();
+        $foreignOwner = $this->artistUser();
+
+        $label = $this->label(
+            $creator,
+            'HTTP Artist Label'
+        );
+
+        $ownArtist = $this->artist(
+            $owner,
+            $label,
+            'HTTP Own Artist'
+        );
+
+        $foreignArtist = $this->artist(
+            $foreignOwner,
+            $label,
+            'HTTP Foreign Artist'
+        );
+
+        $importId = $this->reportImport();
+
+        $this->reportRow(
+            $importId,
+            $label,
+            $ownArtist,
+            135
+        );
+
+        $this->reportRow(
+            $importId,
+            $label,
+            $foreignArtist,
+            865
+        );
+
+        $response = $this
+            ->actingAs($owner)
+            ->get(
+                route(
+                    'v2.analytics.index',
+                    ['month' => '2026-06']
+                )
+            );
+
+        $response
+            ->assertOk()
+            ->assertInertia(
+                fn (Assert $page) =>
+                    $page
+                        ->component(
+                            'V2/Analytics/Index'
+                        )
+                        ->where(
+                            'role',
+                            'artist'
+                        )
+                        ->where(
+                            'summary.earnings',
+                            fn ($value) =>
+                                abs(
+                                    (float) $value - 135.0
+                                ) < 0.000001
+                        )
+            );
+
+        $content = $response->getContent();
+
+        $this->assertStringNotContainsString(
+            $foreignArtist->stage_name,
+            $content
+        );
+    }
+
+    public function test_artist_http_export_excludes_foreign_artist(): void
+    {
+        $creator = User::factory()->create([
+            'role' => 'super_admin',
+        ]);
+
+        $owner = $this->artistUser();
+        $foreignOwner = $this->artistUser();
+
+        $label = $this->label(
+            $creator,
+            'Export Artist Label'
+        );
+
+        $ownArtist = $this->artist(
+            $owner,
+            $label,
+            'Export Own Artist'
+        );
+
+        $foreignArtist = $this->artist(
+            $foreignOwner,
+            $label,
+            'Export Foreign Artist'
+        );
+
+        $importId = $this->reportImport();
+
+        $this->reportRow(
+            $importId,
+            $label,
+            $ownArtist,
+            230
+        );
+
+        $this->reportRow(
+            $importId,
+            $label,
+            $foreignArtist,
+            970
+        );
+
+        $response = $this
+            ->actingAs($owner)
+            ->get(
+                route(
+                    'v2.analytics.export',
+                    ['month' => '2026-06']
+                )
+            );
+
+        $response->assertOk();
+
+        $this->assertStringContainsString(
+            'text/csv',
+            (string) $response
+                ->headers
+                ->get('Content-Type')
+        );
+
+        ob_start();
+
+        $response
+            ->baseResponse
+            ->sendContent();
+
+        $csv = (string) ob_get_clean();
+
+        $this->assertStringContainsString(
+            $ownArtist->stage_name,
+            $csv
+        );
+
+        $this->assertStringNotContainsString(
+            $foreignArtist->stage_name,
+            $csv
+        );
+    }
+
+
 }
