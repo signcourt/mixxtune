@@ -9,6 +9,7 @@ export default function Index({
     role = 'admin',
     artists = {},
     search = '',
+    labelId = null,
 }) {
     return (
         <PanelLayout
@@ -44,6 +45,12 @@ export default function Index({
                                         event
                                             .currentTarget
                                             .value,
+                                    ...(labelId
+                                        ? {
+                                              label_id:
+                                                  labelId,
+                                          }
+                                        : {}),
                                 }
                             );
                         }
@@ -107,9 +114,15 @@ export default function Index({
                                         </Cell>
 
                                         <Cell>
-                                            {
-                                                artist.releases_count
-                                            }
+                                            <a
+                                                href={`/v2/releases?artist_id=${artist.id}`}
+                                                className="font-semibold text-violet-600 hover:text-violet-800 hover:underline"
+                                                title={`View releases for ${artist.stage_name ?? artist.name ?? 'artist'}`}
+                                            >
+                                                {
+                                                    artist.releases_count
+                                                }
+                                            </a>
                                         </Cell>
 
                                         <Cell>

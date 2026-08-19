@@ -302,6 +302,36 @@ class AssignmentManagementController extends Controller
             )
         );
 
+        $labelId = $request->integer('label_id');
+
+        if ($labelId > 0) {
+            if ($role === 'admin') {
+                $allowedLabel = DB::table(
+                    'admin_label_assignments'
+                )
+                    ->where(
+                        'user_id',
+                        $request->user()->id
+                    )
+                    ->where(
+                        'label_id',
+                        $labelId
+                    )
+                    ->exists();
+
+                abort_unless(
+                    $allowedLabel,
+                    403,
+                    'Label access denied.'
+                );
+            }
+
+            $query->where(
+                'label_id',
+                $labelId
+            );
+        }
+
         if ($search !== '') {
             $query->where(
                 function ($builder) use ($search) {
@@ -330,6 +360,9 @@ class AssignmentManagementController extends Controller
             [
                 'role' => $role,
                 'search' => $search,
+                'labelId' => $labelId > 0
+                    ? $labelId
+                    : null,
 
                 'artists' =>
                     $query

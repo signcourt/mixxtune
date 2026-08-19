@@ -52,6 +52,7 @@ export default function Index({
                                     'Artists',
                                     'Releases',
                                     'Assigned Admins',
+                                    'Action',
                                 ].map((heading) => (
                                     <th
                                         key={heading}
@@ -86,15 +87,27 @@ export default function Index({
                                         </Cell>
 
                                         <Cell>
-                                            {
-                                                label.artists_count
-                                            }
+                                            <a
+                                                href={`/v2/admin/artists?label_id=${label.id}`}
+                                                className="font-semibold text-violet-600 hover:text-violet-800 hover:underline"
+                                                title={`View artists for ${label.name}`}
+                                            >
+                                                {
+                                                    label.artists_count
+                                                }
+                                            </a>
                                         </Cell>
 
                                         <Cell>
-                                            {
-                                                label.releases_count
-                                            }
+                                            <a
+                                                href={`/v2/releases?label_id=${label.id}`}
+                                                className="font-semibold text-violet-600 hover:text-violet-800 hover:underline"
+                                                title={`View releases for ${label.name}`}
+                                            >
+                                                {
+                                                    label.releases_count
+                                                }
+                                            </a>
                                         </Cell>
 
                                         <Cell>
@@ -111,6 +124,22 @@ export default function Index({
                                                 .join(', ') ||
                                                 'Unassigned'}
                                         </Cell>
+                                        <Cell>
+                                            {role === 'super_admin' ? (
+                                                <a
+                                                    href={`/v2/admin/admins?label_id=${label.id}`}
+                                                    className="inline-flex rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
+                                                    title={`Manage admin assignment for ${label.name}`}
+                                                >
+                                                    Assign Admin
+                                                </a>
+                                            ) : (
+                                                <span className="text-xs text-slate-400">
+                                                    —
+                                                </span>
+                                            )}
+                                        </Cell>
+
                                     </tr>
                                 )
                             )}

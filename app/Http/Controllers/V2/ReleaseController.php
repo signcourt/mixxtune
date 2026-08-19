@@ -415,6 +415,46 @@ class ReleaseController extends Controller
         }
 
         /*
+         * Optional Admin/Super Admin Label drill-down.
+         *
+         * Existing role scope is applied first. This
+         * additional filter can only narrow that scope.
+         */
+        $labelFilterId =
+            $request->integer('label_id');
+
+        if (
+            $labelFilterId > 0
+            && in_array(
+                $role,
+                ['admin', 'super_admin'],
+                true
+            )
+        ) {
+            if ($role === 'admin') {
+                $assignedLabelIds =
+                    app(
+                        AdminAssignmentService::class
+                    )->labelIds(
+                        $request->user()
+                    );
+
+                abort_unless(
+                    $assignedLabelIds->contains(
+                        $labelFilterId
+                    ),
+                    403,
+                    'Label access denied.'
+                );
+            }
+
+            $query->where(
+                'label_id',
+                $labelFilterId
+            );
+        }
+
+        /*
          * Draft privacy:
          *
          * A draft is a private workspace belonging to its creator.
