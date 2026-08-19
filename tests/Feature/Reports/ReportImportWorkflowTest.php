@@ -193,6 +193,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             );
@@ -284,6 +286,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )
@@ -341,6 +345,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )
@@ -353,19 +359,26 @@ class ReportImportWorkflowTest extends TestCase
             $row->track_id
         );
 
-        $this->assertSame(
-            $release->id,
+        $this->assertNull(
             $row->release_id
         );
 
-        $this->assertSame(
-            $release->artist_id,
+        $this->assertNull(
             $row->artist_id
         );
 
-        $this->assertSame(
-            $release->label_id,
+        $this->assertNull(
             $row->label_id
+        );
+
+        $this->assertSame(
+            'unmapped',
+            $row->mapping_status
+        );
+
+        $this->assertSame(
+            $release->upc,
+            $row->upc
         );
     }
 
@@ -397,6 +410,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )
@@ -460,6 +475,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )
@@ -554,6 +571,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )
@@ -616,6 +635,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )
@@ -658,6 +679,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )
@@ -704,6 +727,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )
@@ -717,9 +742,25 @@ class ReportImportWorkflowTest extends TestCase
             $row->upc
         );
 
-        $this->assertSame(
-            $release->id,
+        $this->assertNull(
             $row->release_id
+        );
+
+        $this->assertNull(
+            $row->track_id
+        );
+
+        $this->assertNull(
+            $row->artist_id
+        );
+
+        $this->assertNull(
+            $row->label_id
+        );
+
+        $this->assertSame(
+            'unmapped',
+            $row->mapping_status
         );
     }
 
@@ -758,6 +799,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )
@@ -808,6 +851,8 @@ class ReportImportWorkflowTest extends TestCase
             ->postJson(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             );
@@ -874,6 +919,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             );
@@ -900,6 +947,8 @@ class ReportImportWorkflowTest extends TestCase
         $response = $this->post(
             $this->importUrl(),
             [
+                'reporting_month' => '2026-07',
+
                 'report_file' => $file,
             ]
         );
@@ -948,6 +997,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )
@@ -1008,6 +1059,8 @@ class ReportImportWorkflowTest extends TestCase
             ->post(
                 $this->importUrl(),
                 [
+                'reporting_month' => '2026-07',
+
                     'report_file' => $file,
                 ]
             )

@@ -569,6 +569,22 @@ class OwnershipRoyaltyService
                          * Child/master cross-owner allocations continue
                          * through shareForStatement().
                          */
+                        $canonicalOwnerHasHierarchyShare =
+                            $row->artist_id === null
+                            && $row->label_id === null
+                            && $this->activeShareForBeneficiary(
+                                (string)
+                                    $row->revenue_owner_type,
+                                (int)
+                                    $row->revenue_owner_id,
+                                Carbon::createFromFormat(
+                                    '!Y-m',
+                                    $month
+                                )
+                                    ->endOfMonth()
+                                    ->toDateString()
+                            ) !== null;
+
                         if (
                             (string) $row->revenue_owner_type
                                 === $statementOwnerType
@@ -576,6 +592,7 @@ class OwnershipRoyaltyService
                                 === $statementOwnerId
                             && $row->artist_id === null
                             && $row->label_id === null
+                            && !$canonicalOwnerHasHierarchyShare
                         ) {
                             $sharePercent = 100.0;
                         } else {

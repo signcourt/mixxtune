@@ -148,7 +148,8 @@ class RoyaltyStatementWorkflowTest extends TestCase
         app(ReportImportService::class)
             ->import(
                 $file,
-                $admin
+                $admin,
+                $month
             );
 
         /*
@@ -1294,6 +1295,9 @@ class RoyaltyStatementWorkflowTest extends TestCase
 
                     'sale_date' =>
                         '2026-08-15',
+
+                    'reporting_month' =>
+                        $month,
 
                     'sale_month' =>
                         $month,

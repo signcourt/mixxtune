@@ -439,11 +439,7 @@ class ReportImportService
             ? Track::query()
                 ->whereNull('deleted_at')
                 ->whereRaw(
-                    "REGEXP_REPLACE(
-                        UPPER(TRIM(isrc)),
-                        '[^A-Z0-9]',
-                        ''
-                    ) = ?",
+                    "{$this->normalizedIsrcSql()} = ?",
                     [$normalizedIsrc]
                 )
                 ->limit(2)
@@ -931,6 +927,42 @@ class ReportImportService
                 $row['earnings'] ?? '',
             ])
         );
+    }
+
+    private function normalizedIsrcSql(): string
+    {
+        /*
+         * MySQL supports REGEXP_REPLACE directly.
+         *
+         * SQLite is used by the isolated test suite and
+         * does not provide REGEXP_REPLACE by default.
+         *
+         * Standard ISRC formatting may contain separators,
+         * so remove common separators while preserving the
+         * same uppercase/alphanumeric comparison semantics.
+         */
+        if (
+            DB::connection()
+                ->getDriverName()
+            === 'sqlite'
+        ) {
+            return "REPLACE("
+                ."REPLACE("
+                ."REPLACE("
+                ."REPLACE("
+                ."REPLACE("
+                ."UPPER(TRIM(isrc)), "
+                ."'-', ''), "
+                ."' ', ''), "
+                ."'_', ''), "
+                ."'.', ''), "
+                ."'/', '')";
+        }
+
+        return "REGEXP_REPLACE("
+            ."UPPER(TRIM(isrc)), "
+            ."'[^A-Z0-9]', "
+            ."'')";
     }
 
     private function normaliseHeader(

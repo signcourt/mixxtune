@@ -52,6 +52,7 @@ class NegativeRevenueFullChargeTest extends TestCase
         foreach ([100.00, -10.00] as $index => $earning) {
             DB::table('report_rows')->insert([
                 'report_import_id' => $importId,
+                'reporting_month' => $month,
                 'row_hash' => hash(
                     'sha256',
                     'negative-rule-'.$index.'-'.$earning

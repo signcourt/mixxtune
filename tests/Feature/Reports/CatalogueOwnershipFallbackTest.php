@@ -96,7 +96,7 @@ class CatalogueOwnershipFallbackTest extends TestCase
         ]);
     }
 
-    public function test_unique_title_and_artist_can_map_without_identifiers(): void
+    public function test_unique_title_and_artist_without_isrc_remains_unmapped(): void
     {
         [
             $label,
@@ -118,42 +118,36 @@ class CatalogueOwnershipFallbackTest extends TestCase
             ->where('id', $rowId)
             ->first();
 
-        $this->assertSame(1, $result['mapped']);
-        $this->assertSame(0, $result['unmapped']);
+        $this->assertSame(0, $result['mapped']);
+        $this->assertSame(1, $result['unmapped']);
 
         $this->assertSame(
-            'mapped',
+            'unmapped',
             $row->mapping_status
         );
 
-        $this->assertSame(
-            $track->id,
-            (int) $row->track_id
+        $this->assertNull(
+            $row->track_id
         );
 
-        $this->assertSame(
-            $release->id,
-            (int) $row->release_id
+        $this->assertNull(
+            $row->release_id
         );
 
-        $this->assertSame(
-            $artist->id,
-            (int) $row->artist_id
+        $this->assertNull(
+            $row->artist_id
         );
 
-        $this->assertSame(
-            $label->id,
-            (int) $row->label_id
+        $this->assertNull(
+            $row->label_id
         );
 
-        $this->assertSame(
-            'label',
+        $this->assertNull(
             $row->revenue_owner_type
         );
 
-        $this->assertSame(
-            $label->id,
-            (int) $row->revenue_owner_id
+        $this->assertNull(
+            $row->revenue_owner_id
         );
     }
 

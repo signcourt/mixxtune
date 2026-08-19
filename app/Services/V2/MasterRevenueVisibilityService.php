@@ -127,14 +127,18 @@ class MasterRevenueVisibilityService
         }
 
         /*
-         * Artists anywhere inside the master's
-         * recursive catalogue tree are visible
-         * to the master.
+         * Only artists directly owned by the master
+         * are direct master beneficiaries.
+         *
+         * Artists attached to a child label belong
+         * to that child label's scope and must not
+         * appear as direct artist children of the
+         * master.
          */
         $directArtists = DB::table('artists')
-            ->whereIn(
+            ->where(
                 'label_id',
-                $treeIds
+                $label->id
             )
             ->whereNull('deleted_at')
             ->get([
