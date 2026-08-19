@@ -91,6 +91,9 @@ class SuperAdminProfitServiceTest extends TestCase
                     'sale_month' =>
                         '2026-08',
 
+                    'reporting_month' =>
+                        '2026-08',
+
                     'earnings' =>
                         $earning,
 

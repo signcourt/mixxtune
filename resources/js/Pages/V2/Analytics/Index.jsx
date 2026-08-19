@@ -433,11 +433,11 @@ export default function Index({
 
     return (
         <>
-            <Head title="Analytics" />
+            <Head title="Financial Analytics" />
 
             <PanelLayout
                 role={role}
-                title="Analytics"
+                title="Financial Analytics"
                 subtitle="Performance intelligence from imported royalty reports"
             >
                 <div className="space-y-6 p-5 lg:p-7">
@@ -447,7 +447,7 @@ export default function Index({
                         <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
                             <div>
                                 <h1 className="text-xl font-bold text-slate-950">
-                                    Performance Analytics
+                                    Financial Analytics
                                 </h1>
 
                                 <p className="mt-1 text-sm text-slate-500">
@@ -668,7 +668,7 @@ export default function Index({
                         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
                             <div>
                                 <div className="text-sm font-black text-slate-950">
-                                    Analytics Hierarchy Scope
+                                    Revenue Hierarchy Scope
                                 </div>
 
                                 <p className="mt-1 text-sm text-slate-500">
