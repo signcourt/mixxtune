@@ -237,9 +237,26 @@ export default function Index({
     saleTypes = [],
     currencySummary = [],
     revenueVisibility = {},
+    financialAnalytics = {},
 }) {
     const primaryCurrency =
         currencySummary?.[0]?.currency || 'INR';
+
+    const financialSummary =
+        financialAnalytics?.summary || {};
+
+    const financialMonthly =
+        financialAnalytics?.monthly || [];
+
+    const financialPlatforms =
+        financialAnalytics?.platforms || [];
+
+    const financialCountries =
+        financialAnalytics?.countries || [];
+
+    const financialCurrency =
+        financialSummary?.currency ||
+        primaryCurrency;
 
     const months =
         filterOptions?.months || [];
@@ -1019,7 +1036,276 @@ export default function Index({
                         </div>
                     )}
 
-                    {/* KPI CARDS */}
+                    {/* CANONICAL FINANCIAL ANALYTICS */}
+                    <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-white p-5 shadow-sm">
+                        <SectionHeader
+                            icon={BadgeIndianRupee}
+                            title="Financial Analytics"
+                            subtitle="Canonical payable analytics generated from royalty statements and allocations"
+                        />
+
+                        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            <Card
+                                title="Gross Revenue"
+                                value={moneyFormat(
+                                    financialSummary.gross_earnings,
+                                    financialCurrency
+                                )}
+                                subtitle="Gross earnings across scoped royalty statements"
+                                icon={BarChart3}
+                            />
+
+                            <Card
+                                title="Commission"
+                                value={moneyFormat(
+                                    financialSummary.commission_amount,
+                                    financialCurrency
+                                )}
+                                subtitle="Commission deducted from gross revenue"
+                                icon={Activity}
+                            />
+
+                            <Card
+                                title="Net Payable"
+                                value={moneyFormat(
+                                    financialSummary.net_payable,
+                                    financialCurrency
+                                )}
+                                subtitle="Final payable royalty amount"
+                                icon={BadgeIndianRupee}
+                            />
+
+                            <Card
+                                title="Statements"
+                                value={numberFormat(
+                                    financialSummary.statements_count
+                                )}
+                                subtitle="Royalty statements in selected period"
+                                icon={Layers3}
+                            />
+                        </div>
+
+                        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                <SectionHeader
+                                    icon={TrendingUp}
+                                    title="Monthly Financial Revenue"
+                                    subtitle="Gross, commission and net payable by statement month"
+                                />
+
+                                {financialMonthly.length ? (
+                                    <div className="mt-5 h-[320px]">
+                                        <ResponsiveContainer
+                                            width="100%"
+                                            height="100%"
+                                        >
+                                            <AreaChart
+                                                data={financialMonthly}
+                                            >
+                                                <CartesianGrid
+                                                    vertical={false}
+                                                    strokeDasharray="3 3"
+                                                />
+
+                                                <XAxis
+                                                    dataKey="month"
+                                                    tickFormatter={
+                                                        monthFormat
+                                                    }
+                                                />
+
+                                                <YAxis
+                                                    tickFormatter={
+                                                        numberFormat
+                                                    }
+                                                />
+
+                                                <Tooltip
+                                                    formatter={(
+                                                        value,
+                                                        name
+                                                    ) => [
+                                                        moneyFormat(
+                                                            value,
+                                                            financialCurrency
+                                                        ),
+                                                        String(
+                                                            name || ''
+                                                        )
+                                                            .replaceAll(
+                                                                '_',
+                                                                ' '
+                                                            )
+                                                            .replace(
+                                                                /\b\w/g,
+                                                                (c) =>
+                                                                    c.toUpperCase()
+                                                            ),
+                                                    ]}
+                                                    labelFormatter={
+                                                        monthFormat
+                                                    }
+                                                />
+
+                                                <Area
+                                                    type="monotone"
+                                                    dataKey="gross_earnings"
+                                                    stroke="#7c3aed"
+                                                    fill="#ede9fe"
+                                                    strokeWidth={2}
+                                                />
+
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="net_payable"
+                                                    stroke="#0f172a"
+                                                    strokeWidth={2}
+                                                    dot={false}
+                                                />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                ) : (
+                                    <EmptyState text="No financial statement data available for the selected period." />
+                                )}
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                <SectionHeader
+                                    icon={Store}
+                                    title="Financial Revenue by Store"
+                                    subtitle="Net payable allocation by DSP / platform"
+                                />
+
+                                {financialPlatforms.length ? (
+                                    <div className="mt-5 h-[320px]">
+                                        <ResponsiveContainer
+                                            width="100%"
+                                            height="100%"
+                                        >
+                                            <BarChart
+                                                data={financialPlatforms.slice(
+                                                    0,
+                                                    10
+                                                )}
+                                                layout="vertical"
+                                            >
+                                                <CartesianGrid
+                                                    horizontal={false}
+                                                    strokeDasharray="3 3"
+                                                />
+
+                                                <XAxis
+                                                    type="number"
+                                                    tickFormatter={
+                                                        numberFormat
+                                                    }
+                                                />
+
+                                                <YAxis
+                                                    type="category"
+                                                    dataKey="platform"
+                                                    width={110}
+                                                />
+
+                                                <Tooltip
+                                                    formatter={(
+                                                        value
+                                                    ) =>
+                                                        moneyFormat(
+                                                            value,
+                                                            financialCurrency
+                                                        )
+                                                    }
+                                                />
+
+                                                <Bar
+                                                    dataKey="net_payable"
+                                                    fill="#7c3aed"
+                                                    radius={[
+                                                        0,
+                                                        6,
+                                                        6,
+                                                        0,
+                                                    ]}
+                                                />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                ) : (
+                                    <EmptyState text="No financial platform allocation data available." />
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
+                            <SectionHeader
+                                icon={Globe2}
+                                title="Financial Revenue by Country"
+                                subtitle="Net payable royalty allocation by territory"
+                            />
+
+                            {financialCountries.length ? (
+                                <div className="mt-5 overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <tr>
+                                                <th className="px-4 py-3">
+                                                    Country
+                                                </th>
+
+                                                <th className="px-4 py-3 text-right">
+                                                    Gross
+                                                </th>
+
+                                                <th className="px-4 py-3 text-right">
+                                                    Net Payable
+                                                </th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody className="divide-y divide-slate-100">
+                                            {financialCountries
+                                                .slice(0, 15)
+                                                .map(
+                                                    (
+                                                        row,
+                                                        index
+                                                    ) => (
+                                                        <tr
+                                                            key={`${row.country}-${index}`}
+                                                        >
+                                                            <td className="px-4 py-3 font-semibold text-slate-900">
+                                                                {row.country ||
+                                                                    'Unknown'}
+                                                            </td>
+
+                                                            <td className="px-4 py-3 text-right text-slate-700">
+                                                                {moneyFormat(
+                                                                    row.gross_earnings,
+                                                                    financialCurrency
+                                                                )}
+                                                            </td>
+
+                                                            <td className="px-4 py-3 text-right font-bold text-violet-700">
+                                                                {moneyFormat(
+                                                                    row.net_payable,
+                                                                    financialCurrency
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <EmptyState text="No financial country allocation data available." />
+                            )}
+                        </div>
+                    </div>
+
+                    {/* RAW REPORT KPI CARDS */}
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <Card
                             title="Revenue"

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReportAnalyticsService;
 use App\Services\V2\MasterRevenueVisibilityService;
+use App\Services\V2\FinancialAnalyticsService;
 use App\Models\Core\Label;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -430,7 +431,8 @@ class AnalyticsController extends Controller
         Request $request,
         PermissionService $permissions,
         ReportAnalyticsService $analytics,
-        MasterRevenueVisibilityService $revenueVisibility
+        MasterRevenueVisibilityService $revenueVisibility,
+        FinancialAnalyticsService $financialAnalytics
     ): Response {
         $user = $request->user();
 
@@ -755,12 +757,57 @@ class AnalyticsController extends Controller
             $growthMonth
         );
 
+        /*
+         * Canonical payable financial analytics.
+         *
+         * Raw DSP analytics above remains sourced from
+         * report_rows through ReportAnalyticsService.
+         * Payable financial values originate only from
+         * royalty statements and allocations.
+         */
+        $financialStatements =
+            $financialAnalytics->scopedStatements(
+                $user,
+                $permissions
+            );
+
+        $financialStatements =
+            $financialAnalytics->applyMonthFilters(
+                $financialStatements,
+                $filters
+            );
+
+        $financialData = [
+            'summary' =>
+                $financialAnalytics->summary(
+                    clone $financialStatements
+                ),
+
+            'monthly' =>
+                $financialAnalytics->monthly(
+                    clone $financialStatements
+                ),
+
+            'platforms' =>
+                $financialAnalytics->platformBreakdown(
+                    clone $financialStatements
+                ),
+
+            'countries' =>
+                $financialAnalytics->countryBreakdown(
+                    clone $financialStatements
+                ),
+        ];
+
         return Inertia::render(
             'V2/Analytics/Index',
             [
                 'role' => $role,
 
                 'filters' => $filters,
+
+                'financialAnalytics' =>
+                    $financialData,
 
                 'hierarchyOptions' =>
                     $hierarchyOptions,
