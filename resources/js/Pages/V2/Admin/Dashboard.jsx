@@ -53,7 +53,14 @@ export default function Dashboard({
 
     const cards = [
         {
-            title: 'Revenue',
+            /*
+             * stats.earnings comes directly from the
+             * authenticated ReportAnalyticsService scope.
+             *
+             * This is reporting/raw earnings, not wallet
+             * balance and not a separate payable ledger.
+             */
+            title: 'Reported Earnings',
             value: money(
                 stats.earnings,
                 'INR'

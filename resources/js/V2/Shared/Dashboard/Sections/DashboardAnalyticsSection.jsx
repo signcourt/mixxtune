@@ -33,7 +33,7 @@ export default function DashboardAnalyticsSection({
             ).toFixed(1)}% monthly growth`,
         },
         {
-            title: 'Total Earnings',
+            title: 'Reported Earnings',
             value: money(
                 summary.total_earnings,
                 reportCurrency
