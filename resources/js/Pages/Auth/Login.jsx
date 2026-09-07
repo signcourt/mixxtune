@@ -1,15 +1,17 @@
 import Checkbox from '@/Components/Checkbox';
 import InputError from '@/Components/InputError';
 import GuestLayout from '@/Layouts/GuestLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
 export default function Login({
     status,
     canResetPassword,
 }) {
-    const [showPassword, setShowPassword] =
-        useState(false);
+    const { brand = {} } = usePage().props;
+    const brandName = brand?.name || "MIXX TUNE";
+
+    const [showPassword, setShowPassword] = useState(false);
 
     const {
         data,
@@ -33,11 +35,14 @@ export default function Login({
     };
 
     return (
-        <GuestLayout
-            title="Welcome back"
-            subtitle="Use your registered email and password. Your account role will automatically open the correct panel."
-        >
-            <Head title="Login — Mixx Tune" />
+        <GuestLayout>
+            <Head title={`Login — ${brandName}`} />
+
+            <div className="mb-7 text-center">
+                <h1 className="text-2xl font-bold tracking-tight text-slate-950">
+                    Login
+                </h1>
+            </div>
 
             {status && (
                 <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
@@ -45,14 +50,11 @@ export default function Login({
                 </div>
             )}
 
-            <form
-                onSubmit={submit}
-                className="space-y-5"
-            >
+            <form onSubmit={submit} className="space-y-5">
                 <div>
                     <label
                         htmlFor="login"
-                        className="mb-2 block text-sm font-semibold text-slate-700"
+                        className="mb-2 block text-sm font-medium text-slate-700"
                     >
                         Email or username
                     </label>
@@ -65,14 +67,11 @@ export default function Login({
                         autoComplete="username"
                         autoFocus
                         required
-                        placeholder="Email address or username"
+                        placeholder="Enter email or username"
                         onChange={(event) =>
-                            setData(
-                                'login',
-                                event.target.value
-                            )
+                            setData('login', event.target.value)
                         }
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                     />
 
                     <InputError
@@ -85,17 +84,15 @@ export default function Login({
                     <div className="mb-2 flex items-center justify-between">
                         <label
                             htmlFor="password"
-                            className="text-sm font-semibold text-slate-700"
+                            className="text-sm font-medium text-slate-700"
                         >
                             Password
                         </label>
 
                         {canResetPassword && (
                             <Link
-                                href={route(
-                                    'password.request'
-                                )}
-                                className="text-xs font-semibold text-blue-600 transition hover:text-blue-700"
+                                href={route('password.request')}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-700"
                             >
                                 Forgot password?
                             </Link>
@@ -105,37 +102,26 @@ export default function Login({
                     <div className="relative">
                         <input
                             id="password"
-                            type={
-                                showPassword
-                                    ? 'text'
-                                    : 'password'
-                            }
+                            type={showPassword ? 'text' : 'password'}
                             name="password"
                             value={data.password}
                             autoComplete="current-password"
                             required
-                            placeholder="Enter your password"
+                            placeholder="Enter password"
                             onChange={(event) =>
-                                setData(
-                                    'password',
-                                    event.target.value
-                                )
+                                setData('password', event.target.value)
                             }
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 pr-20 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 pr-16 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                         />
 
                         <button
                             type="button"
                             onClick={() =>
-                                setShowPassword(
-                                    (value) => !value
-                                )
+                                setShowPassword((value) => !value)
                             }
-                            className="absolute inset-y-0 right-0 px-4 text-xs font-bold text-slate-500 hover:text-blue-600"
+                            className="absolute inset-y-0 right-0 px-4 text-xs font-medium text-slate-500 hover:text-blue-600"
                         >
-                            {showPassword
-                                ? 'Hide'
-                                : 'Show'}
+                            {showPassword ? 'Hide' : 'Show'}
                         </button>
                     </div>
 
@@ -150,35 +136,23 @@ export default function Login({
                         name="remember"
                         checked={data.remember}
                         onChange={(event) =>
-                            setData(
-                                'remember',
-                                event.target.checked
-                            )
+                            setData('remember', event.target.checked)
                         }
                     />
 
                     <span className="text-sm text-slate-600">
-                        Keep me signed in
+                        Remember me
                     </span>
                 </label>
 
                 <button
                     type="submit"
                     disabled={processing}
-                    className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    {processing
-                        ? 'Signing in...'
-                        : 'Sign in to Mixx Tune'}
+                    {processing ? 'Signing in...' : 'Login'}
                 </button>
             </form>
-
-            <div className="mt-7 border-t border-slate-100 pt-5 text-center">
-                <p className="text-xs leading-5 text-slate-400">
-                    Artist, Label, Admin and Super Admin
-                    accounts use the same secure login.
-                </p>
-            </div>
         </GuestLayout>
     );
 }

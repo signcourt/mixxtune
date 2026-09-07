@@ -1,0 +1,29 @@
+<svg
+    width="620"
+    height="120"
+    viewBox="0 0 620 120"
+    xmlns="http://www.w3.org/2000/svg"
+>
+    <g fill="#4B46E5">
+        <rect x="8" y="42" width="5" height="36" rx="2.5"/>
+        <rect x="18" y="30" width="5" height="60" rx="2.5"/>
+        <rect x="28" y="20" width="5" height="80" rx="2.5"/>
+        <rect x="38" y="10" width="5" height="100" rx="2.5"/>
+        <rect x="48" y="4" width="5" height="112" rx="2.5"/>
+        <rect x="58" y="10" width="5" height="100" rx="2.5"/>
+        <rect x="68" y="20" width="5" height="80" rx="2.5"/>
+        <rect x="78" y="30" width="5" height="60" rx="2.5"/>
+        <rect x="88" y="42" width="5" height="36" rx="2.5"/>
+        <rect x="98" y="50" width="5" height="20" rx="2.5"/>
+
+        <text
+            x="122"
+            y="78"
+            font-family="Arial, Helvetica, sans-serif"
+            font-size="62"
+            font-weight="300"
+            letter-spacing="-2"
+            fill="#4B46E5"
+        >mixx tune</text>
+    </g>
+</svg>

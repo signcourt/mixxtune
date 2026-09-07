@@ -7,6 +7,14 @@ import { getPanelNavigation } from "@/V2/Shared/Config/panelNavigation";
 const normalizePath = (url = "") =>
     url.split("?")[0].replace(/\/+$/, "") || "/";
 
+const getQueryParams = (url = "") => {
+    const query = url.includes("?")
+        ? url.split("?").slice(1).join("?")
+        : "";
+
+    return new URLSearchParams(query);
+};
+
 const getStatusQuery = () => {
     if (typeof window === "undefined") {
         return "";
@@ -54,8 +62,8 @@ export default function Sidebar({
     role = "artist",
     permissions = [],
     notificationCount = 0,
-    brandName = "BACKSTAGE",
-    brandSubtitle = "MIXX TUNE",
+    brandName = "MIXX TUNE",
+    brandSubtitle = "BACKSTAGE",
     logoUrl = null,
     mobileOpen = false,
     onMobileClose = () => {},
@@ -95,8 +103,9 @@ export default function Sidebar({
     const [dropTarget, setDropTarget] = useState(null);
 
     const currentPath = normalizePath(url);
-
-    const currentStatus = getStatusQuery();
+    const currentQuery = getQueryParams(url);
+    const currentStatus =
+        currentQuery.get("status") ?? "";
 
     const navigation = useMemo(
         () =>
@@ -333,7 +342,12 @@ export default function Sidebar({
     useEffect(() => {
         const activeParent = orderedNavigation.find((item) =>
             item.children?.some((child) =>
-                isChildActive(child, currentPath, currentStatus),
+                isChildActive(
+                    child,
+                    currentPath,
+                    currentStatus,
+                    currentQuery,
+                ),
             ),
         );
 
@@ -343,7 +357,7 @@ export default function Sidebar({
                 [activeParent.id]: true,
             }));
         }
-    }, [currentPath, currentStatus, orderedNavigation]);
+    }, [currentPath, currentQuery, currentStatus, orderedNavigation]);
 
     const toggleSubmenu = (id) => {
         setOpenMenus((current) => {
@@ -462,6 +476,7 @@ export default function Sidebar({
                                         openMenus[item.id],
                                     )}
                                     currentPath={currentPath}
+                                    currentQuery={currentQuery}
                                     currentStatus={currentStatus}
                                     notificationCount={
                                         notificationCount
@@ -506,6 +521,7 @@ function SidebarItem({
     collapsed,
     open,
     currentPath,
+    currentQuery,
     currentStatus,
     notificationCount,
     onToggle,
@@ -515,9 +531,14 @@ function SidebarItem({
         Array.isArray(item.children) && item.children.length > 0;
 
     const active =
-        isItemActive(item, currentPath) ||
+        isItemActive(item, currentPath, currentQuery) ||
         item.children?.some((child) =>
-            isChildActive(child, currentPath, currentStatus),
+            isChildActive(
+                child,
+                currentPath,
+                currentStatus,
+                currentQuery,
+            ),
         );
 
     const badge = item.badgeKey === "notifications" ? notificationCount : 0;
@@ -565,6 +586,7 @@ function SidebarItem({
                                     child,
                                     currentPath,
                                     currentStatus,
+                                    currentQuery,
                                 );
 
                                 return (
@@ -814,7 +836,11 @@ function NavIcon({ icon: Icon, active }) {
     );
 }
 
-function isItemActive(item, currentPath) {
+function isItemActive(
+    item,
+    currentPath,
+    currentQuery,
+) {
     const itemPath = normalizePath(item.href);
 
     if (item.exact) {
@@ -822,19 +848,65 @@ function isItemActive(item, currentPath) {
     }
 
     if (item.id === "releases") {
+        const createReleasePath =
+            itemPath === "/super-admin/releases"
+                ? "/super-admin/releases/create"
+                : itemPath === "/admin/releases"
+                  ? "/admin/releases/create"
+                  : itemPath === "/label/releases"
+                    ? "/label/releases/create"
+                    : itemPath === "/artist/releases"
+                      ? "/artist/releases/create"
+                      : null;
+
+        if (
+            createReleasePath &&
+            (
+                currentPath === createReleasePath ||
+                currentPath.startsWith(
+                    `${createReleasePath}/`,
+                )
+            )
+        ) {
+            return false;
+        }
+
         return (
-            currentPath === itemPath || currentPath.startsWith(`${itemPath}/`)
+            currentPath === itemPath ||
+            currentPath.startsWith(`${itemPath}/`)
         );
     }
 
     if (item.id === "unmapped-revenue") {
-        return currentPath === "/super-admin/unmapped-revenue";
+        return (
+            currentPath ===
+            "/super-admin/unmapped-revenue"
+        );
     }
 
-    return currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
+    if (item.id === "support") {
+        if (currentQuery?.get("legal_section")) {
+            return false;
+        }
+
+        return (
+            currentPath === itemPath ||
+            currentPath.startsWith(`${itemPath}/`)
+        );
+    }
+
+    return (
+        currentPath === itemPath ||
+        currentPath.startsWith(`${itemPath}/`)
+    );
 }
 
-function isChildActive(child, currentPath, currentStatus) {
+function isChildActive(
+    child,
+    currentPath,
+    currentStatus,
+    currentQuery,
+) {
     const childPath = normalizePath(child.href);
 
     if (currentPath !== childPath) {
@@ -847,6 +919,21 @@ function isChildActive(child, currentPath, currentStatus) {
 
     if (child.id === "releases-all") {
         return currentStatus === "";
+    }
+
+    if (child.id?.startsWith("legal-")) {
+        const childQuery = getQueryParams(
+            child.href,
+        );
+
+        const expectedSection =
+            childQuery.get("legal_section");
+
+        return (
+            expectedSection &&
+            currentQuery?.get("legal_section") ===
+                expectedSection
+        );
     }
 
     return true;

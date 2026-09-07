@@ -1,4 +1,4 @@
-import { Link, router, usePage } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -113,6 +113,15 @@ export default function PanelLayout({
 
     return (
         <>
+            {props.brand?.favicon_url && (
+                <Head>
+                    <link
+                        rel="icon"
+                        href={props.brand.favicon_url}
+                    />
+                </Head>
+            )}
+
             <ImpersonationBanner />
 
             <div className="v2-panel-density min-h-screen bg-slate-100 text-slate-900">
@@ -121,8 +130,8 @@ export default function PanelLayout({
                     permissions={resolvedPermissions}
                     notificationCount={notificationCount}
                     logoUrl={props.brand?.logo_url ?? null}
-                    brandName={props.brand?.name ?? "BACKSTAGE"}
-                    brandSubtitle={props.brand?.subtitle ?? "MIXX TUNE"}
+                    brandName={props.brand?.name ?? "MIXX TUNE"}
+                    brandSubtitle={props.brand?.subtitle ?? "BACKSTAGE"}
                     mobileOpen={mobileOpen}
                     onMobileClose={() => setMobileOpen(false)}
                 />
@@ -465,6 +474,11 @@ export default function PanelLayout({
                     </header>
 
                     <main className="p-5 lg:p-7">{children}</main>
+                    {props.brand?.footer_text && (
+                        <footer className="border-t border-slate-200 bg-white px-5 py-4 text-center text-xs text-slate-500 lg:px-7">
+                            {props.brand.footer_text}
+                        </footer>
+                    )}
                 </div>
             </div>
         </>

@@ -14,18 +14,32 @@ class SystemSettingService
         $setting = Cache::remember(
             "system_setting:{$key}",
             3600,
-            fn () => SystemSetting::query()
-                ->where('key', $key)
-                ->first()
+            function () use ($key) {
+                $row = SystemSetting::query()
+                    ->where('key', $key)
+                    ->first([
+                        'value',
+                        'type',
+                    ]);
+
+                if (!$row) {
+                    return null;
+                }
+
+                return [
+                    'value' => $row->value,
+                    'type' => $row->type,
+                ];
+            }
         );
 
-        if (!$setting) {
+        if (!is_array($setting)) {
             return $default;
         }
 
         return $this->castValue(
-            $setting->value,
-            $setting->type
+            $setting['value'] ?? null,
+            $setting['type'] ?? 'string'
         );
     }
 
@@ -55,6 +69,47 @@ class SystemSettingService
         );
 
         return $setting;
+    }
+
+    /**
+     * Central Mixx Tune branding configuration.
+     *
+     * All authenticated panels and guest/auth pages can consume the
+     * same branding values through the shared Inertia `brand` prop.
+     */
+    public function branding(): array
+    {
+        return [
+            'logo_url' => $this->get(
+                'branding.logo_url',
+                '/images/mixx-tune-login-logo.svg'
+            ),
+
+            'name' => $this->get(
+                'branding.name',
+                'MIXX TUNE'
+            ),
+
+            'subtitle' => $this->get(
+                'branding.subtitle',
+                ''
+            ),
+
+            'login_logo_url' => $this->get(
+                'branding.login_logo_url',
+                '/images/mixx-tune-login-logo.svg'
+            ),
+
+            'favicon_url' => $this->get(
+                'branding.favicon_url',
+                ''
+            ),
+
+            'footer_text' => $this->get(
+                'branding.footer_text',
+                ''
+            ),
+        ];
     }
 
     public function grouped(): array

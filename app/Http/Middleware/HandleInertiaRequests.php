@@ -39,8 +39,14 @@ class HandleInertiaRequests extends Middleware
                 $request->user()
             );
 
+        $branding = app(
+            \App\Services\V2\SystemSettingService::class
+        )->branding();
+
         return [
             ...parent::share($request),
+
+            'brand' => $branding,
 
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

@@ -8,6 +8,7 @@ use App\Services\V2\PermissionService;
 use App\Services\V2\SystemSettingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -66,6 +67,42 @@ class SystemSettingsController extends Controller
         );
 
         $validated = $request->validate([
+            'branding.name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'branding.subtitle' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'branding.logo_url' => [
+                'required',
+                'string',
+                'max:1000',
+            ],
+
+            'branding.login_logo_url' => [
+                'required',
+                'string',
+                'max:1000',
+            ],
+
+            'branding.favicon_url' => [
+                'nullable',
+                'string',
+                'max:1000',
+            ],
+
+            'branding.footer_text' => [
+                'nullable',
+                'string',
+                'max:500',
+            ],
+
             'company.name' => [
                 'required',
                 'string',
@@ -229,6 +266,96 @@ class SystemSettingsController extends Controller
         );
     }
 
+    public function uploadBrandingAsset(
+        Request $request,
+        PermissionService $permissions
+    ) {
+        $this->authorizeSuperAdmin(
+            $request,
+            $permissions
+        );
+
+        $validated = $request->validate([
+            'type' => [
+                'required',
+                'in:panel_logo,login_logo,favicon',
+            ],
+
+            'file' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png,webp,svg,ico',
+                'max:5120',
+            ],
+        ]);
+
+        $file = $request->file('file');
+
+        $extension = strtolower(
+            $file->getClientOriginalExtension()
+        );
+
+        $allowedExtensions = [
+            'jpg',
+            'jpeg',
+            'png',
+            'webp',
+            'svg',
+            'ico',
+        ];
+
+        abort_unless(
+            in_array(
+                $extension,
+                $allowedExtensions,
+                true
+            ),
+            422,
+            'Unsupported branding file type.'
+        );
+
+        $directory =
+            'branding/' .
+            $validated['type'];
+
+        $filename =
+            $validated['type'] .
+            '-' .
+            now()->format('YmdHis') .
+            '-' .
+            bin2hex(random_bytes(4)) .
+            '.' .
+            $extension;
+
+        $path = $file->storeAs(
+            $directory,
+            $filename,
+            'public'
+        );
+
+        abort_unless(
+            is_string($path) &&
+            $path !== '',
+            500,
+            'Unable to store branding asset.'
+        );
+
+        return response()->json([
+            'success' => true,
+
+            'type' =>
+                $validated['type'],
+
+            'path' =>
+                '/storage/' . $path,
+
+            'url' =>
+                Storage::disk('public')->url(
+                    $path
+                ),
+        ]);
+    }
+
     private function authorizeSuperAdmin(
         Request $request,
         PermissionService $permissions
@@ -245,6 +372,17 @@ class SystemSettingsController extends Controller
     private function defaults(): array
     {
         return [
+            'branding' => [
+                'branding.name' => 'MIXX TUNE',
+                'branding.subtitle' => '',
+                'branding.logo_url' =>
+                    '/images/mixx-tune-login-logo.svg',
+                'branding.login_logo_url' =>
+                    '/images/mixx-tune-login-logo.svg',
+                'branding.favicon_url' => '',
+                'branding.footer_text' => '',
+            ],
+
             'company' => [
                 'company.name' =>
                     config(
@@ -292,6 +430,15 @@ class SystemSettingsController extends Controller
     private function schema(): array
     {
         return [
+            'branding' => [
+                'name' => 'string',
+                'subtitle' => 'string',
+                'logo_url' => 'string',
+                'login_logo_url' => 'string',
+                'favicon_url' => 'string',
+                'footer_text' => 'string',
+            ],
+
             'company' => [
                 'name' => 'string',
                 'legal_name' => 'string',

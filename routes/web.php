@@ -2044,6 +2044,14 @@ Route::middleware(['auth', 'verified'])
 
 
 Route::middleware(['auth', 'verified'])
+    ->post(
+        '/v2/admin/settings/branding/upload',
+        [\App\Http\Controllers\V2\Admin\SystemSettingsController::class, 'uploadBrandingAsset']
+    )
+    ->name('v2.admin.settings.branding.upload');
+
+
+Route::middleware(['auth', 'verified'])
     ->get(
         '/v2/admin/audit-logs',
         [\App\Http\Controllers\V2\Admin\AuditLogController::class, 'index']
