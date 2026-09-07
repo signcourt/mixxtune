@@ -1723,6 +1723,22 @@ Route::middleware(['auth', 'verified'])
 
 
 Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/admin/withdrawals/export',
+        [\App\Http\Controllers\V2\Admin\WithdrawalManagementController::class, 'export']
+    )
+    ->name('v2.admin.withdrawals.export');
+
+
+Route::middleware(['auth', 'verified'])
+    ->delete(
+        '/v2/admin/withdrawals/{withdrawal}',
+        [\App\Http\Controllers\V2\Admin\WithdrawalManagementController::class, 'destroy']
+    )
+    ->name('v2.admin.withdrawals.destroy');
+
+
+Route::middleware(['auth', 'verified'])
     ->post(
         '/v2/admin/withdrawals/{withdrawal}/approve',
         [\App\Http\Controllers\V2\Admin\WithdrawalManagementController::class, 'approve']
@@ -1816,6 +1832,17 @@ Route::middleware(['auth', 'verified'])
         [\App\Http\Controllers\V2\Admin\InvoiceManagementController::class, 'generate']
     )
     ->name('v2.admin.invoices.generate');
+
+
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/legal-operations',
+        [
+            \App\Http\Controllers\V2\LegalOperationsController::class,
+            'index',
+        ]
+    )
+    ->name('v2.legal-operations.index');
 
 
 Route::middleware(['auth', 'verified'])

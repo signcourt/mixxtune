@@ -37,28 +37,14 @@ class UserInvitationNotification extends Notification
 
         return (new MailMessage)
             ->subject("You're invited to Mixx Tune")
-            ->greeting('Hello '.$notifiable->name.',')
-            ->line(
-                "You have been invited to join Mixx Tune as a {$roleName}."
-            )
-            ->line(
-                'Username: @'.$notifiable->username
-            )
-            ->line(
-                'Email: '.$notifiable->email
-            )
-            ->line(
-                'Please verify your invitation and create your password.'
-            )
-            ->action(
-                'Accept Invitation & Set Password',
-                $acceptUrl
-            )
-            ->line(
-                'This secure invitation link will expire in 7 days.'
-            )
-            ->line(
-                'If you were not expecting this invitation, you may ignore this email.'
-            );
+            ->view('emails.invitation', [
+                'subject' => "You're invited to Mixx Tune",
+                'name' => $notifiable->name,
+                'roleName' => $roleName,
+                'username' => $notifiable->username,
+                'email' => $notifiable->email,
+                'actionUrl' => $acceptUrl,
+                'actionText' => 'Accept Invitation',
+            ]);
     }
 }

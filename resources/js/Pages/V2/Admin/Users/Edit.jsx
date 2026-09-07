@@ -134,6 +134,16 @@ export default function Edit({
 
         const selected = data[field];
 
+        if (field === "label_ids") {
+            setData(
+                field,
+                selected.includes(numberId)
+                    ? []
+                    : [numberId],
+            );
+            return;
+        }
+
         setData(
             field,
             selected.includes(numberId)
@@ -143,7 +153,11 @@ export default function Edit({
     };
 
     const addNewLabel = () => {
-        setData("new_labels", [...(data.new_labels ?? []), ""]);
+        if ((data.new_labels ?? []).length >= 1) {
+            return;
+        }
+
+        setData("new_labels", [""]);
     };
 
     const updateNewLabel = (index, value) => {
@@ -751,18 +765,13 @@ export default function Edit({
                         </div>
 
                         <SelectionBox
-                            title="Assigned Labels"
+                            title="Select Label"
                             items={labels}
                             selected={data.label_ids}
                             nameKey="name"
                             onToggle={(id) => toggleSelection("label_ids", id)}
-                            onSelectAll={() =>
-                                setData(
-                                    "label_ids",
-                                    labels.map((item) => Number(item.id)),
-                                )
-                            }
                             onClear={() => setData("label_ids", [])}
+                            singleSelect
                         />
 
                         {errors.label_ids && (
@@ -779,8 +788,7 @@ export default function Edit({
                                     </div>
 
                                     <div className="mt-1 text-xs text-slate-500">
-                                        Add more labels to this existing Label
-                                        account.
+                                        Create one new label for this Label account.
                                     </div>
                                 </div>
 

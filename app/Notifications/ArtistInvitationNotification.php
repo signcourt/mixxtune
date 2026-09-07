@@ -27,12 +27,15 @@ class ArtistInvitationNotification extends Notification
         ]);
 
         return (new MailMessage)
-            ->subject('You are invited to Mixx Tune')
-            ->greeting('Hello '.$notifiable->name.',')
-            ->line('You have been invited to join the Mixx Tune Artist Portal.')
-            ->line('First verify your email address. After verification, you will create your own password.')
-            ->action('Verify Email & Create Password', $url)
-            ->line('This invitation link will expire in 7 days.')
-            ->line('If you were not expecting this invitation, you may ignore this email.');
+            ->subject("You're invited to Mixx Tune")
+            ->view('emails.invitation', [
+                'subject' => "You're invited to Mixx Tune",
+                'name' => $notifiable->name,
+                'roleName' => 'Artist',
+                'username' => null,
+                'email' => $notifiable->email,
+                'actionUrl' => $url,
+                'actionText' => 'Verify Email & Continue',
+            ]);
     }
 }

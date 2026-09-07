@@ -241,7 +241,9 @@ class LabelHierarchyController extends Controller
                         (int) $parent->id,
                     'label_type' => 'label',
                     'public_id' =>
-                        (string) Str::ulid(),
+                        'LBL-' . strtoupper(
+                            Str::random(12)
+                        ),
                     'name' => trim(
                         $data['name']
                     ),

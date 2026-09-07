@@ -4,9 +4,12 @@ namespace App\Models\Finance;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WithdrawalRequest extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'withdrawals';
 
     protected $fillable = [
@@ -74,6 +77,15 @@ class WithdrawalRequest extends Model
         return $this->belongsTo(
             User::class,
             'approved_by'
+        );
+    }
+
+    public function payoutProfile()
+    {
+        return $this->hasOne(
+            PayoutProfile::class,
+            'user_id',
+            'user_id'
         );
     }
 

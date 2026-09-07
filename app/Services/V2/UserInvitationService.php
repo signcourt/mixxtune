@@ -38,6 +38,35 @@ class UserInvitationService
     }
 
     /**
+     * Generate a new invitation link without sending email.
+     *
+     * Only the SHA-256 hash is stored in the database.
+     * The plain token is returned only to the caller that
+     * immediately needs to build the invitation link.
+     */
+    public function issueLink(User $user): string
+    {
+        $plainToken = Str::random(64);
+
+        $user->forceFill([
+            'invitation_status' => 'sent',
+            'invitation_token' => hash(
+                'sha256',
+                $plainToken
+            ),
+            'invitation_sent_at' => now(),
+            'invitation_expires_at' =>
+                now()->addDays(7),
+            'invitation_count' =>
+                ((int) $user->invitation_count) + 1,
+            'invitation_error' => null,
+            'email_verified_at' => null,
+        ])->save();
+
+        return $plainToken;
+    }
+
+    /**
      * Generate a new invitation and send it immediately.
      */
     public function send(User $user): string

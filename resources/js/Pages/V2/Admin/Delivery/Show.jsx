@@ -145,6 +145,100 @@ export default function Show({
         );
     };
 
+    const individualActions = (delivery) => {
+        const transitions = {
+            pending: ["processing", "failed"],
+            processing: ["delivered", "failed"],
+            delivered: ["live", "failed", "takedown_requested"],
+            live: ["takedown_requested", "failed"],
+            failed: ["processing"],
+            takedown_requested: ["taken_down", "live"],
+            taken_down: [],
+        };
+
+        return transitions[delivery.status] ?? [];
+    };
+
+    const actionLabel = (status) => {
+        const labels = {
+            processing: "Start Processing",
+            delivered: "Mark Delivered",
+            live: "Mark Live",
+            failed: "Mark Failed",
+            takedown_requested: "Request Takedown",
+            taken_down: "Mark Taken Down",
+        };
+
+        return labels[status] ?? status;
+    };
+
+    const submitIndividualAction = (delivery, status) => {
+        const form = document.createElement("form");
+
+        form.method = "POST";
+        form.action = `/v2/admin/deliveries/${delivery.id}`;
+
+        const method = document.createElement("input");
+        method.type = "hidden";
+        method.name = "_method";
+        method.value = "PATCH";
+
+        const csrf = document.createElement("input");
+        csrf.type = "hidden";
+        csrf.name = "_token";
+        csrf.value =
+            document
+                .querySelector('meta[name="csrf-token"]')
+                ?.getAttribute("content") ?? "";
+
+        const statusInput = document.createElement("input");
+        statusInput.type = "hidden";
+        statusInput.name = "status";
+        statusInput.value = status;
+
+        form.appendChild(method);
+        form.appendChild(csrf);
+        form.appendChild(statusInput);
+
+        if (status === "failed") {
+            const reason = window.prompt(
+                "Enter failure reason:"
+            );
+
+            if (!reason || reason.trim().length < 3) {
+                return;
+            }
+
+            const errorInput = document.createElement("input");
+            errorInput.type = "hidden";
+            errorInput.name = "error_message";
+            errorInput.value = reason.trim();
+
+            form.appendChild(errorInput);
+        }
+
+        if (
+            status === "takedown_requested"
+            || status === "taken_down"
+        ) {
+            const note = window.prompt(
+                "Enter delivery note (optional):"
+            );
+
+            if (note) {
+                const noteInput = document.createElement("input");
+                noteInput.type = "hidden";
+                noteInput.name = "delivery_note";
+                noteInput.value = note.trim();
+
+                form.appendChild(noteInput);
+            }
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+    };
+
     return (
         <PanelLayout role={role} title="DSP Delivery" subtitle={release.title}>
             <Head title={`DSP Delivery - ${release.title}`} />
@@ -281,6 +375,7 @@ export default function Show({
                                         "Note",
                                         "Error",
                                         "Updated",
+                                        "Actions",
                                     ].map((heading) => (
                                         <th
                                             key={heading}
@@ -379,12 +474,44 @@ export default function Show({
                                             <td className="px-5 py-4 text-sm text-slate-500">
                                                 {delivery.updated_at || "—"}
                                             </td>
+                                            <td className="px-5 py-4">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {individualActions(
+                                                        delivery,
+                                                    ).map((status) => (
+                                                        <button
+                                                            key={status}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const label =
+                                                                    actionLabel(
+                                                                        status,
+                                                                    );
+
+                                                                if (
+                                                                    window.confirm(
+                                                                        `${label} for ${delivery.store?.name ?? "this store"}?`,
+                                                                    )
+                                                                ) {
+                                                                    submitIndividualAction(
+                                                                        delivery,
+                                                                        status,
+                                                                    );
+                                                                }
+                                                            }}
+                                                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                        >
+                                                            {actionLabel(status)}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))
                                 ) : (
                                     <tr>
                                         <td
-                                            colSpan="7"
+                                            colSpan="8"
                                             className="px-5 py-16 text-center text-sm text-slate-500"
                                         >
                                             DSP deliveries have not been

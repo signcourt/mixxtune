@@ -184,6 +184,49 @@ const ownerNavigation = (
                 },
             ],
         },
+        {
+            id: 'legal-operations',
+            label: 'Legal Operations',
+            icon: ShieldCheck,
+            href: '/v2/legal-operations',
+            children: [
+                {
+                    id: 'legal-copyright-claims',
+                    label: 'Copyright & Claims',
+                    href: '/v2/support/create?category=copyright&legal_section=copyright',
+                },
+                {
+                    id: 'legal-youtube',
+                    label: 'YouTube Operations',
+                    href: '/v2/support/create?category=copyright&legal_section=youtube',
+                },
+                {
+                    id: 'legal-spotify',
+                    label: 'Spotify Operations',
+                    href: '/v2/support/create?category=general&legal_section=spotify',
+                },
+                {
+                    id: 'legal-dsp',
+                    label: 'Other DSP Operations',
+                    href: '/v2/support/create?category=general&legal_section=dsp',
+                },
+                {
+                    id: 'legal-rights',
+                    label: 'Rights & Ownership',
+                    href: '/v2/support/create?category=general&legal_section=rights',
+                },
+                {
+                    id: 'legal-requests',
+                    label: 'Legal Requests',
+                    href: '/v2/support/create?category=general&legal_section=request',
+                },
+                {
+                    id: 'legal-history',
+                    label: 'Case History',
+                    href: '/v2/support?legal_section=history',
+                },
+            ],
+        },
     ];
 
     if (role === 'label') {
@@ -224,7 +267,7 @@ const ownerNavigation = (
             label: 'Support Tickets',
             icon: icons.support,
             href: routes.support,
-            permission: 'support.view',
+            permission: 'support.create',
         },
         {
             id: 'notifications',
@@ -350,32 +393,60 @@ const adminNavigation = (
             icon: icons.catalogue,
             href: routes.catalogue,
             permission: 'catalogue.view',
-            children: [
-                {
-                    id: 'catalogue-all',
-                    label: 'All Catalogue',
-                    href: routes.catalogue,
-                    permission: 'catalogue.view',
-                },
-                {
-                    id: 'catalogue-ownership',
-                    label: 'Ownership Transfer',
-                    href: '/v2/admin/ownership',
-                    permission: 'catalogue.view',
-                },
-                {
-                    id: 'catalogue-transfer-history',
-                    label: 'Transfer History',
-                    href: '/v2/admin/ownership',
-                    permission: 'catalogue.view',
-                },
-                {
-                    id: 'catalogue-legacy-import',
-                    label: 'Legacy Import',
-                    href: routes.legacyCatalogueImports,
-                    permission: 'catalogue.view',
-                },
-            ],
+            children:
+                role === 'super_admin'
+                    ? [
+                          {
+                              id: 'catalogue-all',
+                              label: 'All Catalogue',
+                              href: routes.catalogue,
+                              permission: 'catalogue.view',
+                          },
+                          {
+                              id: 'catalogue-ownership',
+                              label: 'Ownership Transfer',
+                              href: '/v2/admin/ownership',
+                              permission: 'catalogue.view',
+                          },
+                          {
+                              id: 'catalogue-transfer-history',
+                              label: 'Transfer History',
+                              href: '/v2/admin/ownership',
+                              permission: 'catalogue.view',
+                          },
+                          {
+                              id: 'catalogue-legacy-import',
+                              label: 'Legacy Import',
+                              href: routes.legacyCatalogueImports,
+                              permission: 'catalogue.view',
+                          },
+                      ]
+                    : [
+                          {
+                              id: 'catalogue-all',
+                              label: 'All Catalogue',
+                              href: routes.catalogue,
+                              permission: 'catalogue.view',
+                          },
+                          {
+                              id: 'catalogue-ownership',
+                              label: 'Ownership Transfer',
+                              href: '/v2/admin/ownership',
+                              permission: 'catalogue.view',
+                          },
+                          {
+                              id: 'catalogue-transfer-history',
+                              label: 'Transfer History',
+                              href: '/v2/admin/ownership',
+                              permission: 'catalogue.view',
+                          },
+                          {
+                              id: 'catalogue-legacy-import',
+                              label: 'Legacy Import',
+                              href: routes.legacyCatalogueImports,
+                              permission: 'catalogue.view',
+                          },
+                      ],
         },
         {
             id: 'royalties',

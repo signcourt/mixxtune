@@ -10,6 +10,9 @@ use App\Services\V2\PermissionService;
 use App\Services\V2\WithdrawalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,6 +47,54 @@ class WithdrawalManagementController extends Controller
             )
         );
 
+        $allowedStatuses = [
+            'pending',
+            'approved',
+            'paid',
+            'rejected',
+        ];
+
+        if (
+            !in_array(
+                $status,
+                $allowedStatuses,
+                true
+            )
+        ) {
+            $status = 'pending';
+        }
+
+        $month = trim(
+            (string) $request->input(
+                'month',
+                ''
+            )
+        );
+
+        if (
+            $month !== '' &&
+            !preg_match(
+                '/^\d{4}-\d{2}$/',
+                $month
+            )
+        ) {
+            $month = '';
+        }
+
+        $dateColumns = [
+            'pending' =>
+                'requested_at',
+
+            'approved' =>
+                'approved_at',
+
+            'paid' =>
+                'paid_at',
+
+            'rejected' =>
+                'rejected_at',
+        ];
+
         $query = WithdrawalRequest::query()
             ->with([
                 'user:id,name,email',
@@ -56,72 +107,524 @@ class WithdrawalManagementController extends Controller
                 $request->user()
             );
 
-        if ($status !== '') {
+        $query->where(
+            'status',
+            $status
+        );
+
+        if ($month !== '') {
             $query->where(
-                'status',
-                $status
+                $dateColumns[$status],
+                'like',
+                $month . '%'
             );
         }
 
-        $countBase =
-            WithdrawalRequest::query();
+        $countForStatus = function (
+            string $countStatus
+        ) use (
+            $request,
+            $financialAccess,
+            $month,
+            $dateColumns
+        ): int {
+            $builder =
+                WithdrawalRequest::query();
 
-        $financialAccess
-            ->applyFinancialOwnerScope(
-                $countBase,
-                $request->user()
+            $financialAccess
+                ->applyFinancialOwnerScope(
+                    $builder,
+                    $request->user()
+                );
+
+            $builder->where(
+                'status',
+                $countStatus
             );
+
+            if ($month !== '') {
+                $builder->where(
+                    $dateColumns[$countStatus],
+                    'like',
+                    $month . '%'
+                );
+            }
+
+            return $builder->count();
+        };
 
         return Inertia::render(
             'V2/Admin/Withdrawals/Index',
             [
-                'role' => $role,
+                'role' =>
+                    $role,
 
                 'filters' => [
                     'status' =>
                         $status,
+
+                    'month' =>
+                        $month,
                 ],
 
                 'counts' => [
                     'pending' =>
-                        (clone $countBase)
-                            ->where(
-                                'status',
-                                'pending'
-                            )
-                            ->count(),
+                        $countForStatus(
+                            'pending'
+                        ),
 
                     'approved' =>
-                        (clone $countBase)
-                            ->where(
-                                'status',
-                                'approved'
-                            )
-                            ->count(),
+                        $countForStatus(
+                            'approved'
+                        ),
 
                     'paid' =>
-                        (clone $countBase)
-                            ->where(
-                                'status',
-                                'paid'
-                            )
-                            ->count(),
+                        $countForStatus(
+                            'paid'
+                        ),
 
                     'rejected' =>
-                        (clone $countBase)
-                            ->where(
-                                'status',
-                                'rejected'
-                            )
-                            ->count(),
+                        $countForStatus(
+                            'rejected'
+                        ),
                 ],
 
                 'withdrawals' =>
                     $query
+                        ->orderByDesc(
+                            $dateColumns[$status]
+                        )
                         ->orderByDesc('id')
                         ->paginate(30)
                         ->withQueryString(),
             ]
+        );
+    }
+
+    public function export(
+        Request $request,
+        PermissionService $permissions,
+        AdminFinancialAccessService $financialAccess
+    ) {
+        $this->authorizeAdmin(
+            $request,
+            $permissions
+        );
+
+        $status = trim(
+            (string) $request->input(
+                'status',
+                'pending'
+            )
+        );
+
+        $allowedStatuses = [
+            'pending',
+            'approved',
+            'paid',
+            'rejected',
+        ];
+
+        abort_unless(
+            in_array(
+                $status,
+                $allowedStatuses,
+                true
+            ),
+            422,
+            'Invalid withdrawal status.'
+        );
+
+        $month = trim(
+            (string) $request->input(
+                'month',
+                ''
+            )
+        );
+
+        if (
+            $month !== '' &&
+            !preg_match(
+                '/^\d{4}-\d{2}$/',
+                $month
+            )
+        ) {
+            abort(
+                422,
+                'Invalid month.'
+            );
+        }
+
+        $dateColumns = [
+            'pending' =>
+                'requested_at',
+
+            'approved' =>
+                'approved_at',
+
+            'paid' =>
+                'paid_at',
+
+            'rejected' =>
+                'rejected_at',
+        ];
+
+        $query = WithdrawalRequest::query()
+            ->with([
+                'user:id,name,email',
+                'payoutProfile',
+            ])
+            ->where(
+                'status',
+                $status
+            );
+
+        $financialAccess
+            ->applyFinancialOwnerScope(
+                $query,
+                $request->user()
+            );
+
+        if ($month !== '') {
+            $query->where(
+                $dateColumns[$status],
+                'like',
+                $month . '%'
+            );
+        }
+
+        $rows = $query
+            ->orderByDesc(
+                $dateColumns[$status]
+            )
+            ->orderByDesc('id')
+            ->get();
+
+        $spreadsheet =
+            new Spreadsheet();
+
+        $sheet =
+            $spreadsheet
+                ->getActiveSheet();
+
+        $sheet->setTitle(
+            ucfirst($status)
+        );
+
+        $headers = [
+            'Withdrawal Number',
+            'Status',
+            'User Name',
+            'Email',
+            'Label ID',
+            'Artist ID',
+            'Amount',
+            'Currency',
+            'Payment Method',
+            'Payment Reference / UTR',
+            'Requested At',
+            'Approved At',
+            'Paid At',
+            'Rejected At',
+            'Account Holder Name',
+            'Bank Name',
+            'Bank Account Number',
+            'IFSC Code',
+            'Branch Name',
+            'UPI ID',
+            'PAN Number',
+            'GST Number',
+            'Address Line 1',
+            'Address Line 2',
+            'City',
+            'State',
+            'Postal Code',
+            'Country',
+            'KYC Status',
+            'Request Note',
+            'Admin / Rejection Note',
+        ];
+
+        $sheet->fromArray(
+            $headers,
+            null,
+            'A1'
+        );
+
+        $rowNumber = 2;
+
+        foreach ($rows as $withdrawal) {
+            $profile =
+                $withdrawal->payoutProfile;
+
+            $metadata =
+                $withdrawal->metadata
+                ?? [];
+
+            $sheet->fromArray(
+                [
+                    $withdrawal
+                        ->withdrawal_number,
+
+                    $withdrawal
+                        ->status,
+
+                    $withdrawal
+                        ->user?->name,
+
+                    $withdrawal
+                        ->user?->email,
+
+                    $withdrawal
+                        ->label_id,
+
+                    $withdrawal
+                        ->artist_id,
+
+                    (float) $withdrawal
+                        ->amount,
+
+                    $withdrawal
+                        ->currency,
+
+                    $withdrawal
+                        ->payment_method,
+
+                    $withdrawal
+                        ->payment_reference,
+
+                    optional(
+                        $withdrawal
+                            ->requested_at
+                    )->format(
+                        'Y-m-d H:i:s'
+                    ),
+
+                    optional(
+                        $withdrawal
+                            ->approved_at
+                    )->format(
+                        'Y-m-d H:i:s'
+                    ),
+
+                    optional(
+                        $withdrawal
+                            ->paid_at
+                    )->format(
+                        'Y-m-d H:i:s'
+                    ),
+
+                    optional(
+                        $withdrawal
+                            ->rejected_at
+                    )->format(
+                        'Y-m-d H:i:s'
+                    ),
+
+                    $profile
+                        ?->account_holder_name,
+
+                    $profile
+                        ?->bank_name,
+
+                    $profile
+                        ?->bank_account_number,
+
+                    $profile
+                        ?->ifsc_code,
+
+                    $profile
+                        ?->branch_name,
+
+                    $profile
+                        ?->upi_id,
+
+                    $profile
+                        ?->pan_number,
+
+                    $profile
+                        ?->gst_number,
+
+                    $profile
+                        ?->address_line_1,
+
+                    $profile
+                        ?->address_line_2,
+
+                    $profile
+                        ?->city,
+
+                    $profile
+                        ?->state,
+
+                    $profile
+                        ?->postal_code,
+
+                    $profile
+                        ?->country_code,
+
+                    $profile
+                        ?->kyc_status,
+
+                    $withdrawal
+                        ->note,
+
+                    $metadata[
+                        'admin_note'
+                    ]
+                        ?? $metadata[
+                            'rejection_reason'
+                        ]
+                        ?? null,
+                ],
+                null,
+                'A' . $rowNumber
+            );
+
+            /*
+             * Bank account, IFSC, UPI, PAN and GST
+             * must remain text so Excel never strips
+             * leading zeroes or changes formatting.
+             */
+            foreach (
+                [
+                    'Q',
+                    'R',
+                    'T',
+                    'U',
+                    'V',
+                    'AA',
+                ]
+                as $column
+            ) {
+                $sheet
+                    ->getStyle(
+                        $column .
+                        $rowNumber
+                    )
+                    ->getNumberFormat()
+                    ->setFormatCode('@');
+            }
+
+            $rowNumber++;
+        }
+
+        $sheet
+            ->freezePane(
+                'A2'
+            );
+
+        $sheet
+            ->setAutoFilter(
+                $sheet
+                    ->calculateWorksheetDimension()
+            );
+
+        foreach (
+            range(
+                'A',
+                'Z'
+            )
+            as $column
+        ) {
+            $sheet
+                ->getColumnDimension(
+                    $column
+                )
+                ->setAutoSize(true);
+        }
+
+        foreach (
+            [
+                'AA',
+                'AB',
+                'AC',
+                'AD',
+                'AE',
+            ]
+            as $column
+        ) {
+            $sheet
+                ->getColumnDimension(
+                    $column
+                )
+                ->setAutoSize(true);
+        }
+
+        $filename =
+            'withdrawals-'
+            . $status
+            . '-'
+            . (
+                $month !== ''
+                    ? $month
+                    : 'all'
+            )
+            . '.xlsx';
+
+        return response()->streamDownload(
+            function () use (
+                $spreadsheet
+            ) {
+                $writer =
+                    new Xlsx(
+                        $spreadsheet
+                    );
+
+                $writer->save(
+                    'php://output'
+                );
+
+                $spreadsheet
+                    ->disconnectWorksheets();
+            },
+            $filename,
+            [
+                'Content-Type' =>
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+
+                'Cache-Control' =>
+                    'no-store, no-cache, must-revalidate',
+            ]
+        );
+    }
+
+    public function destroy(
+        Request $request,
+        WithdrawalRequest $withdrawal,
+        PermissionService $permissions,
+        WithdrawalService $service,
+        AdminFinancialAccessService $financialAccess
+    ): RedirectResponse {
+        $this->authorizeAdmin(
+            $request,
+            $permissions
+        );
+
+        abort_unless(
+            $financialAccess
+                ->canAccessFinancialOwner(
+                    $request->user(),
+                    $withdrawal->label_id
+                        ? (int) $withdrawal->label_id
+                        : null,
+                    $withdrawal->artist_id
+                        ? (int) $withdrawal->artist_id
+                        : null
+                ),
+            403,
+            'Financial object outside assigned scope.'
+        );
+
+        $service
+            ->deleteOpenWithdrawal(
+                $withdrawal,
+                $request->user()
+            );
+
+        return back()->with(
+            'success',
+            'Withdrawal deleted and reserved balance restored.'
         );
     }
 

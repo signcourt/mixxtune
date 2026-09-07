@@ -55,6 +55,7 @@ class PermissionService
             'delivery.mark_failed',
             'delivery.takedown',
             'support.manage',
+              'legal.operations.view',
         ],
 
         'label' => [
@@ -78,6 +79,7 @@ class PermissionService
             'profile.update',
               'team.manage',
               'revenue_sharing.manage',
+              'legal.operations.view',
         ],
 
         'artist' => [
@@ -97,6 +99,7 @@ class PermissionService
             'withdrawals.create',
             'support.create',
             'profile.update',
+              'legal.operations.view',
         ],
     ];
 

@@ -24,43 +24,141 @@ export default function Index({
     const [activeId, setActiveId] =
         useState(null);
 
+    const [processingId, setProcessingId] =
+        useState(null);
+
+    const [actionError, setActionError] =
+        useState('');
+
     const rows =
         withdrawals.data ?? [];
 
-    const filterStatus = (status) => {
+    const currentStatus =
+        filters.status ?? 'pending';
+
+    const currentMonth =
+        filters.month ?? '';
+
+    const goToFilters = (
+        status,
+        month = currentMonth
+    ) => {
         router.get(
             '/v2/admin/withdrawals',
-            { status },
             {
-                preserveState: true,
+                status,
+                month,
+            },
+            {
+                preserveState: false,
+                preserveScroll: true,
             }
         );
     };
 
     const postAction = (
         endpoint,
-        payload
+        payload,
+        itemId
     ) => {
+        if (processingId !== null) {
+            return;
+        }
+
+        setActionError('');
+        setProcessingId(itemId);
+
         router.post(
             endpoint,
             payload,
             {
                 preserveScroll: true,
+                preserveState: false,
 
                 onSuccess: () => {
                     setNote('');
                     setReference('');
                     setActiveId(null);
                 },
+
+                onError: (errors) => {
+                    const message =
+                        Object.values(
+                            errors ?? {}
+                        )[0] ??
+                        'Request failed.';
+
+                    setActionError(
+                        String(message)
+                    );
+                },
+
+                onFinish: () => {
+                    setProcessingId(null);
+                },
             }
         );
     };
+
+    const deleteWithdrawal = (
+        item
+    ) => {
+        if (
+            processingId !== null
+        ) {
+            return;
+        }
+
+        const approved =
+            window.confirm(
+                `Delete withdrawal ${item.request_number}?\n\nThe reserved amount will be returned to the wallet.`
+            );
+
+        if (!approved) {
+            return;
+        }
+
+        setActionError('');
+        setProcessingId(item.id);
+
+        router.delete(
+            `/v2/admin/withdrawals/${item.id}`,
+            {
+                preserveScroll: true,
+                preserveState: false,
+
+                onError: (errors) => {
+                    const message =
+                        Object.values(
+                            errors ?? {}
+                        )[0] ??
+                        'Delete failed.';
+
+                    setActionError(
+                        String(message)
+                    );
+                },
+
+                onFinish: () => {
+                    setProcessingId(null);
+                    setActiveId(null);
+                },
+            }
+        );
+    };
+
+    const exportUrl =
+        `/v2/admin/withdrawals/export?status=${encodeURIComponent(
+            currentStatus
+        )}&month=${encodeURIComponent(
+            currentMonth
+        )}`;
 
     return (
         <PanelLayout
             role={role}
             title="Withdrawal Requests"
-            subtitle="Review and process payout requests"
+            subtitle="Review, filter and export payout requests"
         >
             <Head title="Withdrawal Requests" />
 
@@ -76,11 +174,14 @@ export default function Index({
                             key={status}
                             type="button"
                             onClick={() =>
-                                filterStatus(status)
+                                goToFilters(
+                                    status
+                                )
                             }
                             className={[
                                 'rounded-2xl border bg-white p-5 text-left shadow-sm',
-                                filters.status === status
+                                currentStatus ===
+                                status
                                     ? 'border-violet-500 ring-2 ring-violet-100'
                                     : 'border-slate-200',
                             ].join(' ')}
@@ -90,13 +191,69 @@ export default function Index({
                             </div>
 
                             <div className="mt-2 text-3xl font-bold text-slate-900">
-                                {counts[status] ?? 0}
+                                {counts[status] ??
+                                    0}
                             </div>
                         </button>
                     ))}
                 </div>
 
+                <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                            Month
+                        </label>
+
+                        <div className="flex flex-wrap gap-2">
+                            <input
+                                type="month"
+                                value={
+                                    currentMonth
+                                }
+                                onChange={(
+                                    event
+                                ) =>
+                                    goToFilters(
+                                        currentStatus,
+                                        event.target
+                                            .value
+                                    )
+                                }
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-sm"
+                            />
+
+                            {currentMonth && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        goToFilters(
+                                            currentStatus,
+                                            ''
+                                        )
+                                    }
+                                    className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold"
+                                >
+                                    All Months
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <a
+                        href={exportUrl}
+                        className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white"
+                    >
+                        Download Finance Excel
+                    </a>
+                </div>
+
                 <div className="space-y-4">
+                    {rows.length === 0 && (
+                        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                            No withdrawal requests found for this filter.
+                        </div>
+                    )}
+
                     {rows.map((item) => (
                         <section
                             key={item.id}
@@ -126,7 +283,9 @@ export default function Index({
                                         </div>
 
                                         <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold capitalize text-violet-700">
-                                            {item.status}
+                                            {
+                                                item.status
+                                            }
                                         </span>
                                     </div>
 
@@ -166,11 +325,16 @@ export default function Index({
                                 </div>
 
                                 <div>
-                                    {activeId === item.id ? (
+                                    {activeId ===
+                                    item.id ? (
                                         <div className="space-y-3">
                                             <textarea
-                                                value={note}
-                                                onChange={(event) =>
+                                                value={
+                                                    note
+                                                }
+                                                onChange={(
+                                                    event
+                                                ) =>
                                                     setNote(
                                                         event
                                                             .target
@@ -201,22 +365,35 @@ export default function Index({
                                                 />
                                             )}
 
+                                            {actionError && (
+                                                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                                                    {
+                                                        actionError
+                                                    }
+                                                </div>
+                                            )}
+
                                             <div className="flex flex-wrap gap-2">
                                                 {item.status ===
                                                     'pending' && (
                                                     <>
                                                         <button
                                                             type="button"
+                                                            disabled={
+                                                                processingId ===
+                                                                item.id
+                                                            }
                                                             onClick={() =>
                                                                 postAction(
                                                                     `/v2/admin/withdrawals/${item.id}/approve`,
                                                                     {
                                                                         admin_note:
                                                                             note,
-                                                                    }
+                                                                    },
+                                                                    item.id
                                                                 )
                                                             }
-                                                            className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
+                                                            className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
                                                         >
                                                             Approve
                                                         </button>
@@ -224,9 +401,11 @@ export default function Index({
                                                         <button
                                                             type="button"
                                                             disabled={
+                                                                processingId ===
+                                                                    item.id ||
                                                                 note.trim()
                                                                     .length <
-                                                                3
+                                                                    3
                                                             }
                                                             onClick={() =>
                                                                 postAction(
@@ -234,7 +413,8 @@ export default function Index({
                                                                     {
                                                                         rejection_reason:
                                                                             note,
-                                                                    }
+                                                                    },
+                                                                    item.id
                                                                 )
                                                             }
                                                             className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
@@ -249,10 +429,12 @@ export default function Index({
                                                     <button
                                                         type="button"
                                                         disabled={
+                                                            processingId ===
+                                                                item.id ||
                                                             reference
                                                                 .trim()
                                                                 .length <
-                                                            3
+                                                                3
                                                         }
                                                         onClick={() =>
                                                             postAction(
@@ -262,12 +444,36 @@ export default function Index({
                                                                         reference,
                                                                     admin_note:
                                                                         note,
-                                                                }
+                                                                },
+                                                                item.id
                                                             )
                                                         }
                                                         className="rounded-lg bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
                                                     >
                                                         Mark Paid
+                                                    </button>
+                                                )}
+
+                                                {[
+                                                    'pending',
+                                                    'approved',
+                                                ].includes(
+                                                    item.status
+                                                ) && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={
+                                                            processingId ===
+                                                            item.id
+                                                        }
+                                                        onClick={() =>
+                                                            deleteWithdrawal(
+                                                                item
+                                                            )
+                                                        }
+                                                        className="rounded-lg bg-red-700 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                                                    >
+                                                        Delete
                                                     </button>
                                                 )}
 
@@ -287,11 +493,15 @@ export default function Index({
                                     ) : (
                                         <button
                                             type="button"
-                                            onClick={() =>
+                                            onClick={() => {
+                                                setActionError(
+                                                    ''
+                                                );
+
                                                 setActiveId(
                                                     item.id
-                                                )
-                                            }
+                                                );
+                                            }}
                                             className="w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white"
                                         >
                                             Process Request
@@ -317,7 +527,7 @@ function Info({
                 {label}
             </div>
 
-            <div className="mt-1 text-sm font-semibold capitalize text-slate-900">
+            <div className="mt-1 break-all text-sm font-semibold capitalize text-slate-900">
                 {value}
             </div>
         </div>

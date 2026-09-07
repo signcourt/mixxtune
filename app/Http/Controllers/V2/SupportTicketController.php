@@ -50,6 +50,9 @@ class SupportTicketController extends Controller
                     $permissions->role(
                         $request->user()
                     ),
+
+                'legalSection' =>
+                    $request->query('legal_section'),
             ]
         );
     }

@@ -49,6 +49,36 @@ export default function Index({
     const [notice, setNotice] = useState('');
     const [error, setError] = useState('');
 
+    const [manualIdentifier, setManualIdentifier] =
+        useState(null);
+
+    const [manualValue, setManualValue] =
+        useState('');
+
+    const openManualIdentifier = (
+        type,
+        id,
+        title
+    ) => {
+        setError('');
+        setNotice('');
+        setManualValue('');
+        setManualIdentifier({
+            type,
+            id,
+            title,
+        });
+    };
+
+    const closeManualIdentifier = () => {
+        if (busy) {
+            return;
+        }
+
+        setManualIdentifier(null);
+        setManualValue('');
+    };
+
     const tracks =
         pendingIsrc?.data ?? [];
 
@@ -108,6 +138,71 @@ export default function Index({
             setError(
                 exception?.message ??
                     'Request failed.'
+            );
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const saveManualIdentifier = async () => {
+        if (!manualIdentifier) {
+            return;
+        }
+
+        const value = manualValue.trim();
+
+        if (!value) {
+            setError(
+                manualIdentifier.type === 'isrc'
+                    ? 'Please enter an ISRC.'
+                    : 'Please enter a UPC/EAN.'
+            );
+            return;
+        }
+
+        const isIsrc =
+            manualIdentifier.type === 'isrc';
+
+        const url = isIsrc
+            ? `/v2/admin/tracks/${manualIdentifier.id}/isrc/assign`
+            : `/v2/admin/releases/${manualIdentifier.id}/upc/assign`;
+
+        const payload = isIsrc
+            ? { isrc: value }
+            : { upc: value };
+
+        setBusy(true);
+        setNotice('');
+        setError('');
+
+        try {
+            const result =
+                await postJson(
+                    url,
+                    payload
+                );
+
+            setNotice(
+                result?.message ??
+                    'Identifier assigned successfully.'
+            );
+
+            setManualIdentifier(null);
+            setManualValue('');
+
+            setSelectedTracks([]);
+            setSelectedReleases([]);
+
+            router.reload({
+                only: [
+                    'pendingIsrc',
+                    'pendingUpc',
+                ],
+            });
+        } catch (exception) {
+            setError(
+                exception?.message ??
+                    'Unable to assign identifier.'
             );
         } finally {
             setBusy(false);
@@ -288,20 +383,39 @@ export default function Index({
                                                 </Cell>
 
                                                 <Cell>
-                                                    <button
-                                                        type="button"
-                                                        disabled={
-                                                            busy
-                                                        }
-                                                        onClick={() =>
-                                                            runAction(
-                                                                `/v2/admin/tracks/${track.id}/isrc/generate`
-                                                            )
-                                                        }
-                                                        className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-40"
-                                                    >
-                                                        Generate ISRC
-                                                    </button>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <button
+                                                            type="button"
+                                                            disabled={
+                                                                busy
+                                                            }
+                                                            onClick={() =>
+                                                                runAction(
+                                                                    `/v2/admin/tracks/${track.id}/isrc/generate`
+                                                                )
+                                                            }
+                                                            className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-40"
+                                                        >
+                                                            Generate ISRC
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            disabled={
+                                                                busy
+                                                            }
+                                                            onClick={() =>
+                                                                openManualIdentifier(
+                                                                    'isrc',
+                                                                    track.id,
+                                                                    track.title
+                                                                )
+                                                            }
+                                                            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                                                        >
+                                                            Edit ISRC
+                                                        </button>
+                                                    </div>
                                                 </Cell>
                                             </tr>
                                         )
@@ -470,20 +584,39 @@ export default function Index({
                                                 </Cell>
 
                                                 <Cell>
-                                                    <button
-                                                        type="button"
-                                                        disabled={
-                                                            busy
-                                                        }
-                                                        onClick={() =>
-                                                            runAction(
-                                                                `/v2/admin/releases/${release.id}/upc/generate`
-                                                            )
-                                                        }
-                                                        className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-40"
-                                                    >
-                                                        Generate UPC
-                                                    </button>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <button
+                                                            type="button"
+                                                            disabled={
+                                                                busy
+                                                            }
+                                                            onClick={() =>
+                                                                runAction(
+                                                                    `/v2/admin/releases/${release.id}/upc/generate`
+                                                                )
+                                                            }
+                                                            className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-40"
+                                                        >
+                                                            Generate UPC
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            disabled={
+                                                                busy
+                                                            }
+                                                            onClick={() =>
+                                                                openManualIdentifier(
+                                                                    'upc',
+                                                                    release.id,
+                                                                    release.title
+                                                                )
+                                                            }
+                                                            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                                                        >
+                                                            Edit UPC
+                                                        </button>
+                                                    </div>
                                                 </Cell>
                                             </tr>
                                         )
@@ -499,6 +632,122 @@ export default function Index({
                         }
                     />
                 </Section>
+
+                {manualIdentifier && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+                        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-900">
+                                        {manualIdentifier.type ===
+                                        'isrc'
+                                            ? 'Edit ISRC'
+                                            : 'Edit UPC'}
+                                    </h2>
+
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        {
+                                            manualIdentifier.title
+                                        }
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={
+                                        closeManualIdentifier
+                                    }
+                                    className="rounded-lg px-2 py-1 text-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <div className="mt-5">
+                                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                                    {manualIdentifier.type ===
+                                    'isrc'
+                                        ? 'ISRC Code'
+                                        : 'UPC / EAN Code'}
+                                </label>
+
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={manualValue}
+                                    onChange={(event) =>
+                                        setManualValue(
+                                            event.target.value
+                                        )
+                                    }
+                                    onKeyDown={(event) => {
+                                        if (
+                                            event.key ===
+                                            'Enter'
+                                        ) {
+                                            event.preventDefault();
+                                            saveManualIdentifier();
+                                        }
+
+                                        if (
+                                            event.key ===
+                                            'Escape'
+                                        ) {
+                                            closeManualIdentifier();
+                                        }
+                                    }}
+                                    placeholder={
+                                        manualIdentifier.type ===
+                                        'isrc'
+                                            ? 'Example: IN-MXT-26-00001'
+                                            : 'Enter 12 or 13 digit UPC/EAN'
+                                    }
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                                />
+
+                                <p className="mt-2 text-xs text-slate-500">
+                                    {manualIdentifier.type ===
+                                    'isrc'
+                                        ? 'Enter an existing ISRC manually. Duplicate or invalid codes will be rejected.'
+                                        : 'Enter an existing 12 or 13 digit UPC/EAN. Spaces or separators are normalized automatically.'}
+                                </p>
+                            </div>
+
+                            <div className="mt-6 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={
+                                        closeManualIdentifier
+                                    }
+                                    className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                                >
+                                    Cancel
+                                </button>
+
+                                <button
+                                    type="button"
+                                    disabled={
+                                        busy ||
+                                        !manualValue.trim()
+                                    }
+                                    onClick={
+                                        saveManualIdentifier
+                                    }
+                                    className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-40"
+                                >
+                                    {busy
+                                        ? 'Saving...'
+                                        : manualIdentifier.type ===
+                                            'isrc'
+                                          ? 'Save ISRC'
+                                          : 'Save UPC'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </PanelLayout>
     );

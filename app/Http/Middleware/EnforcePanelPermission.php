@@ -211,6 +211,17 @@ class EnforcePanelPermission
         }
 
         /*
+         * Legal Operations.
+         */
+        if (
+            $request->is(
+                'v2/legal-operations*'
+            )
+        ) {
+            return 'legal.operations.view';
+        }
+
+        /*
          * Support tickets.
          */
         if (

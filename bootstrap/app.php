@@ -28,5 +28,44 @@ return Application::configure(basePath: dirname(__DIR__))
                 $request->expectsJson()
                 || $request->is('api/*'),
         );
+
+        $exceptions->respond(function (
+            \Symfony\Component\HttpFoundation\Response $response,
+            \Throwable $exception,
+            Request $request
+        ) {
+            if (
+                $response->getStatusCode() === 403
+                && ! $request->expectsJson()
+                && ! $request->is('api/*')
+                && $request->session()->has(
+                    'impersonator_user_id'
+                )
+                && $request->user()
+            ) {
+                $dashboard = match (
+                    $request->user()->role
+                ) {
+                    'admin' =>
+                        '/admin/dashboard',
+
+                    'label' =>
+                        '/label/dashboard',
+
+                    'artist' =>
+                        '/artist/dashboard',
+
+                    default =>
+                        '/',
+                };
+
+                return redirect($dashboard)->with(
+                    'error',
+                    'That page is not available while viewing another account.'
+                );
+            }
+
+            return $response;
+        });
     })
     ->create();

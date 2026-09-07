@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Notifications\ArtistInvitationNotification;
+use App\Services\V2\UserInvitationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -49,7 +49,10 @@ class ArtistController extends Controller
         return Inertia::render('Admin/Artists/Create');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(
+        Request $request,
+        UserInvitationService $invitationService
+    ): RedirectResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -72,8 +75,6 @@ class ArtistController extends Controller
             ],
         ]);
 
-        $rawToken = Str::random(64);
-
         $artist = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -91,36 +92,21 @@ class ArtistController extends Controller
             'password' => Str::random(40),
 
             'invitation_status' => 'pending',
-            'invitation_token' => hash('sha256', $rawToken),
-            'invitation_sent_at' => now(),
-            'invitation_expires_at' => now()->addDays(7),
-            'invitation_count' => 1,
+            'invitation_token' => null,
+            'invitation_sent_at' => null,
+            'invitation_expires_at' => null,
+            'invitation_count' => 0,
             'invitation_error' => null,
         ]);
 
         try {
-            $artist->notify(
-                new ArtistInvitationNotification($rawToken)
-            );
-
-            $artist->update([
-                'invitation_status' => 'sent',
-                'invitation_error' => null,
-            ]);
+            $invitationService->send($artist);
 
             return redirect()
                 ->route('admin.artists.index')
                 ->with('success', 'Artist invitation sent successfully.');
         } catch (Throwable $exception) {
             report($exception);
-
-            $artist->update([
-                'invitation_status' => 'failed',
-                'invitation_error' => Str::limit(
-                    $exception->getMessage(),
-                    1000
-                ),
-            ]);
 
             return redirect()
                 ->route('admin.artists.index')
@@ -130,7 +116,10 @@ class ArtistController extends Controller
         }
     }
 
-    public function resendInvitation(User $artist): RedirectResponse
+    public function resendInvitation(
+        User $artist,
+        UserInvitationService $invitationService
+    ): RedirectResponse
     {
         abort_unless($artist->role === 'artist', 404);
 
@@ -149,26 +138,8 @@ class ArtistController extends Controller
             ]);
         }
 
-        $rawToken = Str::random(64);
-
-        $artist->update([
-            'invitation_status' => 'pending',
-            'invitation_token' => hash('sha256', $rawToken),
-            'invitation_sent_at' => now(),
-            'invitation_expires_at' => now()->addDays(7),
-            'invitation_count' => $artist->invitation_count + 1,
-            'invitation_error' => null,
-        ]);
-
         try {
-            $artist->notify(
-                new ArtistInvitationNotification($rawToken)
-            );
-
-            $artist->update([
-                'invitation_status' => 'sent',
-                'invitation_error' => null,
-            ]);
+            $invitationService->send($artist);
 
             return back()->with(
                 'success',
@@ -176,14 +147,6 @@ class ArtistController extends Controller
             );
         } catch (Throwable $exception) {
             report($exception);
-
-            $artist->update([
-                'invitation_status' => 'failed',
-                'invitation_error' => Str::limit(
-                    $exception->getMessage(),
-                    1000
-                ),
-            ]);
 
             return back()->withErrors([
                 'invitation' => 'Invitation could not be resent.',

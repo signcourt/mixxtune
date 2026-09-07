@@ -570,6 +570,264 @@ class WithdrawalService
         });
     }
 
+    public function deleteOpenWithdrawal(
+        WithdrawalRequest $withdrawal,
+        User $admin
+    ): void {
+        abort_unless(
+            in_array(
+                $withdrawal->status,
+                [
+                    'pending',
+                    'approved',
+                ],
+                true
+            ),
+            422,
+            'Only pending or approved withdrawals can be deleted.'
+        );
+
+        DB::transaction(function () use (
+            $withdrawal,
+            $admin
+        ) {
+            $withdrawal->refresh();
+
+            abort_unless(
+                in_array(
+                    $withdrawal->status,
+                    [
+                        'pending',
+                        'approved',
+                    ],
+                    true
+                ),
+                422,
+                'Withdrawal status changed and can no longer be deleted.'
+            );
+
+            $wallet = DB::table('wallets')
+                ->where(
+                    'id',
+                    $withdrawal->wallet_id
+                )
+                ->lockForUpdate()
+                ->first();
+
+            abort_unless(
+                $wallet,
+                422,
+                'Withdrawal wallet is missing.'
+            );
+
+            $amount = round(
+                (float) $withdrawal->amount,
+                8
+            );
+
+            $availableBefore = round(
+                (float) $wallet->available_balance,
+                8
+            );
+
+            $pendingBefore = round(
+                (float) $wallet->pending_balance,
+                8
+            );
+
+            abort_unless(
+                $pendingBefore >= $amount,
+                422,
+                'Reserved withdrawal balance is insufficient.'
+            );
+
+            $availableAfter = round(
+                $availableBefore + $amount,
+                8
+            );
+
+            $pendingAfter = round(
+                $pendingBefore - $amount,
+                8
+            );
+
+            DB::table('wallets')
+                ->where(
+                    'id',
+                    $wallet->id
+                )
+                ->update([
+                    'available_balance' =>
+                        $availableAfter,
+
+                    'pending_balance' =>
+                        $pendingAfter,
+
+                    'updated_at' =>
+                        now(),
+                ]);
+
+            DB::table('wallet_transactions')
+                ->where(
+                    'reference_type',
+                    'withdrawal'
+                )
+                ->where(
+                    'reference_id',
+                    $withdrawal->id
+                )
+                ->where(
+                    'transaction_type',
+                    'withdrawal_hold'
+                )
+                ->where(
+                    'status',
+                    'pending'
+                )
+                ->update([
+                    'status' =>
+                        'reversed',
+
+                    'updated_at' =>
+                        now(),
+                ]);
+
+            /*
+             * Older records can contain a posted hold
+             * before payout completion. Deletion is only
+             * allowed before payment, so reverse that hold
+             * as well when encountered.
+             */
+            DB::table('wallet_transactions')
+                ->where(
+                    'reference_type',
+                    'withdrawal'
+                )
+                ->where(
+                    'reference_id',
+                    $withdrawal->id
+                )
+                ->where(
+                    'transaction_type',
+                    'withdrawal_hold'
+                )
+                ->where(
+                    'status',
+                    'posted'
+                )
+                ->update([
+                    'status' =>
+                        'reversed',
+
+                    'updated_at' =>
+                        now(),
+                ]);
+
+            DB::table('wallet_transactions')
+                ->insert([
+                    'public_id' =>
+                        (string) Str::ulid(),
+
+                    'wallet_id' =>
+                        $wallet->id,
+
+                    'user_id' =>
+                        $withdrawal->user_id,
+
+                    'artist_id' =>
+                        $withdrawal->artist_id,
+
+                    'label_id' =>
+                        $withdrawal->label_id,
+
+                    'transaction_type' =>
+                        'withdrawal_release',
+
+                    'direction' =>
+                        'credit',
+
+                    'amount' =>
+                        $amount,
+
+                    'currency' =>
+                        $withdrawal->currency,
+
+                    'balance_before' =>
+                        $availableBefore,
+
+                    'balance_after' =>
+                        $availableAfter,
+
+                    'reference_type' =>
+                        'withdrawal',
+
+                    'reference_id' =>
+                        $withdrawal->id,
+
+                    'description' =>
+                        'Reserved amount released for deleted withdrawal '
+                        . $withdrawal->withdrawal_number,
+
+                    'status' =>
+                        'posted',
+
+                    'effective_at' =>
+                        now(),
+
+                    'posted_at' =>
+                        now(),
+
+                    'metadata' =>
+                        json_encode([
+                            'withdrawal_number' =>
+                                $withdrawal->withdrawal_number,
+
+                            'action' =>
+                                'delete_release',
+
+                            'deleted_by' =>
+                                $admin->id,
+                        ]),
+
+                    'created_by' =>
+                        $admin->id,
+
+                    'created_at' =>
+                        now(),
+
+                    'updated_at' =>
+                        now(),
+                ]);
+
+            $metadata =
+                $withdrawal->metadata ?? [];
+
+            $metadata['deleted_by'] =
+                $admin->id;
+
+            $metadata['deleted_from_status'] =
+                $withdrawal->status;
+
+            $metadata['deleted_at'] =
+                now()->toIso8601String();
+
+            $withdrawal->update([
+                'updated_by' =>
+                    $admin->id,
+
+                'metadata' =>
+                    $metadata,
+            ]);
+
+            /*
+             * Soft delete preserves the financial audit
+             * trail while removing the request from all
+             * operational withdrawal screens.
+             */
+            $withdrawal->delete();
+        });
+    }
+
     public function markPaid(
         WithdrawalRequest $withdrawal,
         User $admin,

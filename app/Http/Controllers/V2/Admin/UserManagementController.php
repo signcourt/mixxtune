@@ -595,8 +595,6 @@ class UserManagementController extends Controller
                         'send_invitation'
                     ];
 
-                $token = null;
-
                 $user = User::query()->create([
                     'name' =>
                         $validated['name'],
@@ -652,23 +650,14 @@ class UserManagementController extends Controller
                             ? 'pending'
                             : 'not_required',
 
-                    'invitation_token' =>
-                        $token,
-
                     'invitation_sent_at' =>
-                        $sendInvitation
-                            ? now()
-                            : null,
+                        null,
 
                     'invitation_expires_at' =>
-                        $sendInvitation
-                            ? now()->addDays(7)
-                            : null,
+                        null,
 
                     'invitation_count' =>
-                        $sendInvitation
-                            ? 1
-                            : 0,
+                        0,
                 ]);
 
                 /*
@@ -1466,8 +1455,6 @@ return Inertia::render(
                         $user->kyc_status,
                     'invitation_status' =>
                         $user->invitation_status,
-                    'invitation_token' =>
-                        $user->invitation_token,
                     'invitation_expires_at' =>
                         $user->invitation_expires_at,
                     'last_login_at' =>
@@ -2759,23 +2746,28 @@ $oldValues = [
         );
 
         abort_unless(
-            $user->invitation_token,
-            422,
-            'This user does not have an active invitation.'
-        );
-
-        abort_if(
-            $user->invitation_expires_at
-            && now()->greaterThan(
-                $user->invitation_expires_at
+            in_array(
+                $user->role,
+                ['admin', 'label', 'artist'],
+                true
             ),
             422,
-            'Invitation has expired. Resend it first.'
+            'This user cannot receive an invitation.'
         );
+
+        abort_unless(
+            $user->invitation_status !== 'accepted',
+            422,
+            'This invitation has already been accepted.'
+        );
+
+        $plainToken = app(
+            UserInvitationService::class
+        )->issueLink($user);
 
         $link = url(
             '/invitation/'
-            . $user->invitation_token
+            . urlencode($plainToken)
         );
 
         return back()->with(
