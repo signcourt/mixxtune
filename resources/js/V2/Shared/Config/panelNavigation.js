@@ -50,6 +50,7 @@ const icons = {
     identifiers: ListMusic,
     stores: Store,
     finance: Landmark,
+    recoupment: Landmark,
     invoices: FileText,
     statements: ClipboardList,
     logs: BookOpen,
@@ -483,6 +484,22 @@ const adminNavigation = (
             href: routes.unmappedRevenue,
             permission: 'reports.view',
         },
+        ...(role === 'super_admin'
+            ? [
+                  {
+                      id: 'recoupment-advances',
+                      label: 'Recoupment & Advances',
+                      icon: icons.recoupment,
+                      href: '/super-admin/finance/recoupment',
+                  },
+                  {
+                      id: 'financial-adjustments',
+                      label: 'Adjustments',
+                      icon: icons.wallet,
+                      href: '/super-admin/finance/adjustments',
+                  },
+              ]
+            : []),
         {
             id: 'wallet',
             label: 'Wallet',

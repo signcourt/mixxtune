@@ -11,12 +11,15 @@ use App\Models\Distribution\Release;
 use App\Models\Distribution\Track;
 use App\Models\Finance\RoyaltyAllocation;
 use App\Models\Finance\RoyaltyStatement;
+use App\Models\Finance\RecoupmentPlan;
+use App\Models\Finance\RecoupmentRecovery;
 use App\Models\Finance\WalletAccount;
 use App\Models\Finance\WalletTransaction;
 use App\Models\Reports\ReportRow;
 use App\Models\User;
 use App\Services\V2\ReportImportService;
 use App\Services\V2\RoyaltyService;
+use App\Services\V3\RecoupmentManagementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -1535,5 +1538,726 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
     }
 
+
+
+    public function test_royalty_approval_applies_artist_recoupment_and_credits_reduced_wallet(): void
+    {
+        [
+            $artistUser,
+            ,
+            $artist,
+            ,
+            ,
+            $admin,
+            $month,
+        ] = $this->createContext();
+
+        $service = $this->royalty();
+
+        $service->generateMonthlyStatements(
+            $month,
+            10,
+            'INR'
+        );
+
+        $statement = $this->statement(
+            $artist,
+            $month
+        );
+
+        /*
+         * Deterministic integration fixture:
+         *
+         * Beneficiary contractual share = 70%.
+         * Allocated gross              = 1750.
+         * Reconstructed source gross   = 2500.
+         *
+         * Existing statement commission leaves
+         * current payable at 1575.
+         *
+         * Recovery uplift = 10 percentage points.
+         * Recovery        = 2500 x 10% = 250.
+         * Final payable   = 1575 - 250 = 1325.
+         */
+        $statement->update([
+            'gross_earnings' => 1750,
+            'commission_amount' => 175,
+            'tax_amount' => 0,
+            'other_deductions' => 0,
+            'net_payable' => 1575,
+        ]);
+
+        $plan = app(
+            RecoupmentManagementService::class
+        )->createPlan(
+            $artistUser,
+            [
+                'artist_id' => $artist->id,
+                'base_percentage' => 70,
+                'recovery_uplift_percentage' => 10,
+                'maximum_recovery_percentage' => 10,
+                'initial_amount' => 1000,
+                'initial_category' => 'advance',
+                'initial_title' => 'Artist Advance',
+            ],
+            $admin
+        );
+
+        $approved = $service->approve(
+            $statement->fresh(),
+            $admin
+        );
+
+        $this->assertSame(
+            'approved',
+            $approved->status
+        );
+
+        $this->assertEquals(
+            250,
+            (float) $approved->other_deductions
+        );
+
+        $this->assertEquals(
+            1325,
+            (float) $approved->net_payable
+        );
+
+        $plan->refresh();
+
+        $this->assertEquals(
+            250,
+            (float) $plan->total_recovered_amount
+        );
+
+        $this->assertEquals(
+            750,
+            (float) $plan->outstanding_amount
+        );
+
+        $recovery =
+            RecoupmentRecovery::query()
+                ->where(
+                    'recoupment_plan_id',
+                    $plan->id
+                )
+                ->where(
+                    'royalty_statement_id',
+                    $approved->id
+                )
+                ->firstOrFail();
+
+        $this->assertEquals(
+            2500,
+            (float) $recovery->source_amount
+        );
+
+        $this->assertEquals(
+            250,
+            (float)
+            $recovery->applied_recovery_amount
+        );
+
+        $this->assertSame(
+            'royalty_statement:'
+            .$approved->id
+            .':approval',
+            $recovery->idempotency_key
+        );
+
+        $wallet = WalletAccount::query()
+            ->where(
+                'user_id',
+                $artistUser->id
+            )
+            ->firstOrFail();
+
+        $this->assertEquals(
+            1325,
+            (float) $wallet->pending_balance
+        );
+
+        $this->assertEquals(
+            1325,
+            (float) $wallet->lifetime_earnings
+        );
+
+        $walletTransaction =
+            WalletTransaction::query()
+                ->where(
+                    'wallet_id',
+                    $wallet->id
+                )
+                ->where(
+                    'transaction_type',
+                    'royalty_statement'
+                )
+                ->where(
+                    'reference_id',
+                    $approved->id
+                )
+                ->firstOrFail();
+
+        $this->assertEquals(
+            1325,
+            (float) $walletTransaction->amount
+        );
+
+        $this->assertSame(
+            $walletTransaction->id,
+            $recovery->wallet_transaction_id
+        );
+    }
+
+    public function test_royalty_approval_caps_final_recoupment_and_completes_plan(): void
+    {
+        [
+            $artistUser,
+            ,
+            $artist,
+            ,
+            ,
+            $admin,
+            $month,
+        ] = $this->createContext();
+
+        $service = $this->royalty();
+
+        $service->generateMonthlyStatements(
+            $month,
+            10,
+            'INR'
+        );
+
+        $statement = $this->statement(
+            $artist,
+            $month
+        );
+
+        $statement->update([
+            'gross_earnings' => 1750,
+            'commission_amount' => 175,
+            'tax_amount' => 0,
+            'other_deductions' => 0,
+            'net_payable' => 1575,
+        ]);
+
+        $plan = app(
+            RecoupmentManagementService::class
+        )->createPlan(
+            $artistUser,
+            [
+                'artist_id' => $artist->id,
+                'base_percentage' => 70,
+                'recovery_uplift_percentage' => 10,
+                'maximum_recovery_percentage' => 10,
+                'initial_amount' => 100,
+                'initial_category' => 'advance',
+            ],
+            $admin
+        );
+
+        $approved = $service->approve(
+            $statement->fresh(),
+            $admin
+        );
+
+        /*
+         * Percentage formula would recover 250,
+         * but only 100 remains outstanding.
+         */
+        $this->assertEquals(
+            100,
+            (float) $approved->other_deductions
+        );
+
+        $this->assertEquals(
+            1475,
+            (float) $approved->net_payable
+        );
+
+        $plan->refresh();
+
+        $this->assertSame(
+            'completed',
+            $plan->status
+        );
+
+        $this->assertEquals(
+            0,
+            (float) $plan->outstanding_amount
+        );
+
+        $this->assertEquals(
+            100,
+            (float) $plan->total_recovered_amount
+        );
+
+        $this->assertNotNull(
+            $plan->completed_on
+        );
+
+        $recovery =
+            RecoupmentRecovery::query()
+                ->where(
+                    'recoupment_plan_id',
+                    $plan->id
+                )
+                ->where(
+                    'royalty_statement_id',
+                    $approved->id
+                )
+                ->firstOrFail();
+
+        $this->assertEquals(
+            100,
+            (float)
+            $recovery->applied_recovery_amount
+        );
+
+        $wallet = WalletAccount::query()
+            ->where(
+                'user_id',
+                $artistUser->id
+            )
+            ->firstOrFail();
+
+        $this->assertEquals(
+            1475,
+            (float) $wallet->pending_balance
+        );
+    }
+
+    public function test_royalty_approval_without_recoupment_plan_keeps_existing_behavior(): void
+    {
+        [
+            $artistUser,
+            ,
+            $artist,
+            ,
+            ,
+            $admin,
+            $month,
+        ] = $this->createContext();
+
+        $service = $this->royalty();
+
+        $service->generateMonthlyStatements(
+            $month,
+            10,
+            'INR'
+        );
+
+        $statement = $service->approve(
+            $this->statement(
+                $artist,
+                $month
+            ),
+            $admin
+        );
+
+        $this->assertEquals(
+            0,
+            (float) $statement->other_deductions
+        );
+
+        $this->assertEquals(
+            270,
+            (float) $statement->net_payable
+        );
+
+        $this->assertSame(
+            0,
+            RecoupmentRecovery::query()->count()
+        );
+
+        $wallet = WalletAccount::query()
+            ->where(
+                'user_id',
+                $artistUser->id
+            )
+            ->firstOrFail();
+
+        $this->assertEquals(
+            270,
+            (float) $wallet->pending_balance
+        );
+    }
+
+
+    public function test_wrong_artist_scoped_plan_is_not_applied_to_statement(): void
+    {
+        [
+            $artistUser,
+            ,
+            $artist,
+            ,
+            ,
+            $admin,
+            $month,
+        ] = $this->createContext();
+
+        /*
+         * Same account, different artist entity.
+         *
+         * A plan scoped to this second artist must not
+         * deduct from the first artist's statement.
+         */
+        $otherArtist = Artist::factory()->create([
+            'user_id' => $artistUser->id,
+            'label_id' => null,
+            'created_by' => $artistUser->id,
+        ]);
+
+        app(
+            RecoupmentManagementService::class
+        )->createPlan(
+            $artistUser,
+            [
+                'artist_id' => $otherArtist->id,
+                'base_percentage' => 70,
+                'recovery_uplift_percentage' => 10,
+                'maximum_recovery_percentage' => 10,
+                'initial_amount' => 1000,
+            ],
+            $admin
+        );
+
+        $service = $this->royalty();
+
+        $service->generateMonthlyStatements(
+            $month,
+            10,
+            'INR'
+        );
+
+        $statement = $service->approve(
+            $this->statement(
+                $artist,
+                $month
+            ),
+            $admin
+        );
+
+        $this->assertEquals(
+            0,
+            (float) $statement->other_deductions
+        );
+
+        $this->assertEquals(
+            270,
+            (float) $statement->net_payable
+        );
+
+        $this->assertSame(
+            0,
+            RecoupmentRecovery::query()->count()
+        );
+
+        $wallet = WalletAccount::query()
+            ->where(
+                'user_id',
+                $artistUser->id
+            )
+            ->firstOrFail();
+
+        $this->assertEquals(
+            270,
+            (float) $wallet->pending_balance
+        );
+    }
+
+    public function test_account_level_plan_falls_back_for_artist_statement(): void
+    {
+        [
+            $artistUser,
+            ,
+            $artist,
+            ,
+            ,
+            $admin,
+            $month,
+        ] = $this->createContext();
+
+        /*
+         * Account-level plan intentionally has no
+         * artist_id or label_id.
+         *
+         * It should be used when no exact entity plan
+         * exists for the statement owner.
+         */
+        $plan = app(
+            RecoupmentManagementService::class
+        )->createPlan(
+            $artistUser,
+            [
+                'base_percentage' => 100,
+                'recovery_uplift_percentage' => 10,
+                'maximum_recovery_percentage' => 10,
+                'initial_amount' => 1000,
+            ],
+            $admin
+        );
+
+        $service = $this->royalty();
+
+        $service->generateMonthlyStatements(
+            $month,
+            0,
+            'INR'
+        );
+
+        $statement = $service->approve(
+            $this->statement(
+                $artist,
+                $month
+            ),
+            $admin
+        );
+
+        /*
+         * Gross/net = 300.
+         * Base beneficiary share = 100%.
+         * Recovery uplift = 10%.
+         * Recovery = 30.
+         * Final wallet payable = 270.
+         */
+        $this->assertEquals(
+            30,
+            (float) $statement->other_deductions
+        );
+
+        $this->assertEquals(
+            270,
+            (float) $statement->net_payable
+        );
+
+        $plan->refresh();
+
+        $this->assertEquals(
+            30,
+            (float) $plan->total_recovered_amount
+        );
+
+        $this->assertEquals(
+            970,
+            (float) $plan->outstanding_amount
+        );
+
+        $this->assertDatabaseHas(
+            'recoupment_recoveries',
+            [
+                'recoupment_plan_id' => $plan->id,
+                'royalty_statement_id' => $statement->id,
+            ]
+        );
+    }
+
+    public function test_full_recoupment_can_reduce_statement_to_zero_without_wallet_credit(): void
+    {
+        [
+            $artistUser,
+            ,
+            $artist,
+            ,
+            ,
+            $admin,
+            $month,
+        ] = $this->createContext();
+
+        $service = $this->royalty();
+
+        $service->generateMonthlyStatements(
+            $month,
+            0,
+            'INR'
+        );
+
+        $statement = $this->statement(
+            $artist,
+            $month
+        );
+
+        /*
+         * 100% base share + 100% recovery uplift.
+         *
+         * Statement gross/net = 300.
+         * Recovery = 300.
+         * Net payable becomes zero.
+         *
+         * Approval must still succeed, but WalletService
+         * must not receive an invalid zero-value credit.
+         */
+        $plan = app(
+            RecoupmentManagementService::class
+        )->createPlan(
+            $artistUser,
+            [
+                'artist_id' => $artist->id,
+                'base_percentage' => 100,
+                'recovery_uplift_percentage' => 100,
+                'maximum_recovery_percentage' => 100,
+                'initial_amount' => 300,
+            ],
+            $admin
+        );
+
+        $approved = $service->approve(
+            $statement,
+            $admin
+        );
+
+        $this->assertSame(
+            'approved',
+            $approved->status
+        );
+
+        $this->assertEquals(
+            300,
+            (float) $approved->other_deductions
+        );
+
+        $this->assertEquals(
+            0,
+            (float) $approved->net_payable
+        );
+
+        $plan->refresh();
+
+        $this->assertSame(
+            'completed',
+            $plan->status
+        );
+
+        $this->assertEquals(
+            0,
+            (float) $plan->outstanding_amount
+        );
+
+        $this->assertSame(
+            0,
+            WalletTransaction::query()
+                ->where(
+                    'transaction_type',
+                    'royalty_statement'
+                )
+                ->where(
+                    'reference_id',
+                    $approved->id
+                )
+                ->count()
+        );
+
+        $recovery =
+            RecoupmentRecovery::query()
+                ->where(
+                    'royalty_statement_id',
+                    $approved->id
+                )
+                ->firstOrFail();
+
+        $this->assertEquals(
+            300,
+            (float)
+            $recovery->applied_recovery_amount
+        );
+
+        $this->assertNull(
+            $recovery->wallet_transaction_id
+        );
+
+        $this->assertFalse(
+            WalletAccount::query()
+                ->where(
+                    'user_id',
+                    $artistUser->id
+                )
+                ->exists()
+        );
+    }
+
+
+    public function test_zero_net_approved_statement_can_be_made_available_without_wallet_transactions(): void
+    {
+        [
+            $artistUser,
+            ,
+            $artist,
+            ,
+            ,
+            $admin,
+            $month,
+        ] = $this->createContext();
+
+        $service = $this->royalty();
+
+        $service->generateMonthlyStatements(
+            $month,
+            0,
+            'INR'
+        );
+
+        $statement = $this->statement(
+            $artist,
+            $month
+        );
+
+        app(
+            RecoupmentManagementService::class
+        )->createPlan(
+            $artistUser,
+            [
+                'artist_id' => $artist->id,
+                'base_percentage' => 100,
+                'recovery_uplift_percentage' => 100,
+                'maximum_recovery_percentage' => 100,
+                'initial_amount' => 300,
+            ],
+            $admin
+        );
+
+        $approved = $service->approve(
+            $statement,
+            $admin
+        );
+
+        $this->assertEquals(
+            0,
+            (float) $approved->net_payable
+        );
+
+        $available = $service->makeAvailable(
+            $approved,
+            $admin
+        );
+
+        $this->assertSame(
+            'available',
+            $available->status
+        );
+
+        $this->assertNotNull(
+            $available->available_at
+        );
+
+        $this->assertSame(
+            0,
+            WalletTransaction::query()
+                ->where(
+                    'reference_id',
+                    $available->id
+                )
+                ->count()
+        );
+
+        $this->assertFalse(
+            WalletAccount::query()
+                ->where(
+                    'user_id',
+                    $artistUser->id
+                )
+                ->exists()
+        );
+    }
 
 }

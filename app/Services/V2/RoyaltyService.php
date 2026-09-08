@@ -6,6 +6,8 @@ use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\Finance\RoyaltyAllocation;
 use App\Models\Finance\RoyaltyStatement;
+use App\Models\Finance\RecoupmentPlan;
+use App\Services\V3\RecoupmentManagementService;
 use App\Models\Reports\ReportRow;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +18,8 @@ class RoyaltyService
 {
     public function __construct(
         private readonly WalletService $wallet,
-        private readonly OwnershipRoyaltyService $ownershipRoyalty
+        private readonly OwnershipRoyaltyService $ownershipRoyalty,
+        private readonly RecoupmentManagementService $recoupment
     ) {
     }
 
@@ -51,33 +54,242 @@ class RoyaltyService
         RoyaltyStatement $statement,
         User $admin
     ): RoyaltyStatement {
-        abort_unless(
-            in_array(
-                $statement->status,
-                ['pending', 'generated'],
-                true
-            ),
-            422,
-            'Only pending statements can be approved.'
-        );
-
-        $owner = $this->ownerUser(
-            $statement
-        );
-
-        abort_unless(
-            $owner,
-            422,
-            'Statement owner user is missing.'
-        );
-
         DB::transaction(
             function () use (
                 $statement,
-                $admin,
-                $owner
+                $admin
             ) {
-                $statement->update([
+                /*
+                 * Lock and re-read the statement inside the
+                 * financial transaction.
+                 *
+                 * This prevents concurrent approval requests
+                 * from crediting the wallet twice.
+                 */
+                $lockedStatement =
+                    RoyaltyStatement::query()
+                        ->whereKey($statement->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                abort_unless(
+                    in_array(
+                        $lockedStatement->status,
+                        ['pending', 'generated'],
+                        true
+                    ),
+                    422,
+                    'Only pending statements can be approved.'
+                );
+
+                $owner = $this->ownerUser(
+                    $lockedStatement
+                );
+
+                abort_unless(
+                    $owner,
+                    422,
+                    'Statement owner user is missing.'
+                );
+
+                /*
+                 * Recoupment is scoped to the exact financial
+                 * beneficiary represented by this statement.
+                 *
+                 * Priority:
+                 * 1. exact artist plan for artist statement
+                 * 2. exact label plan for label statement
+                 * 3. account-level plan with no entity scope
+                 *
+                 * createPlan() currently allows only one active
+                 * plan per user, but keeping this lookup explicit
+                 * prevents accidental cross-entity recovery if
+                 * that rule changes later.
+                 */
+                $planQuery =
+                    RecoupmentPlan::query()
+                        ->where(
+                            'user_id',
+                            $owner->id
+                        )
+                        ->where(
+                            'status',
+                            'active'
+                        )
+                        ->where(
+                            'outstanding_amount',
+                            '>',
+                            0
+                        );
+
+                if ($lockedStatement->artist_id) {
+                    $plan = (clone $planQuery)
+                        ->where(
+                            'artist_id',
+                            $lockedStatement->artist_id
+                        )
+                        ->whereNull('label_id')
+                        ->first();
+
+                    if (! $plan) {
+                        $plan = (clone $planQuery)
+                            ->whereNull('artist_id')
+                            ->whereNull('label_id')
+                            ->first();
+                    }
+                } elseif (
+                    $lockedStatement->label_id
+                ) {
+                    $plan = (clone $planQuery)
+                        ->where(
+                            'label_id',
+                            $lockedStatement->label_id
+                        )
+                        ->whereNull('artist_id')
+                        ->first();
+
+                    if (! $plan) {
+                        $plan = (clone $planQuery)
+                            ->whereNull('artist_id')
+                            ->whereNull('label_id')
+                            ->first();
+                    }
+                } else {
+                    $plan = (clone $planQuery)
+                        ->whereNull('artist_id')
+                        ->whereNull('label_id')
+                        ->first();
+                }
+
+                $recovery = null;
+
+                if ($plan) {
+                    $recovery =
+                        $this->recoupment
+                            ->applyStatementRecovery(
+                                $plan,
+                                (float)
+                                $lockedStatement
+                                    ->gross_earnings,
+                                (float)
+                                $lockedStatement
+                                    ->net_payable,
+                                [
+                                    'royalty_statement_id' =>
+                                        $lockedStatement->id,
+
+                                    'reporting_month' =>
+                                        $lockedStatement
+                                            ->statement_month,
+
+                                    'reference' =>
+                                        'Royalty statement '
+                                        .$lockedStatement
+                                            ->public_id,
+
+                                    'idempotency_key' =>
+                                        'royalty_statement:'
+                                        .$lockedStatement->id
+                                        .':approval',
+                                ]
+                            );
+                }
+
+                if ($recovery) {
+                    $recoveryAmount = round(
+                        (float)
+                        $recovery
+                            ->applied_recovery_amount,
+                        8
+                    );
+
+                    $lockedStatement->update([
+                        'other_deductions' =>
+                            round(
+                                (float)
+                                $lockedStatement
+                                    ->other_deductions
+                                + $recoveryAmount,
+                                8
+                            ),
+
+                        'net_payable' =>
+                            round(
+                                max(
+                                    0,
+                                    (float)
+                                    $lockedStatement
+                                        ->net_payable
+                                    - $recoveryAmount
+                                ),
+                                8
+                            ),
+                    ]);
+
+                    $lockedStatement->refresh();
+                }
+
+                /*
+                 * WalletService rejects zero-value credits.
+                 *
+                 * A fully recouped statement may legitimately
+                 * have zero payable, so only create a wallet
+                 * transaction when money remains payable.
+                 */
+                $walletTransaction = null;
+
+                if (
+                    (float)
+                    $lockedStatement->net_payable
+                    > 0
+                ) {
+                    $walletTransaction =
+                        $this->wallet
+                            ->creditPending(
+                                $owner,
+                                (float)
+                                $lockedStatement
+                                    ->net_payable,
+                                'royalty_statement',
+                                [
+                                    'currency' =>
+                                        $lockedStatement
+                                            ->currency,
+
+                                    'reference_type' =>
+                                        RoyaltyStatement::class,
+
+                                    'reference_id' =>
+                                        $lockedStatement->id,
+
+                                    'reference_code' =>
+                                        $lockedStatement
+                                            ->public_id,
+
+                                    'description' =>
+                                        "Royalty statement {$lockedStatement->statement_month}",
+
+                                    'created_by' =>
+                                        $admin->id,
+                                ]
+                            );
+                }
+
+                if (
+                    $recovery
+                    && $walletTransaction
+                ) {
+                    $recovery->update([
+                        'wallet_transaction_id' =>
+                            $walletTransaction->id,
+                    ]);
+                }
+
+                /*
+                 * Mark approved only after all financial
+                 * deductions and wallet posting succeed.
+                 */
+                $lockedStatement->update([
                     'status' =>
                         'approved',
 
@@ -87,32 +299,6 @@ class RoyaltyService
                     'approved_by' =>
                         $admin->id,
                 ]);
-
-                $this->wallet->creditPending(
-                    $owner,
-                    (float) $statement
-                        ->net_payable,
-                    'royalty_statement',
-                    [
-                        'currency' =>
-                            $statement->currency,
-
-                        'reference_type' =>
-                            RoyaltyStatement::class,
-
-                        'reference_id' =>
-                            $statement->id,
-
-                        'reference_code' =>
-                            $statement->public_id,
-
-                        'description' =>
-                            "Royalty statement {$statement->statement_month}",
-
-                        'created_by' =>
-                            $admin->id,
-                    ]
-                );
             }
         );
 
@@ -123,55 +309,81 @@ class RoyaltyService
         RoyaltyStatement $statement,
         User $admin
     ): RoyaltyStatement {
-        abort_unless(
-            $statement->status ===
-                'approved',
-            422,
-            'Statement must be approved first.'
-        );
-
-        $owner = $this->ownerUser(
-            $statement
-        );
-
-        abort_unless(
-            $owner,
-            422,
-            'Statement owner user is missing.'
-        );
-
         DB::transaction(
             function () use (
                 $statement,
-                $owner,
                 $admin
             ) {
-                $this->wallet->releasePending(
-                    $owner,
-                    (float) $statement
-                        ->net_payable,
-                    [
-                        'currency' =>
-                            $statement->currency,
+                /*
+                 * Lock and re-read the statement inside the
+                 * transaction.
+                 *
+                 * Two concurrent make-available requests must
+                 * never release the same pending royalty twice.
+                 */
+                $lockedStatement =
+                    RoyaltyStatement::query()
+                        ->whereKey($statement->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
 
-                        'reference_type' =>
-                            RoyaltyStatement::class,
-
-                        'reference_id' =>
-                            $statement->id,
-
-                        'reference_code' =>
-                            $statement->public_id,
-
-                        'description' =>
-                            "Royalty available for {$statement->statement_month}",
-
-                        'created_by' =>
-                            $admin->id,
-                    ]
+                abort_unless(
+                    $lockedStatement->status ===
+                        'approved',
+                    422,
+                    'Statement must be approved first.'
                 );
 
-                $statement->update([
+                $owner = $this->ownerUser(
+                    $lockedStatement
+                );
+
+                abort_unless(
+                    $owner,
+                    422,
+                    'Statement owner user is missing.'
+                );
+
+                /*
+                 * A fully recouped statement may legitimately
+                 * have zero payable.
+                 *
+                 * WalletService rejects zero-value releases,
+                 * so only move pending funds when money is
+                 * actually payable.
+                 */
+                if (
+                    (float) $lockedStatement
+                        ->net_payable
+                    > 0
+                ) {
+                    $this->wallet->releasePending(
+                        $owner,
+                        (float) $lockedStatement
+                            ->net_payable,
+                        [
+                            'currency' =>
+                                $lockedStatement->currency,
+
+                            'reference_type' =>
+                                RoyaltyStatement::class,
+
+                            'reference_id' =>
+                                $lockedStatement->id,
+
+                            'reference_code' =>
+                                $lockedStatement->public_id,
+
+                            'description' =>
+                                "Royalty available for {$lockedStatement->statement_month}",
+
+                            'created_by' =>
+                                $admin->id,
+                        ]
+                    );
+                }
+
+                $lockedStatement->update([
                     'status' =>
                         'available',
 

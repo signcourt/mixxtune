@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\V2\Label;
 
+use App\Models\Core\Artist;
+
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\V2\ClientIdService;
@@ -691,9 +693,11 @@ class ArtistManagementController extends Controller
             $artist
         );
 
-        $user = User::query()->findOrFail(
-            $managedArtist->user_id
-        );
+        $user = $managedArtist->user_id
+            ? User::query()->find(
+                $managedArtist->user_id
+            )
+            : null;
 
         $releaseBase = DB::table('releases')
             ->where(
@@ -730,14 +734,16 @@ class ArtistManagementController extends Controller
             )
             ->count();
 
-        $wallet = DB::table(
-            'wallets'
-        )
-            ->where(
-                'user_id',
-                $user->id
+        $wallet = $user
+            ? DB::table(
+                'wallets'
             )
-            ->first();
+                ->where(
+                    'user_id',
+                    $user->id
+                )
+                ->first()
+            : null;
 
         $walletTransactionCount =
             DB::table('wallet_transactions')
@@ -747,13 +753,29 @@ class ArtistManagementController extends Controller
                 )
                 ->count();
 
-        $withdrawalCount =
-            DB::table('withdrawals')
+        $withdrawalCount = $user
+            ? DB::table('withdrawals')
                 ->where(
                     'user_id',
                     $user->id
                 )
-                ->count();
+                ->whereNull('deleted_at')
+                ->count()
+            : 0;
+
+        $withdrawnBalance = $user
+            ? (float) DB::table('withdrawals')
+                ->where(
+                    'user_id',
+                    $user->id
+                )
+                ->where(
+                    'status',
+                    'paid'
+                )
+                ->whereNull('deleted_at')
+                ->sum('amount')
+            : 0.0;
 
         $recentReleases = DB::table(
             'releases'
@@ -803,7 +825,7 @@ class ArtistManagementController extends Controller
                         $managedArtist->legal_name,
 
                     'username' =>
-                        $user->username,
+                        $user?->username,
 
                     'email' =>
                         $managedArtist->email,
@@ -844,16 +866,19 @@ class ArtistManagementController extends Controller
                             ->can_receive_splits,
 
                     'invitation_status' =>
-                        $user->invitation_status,
+                        $user?->invitation_status,
 
                     'invitation_sent_at' =>
-                        $user->invitation_sent_at,
+                        $user?->invitation_sent_at,
 
                     'invitation_expires_at' =>
-                        $user->invitation_expires_at,
+                        $user?->invitation_expires_at,
 
                     'last_login_at' =>
-                        $user->last_login_at,
+                        $user?->last_login_at,
+
+                    'has_login_account' =>
+                        $user !== null,
 
                     'created_at' =>
                         $managedArtist->created_at,
@@ -914,38 +939,32 @@ class ArtistManagementController extends Controller
                 ],
 
                 'walletSummary' => [
+                    'has_wallet_account' =>
+                        $wallet !== null,
+
                     'currency' =>
-                        $wallet->currency
+                        $wallet?->currency
                             ?? $managedArtist->currency
                             ?? 'INR',
 
                     'pending_balance' =>
                         (float) (
-                            $wallet->pending_balance
+                            $wallet?->pending_balance
                             ?? 0
                         ),
 
                     'available_balance' =>
                         (float) (
-                            $wallet->available_balance
+                            $wallet?->available_balance
                             ?? 0
                         ),
 
                     'withdrawn_balance' =>
-                        (float) (
-                            $wallet->withdrawn_balance
-                            ?? 0
-                        ),
+                        $withdrawnBalance,
 
                     'lifetime_earnings' =>
                         (float) (
-                            $wallet->lifetime_earnings
-                            ?? 0
-                        ),
-
-                    'hold_balance' =>
-                        (float) (
-                            $wallet->hold_balance
+                            $wallet?->lifetime_credits
                             ?? 0
                         ),
 
@@ -977,9 +996,11 @@ class ArtistManagementController extends Controller
             $artist
         );
 
-        $user = User::query()->findOrFail(
-            $managedArtist->user_id
-        );
+        $user = $managedArtist->user_id
+            ? User::query()->find(
+                $managedArtist->user_id
+            )
+            : null;
 
         return Inertia::render(
             'V2/Label/Artists/Edit',
@@ -1007,7 +1028,7 @@ class ArtistManagementController extends Controller
                         $managedArtist->legal_name,
 
                     'username' =>
-                        $user->username,
+                        $user?->username,
 
                     'email' =>
                         $managedArtist->email,
@@ -1039,10 +1060,13 @@ class ArtistManagementController extends Controller
                             ->can_receive_splits,
 
                     'invitation_status' =>
-                        $user->invitation_status,
+                        $user?->invitation_status,
 
                     'last_login_at' =>
-                        $user->last_login_at,
+                        $user?->last_login_at,
+
+                      'has_login_account' =>
+                          $user !== null,
                 ],
             ]
         );
@@ -1064,9 +1088,11 @@ class ArtistManagementController extends Controller
             $artist
         );
 
-        $user = User::query()->findOrFail(
-            $managedArtist->user_id
-        );
+        $user = $managedArtist->user_id
+            ? User::query()->find(
+                $managedArtist->user_id
+            )
+            : null;
 
         $validated = $request->validate([
             'stage_name' => [
@@ -1082,13 +1108,13 @@ class ArtistManagementController extends Controller
             ],
 
             'username' => [
-                'required',
+                $user ? 'required' : 'nullable',
                 'string',
                 'max:40',
             ],
 
             'email' => [
-                'required',
+                $user ? 'required' : 'nullable',
                 'email',
                 'max:190',
             ],
@@ -1133,86 +1159,108 @@ class ArtistManagementController extends Controller
             ],
         ]);
 
-        $email = Str::lower(
-            trim($validated['email'])
-        );
+        $email = filled(
+            $validated['email'] ?? null
+        )
+            ? Str::lower(
+                trim($validated['email'])
+            )
+            : null;
 
-        $emailExists = User::query()
-            ->where('email', $email)
-            ->where('id', '!=', $user->id)
-            ->exists();
+        if ($email !== null) {
+            $emailExists = User::query()
+                ->where('email', $email)
+                ->when(
+                    $user,
+                    fn ($query) =>
+                        $query->where(
+                            'id',
+                            '!=',
+                            $user->id
+                        )
+                )
+                ->exists();
 
-        if ($emailExists) {
-            throw ValidationException::withMessages([
-                'email' =>
-                    'This email is already in use.',
-            ]);
+            if ($emailExists) {
+                throw ValidationException::withMessages([
+                    'email' =>
+                        'This email is already in use.',
+                ]);
+            }
+
+            $artistEmailExists = DB::table('artists')
+                ->where('email', $email)
+                ->where(
+                    'id',
+                    '!=',
+                    $managedArtist->id
+                )
+                ->whereNull('deleted_at')
+                ->exists();
+
+            if ($artistEmailExists) {
+                throw ValidationException::withMessages([
+                    'email' =>
+                        'This email is already linked to another artist.',
+                ]);
+            }
         }
 
-        $artistEmailExists = DB::table('artists')
-            ->where('email', $email)
-            ->where('id', '!=', $managedArtist->id)
-            ->whereNull('deleted_at')
-            ->exists();
+        $username = null;
 
-        if ($artistEmailExists) {
-            throw ValidationException::withMessages([
-                'email' =>
-                    'This email is already linked to another artist.',
-            ]);
-        }
-
-        $requestedUsername = trim(
-            $validated['username']
-        );
-
-        $username =
-            $usernameService->normalize(
-                $requestedUsername
+        if ($user) {
+            $requestedUsername = trim(
+                $validated['username']
             );
 
-        if (
-            Str::lower($requestedUsername)
-            !== $username
-        ) {
-            throw ValidationException::withMessages([
-                'username' =>
-                    'Username may contain lowercase letters, numbers and hyphens only.',
-            ]);
-        }
+            $username =
+                $usernameService->normalize(
+                    $requestedUsername
+                );
 
-        if (
-            ! $usernameService->validateFormat(
-                $username
-            )
-        ) {
-            throw ValidationException::withMessages([
-                'username' =>
-                    'Username must be between 4 and 40 characters.',
-            ]);
-        }
+            if (
+                Str::lower($requestedUsername)
+                !== $username
+            ) {
+                throw ValidationException::withMessages([
+                    'username' =>
+                        'Username may contain lowercase letters, numbers and hyphens only.',
+                ]);
+            }
 
-        if (
-            $usernameService->isReserved(
-                $username
-            )
-        ) {
-            throw ValidationException::withMessages([
-                'username' =>
-                    'This username is reserved.',
-            ]);
-        }
+            if (
+                ! $usernameService->validateFormat(
+                    $username
+                )
+            ) {
+                throw ValidationException::withMessages([
+                    'username' =>
+                        'Username must be between 4 and 40 characters.',
+                ]);
+            }
 
-        if (
-            $usernameService->exists(
-                $username,
-                $user->id
-            )
-        ) {
-            throw ValidationException::withMessages([
-                'username' =>
-                    'This username is already in use.',
-            ]);
+            if (
+                $usernameService->isReserved(
+                    $username
+                )
+            ) {
+                throw ValidationException::withMessages([
+                    'username' =>
+                        'This username is reserved.',
+                ]);
+            }
+
+            if (
+                $usernameService->exists(
+                    $username,
+                    $user->id
+                )
+            ) {
+                throw ValidationException::withMessages([
+                    'username' =>
+                        'This username is already in use.',
+                ]);
+            }
         }
 
         DB::transaction(
@@ -1224,28 +1272,30 @@ class ArtistManagementController extends Controller
                 $username,
                 $email
             ) {
-                $user->forceFill([
-                    'name' =>
-                        $validated['stage_name'],
+                if ($user) {
+                    $user->forceFill([
+                        'name' =>
+                            $validated['stage_name'],
 
-                    'username' =>
-                        $username,
+                        'username' =>
+                            $username,
 
-                    'email' =>
-                        $email,
+                        'email' =>
+                            $email,
 
-                    'phone' =>
-                        $validated['phone']
-                        ?? null,
+                        'phone' =>
+                            $validated['phone']
+                            ?? null,
 
-                    'country' =>
-                        $validated['country'],
+                        'country' =>
+                            $validated['country'],
 
-                    'account_status' =>
-                        $validated[
-                            'account_status'
-                        ],
-                ])->save();
+                        'account_status' =>
+                            $validated[
+                                'account_status'
+                            ],
+                    ])->save();
+                }
 
                 DB::table('artists')
                     ->where(
@@ -1483,21 +1533,8 @@ class ArtistManagementController extends Controller
         int $labelId,
         int $artistId
     ): object {
-        if (
-            ! app(LabelTeamAccessService::class)
-                ->canAccessArtist(
-                    $user,
-                    $artistId
-                )
-        ) {
-            abort(403);
-        }
-
-        $artist = DB::table('artists')
-            ->where(
-                'id',
-                $artistId
-            )
+        $artist = Artist::query()
+            ->whereKey($artistId)
             ->where(
                 'label_id',
                 $labelId
@@ -1511,11 +1548,15 @@ class ArtistManagementController extends Controller
             'Artist was not found under this label.'
         );
 
-        abort_unless(
-            $artist->user_id,
-            422,
-            'Artist user account is not linked.'
-        );
+        if (
+            ! app(LabelTeamAccessService::class)
+                ->canAccessArtist(
+                    $user,
+                    $artist
+                )
+        ) {
+            abort(403);
+        }
 
         return $artist;
     }

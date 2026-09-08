@@ -14,6 +14,12 @@ export default function Show({
     walletSummary = {},
     recentReleases = [],
 }) {
+    const hasLoginAccount =
+        artist.has_login_account === true;
+
+    const hasWalletAccount =
+        walletSummary.has_wallet_account === true;
+
     const currency =
         walletSummary.currency ?? 'INR';
 
@@ -76,9 +82,15 @@ export default function Show({
                                     />
                                 </div>
 
-                                <p className="mt-1 font-semibold text-violet-600">
-                                    @{artist.username}
-                                </p>
+                                {hasLoginAccount ? (
+                                    <p className="mt-1 font-semibold text-violet-600">
+                                        @{artist.username}
+                                    </p>
+                                ) : (
+                                    <p className="mt-1 text-sm font-semibold text-slate-500">
+                                        Catalogue-only artist
+                                    </p>
+                                )}
 
                                 <p className="mt-2 text-sm text-slate-500">
                                     {artist.email}
@@ -128,21 +140,30 @@ export default function Show({
                             }
                         />
 
-                        <Info
-                            label="Invitation"
-                            value={
-                                artist.invitation_status
-                                ?? 'Not sent'
-                            }
-                        />
+                        {hasLoginAccount ? (
+                            <>
+                                <Info
+                                    label="Invitation"
+                                    value={
+                                        artist.invitation_status
+                                        ?? 'Not sent'
+                                    }
+                                />
 
-                        <Info
-                            label="Last Login"
-                            value={
-                                artist.last_login_at
-                                ?? 'Never'
-                            }
-                        />
+                                <Info
+                                    label="Last Login"
+                                    value={
+                                        artist.last_login_at
+                                        ?? 'Never'
+                                    }
+                                />
+                            </>
+                        ) : (
+                            <Info
+                                label="Login Account"
+                                value="Not linked"
+                            />
+                        )}
                     </div>
                 </section>
 
@@ -205,8 +226,16 @@ export default function Show({
 
                 <section>
                     <SectionTitle
-                        title="Catalogue & Wallet"
-                        subtitle="Current catalogue and financial summary."
+                        title={
+                            hasWalletAccount
+                                ? 'Catalogue & Wallet'
+                                : 'Catalogue'
+                        }
+                        subtitle={
+                            hasWalletAccount
+                                ? 'Current catalogue and financial summary.'
+                                : 'Catalogue summary. No login wallet is linked to this artist.'
+                        }
                     />
 
                     <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -226,49 +255,63 @@ export default function Show({
                             }
                         />
 
-                        <MoneyCard
-                            label="Available Balance"
-                            value={money(
-                                walletSummary.available_balance
-                            )}
-                        />
+                        {hasWalletAccount ? (
+                            <>
+                                <MoneyCard
+                                    label="Available Balance"
+                                    value={money(
+                                        walletSummary.available_balance
+                                    )}
+                                />
 
-                        <MoneyCard
-                            label="Pending Balance"
-                            value={money(
-                                walletSummary.pending_balance
-                            )}
-                        />
+                                <MoneyCard
+                                    label="Pending Balance"
+                                    value={money(
+                                        walletSummary.pending_balance
+                                    )}
+                                />
 
-                        <MoneyCard
-                            label="Lifetime Earnings"
-                            value={money(
-                                walletSummary.lifetime_earnings
-                            )}
-                        />
+                                <MoneyCard
+                                    label="Lifetime Earnings"
+                                    value={money(
+                                        walletSummary.lifetime_earnings
+                                    )}
+                                />
 
-                        <MoneyCard
-                            label="Withdrawn"
-                            value={money(
-                                walletSummary.withdrawn_balance
-                            )}
-                        />
+                                <MoneyCard
+                                    label="Withdrawn"
+                                    value={money(
+                                        walletSummary.withdrawn_balance
+                                    )}
+                                />
 
-                        <Stat
-                            label="Transactions"
-                            value={
-                                walletSummary.transactions
-                                ?? 0
-                            }
-                        />
+                                <Stat
+                                    label="Transactions"
+                                    value={
+                                        walletSummary.transactions
+                                        ?? 0
+                                    }
+                                />
 
-                        <Stat
-                            label="Withdrawals"
-                            value={
-                                walletSummary.withdrawals
-                                ?? 0
-                            }
-                        />
+                                <Stat
+                                    label="Withdrawals"
+                                    value={
+                                        walletSummary.withdrawals
+                                        ?? 0
+                                    }
+                                />
+                            </>
+                        ) : (
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:col-span-2">
+                                <p className="text-sm font-semibold text-slate-800">
+                                    No wallet account linked
+                                </p>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Financial balance is not shown because this is a catalogue-only artist without a panel login wallet.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </section>
 

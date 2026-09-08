@@ -78,7 +78,17 @@ class WalletService
                         ?? 'INR'
                 );
 
-                $wallet->refresh();
+                /*
+                 * Lock the resolved wallet row before reading
+                 * or mutating balances.
+                 *
+                 * refresh() alone does not serialize concurrent
+                 * financial writes and can cause lost updates.
+                 */
+                $wallet = WalletAccount::query()
+                    ->whereKey($wallet->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
                 $before =
                     (float) $wallet
@@ -134,7 +144,17 @@ class WalletService
                         ?? 'INR'
                 );
 
-                $wallet->refresh();
+                /*
+                 * Lock the resolved wallet row before reading
+                 * or mutating balances.
+                 *
+                 * refresh() alone does not serialize concurrent
+                 * financial writes and can cause lost updates.
+                 */
+                $wallet = WalletAccount::query()
+                    ->whereKey($wallet->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
                 $pendingBefore =
                     (float) $wallet
@@ -195,6 +215,74 @@ class WalletService
         );
     }
 
+    public function creditAvailable(
+        User $user,
+        float $amount,
+        string $category,
+        array $reference = []
+    ): WalletTransaction {
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' =>
+                    'Credit amount must be greater than zero.',
+            ]);
+        }
+
+        return DB::transaction(
+            function () use (
+                $user,
+                $amount,
+                $category,
+                $reference
+            ) {
+                $wallet = $this->account(
+                    $user,
+                    $reference['currency']
+                        ?? 'INR'
+                );
+
+                /*
+                 * Lock the resolved wallet row before reading
+                 * or mutating balances.
+                 *
+                 * refresh() alone does not serialize concurrent
+                 * financial writes and can cause lost updates.
+                 */
+                $wallet = WalletAccount::query()
+                    ->whereKey($wallet->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $before =
+                    (float) $wallet
+                        ->available_balance;
+
+                $after =
+                    $before + $amount;
+
+                $wallet->update([
+                    'available_balance' =>
+                        $after,
+
+                    'lifetime_credits' =>
+                        (float) $wallet
+                            ->lifetime_credits
+                        + $amount,
+                ]);
+
+                return $this->transaction(
+                    $wallet,
+                    'credit',
+                    $category,
+                    $amount,
+                    $before,
+                    $after,
+                    $reference
+                );
+            }
+        );
+    }
+
     public function debitAvailable(
         User $user,
         float $amount,
@@ -221,7 +309,17 @@ class WalletService
                         ?? 'INR'
                 );
 
-                $wallet->refresh();
+                /*
+                 * Lock the resolved wallet row before reading
+                 * or mutating balances.
+                 *
+                 * refresh() alone does not serialize concurrent
+                 * financial writes and can cause lost updates.
+                 */
+                $wallet = WalletAccount::query()
+                    ->whereKey($wallet->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
                 $before =
                     (float) $wallet

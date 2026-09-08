@@ -12,6 +12,9 @@ export default function Edit({
     label = {},
     artist = {},
 }) {
+    const hasLoginAccount =
+        artist.has_login_account === true;
+
     const {
         data,
         setData,
@@ -152,30 +155,42 @@ export default function Edit({
                             }
                         />
 
-                        <Field
-                            label="Username"
-                            value={data.username}
-                            error={errors.username}
-                            required
-                            onChange={(value) =>
-                                setData(
-                                    'username',
-                                    value
-                                        .toLowerCase()
-                                        .replace(
-                                            /[^a-z0-9-]/g,
-                                            ''
-                                        )
-                                )
-                            }
-                        />
+                        {hasLoginAccount ? (
+                            <Field
+                                label="Username"
+                                value={data.username}
+                                error={errors.username}
+                                required
+                                onChange={(value) =>
+                                    setData(
+                                        'username',
+                                        value
+                                            .toLowerCase()
+                                            .replace(
+                                                /[^a-z0-9-]/g,
+                                                ''
+                                            )
+                                    )
+                                }
+                            />
+                        ) : (
+                            <div>
+                                <span className="text-sm font-semibold text-slate-700">
+                                    Login Account
+                                </span>
+
+                                <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                                    Catalogue-only artist — no login account linked.
+                                </div>
+                            </div>
+                        )}
 
                         <Field
                             label="Email"
                             type="email"
                             value={data.email}
                             error={errors.email}
-                            required
+                            required={hasLoginAccount}
                             onChange={(value) =>
                                 setData(
                                     'email',
@@ -312,69 +327,83 @@ export default function Edit({
                     </div>
                 </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold text-slate-900">
-                        Account Actions
-                    </h2>
+                {hasLoginAccount ? (
+                    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h2 className="text-lg font-semibold text-slate-900">
+                            Account Actions
+                        </h2>
 
-                    <p className="mt-1 text-sm text-slate-500">
-                        Invitation: {
-                            artist.invitation_status
-                            ?? 'unknown'
-                        }
-                        {' · '}
-                        Last login: {
-                            artist.last_login_at
-                            ?? 'Never'
-                        }
-                    </p>
-
-                    <div className="mt-5 flex flex-wrap gap-3">
-                        <button
-                            type="button"
-                            onClick={() =>
-                                postAction(
-                                    'resend-invitation'
-                                )
+                        <p className="mt-1 text-sm text-slate-500">
+                            Invitation: {
+                                artist.invitation_status
+                                ?? 'unknown'
                             }
-                            className="rounded-xl border border-violet-300 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-700"
-                        >
-                            Resend Invitation
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() =>
-                                postAction(
-                                    'reset-password',
-                                    'Send a new secure password setup email?'
-                                )
+                            {' · '}
+                            Last login: {
+                                artist.last_login_at
+                                ?? 'Never'
                             }
-                            className="rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700"
-                        >
-                            Reset Password
-                        </button>
+                        </p>
 
-                        <button
-                            type="button"
-                            onClick={() =>
-                                postAction(
-                                    'toggle-status',
-                                    artist.account_status
-                                        === 'active'
-                                        ? 'Suspend this artist?'
-                                        : 'Activate this artist?'
-                                )
-                            }
-                            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700"
-                        >
-                            {artist.account_status
-                                === 'active'
-                                ? 'Suspend Artist'
-                                : 'Activate Artist'}
-                        </button>
-                    </div>
-                </section>
+                        <div className="mt-5 flex flex-wrap gap-3">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    postAction(
+                                        'resend-invitation'
+                                    )
+                                }
+                                className="rounded-xl border border-violet-300 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-700"
+                            >
+                                Resend Invitation
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    postAction(
+                                        'reset-password',
+                                        'Send a new secure password setup email?'
+                                    )
+                                }
+                                className="rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700"
+                            >
+                                Reset Password
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    postAction(
+                                        'toggle-status',
+                                        artist.account_status
+                                            === 'active'
+                                            ? 'Suspend this artist?'
+                                            : 'Activate this artist?'
+                                    )
+                                }
+                                className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700"
+                            >
+                                {artist.account_status
+                                    === 'active'
+                                    ? 'Suspend Artist'
+                                    : 'Activate Artist'}
+                            </button>
+                        </div>
+                    </section>
+                ) : (
+                    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h2 className="text-lg font-semibold text-slate-900">
+                            Artist Account
+                        </h2>
+
+                        <p className="mt-2 text-sm text-slate-500">
+                            Catalogue-only artist.
+                            No panel login account is linked.
+                            Artist information can still be edited and saved.
+                        </p>
+                    </section>
+                )}
 
                 {Object.keys(errors).length >
                     0 && (

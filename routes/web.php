@@ -2403,3 +2403,110 @@ Route::middleware(['auth'])
             ]
         )->name('v2.admin.label-hierarchy.destroy');
     });
+
+/*
+|--------------------------------------------------------------------------
+| Finance V3 - Financial Adjustments
+|--------------------------------------------------------------------------
+| Super Admin only.
+| Immutable ledger entries. Corrections are posted as reversals.
+|--------------------------------------------------------------------------
+*/
+Route::middleware([
+    'auth',
+    'verified',
+    'role:super_admin',
+])
+    ->prefix('super-admin/finance/adjustments')
+    ->name('single.super-admin.finance.adjustments.')
+    ->group(function () {
+        Route::get(
+            '/',
+            [
+                \App\Http\Controllers\V3\SuperAdmin\FinancialAdjustmentController::class,
+                'index',
+            ]
+        )->name('index');
+
+        Route::post(
+            '/',
+            [
+                \App\Http\Controllers\V3\SuperAdmin\FinancialAdjustmentController::class,
+                'store',
+            ]
+        )->name('store');
+
+        Route::post(
+            '/{adjustment}/reverse',
+            [
+                \App\Http\Controllers\V3\SuperAdmin\FinancialAdjustmentController::class,
+                'reverse',
+            ]
+        )->name('reverse');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Finance V3 - Recoupment Management
+|--------------------------------------------------------------------------
+| Super Admin only.
+| Documents are stored privately and served only through authenticated
+| controller downloads.
+|--------------------------------------------------------------------------
+*/
+Route::middleware([
+    'auth',
+    'verified',
+    'role:super_admin',
+])
+    ->prefix('super-admin/finance/recoupment')
+    ->name('single.super-admin.finance.recoupment.')
+    ->group(function () {
+        Route::get(
+            '/',
+            [
+                \App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class,
+                'index',
+            ]
+        )->name('index');
+
+        Route::post(
+            '/',
+            [
+                \App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class,
+                'store',
+            ]
+        )->name('store');
+
+        Route::get(
+            '/{plan}',
+            [
+                \App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class,
+                'details',
+            ]
+        )->name('details');
+
+        Route::post(
+            '/{plan}/expenses',
+            [
+                \App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class,
+                'addExpense',
+            ]
+        )->name('expenses.store');
+
+        Route::post(
+            '/{plan}/documents',
+            [
+                \App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class,
+                'uploadDocument',
+            ]
+        )->name('documents.store');
+
+        Route::get(
+            '/{plan}/documents/{document}/download',
+            [
+                \App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class,
+                'downloadDocument',
+            ]
+        )->name('documents.download');
+    });
