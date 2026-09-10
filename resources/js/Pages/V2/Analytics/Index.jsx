@@ -476,6 +476,16 @@ export default function Index({
             0
         );
 
+    const financialCountryPie =
+        financialCountries.slice(0, 10);
+
+    const financialCountryTotal =
+        financialCountryPie.reduce(
+            (total, item) =>
+                total + Number(item.net_payable || 0),
+            0
+        );
+
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [hierarchyOpen, setHierarchyOpen] = useState(false);
 
@@ -1445,58 +1455,146 @@ export default function Index({
                             />
 
                             {financialCountries.length ? (
-                                <div className="mt-5 overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                            <tr>
-                                                <th className="px-4 py-3">
-                                                    Country
-                                                </th>
+                                <div className="mt-5 grid min-h-[320px] items-center gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
+                                    <div className="relative h-[320px]">
+                                        <ResponsiveContainer
+                                            width="100%"
+                                            height="100%"
+                                        >
+                                            <PieChart>
+                                                <Pie
+                                                    data={
+                                                        financialCountryPie
+                                                    }
+                                                    dataKey="net_payable"
+                                                    nameKey="country"
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={82}
+                                                    outerRadius={125}
+                                                    paddingAngle={2}
+                                                    stroke="#ffffff"
+                                                    strokeWidth={3}
+                                                >
+                                                    {financialCountryPie.map(
+                                                        (
+                                                            item,
+                                                            index
+                                                        ) => (
+                                                            <Cell
+                                                                key={`${item.country || 'Unknown'}-${index}`}
+                                                                fill={
+                                                                    [
+                                                                        '#7c3aed',
+                                                                        '#2563eb',
+                                                                        '#059669',
+                                                                        '#ea580c',
+                                                                        '#db2777',
+                                                                        '#0891b2',
+                                                                        '#4f46e5',
+                                                                        '#65a30d',
+                                                                        '#d97706',
+                                                                        '#475569',
+                                                                    ][
+                                                                        index %
+                                                                            10
+                                                                    ]
+                                                                }
+                                                            />
+                                                        )
+                                                    )}
+                                                </Pie>
 
-                                                <th className="px-4 py-3 text-right">
-                                                    Gross
-                                                </th>
+                                                <Tooltip
+                                                    formatter={(
+                                                        value
+                                                    ) => [
+                                                        moneyFormat(
+                                                            value,
+                                                            financialCurrency
+                                                        ),
+                                                        'Net Payable',
+                                                    ]}
+                                                />
+                                            </PieChart>
+                                        </ResponsiveContainer>
 
-                                                <th className="px-4 py-3 text-right">
-                                                    Net Payable
-                                                </th>
-                                            </tr>
-                                        </thead>
+                                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                                Total
+                                            </div>
 
-                                        <tbody className="divide-y divide-slate-100">
-                                            {financialCountries
-                                                .slice(0, 15)
-                                                .map(
-                                                    (
-                                                        row,
-                                                        index
-                                                    ) => (
-                                                        <tr
-                                                            key={`${row.country}-${index}`}
-                                                        >
-                                                            <td className="px-4 py-3 font-semibold text-slate-900">
-                                                                {row.country ||
-                                                                    'Unknown'}
-                                                            </td>
-
-                                                            <td className="px-4 py-3 text-right text-slate-700">
-                                                                {moneyFormat(
-                                                                    row.gross_earnings,
-                                                                    financialCurrency
-                                                                )}
-                                                            </td>
-
-                                                            <td className="px-4 py-3 text-right font-bold text-violet-700">
-                                                                {moneyFormat(
-                                                                    row.net_payable,
-                                                                    financialCurrency
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    )
+                                            <div className="mt-1 text-xl font-black text-slate-950">
+                                                {moneyFormat(
+                                                    financialCountryTotal,
+                                                    financialCurrency
                                                 )}
-                                        </tbody>
-                                    </table>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2.5">
+                                        {financialCountryPie.map(
+                                            (item, index) => {
+                                                const value =
+                                                    Number(
+                                                        item.net_payable ||
+                                                            0
+                                                    );
+
+                                                const share =
+                                                    financialCountryTotal >
+                                                    0
+                                                        ? (value /
+                                                              financialCountryTotal) *
+                                                          100
+                                                        : 0;
+
+                                                return (
+                                                    <div
+                                                        key={`${item.country || 'Unknown'}-legend-${index}`}
+                                                        className="flex items-center justify-between gap-3 text-sm"
+                                                    >
+                                                        <div className="flex min-w-0 items-center gap-2">
+                                                            <span
+                                                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                                                style={{
+                                                                    backgroundColor:
+                                                                        [
+                                                                            '#7c3aed',
+                                                                            '#2563eb',
+                                                                            '#059669',
+                                                                            '#ea580c',
+                                                                            '#db2777',
+                                                                            '#0891b2',
+                                                                            '#4f46e5',
+                                                                            '#65a30d',
+                                                                            '#d97706',
+                                                                            '#475569',
+                                                                        ][
+                                                                            index %
+                                                                                10
+                                                                        ],
+                                                                }}
+                                                            />
+
+                                                            <span className="truncate font-medium text-slate-700">
+                                                                {item.country ||
+                                                                    'Unknown'}
+                                                            </span>
+                                                        </div>
+
+                                                        <span className="shrink-0 font-bold text-slate-900">
+                                                            {share.toFixed(
+                                                                1
+                                                            )}
+                                                            %
+                                                        </span>
+                                                    </div>
+                                                );
+                                            }
+                                        )}
+                                    </div>
                                 </div>
                             ) : (
                                 <EmptyState text="No financial country allocation data available." />
