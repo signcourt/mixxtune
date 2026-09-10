@@ -370,11 +370,11 @@ class FinancialAnalyticsHttpDimensionPayloadTest extends TestCase
                         )
                         ->has(
                             'financialAnalytics.currencies',
-                            2
+                            0
                         )
                         ->has(
                             'financialAnalytics.cms',
-                            2
+                            0
                         )
                         ->where(
                             'financialAnalytics.saleTypes',
@@ -424,82 +424,7 @@ class FinancialAnalyticsHttpDimensionPayloadTest extends TestCase
                                     );
                             }
                         )
-                        ->where(
-                            'financialAnalytics.currencies',
-                            function ($rows) {
-                                $rows = collect(
-                                    $rows
-                                );
 
-                                $inr =
-                                    $rows->firstWhere(
-                                        'currency',
-                                        'INR'
-                                    );
-
-                                $usd =
-                                    $rows->firstWhere(
-                                        'currency',
-                                        'USD'
-                                    );
-
-                                return
-                                    $inr !== null
-                                    && $usd !== null
-                                    && abs(
-                                        (float) $inr[
-                                            'gross_earnings'
-                                        ] - 100.0
-                                    ) < 0.000001
-                                    && abs(
-                                        (float) $usd[
-                                            'gross_earnings'
-                                        ] - 200.0
-                                    ) < 0.000001
-                                    && !$rows->contains(
-                                        'currency',
-                                        'EUR'
-                                    );
-                            }
-                        )
-                        ->where(
-                            'financialAnalytics.cms',
-                            function ($rows) {
-                                $rows = collect(
-                                    $rows
-                                );
-
-                                $wmg =
-                                    $rows->firstWhere(
-                                        'cms',
-                                        'WMG'
-                                    );
-
-                                $blv =
-                                    $rows->firstWhere(
-                                        'cms',
-                                        'BLV'
-                                    );
-
-                                return
-                                    $wmg !== null
-                                    && $blv !== null
-                                    && abs(
-                                        (float) $wmg[
-                                            'net_payable'
-                                        ] - 80.0
-                                    ) < 0.000001
-                                    && abs(
-                                        (float) $blv[
-                                            'net_payable'
-                                        ] - 160.0
-                                    ) < 0.000001
-                                    && !$rows->contains(
-                                        'cms',
-                                        'FOREIGN-CMS'
-                                    );
-                            }
-                        )
             );
 
         $content =

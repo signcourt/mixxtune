@@ -857,16 +857,20 @@ class AnalyticsController extends Controller
                 ),
 
             'currencies' =>
-                $financialAnalytics->currencyBreakdown(
-                    clone $financialStatements,
-                    $filters
-                ),
+                $role === 'super_admin'
+                    ? $financialAnalytics->currencyBreakdown(
+                        clone $financialStatements,
+                        $filters
+                    )
+                    : [],
 
             'cms' =>
-                $financialAnalytics->cmsBreakdown(
-                    clone $financialStatements,
-                    $filters
-                ),
+                $role === 'super_admin'
+                    ? $financialAnalytics->cmsBreakdown(
+                        clone $financialStatements,
+                        $filters
+                    )
+                    : [],
         ];
 
         return Inertia::render(
@@ -923,9 +927,11 @@ class AnalyticsController extends Controller
                     ),
 
                 'topAlbums' =>
-                    $analytics->topAlbums(
-                        clone $filtered
-                    ),
+                    $role === 'super_admin'
+                        ? $analytics->topAlbums(
+                            clone $filtered
+                        )
+                        : [],
 
                 'topLabels' =>
                     $analytics->topLabels(
@@ -933,19 +939,25 @@ class AnalyticsController extends Controller
                     ),
 
                 'saleTypes' =>
-                    $analytics->saleTypeSummary(
-                        clone $filtered
-                    ),
+                    $role === 'super_admin'
+                        ? $analytics->saleTypeSummary(
+                            clone $filtered
+                        )
+                        : [],
 
                 'currencySummary' =>
-                    $analytics->currencySummary(
-                        clone $filtered
-                    ),
+                    $role === 'super_admin'
+                        ? $analytics->currencySummary(
+                            clone $filtered
+                        )
+                        : [],
 
                 'cmsSummary' =>
-                    $analytics->cmsSummary(
-                        clone $filtered
-                    ),
+                    $role === 'super_admin'
+                        ? $analytics->cmsSummary(
+                            clone $filtered
+                        )
+                        : [],
 
                 'revenueVisibility' =>
                     $this->revenueVisibility(

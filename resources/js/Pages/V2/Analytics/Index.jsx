@@ -1,10 +1,12 @@
 import { Head, router } from '@inertiajs/react';
+import { useState } from 'react';
 import {
     Activity,
     BadgeIndianRupee,
     BarChart3,
     Disc3,
     Download,
+    Filter,
     Globe2,
     Layers3,
     MapPinned,
@@ -464,6 +466,19 @@ export default function Index({
     const platformPie =
         topPlatforms.slice(0, 6);
 
+    const financialPlatformPie =
+        financialPlatforms.slice(0, 10);
+
+    const financialPlatformTotal =
+        financialPlatformPie.reduce(
+            (total, item) =>
+                total + Number(item.net_payable || 0),
+            0
+        );
+
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const [hierarchyOpen, setHierarchyOpen] = useState(false);
+
     return (
         <>
             <Head title="Financial Analytics" />
@@ -475,7 +490,41 @@ export default function Index({
             >
                 <div className="space-y-6 p-5 lg:p-7">
 
+                    {/* ANALYTICS CONTROLS */}
+                    <div className="flex items-center justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setFiltersOpen((open) => !open)}
+                            title="Filters"
+                            aria-label="Filters"
+                            aria-expanded={filtersOpen}
+                            className={`flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition ${
+                                filtersOpen
+                                    ? 'border-violet-300 bg-violet-600 text-white'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700'
+                            }`}
+                        >
+                            <Filter className="h-4 w-4" />
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setHierarchyOpen((open) => !open)}
+                            title="Revenue Hierarchy Scope"
+                            aria-label="Revenue Hierarchy Scope"
+                            aria-expanded={hierarchyOpen}
+                            className={`flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition ${
+                                hierarchyOpen
+                                    ? 'border-violet-300 bg-violet-600 text-white'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700'
+                            }`}
+                        >
+                            <Layers3 className="h-4 w-4" />
+                        </button>
+                    </div>
+
                     {/* FILTER BAR */}
+                    {filtersOpen && (
                     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
                             <div>
@@ -772,7 +821,9 @@ export default function Index({
                             </div>
                         </div>
                     </div>
+                    )}
 
+                    {hierarchyOpen && (
                     <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
                         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
                             <div>
@@ -925,6 +976,7 @@ export default function Index({
                             Selecting a level includes that level and its complete descendant subtree.
                         </div>
                     </div>
+                    )}
 
                     {revenueVisibility?.available &&
                         !revenueVisibility?.is_master && (
@@ -1278,59 +1330,147 @@ export default function Index({
                                 />
 
                                 {financialPlatforms.length ? (
-                                    <div className="mt-5 h-[320px]">
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
-                                        >
-                                            <BarChart
-                                                data={financialPlatforms.slice(
-                                                    0,
-                                                    10
-                                                )}
-                                                layout="vertical"
+                                    <div className="mt-5 grid min-h-[320px] items-center gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
+                                        <div className="relative h-[320px]">
+                                            <ResponsiveContainer
+                                                width="100%"
+                                                height="100%"
                                             >
-                                                <CartesianGrid
-                                                    horizontal={false}
-                                                    strokeDasharray="3 3"
-                                                />
+                                                <PieChart>
+                                                    <Pie
+                                                        data={
+                                                            financialPlatformPie
+                                                        }
+                                                        dataKey="net_payable"
+                                                        nameKey="platform"
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={82}
+                                                        outerRadius={125}
+                                                        paddingAngle={2}
+                                                        stroke="#ffffff"
+                                                        strokeWidth={3}
+                                                    >
+                                                        {financialPlatformPie.map(
+                                                            (
+                                                                item,
+                                                                index
+                                                            ) => (
+                                                                <Cell
+                                                                    key={`${item.platform}-${index}`}
+                                                                    fill={
+                                                                        [
+                                                                            '#7c3aed',
+                                                                            '#2563eb',
+                                                                            '#059669',
+                                                                            '#ea580c',
+                                                                            '#db2777',
+                                                                            '#0891b2',
+                                                                            '#4f46e5',
+                                                                            '#65a30d',
+                                                                            '#d97706',
+                                                                            '#475569',
+                                                                        ][
+                                                                            index %
+                                                                                10
+                                                                        ]
+                                                                    }
+                                                                />
+                                                            )
+                                                        )}
+                                                    </Pie>
 
-                                                <XAxis
-                                                    type="number"
-                                                    tickFormatter={
-                                                        numberFormat
-                                                    }
-                                                />
+                                                    <Tooltip
+                                                        formatter={(
+                                                            value
+                                                        ) => [
+                                                            moneyFormat(
+                                                                value,
+                                                                financialCurrency
+                                                            ),
+                                                            'Net Payable',
+                                                        ]}
+                                                    />
+                                                </PieChart>
+                                            </ResponsiveContainer>
 
-                                                <YAxis
-                                                    type="category"
-                                                    dataKey="platform"
-                                                    width={110}
-                                                />
+                                            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                                    Total
+                                                </div>
 
-                                                <Tooltip
-                                                    formatter={(
-                                                        value
-                                                    ) =>
-                                                        moneyFormat(
-                                                            value,
-                                                            financialCurrency
-                                                        )
-                                                    }
-                                                />
+                                                <div className="mt-1 text-xl font-black text-slate-950">
+                                                    {moneyFormat(
+                                                        financialPlatformTotal,
+                                                        financialCurrency
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                                <Bar
-                                                    dataKey="net_payable"
-                                                    fill="#7c3aed"
-                                                    radius={[
-                                                        0,
-                                                        6,
-                                                        6,
-                                                        0,
-                                                    ]}
-                                                />
-                                            </BarChart>
-                                        </ResponsiveContainer>
+                                        <div className="space-y-2.5">
+                                            {financialPlatformPie.map(
+                                                (item, index) => {
+                                                    const value =
+                                                        Number(
+                                                            item.net_payable ||
+                                                                0
+                                                        );
+
+                                                    const share =
+                                                        financialPlatformTotal >
+                                                        0
+                                                            ? (value /
+                                                                  financialPlatformTotal) *
+                                                              100
+                                                            : 0;
+
+                                                    return (
+                                                        <div
+                                                            key={`${item.platform}-legend-${index}`}
+                                                            className="flex items-center justify-between gap-3 text-sm"
+                                                        >
+                                                            <div className="flex min-w-0 items-center gap-2">
+                                                                <span
+                                                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                                                    style={{
+                                                                        backgroundColor:
+                                                                            [
+                                                                                '#7c3aed',
+                                                                                '#2563eb',
+                                                                                '#059669',
+                                                                                '#ea580c',
+                                                                                '#db2777',
+                                                                                '#0891b2',
+                                                                                '#4f46e5',
+                                                                                '#65a30d',
+                                                                                '#d97706',
+                                                                                '#475569',
+                                                                            ][
+                                                                                index %
+                                                                                    10
+                                                                            ],
+                                                                    }}
+                                                                />
+
+                                                                <span className="truncate font-medium text-slate-700">
+                                                                    {
+                                                                        item.platform
+                                                                    }
+                                                                </span>
+                                                            </div>
+
+                                                            <span className="shrink-0 font-bold text-slate-900">
+                                                                {share.toFixed(
+                                                                    1
+                                                                )}
+                                                                %
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                }
+                                            )}
+                                        </div>
                                     </div>
                                 ) : (
                                     <EmptyState text="No financial platform allocation data available." />
@@ -1473,6 +1613,7 @@ export default function Index({
                                 </div>
                             </div>
 
+                            {role === 'super_admin' && (
                             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                                 <div className="border-b border-slate-100 p-5">
                                     <SectionHeader
@@ -1541,8 +1682,10 @@ export default function Index({
                                     </table>
                                 </div>
                             </div>
+                            )}
                         </div>
 
+                        {role === 'super_admin' && (
                         <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                             <div className="border-b border-slate-100 p-5">
                                 <SectionHeader
@@ -1609,6 +1752,7 @@ export default function Index({
                                 </table>
                             </div>
                         </div>
+                        )}
                     </div>
 
                     {/* RAW REPORT KPI CARDS */}
@@ -2002,6 +2146,7 @@ export default function Index({
                             </div>
                         </div>
 
+                        {role === 'super_admin' && (
                         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                             <SectionHeader
                                 icon={Disc3}
@@ -2016,6 +2161,7 @@ export default function Index({
                                 />
                             </div>
                         </div>
+                        )}
 
                         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                             <SectionHeader
@@ -2035,6 +2181,7 @@ export default function Index({
 
                     {/* SALE TYPE + CURRENCY */}
                     <div className="grid gap-4 xl:grid-cols-2">
+                        {role === 'super_admin' && (
                         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                             <div className="border-b border-slate-100 p-5">
                                 <SectionHeader
@@ -2114,7 +2261,9 @@ export default function Index({
                                 </table>
                             </div>
                         </div>
+                        )}
 
+                        {role === 'super_admin' && (
                         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                             <div className="border-b border-slate-100 p-5">
                                 <SectionHeader
@@ -2175,9 +2324,11 @@ export default function Index({
                                 </table>
                             </div>
                         </div>
+                        )}
                     </div>
 
-                    {/* CMS BREAKDOWN */}
+                    {/* CMS BREAKDOWN — SUPER ADMIN ONLY */}
+                    {role === 'super_admin' && (
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="border-b border-slate-100 p-5">
                             <SectionHeader
@@ -2257,6 +2408,8 @@ export default function Index({
                             </table>
                         </div>
                     </div>
+
+                    )}
 
                     {/* TRACK TABLE */}
                     <div className="grid gap-4">
@@ -2343,67 +2496,6 @@ export default function Index({
 
                     </div>
 
-                    {/* STORE SHARE PIE */}
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <SectionHeader
-                            icon={Globe2}
-                            title="Store Reported Earnings Share"
-                            subtitle="Percentage contribution to reported earnings by DSP"
-                        />
-
-                        {platformPie.length ? (
-                            <div className="mt-4 h-[350px]">
-                                <ResponsiveContainer
-                                    width="100%"
-                                    height="100%"
-                                >
-                                    <PieChart>
-                                        <Pie
-                                            data={platformPie}
-                                            dataKey="earnings"
-                                            nameKey="name"
-                                            cx="50%"
-                                            cy="50%"
-                                            outerRadius={115}
-                                            label={({ name, percent }) =>
-                                                `${name} ${(percent * 100).toFixed(1)}%`
-                                            }
-                                        >
-                                            {platformPie.map(
-                                                (item, index) => (
-                                                    <Cell
-                                                        key={`${item.name}-${index}`}
-                                                        fill={
-                                                            [
-                                                                '#7c3aed',
-                                                                '#2563eb',
-                                                                '#059669',
-                                                                '#ea580c',
-                                                                '#db2777',
-                                                                '#475569',
-                                                            ][index % 6]
-                                                        }
-                                                    />
-                                                )
-                                            )}
-                                        </Pie>
-
-                                        <Tooltip
-                                            formatter={(value) => [
-                                                moneyFormat(
-                                                    value,
-                                                    primaryCurrency
-                                                ),
-                                                'Reported Earnings',
-                                            ]}
-                                        />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                        ) : (
-                            <EmptyState />
-                        )}
-                    </div>
                 </div>
             </PanelLayout>
         </>
