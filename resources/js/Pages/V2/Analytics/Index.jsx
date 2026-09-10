@@ -1351,13 +1351,15 @@ export default function Index({
 
                                                     <Tooltip
                                                         formatter={(
-                                                            value
+                                                            value,
+                                                            name
                                                         ) => [
                                                             moneyFormat(
                                                                 value,
                                                                 financialCurrency
                                                             ),
-                                                            'Net Payable',
+                                                            name ||
+                                                                'Unknown Store',
                                                         ]}
                                                     />
                                                 </PieChart>
@@ -1507,13 +1509,15 @@ export default function Index({
 
                                                 <Tooltip
                                                     formatter={(
-                                                        value
+                                                        value,
+                                                        name
                                                     ) => [
                                                         moneyFormat(
                                                             value,
                                                             financialCurrency
                                                         ),
-                                                        'Net Payable',
+                                                        name ||
+                                                            'Unknown Country',
                                                     ]}
                                                 />
                                             </PieChart>
