@@ -1188,47 +1188,6 @@ export default function Index({
                             subtitle="Canonical payable analytics generated from royalty statements and allocations"
                         />
 
-                        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                            <Card
-                                title="Gross Revenue"
-                                value={moneyFormat(
-                                    financialSummary.gross_earnings,
-                                    financialCurrency
-                                )}
-                                subtitle="Gross earnings across scoped royalty statements"
-                                icon={BarChart3}
-                            />
-
-                            <Card
-                                title="Commission"
-                                value={moneyFormat(
-                                    financialSummary.commission_amount,
-                                    financialCurrency
-                                )}
-                                subtitle="Commission deducted from gross revenue"
-                                icon={Activity}
-                            />
-
-                            <Card
-                                title="Net Payable"
-                                value={moneyFormat(
-                                    financialSummary.net_payable,
-                                    financialCurrency
-                                )}
-                                subtitle="Final payable royalty amount"
-                                icon={BadgeIndianRupee}
-                            />
-
-                            <Card
-                                title="Statements"
-                                value={numberFormat(
-                                    financialSummary.statements_count
-                                )}
-                                subtitle="Royalty statements in selected period"
-                                icon={Layers3}
-                            />
-                        </div>
-
                         <div className="mt-5 grid gap-4 xl:grid-cols-2">
                             <div className="rounded-2xl border border-slate-200 bg-white p-5">
                                 <SectionHeader
@@ -1546,73 +1505,6 @@ export default function Index({
 
                         {/* CANONICAL FINANCIAL DIMENSIONS */}
                         <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                                <div className="border-b border-slate-100 p-5">
-                                    <SectionHeader
-                                        icon={BarChart3}
-                                        title="Financial Revenue by Sale Type"
-                                        subtitle="Allocation-safe gross and net payable by usage type"
-                                    />
-                                </div>
-
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full">
-                                        <thead className="bg-slate-50">
-                                            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                <th className="px-5 py-3">
-                                                    Sale Type
-                                                </th>
-                                                <th className="px-5 py-3 text-right">
-                                                    Gross
-                                                </th>
-                                                <th className="px-5 py-3 text-right">
-                                                    Net Payable
-                                                </th>
-                                            </tr>
-                                        </thead>
-
-                                        <tbody className="divide-y divide-slate-100">
-                                            {financialSaleTypes.length ? (
-                                                financialSaleTypes.map(
-                                                    (row, index) => (
-                                                        <tr
-                                                            key={`${row.sale_type || 'unknown'}-${index}`}
-                                                            className="hover:bg-slate-50"
-                                                        >
-                                                            <td className="px-5 py-4 text-sm font-semibold text-slate-900">
-                                                                {row.sale_type ||
-                                                                    'Unknown'}
-                                                            </td>
-                                                            <td className="px-5 py-4 text-right text-sm text-slate-700">
-                                                                {moneyFormat(
-                                                                    row.gross_earnings,
-                                                                    financialCurrency
-                                                                )}
-                                                            </td>
-                                                            <td className="px-5 py-4 text-right text-sm font-bold text-violet-700">
-                                                                {moneyFormat(
-                                                                    row.net_payable,
-                                                                    financialCurrency
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    )
-                                                )
-                                            ) : (
-                                                <tr>
-                                                    <td
-                                                        colSpan="3"
-                                                        className="px-5 py-14 text-center text-sm text-slate-400"
-                                                    >
-                                                        No financial sale type allocation data available.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
                             {role === 'super_admin' && (
                             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                                 <div className="border-b border-slate-100 p-5">
