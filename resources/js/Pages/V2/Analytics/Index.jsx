@@ -327,6 +327,50 @@ export default function Index({
             >
                 <div className="space-y-6 p-5 lg:p-7">
 
+                    {/* RAW REPORT KPI CARDS */}
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <Card
+                            title="Reported Earnings"
+                            value={moneyFormat(
+                                summary.earnings,
+                                primaryCurrency
+                            )}
+                            subtitle={`${numberFormat(summary.rows)} report rows`}
+                            growth={
+                                growth.has_previous
+                                    ? growth.earnings_percent
+                                    : null
+                            }
+                            icon={BadgeIndianRupee}
+                        />
+
+                        <Card
+                            title="Streams"
+                            value={numberFormat(summary.streams)}
+                            subtitle="Reported DSP streams"
+                            growth={
+                                growth.has_previous
+                                    ? growth.streams_percent
+                                    : null
+                            }
+                            icon={Activity}
+                        />
+
+                        <Card
+                            title="Consumption Units"
+                            value={numberFormat(summary.sale_units)}
+                            subtitle="Imported sale / stream units"
+                            icon={BarChart3}
+                        />
+
+                        <Card
+                            title="Active Stores"
+                            value={numberFormat(topPlatforms.length)}
+                            subtitle="DSPs in selected period"
+                            icon={Store}
+                        />
+                    </div>
+
                     {/* REPORTING RANGE */}
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -960,50 +1004,6 @@ export default function Index({
                             </div>
                         </div>
                         )}
-                    {/* RAW REPORT KPI CARDS */}
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                        <Card
-                            title="Reported Earnings"
-                            value={moneyFormat(
-                                summary.earnings,
-                                primaryCurrency
-                            )}
-                            subtitle={`${numberFormat(summary.rows)} report rows`}
-                            growth={
-                                growth.has_previous
-                                    ? growth.earnings_percent
-                                    : null
-                            }
-                            icon={BadgeIndianRupee}
-                        />
-
-                        <Card
-                            title="Streams"
-                            value={numberFormat(summary.streams)}
-                            subtitle="Reported DSP streams"
-                            growth={
-                                growth.has_previous
-                                    ? growth.streams_percent
-                                    : null
-                            }
-                            icon={Activity}
-                        />
-
-                        <Card
-                            title="Consumption Units"
-                            value={numberFormat(summary.sale_units)}
-                            subtitle="Imported sale / stream units"
-                            icon={BarChart3}
-                        />
-
-                        <Card
-                            title="Active Stores"
-                            value={numberFormat(topPlatforms.length)}
-                            subtitle="DSPs in selected period"
-                            icon={Store}
-                        />
-                    </div>
-
                     {/* RANKINGS */}
                     <div className="grid gap-4 xl:grid-cols-3">
                         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
