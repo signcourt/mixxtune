@@ -559,18 +559,6 @@ export default function ReleaseIndex({
                                 <thead className="bg-slate-50">
                                     <tr className="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
                                             <th className="px-5 py-4">
-                                                Release
-                                            </th>
-
-                                            <th className="px-5 py-4">
-                                                Artist
-                                            </th>
-
-                                            <th className="px-5 py-4">
-                                                Tracks
-                                            </th>
-
-                                            <th className="px-5 py-4">
                                                 Status
                                             </th>
 
@@ -579,11 +567,27 @@ export default function ReleaseIndex({
                                             </th>
 
                                             <th className="px-5 py-4">
+                                                Release
+                                            </th>
+
+                                            <th className="px-5 py-4">
+                                                Label Name
+                                            </th>
+
+                                            <th className="px-5 py-4">
+                                                Artist
+                                            </th>
+
+                                            <th className="px-5 py-4">
+                                                Track
+                                            </th>
+
+                                            <th className="px-5 py-4">
                                                 UPC
                                             </th>
 
                                             <th className="px-5 py-4 text-right">
-                                                Actions
+                                                Action
                                             </th>
                                         </tr>
                                 </thead>
@@ -861,7 +865,23 @@ function ReleaseRow({
     return (
         <tr className="transition hover:bg-slate-50">
             <td className="px-5 py-3.5">
-                <div className="flex min-w-[290px] items-center gap-3">
+                <ReleaseStatusIcon
+                    status={status}
+                />
+            </td>
+
+            <td className="px-5 py-3.5">
+                <span className="whitespace-nowrap text-sm font-medium text-slate-600">
+                    {displayReleaseDate
+                        ? formatDate(
+                            displayReleaseDate
+                        ).replace(/ /g, '-')
+                        : 'Not scheduled'}
+                </span>
+            </td>
+
+            <td className="px-5 py-3.5">
+                <div className="flex min-w-[310px] items-center gap-3">
                     <Link
                         href={viewPath}
                         className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm"
@@ -887,37 +907,46 @@ function ReleaseRow({
                         <Link
                             href={viewPath}
                             className="block max-w-[260px] truncate text-sm font-semibold text-slate-900 transition hover:text-violet-700"
+                            title={
+                                release.title
+                                || 'Untitled Release'
+                            }
                         >
                             {release.title
                                 || 'Untitled Release'}
                         </Link>
 
-                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-                            <span className="capitalize">
-                                {release.release_type
-                                    || 'Single'}
-                            </span>
-
-                            {release.label_name && (
-                                <>
-                                    <span>·</span>
-
-                                    <span className="max-w-[150px] truncate">
-                                        {release.label_name}
-                                    </span>
-                                </>
-                            )}
-                        </div>
+                        <p className="mt-1 text-xs font-medium capitalize text-slate-400">
+                            {release.release_type
+                                || 'Single'}
+                        </p>
                     </div>
                 </div>
             </td>
 
             <td className="px-5 py-3.5">
-                <div className="min-w-[150px]">
-                    <div className="max-w-[190px] truncate text-sm font-medium text-slate-700">
-                        {release.primary_artist_name
-                            || 'Artist'}
-                    </div>
+                <div
+                    title={
+                        release.label_name
+                        || ''
+                    }
+                    className="max-w-[210px] truncate text-sm font-medium text-slate-700"
+                >
+                    {release.label_name
+                        || '—'}
+                </div>
+            </td>
+
+            <td className="px-5 py-3.5">
+                <div
+                    title={
+                        release.primary_artist_name
+                        || ''
+                    }
+                    className="max-w-[220px] truncate text-sm font-medium text-slate-700"
+                >
+                    {release.primary_artist_name
+                        || 'Artist'}
                 </div>
             </td>
 
@@ -938,29 +967,15 @@ function ReleaseRow({
             </td>
 
             <td className="px-5 py-3.5">
-                <StatusBadge
-                    status={status}
-                />
-            </td>
-
-            <td className="px-5 py-3.5">
-                <span className="whitespace-nowrap text-sm text-slate-600">
-                    {displayReleaseDate
-                        ? formatDate(
-                            displayReleaseDate
-                        )
-                        : 'Not scheduled'}
-                </span>
-            </td>
-
-            <td className="px-5 py-3.5">
-                <div className="min-w-[130px]">
+                {release.upc ? (
                     <span className="whitespace-nowrap text-sm font-medium text-slate-700">
-                        {release.upc
-                            || 'Pending'}
+                        {release.upc}
                     </span>
-
-                </div>
+                ) : (
+                    <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-600 ring-1 ring-inset ring-amber-200">
+                        Pending
+                    </span>
+                )}
             </td>
 
             <td className="px-5 py-3.5">
@@ -1002,6 +1017,144 @@ function ReleaseRow({
     );
 }
 
+function ReleaseStatusIcon({
+    status,
+}) {
+    const value =
+        normaliseStatus(status);
+
+    if (
+        [
+            'live',
+            'approved',
+            'delivered',
+        ].includes(value)
+    ) {
+        return (
+            <span
+                title={value}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-5 w-5"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                >
+                    <path
+                        d="m5 12 4 4 10-10"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            </span>
+        );
+    }
+
+    if (
+        [
+            'submitted',
+            'processing',
+            'under_review',
+            'in_review',
+        ].includes(value)
+    ) {
+        return (
+            <span
+                title={value}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-500"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-5 w-5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                >
+                    <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                    />
+                    <path
+                        d="M12 7v5l3 2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            </span>
+        );
+    }
+
+    if (
+        value === 'draft'
+    ) {
+        return (
+            <span
+                title="draft"
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-5 w-5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                >
+                    <path
+                        d="M6 3h8l4 4v14H6V3Z"
+                        strokeLinejoin="round"
+                    />
+                    <path
+                        d="M14 3v5h5M9 13h6M9 17h5"
+                        strokeLinecap="round"
+                    />
+                </svg>
+            </span>
+        );
+    }
+
+    if (
+        [
+            'rejected',
+            'failed',
+            'changes_requested',
+            'takedown',
+            'taken_down',
+        ].includes(value)
+    ) {
+        return (
+            <span
+                title={value}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-5 w-5"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                >
+                    <path
+                        d="m7 7 10 10M17 7 7 17"
+                        strokeLinecap="round"
+                    />
+                </svg>
+            </span>
+        );
+    }
+
+    return (
+        <span
+            title={value || 'status'}
+            aria-label={value || 'status'}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+        >
+            <span className="h-2.5 w-2.5 rounded-full bg-current" />
+        </span>
+    );
+}
 
 function EyeIcon() {
     return (

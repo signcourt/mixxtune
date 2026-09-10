@@ -698,23 +698,11 @@ function CatalogueTable({
 }) {
     return (
         <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] border-collapse">
+            <table className="w-full min-w-[1380px] border-collapse">
                 <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/90 text-left">
+                    <tr className="border-b border-slate-200 bg-white text-left">
                         <TableHeading>
-                            Release
-                        </TableHeading>
-
-                        <TableHeading>
-                            UPC
-                        </TableHeading>
-
-                        <TableHeading>
-                            Type
-                        </TableHeading>
-
-                        <TableHeading>
-                            Tracks
+                            Status
                         </TableHeading>
 
                         <TableHeading>
@@ -722,11 +710,27 @@ function CatalogueTable({
                         </TableHeading>
 
                         <TableHeading>
-                            Status
+                            Release
+                        </TableHeading>
+
+                        <TableHeading>
+                            Label Name
+                        </TableHeading>
+
+                        <TableHeading>
+                            Artist
+                        </TableHeading>
+
+                        <TableHeading>
+                            Track
+                        </TableHeading>
+
+                        <TableHeading>
+                            UPC
                         </TableHeading>
 
                         <TableHeading align="right">
-                            Actions
+                            Action
                         </TableHeading>
                     </tr>
                 </thead>
@@ -751,13 +755,33 @@ function CatalogueRow({
         item.artwork_path
     );
 
+    const trackCount =
+        Number(item.track_count ?? 0);
+
     return (
-        <tr className="group border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50/80">
-            <td className="px-5 py-3">
-                <div className="flex min-w-[310px] items-center gap-3">
+        <tr className="group border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50/70">
+            <td className="px-5 py-4">
+                <CatalogueStatusIcon
+                    status={
+                        item.release_status
+                    }
+                />
+            </td>
+
+            <td className="px-5 py-4">
+                <span className="whitespace-nowrap text-sm font-medium text-slate-700">
+                    {formatDate(
+                        item.digital_release_date ||
+                            item.original_release_date
+                    )}
+                </span>
+            </td>
+
+            <td className="px-5 py-4">
+                <div className="flex min-w-[330px] items-center gap-3">
                     <Link
                         href={`/v2/catalogue/${item.id}`}
-                        className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm"
+                        className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm"
                     >
                         {artwork ? (
                             <img
@@ -769,109 +793,288 @@ function CatalogueRow({
                                 className="h-full w-full object-cover"
                             />
                         ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xl text-slate-300">
+                            <span className="text-2xl font-semibold text-violet-600">
                                 ♪
-                            </div>
+                            </span>
                         )}
                     </Link>
 
                     <div className="min-w-0">
                         <Link
                             href={`/v2/catalogue/${item.id}`}
-                            className="block max-w-[260px] truncate text-sm font-bold text-slate-900 transition hover:text-violet-700"
+                            title={
+                                item.title ??
+                                'Untitled Release'
+                            }
+                            className="block max-w-[290px] truncate text-sm font-bold text-slate-900 transition hover:text-violet-700"
                         >
                             {item.title ??
                                 'Untitled Release'}
                         </Link>
 
-                        <p className="mt-0.5 max-w-[260px] truncate text-xs font-medium text-slate-500">
-                            {item.primary_artist_name ||
-                                'Unknown Artist'}
+                        <p className="mt-1 text-xs font-medium capitalize text-slate-400">
+                            {item.release_type ||
+                                'Single'}
                         </p>
-
-                        {item.label_name && (
-                            <p className="mt-1 max-w-[260px] truncate text-[11px] text-slate-400">
-                                {item.label_name}
-                            </p>
-                        )}
                     </div>
                 </div>
             </td>
 
-            <td className="px-5 py-3">
-                <div className="min-w-[170px]">
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase text-slate-400">
-                            UPC
-                        </span>
-
-                        <span className="text-xs font-semibold text-slate-700">
-                            {item.upc || 'Pending'}
-                        </span>
-                    </div>
-
-                </div>
-            </td>
-
-            <td className="px-5 py-3">
-                <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-bold capitalize text-slate-600">
-                    {item.release_type ||
-                        'Single'}
-                </span>
-            </td>
-
-            <td className="px-5 py-3">
-                <div className="text-sm font-bold text-slate-900">
-                    {item.track_count ?? 0}
-                </div>
-
-                <div className="mt-0.5 text-[10px] text-slate-400">
-                    {item.isrc_assigned_count ??
-                        0}
-                    /
-                    {item.track_count ?? 0}{' '}
-                    ISRC
-                </div>
-            </td>
-
-            <td className="px-5 py-3">
-                <span className="whitespace-nowrap text-xs font-semibold text-slate-700">
-                    {formatDate(
-                        item.digital_release_date || item.original_release_date
-                    )}
-                </span>
-            </td>
-
-            <td className="px-5 py-3">
-                <StatusBadge
-                    status={
-                        item.release_status
+            <td className="px-5 py-4">
+                <span
+                    title={
+                        item.label_name || ''
                     }
-                />
+                    className="block max-w-[220px] truncate text-sm font-medium text-slate-700"
+                >
+                    {item.label_name ||
+                        '—'}
+                </span>
             </td>
 
-            <td className="px-5 py-3">
-                <div className="flex items-center justify-end gap-1.5">
+            <td className="px-5 py-4">
+                <span
+                    title={
+                        item.primary_artist_name ||
+                        ''
+                    }
+                    className="block max-w-[240px] truncate text-sm font-medium text-slate-700"
+                >
+                    {item.primary_artist_name ||
+                        'Unknown Artist'}
+                </span>
+            </td>
+
+            <td className="px-5 py-4">
+                <div className="inline-flex items-center gap-2.5 whitespace-nowrap">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-lg font-semibold text-violet-600">
+                        ♪
+                    </span>
+
+                    <span className="text-sm font-semibold text-slate-700">
+                        {trackCount}{' '}
+                        {trackCount === 1
+                            ? 'Track'
+                            : 'Tracks'}
+                    </span>
+                </div>
+            </td>
+
+            <td className="px-5 py-4">
+                {item.upc ? (
+                    <span className="whitespace-nowrap text-sm font-medium text-slate-700">
+                        {item.upc}
+                    </span>
+                ) : (
+                    <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-600 ring-1 ring-inset ring-amber-200">
+                        Pending
+                    </span>
+                )}
+            </td>
+
+            <td className="px-5 py-4">
+                <div className="flex justify-end">
                     <Link
                         href={`/v2/catalogue/${item.id}`}
                         title="View release"
                         aria-label="View release"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-base text-slate-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
                     >
-                        ◉
-                    </Link>
-
-                    <Link
-                        href={`/v2/catalogue/${item.id}`}
-                        title="Release details"
-                        aria-label="Release details"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm text-slate-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
-                    >
-                        ⋮
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            className="h-5 w-5"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            aria-hidden="true"
+                        >
+                            <path
+                                d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                            <circle
+                                cx="12"
+                                cy="12"
+                                r="2.75"
+                            />
+                        </svg>
                     </Link>
                 </div>
             </td>
         </tr>
+    );
+}
+
+function CatalogueStatusIcon({
+    status,
+}) {
+    const value = String(
+        status || 'pending'
+    )
+        .toLowerCase()
+        .trim();
+
+    if (
+        [
+            'live',
+            'approved',
+            'delivered',
+        ].includes(value)
+    ) {
+        return (
+            <span
+                title={normaliseStatus(status)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-5 w-5"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                >
+                    <path
+                        d="m5 12 4 4 10-10"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            </span>
+        );
+    }
+
+    if (
+        [
+            'scheduled',
+            'upcoming',
+        ].includes(value)
+    ) {
+        return (
+            <span
+                title={normaliseStatus(status)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-5 w-5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                >
+                    <rect
+                        x="3"
+                        y="5"
+                        width="18"
+                        height="16"
+                        rx="2"
+                    />
+                    <path
+                        d="M8 3v4M16 3v4M3 10h18"
+                        strokeLinecap="round"
+                    />
+                </svg>
+            </span>
+        );
+    }
+
+    if (
+        [
+            'pending',
+            'submitted',
+            'processing',
+            'under_review',
+        ].includes(value)
+    ) {
+        return (
+            <span
+                title={normaliseStatus(status)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-500"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-5 w-5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                >
+                    <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                    />
+                    <path
+                        d="M12 7v5l3 2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            </span>
+        );
+    }
+
+    if (value === 'draft') {
+        return (
+            <span
+                title="Draft"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-5 w-5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                >
+                    <path
+                        d="M6 3h8l4 4v14H6V3Z"
+                        strokeLinejoin="round"
+                    />
+                    <path
+                        d="M14 3v5h5M9 13h6M9 17h5"
+                        strokeLinecap="round"
+                    />
+                </svg>
+            </span>
+        );
+    }
+
+    if (
+        [
+            'rejected',
+            'failed',
+            'taken_down',
+            'takedown',
+        ].includes(value)
+    ) {
+        return (
+            <span
+                title={normaliseStatus(status)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500 text-white shadow-sm"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-5 w-5"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                >
+                    <path
+                        d="m7 7 10 10M17 7 7 17"
+                        strokeLinecap="round"
+                    />
+                </svg>
+            </span>
+        );
+    }
+
+    return (
+        <span
+            title={normaliseStatus(status)}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+        >
+            <span className="h-2.5 w-2.5 rounded-full bg-current" />
+        </span>
     );
 }
 
