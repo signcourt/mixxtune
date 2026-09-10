@@ -5,24 +5,16 @@ import {
     BadgeIndianRupee,
     BarChart3,
     Disc3,
-    Download,
-    Filter,
     Globe2,
     Layers3,
-    MapPinned,
     Music2,
-    RefreshCcw,
     Store,
-    TrendingDown,
-    TrendingUp,
     Users,
 } from 'lucide-react';
 
 import {
     Area,
     AreaChart,
-    Bar,
-    BarChart,
     CartesianGrid,
     Cell,
     Line,
@@ -226,20 +218,14 @@ export default function Index({
     role = 'artist',
     filters = {},
     filterOptions = {},
-    hierarchyOptions = {},
     summary = {},
     growth = {},
-    monthlyTrend = [],
     topPlatforms = [],
-    topCountries = [],
     topTracks = [],
     topArtists = [],
     topAlbums = [],
     topLabels = [],
-    saleTypes = [],
     currencySummary = [],
-    cmsSummary = [],
-    revenueVisibility = {},
     financialAnalytics = {},
 }) {
     const primaryCurrency =
@@ -256,9 +242,6 @@ export default function Index({
 
     const financialCountries =
         financialAnalytics?.countries || [];
-
-    const financialSaleTypes =
-        financialAnalytics?.saleTypes || [];
 
     const financialCurrencies =
         financialAnalytics?.currencies || [];
@@ -279,215 +262,59 @@ export default function Index({
     const countries =
         filterOptions?.countries || [];
 
-    const saleTypeOptions =
-        filterOptions?.saleTypes || [];
-
-    const cmsOptions =
-        filterOptions?.cms || [];
-
-    const hierarchyMasters =
-        hierarchyOptions?.masters || [];
-
-    const hierarchyLevels =
-        hierarchyOptions?.levels || [];
-
-    const hierarchyArtists =
-        hierarchyOptions?.artists || [];
-
-    const selectedMasterId =
-        filters.master_label_id || '';
-
-    const selectedLevelId =
-        filters.level_id || '';
-
-    const selectedArtistId =
-        filters.artist_id || '';
-
-    const filteredLevels =
-        selectedMasterId
-            ? hierarchyLevels.filter(
-                  (level) =>
-                      String(level.root_id) ===
-                      String(selectedMasterId)
-              )
-            : hierarchyLevels;
-
-    const selectedLevel =
-        hierarchyLevels.find(
-            (level) =>
-                String(level.id) ===
-                String(selectedLevelId)
-        ) || null;
-
-    const descendantLevelIds =
-        selectedLevel
-            ? new Set(
-                  hierarchyLevels
-                      .filter((level) => {
-                          const selectedPath =
-                              String(
-                                  selectedLevel.path ||
-                                  ''
-                              );
-
-                          const path =
-                              String(
-                                  level.path ||
-                                  ''
-                              );
-
-                          return (
-                              String(level.id) ===
-                                  String(
-                                      selectedLevel.id
-                                  )
-                              ||
-                              path.startsWith(
-                                  `${selectedPath} › `
-                              )
-                          );
-                      })
-                      .map(
-                          (level) =>
-                              String(level.id)
-                      )
-              )
-            : null;
-
-    const filteredHierarchyArtists =
-        hierarchyArtists.filter(
-            (artist) => {
-                if (
-                    selectedMasterId
-                    && artist.label_id
-                ) {
-                    const artistLevel =
-                        hierarchyLevels.find(
-                            (level) =>
-                                String(
-                                    level.id
-                                ) ===
-                                String(
-                                    artist.label_id
-                                )
-                        );
-
-                    if (
-                        !artistLevel
-                        ||
-                        String(
-                            artistLevel.root_id
-                        ) !==
-                            String(
-                                selectedMasterId
-                            )
-                    ) {
-                        return false;
-                    }
-                }
-
-                if (
-                    descendantLevelIds
-                    && artist.label_id
-                    && !descendantLevelIds.has(
-                        String(
-                            artist.label_id
-                        )
-                    )
-                ) {
-                    return false;
-                }
-
-                return true;
-            }
+    const financialPlatformTotal =
+        financialPlatforms.reduce(
+            (total, item) =>
+                total + Number(item.net_payable || 0),
+            0
         );
-
-    const changeFilter = (key, value) => {
-        router.get(
-            window.location.pathname,
-            {
-                ...filters,
-                [key]: value,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                replace: true,
-            }
-        );
-    };
-
-    const resetFilters = () => {
-        router.get(
-            window.location.pathname,
-            {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-                replace: true,
-            }
-        );
-    };
-
-    const exportCsv = () => {
-        const params = new URLSearchParams();
-
-        Object.entries(filters || {}).forEach(
-            ([key, value]) => {
-                if (value !== null && value !== undefined && value !== '') {
-                    params.set(key, value);
-                }
-            }
-        );
-
-        const query = params.toString();
-
-        window.location.href =
-            `/v2/analytics/export${query ? `?${query}` : ''}`;
-    };
-
-    const scope =
-        role === 'super_admin'
-            ? 'All platform data'
-            : role === 'admin'
-              ? 'Assigned labels and artists'
-              : role === 'label'
-                ? 'Your label catalogue'
-                : 'Your artist catalogue';
-
-    const direction =
-        growth.direction || 'neutral';
-
-    const GrowthIcon =
-        direction === 'down'
-            ? TrendingDown
-            : TrendingUp;
-
-    const platformPie =
-        topPlatforms.slice(0, 6);
 
     const financialPlatformPie =
-        financialPlatforms.slice(0, 10);
+        financialPlatforms.length <= 10
+            ? financialPlatforms
+            : [
+                  ...financialPlatforms.slice(0, 9),
+                  {
+                      platform: 'Others',
+                      net_payable: financialPlatforms
+                          .slice(9)
+                          .reduce(
+                              (total, item) =>
+                                  total +
+                                  Number(
+                                      item.net_payable || 0
+                                  ),
+                              0
+                          ),
+                  },
+              ];
 
-    const financialPlatformTotal =
-        financialPlatformPie.reduce(
+    const financialCountryTotal =
+        financialCountries.reduce(
             (total, item) =>
                 total + Number(item.net_payable || 0),
             0
         );
 
     const financialCountryPie =
-        financialCountries.slice(0, 10);
-
-    const financialCountryTotal =
-        financialCountryPie.reduce(
-            (total, item) =>
-                total + Number(item.net_payable || 0),
-            0
-        );
-
-    const [filtersOpen, setFiltersOpen] = useState(false);
-    const [hierarchyOpen, setHierarchyOpen] = useState(false);
+        financialCountries.length <= 10
+            ? financialCountries
+            : [
+                  ...financialCountries.slice(0, 9),
+                  {
+                      country: 'Others',
+                      net_payable: financialCountries
+                          .slice(9)
+                          .reduce(
+                              (total, item) =>
+                                  total +
+                                  Number(
+                                      item.net_payable || 0
+                                  ),
+                              0
+                          ),
+                  },
+              ];
 
     return (
         <>
@@ -500,70 +327,26 @@ export default function Index({
             >
                 <div className="space-y-6 p-5 lg:p-7">
 
-                    {/* ANALYTICS CONTROLS */}
-                    <div className="flex items-center justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setFiltersOpen((open) => !open)}
-                            title="Filters"
-                            aria-label="Filters"
-                            aria-expanded={filtersOpen}
-                            className={`flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition ${
-                                filtersOpen
-                                    ? 'border-violet-300 bg-violet-600 text-white'
-                                    : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700'
-                            }`}
-                        >
-                            <Filter className="h-4 w-4" />
-                        </button>
+                    {/* REPORTING RANGE */}
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <div className="w-full sm:max-w-xs">
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    From Month
+                                </label>
 
-                        <button
-                            type="button"
-                            onClick={() => setHierarchyOpen((open) => !open)}
-                            title="Revenue Hierarchy Scope"
-                            aria-label="Revenue Hierarchy Scope"
-                            aria-expanded={hierarchyOpen}
-                            className={`flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm transition ${
-                                hierarchyOpen
-                                    ? 'border-violet-300 bg-violet-600 text-white'
-                                    : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700'
-                            }`}
-                        >
-                            <Layers3 className="h-4 w-4" />
-                        </button>
-                    </div>
-
-                    {/* FILTER BAR */}
-                    {filtersOpen && (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
-                            <div>
-                                <h1 className="text-xl font-bold text-slate-950">
-                                    Financial Analytics
-                                </h1>
-
-                                <p className="mt-1 text-sm text-slate-500">
-                                    {scope}. Data isolation is applied automatically.
-                                </p>
-                            </div>
-
-                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
-                                <div>
-                                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Reporting Month
-                                    </label>
-
-                                    <select
-                                    value={filters.month || ''}
-                                    onChange={(e) =>
+                                <select
+                                    value={filters.from_month || filters.month || ''}
+                                    onChange={(event) =>
                                         router.get(
                                             window.location.pathname,
                                             {
-                                                ...filters,
-                                                month: e.target.value,
-                                                sale_month: '',
-                                                from_month: '',
-                                                to_month: '',
+                                                from_month:
+                                                    event.target.value,
+                                                to_month:
+                                                    filters.to_month ||
+                                                    filters.month ||
+                                                    event.target.value,
                                             },
                                             {
                                                 preserveScroll: true,
@@ -572,64 +355,37 @@ export default function Index({
                                             }
                                         )
                                     }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                                 >
-                                    <option value="">
-                                        Select Reporting Month
-                                    </option>
-
                                     {months.map((month) => (
-                                        <option
-                                            key={month}
-                                            value={month}
-                                        >
+                                        <option key={month} value={month}>
                                             {monthFormat(month)}
                                         </option>
                                     ))}
                                 </select>
-                                </div>
+                            </div>
 
-                                <div>
-                                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Sale Month
-                                    </label>
+                            <div className="hidden pb-2 text-slate-400 sm:block">
+                                →
+                            </div>
 
-                                    <select
-                                        value={filters.sale_month || ''}
-                                        onChange={(event) =>
-                                            changeFilter(
-                                                'sale_month',
-                                                event.target.value
-                                            )
-                                        }
-                                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                                    >
-                                        <option value="">
-                                            All
-                                        </option>
-
-                                        {(filterOptions.saleMonths || []).map(
-                                            (month) => (
-                                                <option
-                                                    key={month}
-                                                    value={month}
-                                                >
-                                                    {monthFormat(month)}
-                                                </option>
-                                            )
-                                        )}
-                                    </select>
-                                </div>
+                            <div className="w-full sm:max-w-xs">
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    To Month
+                                </label>
 
                                 <select
-                                    value={filters.from_month || ''}
-                                    onChange={(e) =>
+                                    value={filters.to_month || filters.month || ''}
+                                    onChange={(event) =>
                                         router.get(
                                             window.location.pathname,
                                             {
-                                                ...filters,
-                                                month: '',
-                                                from_month: e.target.value,
+                                                from_month:
+                                                    filters.from_month ||
+                                                    filters.month ||
+                                                    event.target.value,
+                                                to_month:
+                                                    event.target.value,
                                             },
                                             {
                                                 preserveScroll: true,
@@ -638,573 +394,30 @@ export default function Index({
                                             }
                                         )
                                     }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                                 >
-                                    <option value="">
-                                        From Month
-                                    </option>
-
-                                    {[...months].reverse().map((month) => (
-                                        <option
-                                            key={month}
-                                            value={month}
-                                        >
+                                    {months.map((month) => (
+                                        <option key={month} value={month}>
                                             {monthFormat(month)}
                                         </option>
                                     ))}
                                 </select>
+                            </div>
 
-                                <select
-                                    value={filters.to_month || ''}
-                                    onChange={(e) =>
-                                        router.get(
-                                            window.location.pathname,
-                                            {
-                                                ...filters,
-                                                month: '',
-                                                to_month: e.target.value,
-                                            },
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                                replace: true,
-                                            }
-                                        )
-                                    }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                                >
-                                    <option value="">
-                                        To Month
-                                    </option>
-
-                                    {[...months].reverse().map((month) => (
-                                        <option
-                                            key={month}
-                                            value={month}
-                                        >
-                                            {monthFormat(month)}
-                                        </option>
-                                    ))}
-                                </select>
-
-                                <select
-                                    value={filters.platform || ''}
-                                    onChange={(e) =>
-                                        changeFilter(
-                                            'platform',
-                                            e.target.value
-                                        )
-                                    }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                                >
-                                    <option value="">
-                                        All Stores
-                                    </option>
-
-                                    {platforms.map((platform) => (
-                                        <option
-                                            key={platform}
-                                            value={platform}
-                                        >
-                                            {platform}
-                                        </option>
-                                    ))}
-                                </select>
-
-                                <input
-                                    type="search"
-                                    value={filters.isrc || ''}
-                                    onChange={(e) =>
-                                        changeFilter(
-                                            'isrc',
-                                            e.target.value
-                                        )
-                                    }
-                                    placeholder="Search ISRC"
-                                    autoComplete="off"
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                                />
-
-                                <input
-                                    type="search"
-                                    value={filters.upc || ''}
-                                    onChange={(e) =>
-                                        changeFilter(
-                                            'upc',
-                                            e.target.value
-                                        )
-                                    }
-                                    placeholder="Search UPC"
-                                    autoComplete="off"
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                                />
-
-                                <select
-                                    value={filters.sale_type || ''}
-                                    onChange={(e) =>
-                                        changeFilter(
-                                            'sale_type',
-                                            e.target.value
-                                        )
-                                    }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                                >
-                                    <option value="">
-                                        All Sale Types
-                                    </option>
-
-                                    {saleTypeOptions.map((saleType) => (
-                                        <option
-                                            key={saleType}
-                                            value={saleType}
-                                        >
-                                            {saleType}
-                                        </option>
-                                    ))}
-                                </select>
-
-                                <select
-                                    value={filters.country || ''}
-                                    onChange={(e) =>
-                                        changeFilter(
-                                            'country',
-                                            e.target.value
-                                        )
-                                    }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                                >
-                                    <option value="">
-                                        All Regions
-                                    </option>
-
-                                    {countries.map((country) => (
-                                        <option
-                                            key={country}
-                                            value={country}
-                                        >
-                                            {country}
-                                        </option>
-                                    ))}
-                                </select>
-
-                                <select
-                                    value={filters.cms || ''}
-                                    onChange={(e) =>
-                                        changeFilter(
-                                            'cms',
-                                            e.target.value
-                                        )
-                                    }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                                >
-                                    <option value="">
-                                        All CMS
-                                    </option>
-
-                                    {cmsOptions.map((cmsValue) => (
-                                        <option
-                                            key={cmsValue}
-                                            value={cmsValue}
-                                        >
-                                            {cmsValue}
-                                        </option>
-                                    ))}
-                                </select>
-
-                                <button
-                                    type="button"
-                                    onClick={exportCsv}
-                                    className="flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
-                                >
-                                    <Download className="h-4 w-4" />
-                                    Export CSV
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={resetFilters}
-                                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                                >
-                                    <RefreshCcw className="h-4 w-4" />
-                                    Reset
-                                </button>
+                            <div className="pb-2 text-xs font-medium text-slate-400">
+                                Reporting period
                             </div>
                         </div>
                     </div>
-                    )}
 
-                    {hierarchyOpen && (
-                    <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
-                        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-                            <div>
-                                <div className="text-sm font-black text-slate-950">
-                                    Revenue Hierarchy Scope
-                                </div>
-
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Select a master account, recursive catalogue level, or exact artist.
-                                </p>
-                            </div>
-
-                            <div className="grid flex-1 gap-3 md:grid-cols-3 xl:max-w-4xl">
-                                <select
-                                    value={
-                                        selectedMasterId
-                                    }
-                                    onChange={(e) =>
-                                        router.get(
-                                            window.location.pathname,
-                                            {
-                                                ...filters,
-                                                master_label_id:
-                                                    e.target.value,
-                                                level_id: '',
-                                                artist_id: '',
-                                            },
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                                replace: true,
-                                            }
-                                        )
-                                    }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                                >
-                                    <option value="">
-                                        All Master Accounts
-                                    </option>
-
-                                    {hierarchyMasters.map(
-                                        (master) => (
-                                            <option
-                                                key={
-                                                    master.id
-                                                }
-                                                value={
-                                                    master.id
-                                                }
-                                            >
-                                                {
-                                                    master.name
-                                                }
-                                            </option>
-                                        )
-                                    )}
-                                </select>
-
-                                <select
-                                    value={
-                                        selectedLevelId
-                                    }
-                                    onChange={(e) =>
-                                        router.get(
-                                            window.location.pathname,
-                                            {
-                                                ...filters,
-                                                level_id:
-                                                    e.target.value,
-                                                artist_id: '',
-                                            },
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                                replace: true,
-                                            }
-                                        )
-                                    }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                                >
-                                    <option value="">
-                                        All Levels
-                                    </option>
-
-                                    {filteredLevels.map(
-                                        (level) => (
-                                            <option
-                                                key={
-                                                    level.id
-                                                }
-                                                value={
-                                                    level.id
-                                                }
-                                            >
-                                                {
-                                                    level.path ||
-                                                    level.name
-                                                }
-                                            </option>
-                                        )
-                                    )}
-                                </select>
-
-                                <select
-                                    value={
-                                        selectedArtistId
-                                    }
-                                    onChange={(e) =>
-                                        router.get(
-                                            window.location.pathname,
-                                            {
-                                                ...filters,
-                                                artist_id:
-                                                    e.target.value,
-                                            },
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                                replace: true,
-                                            }
-                                        )
-                                    }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                                >
-                                    <option value="">
-                                        All Artists
-                                    </option>
-
-                                    {filteredHierarchyArtists.map(
-                                        (artist) => (
-                                            <option
-                                                key={
-                                                    artist.id
-                                                }
-                                                value={
-                                                    artist.id
-                                                }
-                                            >
-                                                {
-                                                    artist.name
-                                                }
-                                            </option>
-                                        )
-                                    )}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="mt-4 text-xs font-semibold text-slate-500">
-                            Selecting a level includes that level and its complete descendant subtree.
-                        </div>
-                    </div>
-                    )}
-
-                    {revenueVisibility?.available &&
-                        !revenueVisibility?.is_master && (
-                        <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm">
-                            <div className="flex flex-col gap-5">
-                                <SectionHeader
-                                    icon={BadgeIndianRupee}
-                                    title={
-                                        revenueVisibility.is_master
-                                            ? 'Master Label Revenue'
-                                            : 'Your Revenue Share'
-                                    }
-                                    subtitle={
-                                        revenueVisibility.is_master
-                                            ? 'Canonical royalty allocation across your complete managed catalogue hierarchy'
-                                            : 'Your payable revenue after the configured revenue-share allocation'
-                                    }
-                                />
-
-                                {revenueVisibility.is_master ? (
-                                    <>
-                                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                                            <Card
-                                                title="Managed Gross"
-                                                value={moneyFormat(
-                                                    revenueVisibility.managed_revenue,
-                                                    primaryCurrency
-                                                )}
-                                                subtitle="Revenue managed across the complete hierarchy"
-                                                icon={Layers3}
-                                            />
-
-                                            <Card
-                                                title="Child Allocated"
-                                                value={moneyFormat(
-                                                    revenueVisibility.allocated_revenue,
-                                                    primaryCurrency
-                                                )}
-                                                subtitle="Payable to child labels and artists"
-                                                icon={Users}
-                                            />
-
-                                            <Card
-                                                title="Master Retained"
-                                                value={moneyFormat(
-                                                    revenueVisibility.retained_revenue,
-                                                    primaryCurrency
-                                                )}
-                                                subtitle="Master label payable amount"
-                                                icon={BadgeIndianRupee}
-                                            />
-
-                                            <Card
-                                                title="Master Statement Gross"
-                                                value={moneyFormat(
-                                                    revenueVisibility.gross_statement_revenue,
-                                                    primaryCurrency
-                                                )}
-                                                subtitle="Gross amount on master statements"
-                                                icon={BarChart3}
-                                            />
-                                        </div>
-
-                                        {!!revenueVisibility.children?.length && (
-                                            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                                                <div className="border-b border-slate-200 px-5 py-4">
-                                                    <div className="font-semibold text-slate-950">
-                                                        Revenue Beneficiaries
-                                                    </div>
-
-                                                    <div className="mt-1 text-sm text-slate-500">
-                                                        Catalogue levels and artists within the managed hierarchy.
-                                                    </div>
-                                                </div>
-
-                                                <div className="overflow-x-auto">
-                                                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                                        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                            <tr>
-                                                                <th className="px-5 py-3">
-                                                                    Beneficiary
-                                                                </th>
-
-                                                                <th className="px-5 py-3">
-                                                                    Type
-                                                                </th>
-
-                                                                <th className="px-5 py-3 text-right">
-                                                                    Share
-                                                                </th>
-
-                                                                <th className="px-5 py-3 text-right">
-                                                                    Managed Gross
-                                                                </th>
-
-                                                                <th className="px-5 py-3 text-right">
-                                                                    Allocated
-                                                                </th>
-
-                                                                <th className="px-5 py-3 text-right">
-                                                                    Master Retained
-                                                                </th>
-                                                            </tr>
-                                                        </thead>
-
-                                                        <tbody className="divide-y divide-slate-100">
-                                                            {revenueVisibility.children.map(
-                                                                (child) => (
-                                                                    <tr
-                                                                        key={`${child.type}-${child.id}`}
-                                                                        className="text-slate-700"
-                                                                    >
-                                                                        <td className="px-5 py-4 font-semibold text-slate-900">
-                                                                            {child.name}
-                                                                        </td>
-
-                                                                        <td className="px-5 py-4 capitalize">
-                                                                            {String(
-                                                                                child.type || ''
-                                                                            ).replace(
-                                                                                '_',
-                                                                                ' '
-                                                                            )}
-                                                                        </td>
-
-                                                                        <td className="px-5 py-4 text-right">
-                                                                            {child.share_percent !== null &&
-                                                                            child.share_percent !== undefined
-                                                                                ? `${Number(
-                                                                                      child.share_percent
-                                                                                  ).toFixed(
-                                                                                      2
-                                                                                  )}%`
-                                                                                : '—'}
-                                                                        </td>
-
-                                                                        <td className="px-5 py-4 text-right font-medium">
-                                                                            {moneyFormat(
-                                                                                child.managed_revenue,
-                                                                                primaryCurrency
-                                                                            )}
-                                                                        </td>
-
-                                                                        <td className="px-5 py-4 text-right font-medium">
-                                                                            {moneyFormat(
-                                                                                child.allocated_revenue,
-                                                                                primaryCurrency
-                                                                            )}
-                                                                        </td>
-
-                                                                        <td className="px-5 py-4 text-right font-bold text-violet-700">
-                                                                            {moneyFormat(
-                                                                                child.master_retained,
-                                                                                primaryCurrency
-                                                                            )}
-                                                                        </td>
-                                                                    </tr>
-                                                                )
-                                                            )}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                                        <Card
-                                            title="Payable Revenue"
-                                            value={moneyFormat(
-                                                revenueVisibility.payable_revenue,
-                                                primaryCurrency
-                                            )}
-                                            subtitle="Your allocated payable amount"
-                                            icon={BadgeIndianRupee}
-                                        />
-
-                                        <Card
-                                            title="Statement Gross"
-                                            value={moneyFormat(
-                                                revenueVisibility.gross_statement_revenue,
-                                                primaryCurrency
-                                            )}
-                                            subtitle="Gross value recorded on your statements"
-                                            icon={BarChart3}
-                                        />
-
-                                        {revenueVisibility.share_visible && (
-                                            <Card
-                                                title="Revenue Share"
-                                                value={`${Number(
-                                                    revenueVisibility.share_percent || 0
-                                                ).toFixed(2)}%`}
-                                                subtitle="Configured share visible to your account"
-                                                icon={Activity}
-                                            />
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* CANONICAL FINANCIAL ANALYTICS */}
-                    <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-white p-5 shadow-sm">
+                    {/* FINANCIAL MONTHLY + STORE */}
+                    <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <SectionHeader
                             icon={BadgeIndianRupee}
-                            title="Financial Analytics"
-                            subtitle="Canonical payable analytics generated from royalty statements and allocations"
+                            title="Monthly Financial Revenue"
+                            subtitle="Gross, commission and net payable by statement month"
                         />
-
-                        <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                                <SectionHeader
-                                    icon={TrendingUp}
-                                    title="Monthly Financial Revenue"
-                                    subtitle="Gross, commission and net payable by statement month"
-                                />
 
                                 {financialMonthly.length ? (
                                     <div className="mt-5 h-[320px]">
@@ -1747,8 +960,6 @@ export default function Index({
                             </div>
                         </div>
                         )}
-                    </div>
-
                     {/* RAW REPORT KPI CARDS */}
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <Card
@@ -1791,336 +1002,6 @@ export default function Index({
                             subtitle="DSPs in selected period"
                             icon={Store}
                         />
-                    </div>
-
-                    {/* BUSINESS GROWTH */}
-                    <div className="grid gap-4 xl:grid-cols-3">
-                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
-                            <div className="flex flex-wrap items-start justify-between gap-4">
-                                <SectionHeader
-                                    icon={TrendingUp}
-                                    title="Month-wise Business Growth"
-                                    subtitle="Reported earnings and streams performance over time"
-                                />
-
-                                <div
-                                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${
-                                        direction === 'up'
-                                            ? 'bg-emerald-50 text-emerald-700'
-                                            : direction === 'down'
-                                              ? 'bg-red-50 text-red-700'
-                                              : 'bg-slate-100 text-slate-600'
-                                    }`}
-                                >
-                                    <GrowthIcon className="h-4 w-4" />
-
-                                    {growth.has_previous
-                                        ? percentFormat(
-                                              growth.earnings_percent
-                                          )
-                                        : 'No previous month'}
-                                </div>
-                            </div>
-
-                            {monthlyTrend.length ? (
-                                <div className="mt-6 h-[360px]">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <AreaChart
-                                            data={monthlyTrend}
-                                            margin={{
-                                                top: 10,
-                                                right: 20,
-                                                left: 24,
-                                                bottom: 0,
-                                            }}
-                                        >
-                                            <defs>
-                                                <linearGradient
-                                                    id="analyticsRevenue"
-                                                    x1="0"
-                                                    y1="0"
-                                                    x2="0"
-                                                    y2="1"
-                                                >
-                                                    <stop
-                                                        offset="5%"
-                                                        stopColor="#7c3aed"
-                                                        stopOpacity={0.28}
-                                                    />
-                                                    <stop
-                                                        offset="95%"
-                                                        stopColor="#7c3aed"
-                                                        stopOpacity={0}
-                                                    />
-                                                </linearGradient>
-                                            </defs>
-
-                                            <CartesianGrid
-                                                vertical={false}
-                                                strokeDasharray="3 3"
-                                            />
-
-                                            <XAxis
-                                                dataKey="month"
-                                                tickFormatter={monthFormat}
-                                            />
-
-                                            <YAxis
-                                                width={88}
-                                                tickMargin={8}
-                                                tickFormatter={
-                                                    numberFormat
-                                                }
-                                            />
-
-                                            <Tooltip
-                                                labelFormatter={monthFormat}
-                                                formatter={(value, name) => [
-                                                    name === 'Reported Earnings'
-                                                        ? moneyFormat(
-                                                              value,
-                                                              primaryCurrency
-                                                          )
-                                                        : numberFormat(value),
-                                                    name,
-                                                ]}
-                                            />
-
-                                            <Area
-                                                type="monotone"
-                                                dataKey="earnings"
-                                                name="Reported Earnings"
-                                                stroke="#7c3aed"
-                                                strokeWidth={3}
-                                                fill="url(#analyticsRevenue)"
-                                            />
-
-                                            <Line
-                                                type="monotone"
-                                                dataKey="streams"
-                                                name="Streams"
-                                                stroke="#0f172a"
-                                                strokeWidth={2}
-                                                dot={false}
-                                            />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            ) : (
-                                <EmptyState />
-                            )}
-                        </div>
-
-                        {/* MOM */}
-                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <SectionHeader
-                                icon={Activity}
-                                title="Growth Overview"
-                                subtitle="Current vs previous month"
-                            />
-
-                            <div className="mt-6 space-y-4">
-                                <div className="rounded-xl bg-slate-50 p-4">
-                                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                        Current Month
-                                    </div>
-
-                                    <div className="mt-1 font-semibold text-slate-800">
-                                        {monthFormat(
-                                            growth.current_month
-                                        )}
-                                    </div>
-
-                                    <div className="mt-2 text-2xl font-bold text-slate-950">
-                                        {moneyFormat(
-                                            growth.current_earnings,
-                                            primaryCurrency
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="rounded-xl bg-slate-50 p-4">
-                                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                        Previous Month
-                                    </div>
-
-                                    <div className="mt-1 font-semibold text-slate-800">
-                                        {growth.has_previous
-                                            ? monthFormat(
-                                                  growth.previous_month
-                                              )
-                                            : 'Not available'}
-                                    </div>
-
-                                    <div className="mt-2 text-2xl font-bold text-slate-950">
-                                        {growth.has_previous
-                                            ? moneyFormat(
-                                                  growth.previous_earnings,
-                                                  primaryCurrency
-                                              )
-                                            : '—'}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="rounded-xl border border-slate-200 p-4">
-                                        <div className="text-xs text-slate-500">
-                                            Reported Earnings Growth
-                                        </div>
-
-                                        <div
-                                            className={`mt-1 text-lg font-bold ${
-                                                Number(
-                                                    growth.earnings_percent
-                                                ) > 0
-                                                    ? 'text-emerald-600'
-                                                    : Number(
-                                                          growth.earnings_percent
-                                                      ) < 0
-                                                      ? 'text-red-600'
-                                                      : 'text-slate-700'
-                                            }`}
-                                        >
-                                            {growth.has_previous
-                                                ? percentFormat(
-                                                      growth.earnings_percent
-                                                  )
-                                                : 'N/A'}
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-xl border border-slate-200 p-4">
-                                        <div className="text-xs text-slate-500">
-                                            Stream Growth
-                                        </div>
-
-                                        <div
-                                            className={`mt-1 text-lg font-bold ${
-                                                Number(
-                                                    growth.streams_percent
-                                                ) > 0
-                                                    ? 'text-emerald-600'
-                                                    : Number(
-                                                          growth.streams_percent
-                                                      ) < 0
-                                                      ? 'text-red-600'
-                                                      : 'text-slate-700'
-                                            }`}
-                                        >
-                                            {growth.has_previous
-                                                ? percentFormat(
-                                                      growth.streams_percent
-                                                  )
-                                                : 'N/A'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* STORES + REGIONS */}
-                    <div className="grid gap-4 xl:grid-cols-2">
-                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <SectionHeader
-                                icon={Store}
-                                title="Stores"
-                                subtitle="DSP reported earnings performance"
-                            />
-
-                            {topPlatforms.length ? (
-                                <div className="mt-5 h-[320px]">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <BarChart data={topPlatforms}>
-                                            <CartesianGrid
-                                                vertical={false}
-                                                strokeDasharray="3 3"
-                                            />
-
-                                            <XAxis dataKey="name" />
-                                            <YAxis />
-
-                                            <Tooltip
-                                                formatter={(value) => [
-                                                    moneyFormat(
-                                                        value,
-                                                        primaryCurrency
-                                                    ),
-                                                    'Reported Earnings',
-                                                ]}
-                                            />
-
-                                            <Bar
-                                                dataKey="earnings"
-                                                fill="#7c3aed"
-                                                radius={[7, 7, 0, 0]}
-                                            />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            ) : (
-                                <EmptyState />
-                            )}
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <SectionHeader
-                                icon={MapPinned}
-                                title="Regions"
-                                subtitle="Country-wise reported earnings performance"
-                            />
-
-                            {topCountries.length ? (
-                                <div className="mt-5 h-[320px]">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <BarChart
-                                            data={topCountries}
-                                            layout="vertical"
-                                        >
-                                            <CartesianGrid
-                                                horizontal={false}
-                                                strokeDasharray="3 3"
-                                            />
-
-                                            <XAxis type="number" />
-
-                                            <YAxis
-                                                type="category"
-                                                dataKey="name"
-                                                width={60}
-                                            />
-
-                                            <Tooltip
-                                                formatter={(value) => [
-                                                    moneyFormat(
-                                                        value,
-                                                        primaryCurrency
-                                                    ),
-                                                    'Reported Earnings',
-                                                ]}
-                                            />
-
-                                            <Bar
-                                                dataKey="earnings"
-                                                fill="#0f172a"
-                                                radius={[0, 7, 7, 0]}
-                                            />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            ) : (
-                                <EmptyState />
-                            )}
-                        </div>
                     </div>
 
                     {/* RANKINGS */}
@@ -2172,238 +1053,6 @@ export default function Index({
                             </div>
                         </div>
                     </div>
-
-                    {/* SALE TYPE + CURRENCY */}
-                    <div className="grid gap-4 xl:grid-cols-2">
-                        {role === 'super_admin' && (
-                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            <div className="border-b border-slate-100 p-5">
-                                <SectionHeader
-                                    icon={BarChart3}
-                                    title="Revenue by Sale Type"
-                                    subtitle="Reported earnings grouped by transaction / usage type"
-                                />
-                            </div>
-
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full">
-                                    <thead className="bg-slate-50">
-                                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                            <th className="px-5 py-3">
-                                                Sale Type
-                                            </th>
-
-                                            <th className="px-5 py-3 text-right">
-                                                Streams
-                                            </th>
-
-                                            <th className="px-5 py-3 text-right">
-                                                Units
-                                            </th>
-
-                                            <th className="px-5 py-3 text-right">
-                                                Reported Earnings
-                                            </th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody className="divide-y divide-slate-100">
-                                        {saleTypes.length ? (
-                                            saleTypes.map(
-                                                (row, index) => (
-                                                    <tr
-                                                        key={`${row.name || 'unknown'}-${index}`}
-                                                        className="hover:bg-slate-50"
-                                                    >
-                                                        <td className="px-5 py-4 text-sm font-semibold text-slate-900">
-                                                            {row.name ||
-                                                                'Unknown'}
-                                                        </td>
-
-                                                        <td className="px-5 py-4 text-right text-sm text-slate-700">
-                                                            {numberFormat(
-                                                                row.streams
-                                                            )}
-                                                        </td>
-
-                                                        <td className="px-5 py-4 text-right text-sm text-slate-700">
-                                                            {numberFormat(
-                                                                row.sale_units
-                                                            )}
-                                                        </td>
-
-                                                        <td className="px-5 py-4 text-right text-sm font-bold text-slate-950">
-                                                            {moneyFormat(
-                                                                row.earnings,
-                                                                primaryCurrency
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            )
-                                        ) : (
-                                            <tr>
-                                                <td
-                                                    colSpan="4"
-                                                    className="px-5 py-14 text-center text-sm text-slate-400"
-                                                >
-                                                    No sale type analytics available.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        )}
-
-                        {role === 'super_admin' && (
-                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            <div className="border-b border-slate-100 p-5">
-                                <SectionHeader
-                                    icon={BadgeIndianRupee}
-                                    title="Revenue by Currency"
-                                    subtitle="Reported earnings grouped by statement currency"
-                                />
-                            </div>
-
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full">
-                                    <thead className="bg-slate-50">
-                                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                            <th className="px-5 py-3">
-                                                Currency
-                                            </th>
-
-                                            <th className="px-5 py-3 text-right">
-                                                Reported Earnings
-                                            </th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody className="divide-y divide-slate-100">
-                                        {currencySummary.length ? (
-                                            currencySummary.map(
-                                                (row, index) => (
-                                                    <tr
-                                                        key={`${row.currency || 'unknown'}-${index}`}
-                                                        className="hover:bg-slate-50"
-                                                    >
-                                                        <td className="px-5 py-4 text-sm font-semibold text-slate-900">
-                                                            {row.currency ||
-                                                                'Unknown'}
-                                                        </td>
-
-                                                        <td className="px-5 py-4 text-right text-sm font-bold text-slate-950">
-                                                            {moneyFormat(
-                                                                row.earnings,
-                                                                row.currency ||
-                                                                    primaryCurrency
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            )
-                                        ) : (
-                                            <tr>
-                                                <td
-                                                    colSpan="2"
-                                                    className="px-5 py-14 text-center text-sm text-slate-400"
-                                                >
-                                                    No currency analytics available.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        )}
-                    </div>
-
-                    {/* CMS BREAKDOWN — SUPER ADMIN ONLY */}
-                    {role === 'super_admin' && (
-                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        <div className="border-b border-slate-100 p-5">
-                            <SectionHeader
-                                icon={BarChart3}
-                                title="Revenue by CMS"
-                                subtitle="Reported earnings grouped by CMS"
-                            />
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full">
-                                <thead className="bg-slate-50">
-                                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        <th className="px-5 py-3">
-                                            CMS
-                                        </th>
-
-                                        <th className="px-5 py-3 text-right">
-                                            Streams
-                                        </th>
-
-                                        <th className="px-5 py-3 text-right">
-                                            Units
-                                        </th>
-
-                                        <th className="px-5 py-3 text-right">
-                                            Reported Earnings
-                                        </th>
-                                    </tr>
-                                </thead>
-
-                                <tbody className="divide-y divide-slate-100">
-                                    {cmsSummary.length ? (
-                                        cmsSummary.map(
-                                            (row, index) => (
-                                                <tr
-                                                    key={`${row.name || 'unknown'}-${index}`}
-                                                    className="hover:bg-slate-50"
-                                                >
-                                                    <td className="px-5 py-4 text-sm font-semibold text-slate-900">
-                                                        {row.name ||
-                                                            'Unknown'}
-                                                    </td>
-
-                                                    <td className="px-5 py-4 text-right text-sm text-slate-700">
-                                                        {numberFormat(
-                                                            row.streams
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-5 py-4 text-right text-sm text-slate-700">
-                                                        {numberFormat(
-                                                            row.sale_units
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-5 py-4 text-right text-sm font-bold text-slate-950">
-                                                        {moneyFormat(
-                                                            row.earnings,
-                                                            primaryCurrency
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            )
-                                        )
-                                    ) : (
-                                        <tr>
-                                            <td
-                                                colSpan="4"
-                                                className="px-5 py-14 text-center text-sm text-slate-400"
-                                            >
-                                                No CMS analytics available.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    )}
 
                     {/* TRACK TABLE */}
                     <div className="grid gap-4">
