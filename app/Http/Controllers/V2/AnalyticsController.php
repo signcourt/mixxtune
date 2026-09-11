@@ -918,7 +918,7 @@ class AnalyticsController extends Controller
                 'topTracks' =>
                     $analytics->topTracks(
                         clone $filtered,
-                        10
+                        null
                     ),
 
                 'topArtists' =>

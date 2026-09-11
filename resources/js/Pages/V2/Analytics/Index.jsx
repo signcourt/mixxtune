@@ -231,6 +231,38 @@ export default function Index({
     const primaryCurrency =
         currencySummary?.[0]?.currency || 'INR';
 
+    const [trackSort, setTrackSort] = useState({
+        key: 'earnings',
+        direction: 'desc',
+    });
+
+    const sortedTracks = [...topTracks].sort((a, b) => {
+        const left = Number(a?.[trackSort.key] || 0);
+        const right = Number(b?.[trackSort.key] || 0);
+
+        return trackSort.direction === 'asc'
+            ? left - right
+            : right - left;
+    });
+
+    const toggleTrackSort = (key) => {
+        setTrackSort((current) => ({
+            key,
+            direction:
+                current.key === key && current.direction === 'desc'
+                    ? 'asc'
+                    : 'desc',
+        }));
+    };
+
+    const trackSortIndicator = (key) => {
+        if (trackSort.key !== key) {
+            return null;
+        }
+
+        return trackSort.direction === 'desc' ? '↓' : '↑';
+    };
+
     const financialSummary =
         financialAnalytics?.summary || {};
 
@@ -454,100 +486,8 @@ export default function Index({
                         </div>
                     </div>
 
-                    {/* FINANCIAL MONTHLY + STORE */}
+                    {/* FINANCIAL STORE + COUNTRY */}
                     <div className="grid gap-4 xl:grid-cols-2">
-                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <SectionHeader
-                            icon={BadgeIndianRupee}
-                            title="Monthly Financial Revenue"
-                            subtitle="Gross, commission and net payable by statement month"
-                        />
-
-                                {financialMonthly.length ? (
-                                    <div className="mt-5 h-[320px]">
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
-                                        >
-                                            <AreaChart
-                                                data={financialMonthly}
-                                                margin={{
-                                                    top: 10,
-                                                    right: 20,
-                                                    left: 24,
-                                                    bottom: 0,
-                                                }}
-                                            >
-                                                <CartesianGrid
-                                                    vertical={false}
-                                                    strokeDasharray="3 3"
-                                                />
-
-                                                <XAxis
-                                                    dataKey="month"
-                                                    tickFormatter={
-                                                        monthFormat
-                                                    }
-                                                />
-
-                                                <YAxis
-                                                    width={88}
-                                                    tickMargin={8}
-                                                    tickFormatter={
-                                                        numberFormat
-                                                    }
-                                                />
-
-                                                <Tooltip
-                                                    formatter={(
-                                                        value,
-                                                        name
-                                                    ) => [
-                                                        moneyFormat(
-                                                            value,
-                                                            financialCurrency
-                                                        ),
-                                                        String(
-                                                            name || ''
-                                                        )
-                                                            .replaceAll(
-                                                                '_',
-                                                                ' '
-                                                            )
-                                                            .replace(
-                                                                /\b\w/g,
-                                                                (c) =>
-                                                                    c.toUpperCase()
-                                                            ),
-                                                    ]}
-                                                    labelFormatter={
-                                                        monthFormat
-                                                    }
-                                                />
-
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="gross_earnings"
-                                                    stroke="#7c3aed"
-                                                    fill="#ede9fe"
-                                                    strokeWidth={2}
-                                                />
-
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="net_payable"
-                                                    stroke="#0f172a"
-                                                    strokeWidth={2}
-                                                    dot={false}
-                                                />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                ) : (
-                                    <EmptyState text="No financial statement data available for the selected period." />
-                                )}
-                            </div>
-
                             <div className="rounded-2xl border border-slate-200 bg-white p-5">
                                 <SectionHeader
                                     icon={Store}
@@ -704,9 +644,8 @@ export default function Index({
                                     <EmptyState text="No financial platform allocation data available." />
                                 )}
                             </div>
-                        </div>
 
-                        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5">
                             <SectionHeader
                                 icon={Globe2}
                                 title="Financial Revenue by Country"
@@ -861,6 +800,100 @@ export default function Index({
                                 <EmptyState text="No financial country allocation data available." />
                             )}
                         </div>
+                    </div>
+
+                    {/* FINANCIAL MONTHLY */}
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <SectionHeader
+                            icon={BadgeIndianRupee}
+                            title="Monthly Financial Revenue"
+                            subtitle="Gross, commission and net payable by statement month"
+                        />
+
+                                {financialMonthly.length ? (
+                                    <div className="mt-5 h-[320px]">
+                                        <ResponsiveContainer
+                                            width="100%"
+                                            height="100%"
+                                        >
+                                            <AreaChart
+                                                data={financialMonthly}
+                                                margin={{
+                                                    top: 10,
+                                                    right: 20,
+                                                    left: 24,
+                                                    bottom: 0,
+                                                }}
+                                            >
+                                                <CartesianGrid
+                                                    vertical={false}
+                                                    strokeDasharray="3 3"
+                                                />
+
+                                                <XAxis
+                                                    dataKey="month"
+                                                    tickFormatter={
+                                                        monthFormat
+                                                    }
+                                                />
+
+                                                <YAxis
+                                                    width={88}
+                                                    tickMargin={8}
+                                                    tickFormatter={
+                                                        numberFormat
+                                                    }
+                                                />
+
+                                                <Tooltip
+                                                    formatter={(
+                                                        value,
+                                                        name
+                                                    ) => [
+                                                        moneyFormat(
+                                                            value,
+                                                            financialCurrency
+                                                        ),
+                                                        String(
+                                                            name || ''
+                                                        )
+                                                            .replaceAll(
+                                                                '_',
+                                                                ' '
+                                                            )
+                                                            .replace(
+                                                                /\b\w/g,
+                                                                (c) =>
+                                                                    c.toUpperCase()
+                                                            ),
+                                                    ]}
+                                                    labelFormatter={
+                                                        monthFormat
+                                                    }
+                                                />
+
+                                                <Area
+                                                    type="monotone"
+                                                    dataKey="gross_earnings"
+                                                    stroke="#7c3aed"
+                                                    fill="#ede9fe"
+                                                    strokeWidth={2}
+                                                />
+
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="net_payable"
+                                                    stroke="#0f172a"
+                                                    strokeWidth={2}
+                                                    dot={false}
+                                                />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                ) : (
+                                    <EmptyState text="No financial statement data available for the selected period." />
+                                )}
+                            </div>
 
                         {/* CANONICAL FINANCIAL DIMENSIONS */}
                         <div className="mt-4 grid gap-4 xl:grid-cols-2">
@@ -876,7 +909,7 @@ export default function Index({
 
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full">
-                                        <thead className="bg-slate-50">
+                                        <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
                                             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                                 <th className="px-5 py-3">
                                                     Currency
@@ -946,8 +979,9 @@ export default function Index({
                                 />
                             </div>
 
-                            <div className="overflow-x-auto">
+                            <div className="max-h-[620px] overflow-auto">
                                 <table className="min-w-full">
+
                                     <thead className="bg-slate-50">
                                         <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                             <th className="px-5 py-3">
@@ -1005,7 +1039,13 @@ export default function Index({
                         </div>
                         )}
                     {/* RANKINGS */}
-                    <div className="grid gap-4 xl:grid-cols-3">
+                    <div
+                        className={`grid gap-4 ${
+                            role === 'super_admin'
+                                ? 'xl:grid-cols-3'
+                                : 'xl:grid-cols-2'
+                        }`}
+                    >
                         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                             <SectionHeader
                                 icon={Users}
@@ -1065,25 +1105,45 @@ export default function Index({
                                 />
                             </div>
 
-                            <div className="overflow-x-auto">
+                            <div className="max-h-[620px] overflow-auto">
                                 <table className="min-w-full">
-                                    <thead className="bg-slate-50">
+                                    <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
                                         <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                             <th className="px-5 py-3">#</th>
                                             <th className="px-5 py-3">Track</th>
                                             <th className="px-5 py-3">ISRC</th>
                                             <th className="px-5 py-3 text-right">
-                                                Streams
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleTrackSort('streams')}
+                                                    className="ml-auto inline-flex items-center gap-1 font-semibold uppercase tracking-wide text-slate-500 transition hover:text-violet-700"
+                                                    title="Sort by streams"
+                                                >
+                                                    Streams
+                                                    <span aria-hidden="true">
+                                                        {trackSortIndicator('streams')}
+                                                    </span>
+                                                </button>
                                             </th>
                                             <th className="px-5 py-3 text-right">
-                                                Reported Earnings
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleTrackSort('earnings')}
+                                                    className="ml-auto inline-flex items-center gap-1 font-semibold uppercase tracking-wide text-slate-500 transition hover:text-violet-700"
+                                                    title="Sort by earnings"
+                                                >
+                                                    Earnings
+                                                    <span aria-hidden="true">
+                                                        {trackSortIndicator('earnings')}
+                                                    </span>
+                                                </button>
                                             </th>
                                         </tr>
                                     </thead>
 
                                     <tbody className="divide-y divide-slate-100">
-                                        {topTracks.length ? (
-                                            topTracks.map(
+                                        {sortedTracks.length ? (
+                                            sortedTracks.map(
                                                 (track, index) => (
                                                     <tr
                                                         key={`${track.track_id ?? index}-${track.isrc ?? index}`}

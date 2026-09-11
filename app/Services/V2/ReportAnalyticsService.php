@@ -786,9 +786,9 @@ class ReportAnalyticsService
 
     public function topTracks(
         Builder $query,
-        int $limit = 10
+        ?int $limit = 10
     ): array {
-        return (clone $query)
+        $tracks = (clone $query)
             ->where(
                 function ($builder) {
                     $builder
@@ -821,8 +821,13 @@ class ReportAnalyticsService
                 'album_artist',
                 'isrc',
             ])
-            ->orderByDesc('earnings')
-            ->limit($limit)
+            ->orderByDesc('earnings');
+
+        if ($limit !== null) {
+            $tracks->limit($limit);
+        }
+
+        return $tracks
             ->get()
             ->map(fn ($row) => [
                 'track_id' =>
