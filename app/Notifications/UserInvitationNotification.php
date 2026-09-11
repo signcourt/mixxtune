@@ -31,7 +31,7 @@ class UserInvitationNotification extends Notification
         $roleName = match ($this->role) {
             'artist' => 'Artist',
             'label' => 'Label',
-            'admin' => 'Admin',
+            'admin' => 'Manager',
             default => ucfirst($this->role),
         };
 

@@ -95,7 +95,7 @@ export default function Show({
                     />
 
                     <Info
-                        label="Assigned Admins"
+                        label="Assigned Managers"
                         value={
                             (artist.assigned_admins ?? [])
                                 .map((admin) => admin.name)

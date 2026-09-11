@@ -269,7 +269,7 @@ export default function DistributionStep({
                                 </div>
 
                                 <div className="mt-1 text-xs text-slate-400">
-                                    Stores enabled by the administrator will appear here automatically.
+                                    Stores enabled by the manager will appear here automatically.
                                 </div>
                             </div>
                         ) : distributionStores.map(

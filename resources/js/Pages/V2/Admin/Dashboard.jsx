@@ -49,7 +49,7 @@ export default function Dashboard({
 
     const panelName = isSuperAdmin
         ? 'Super Admin'
-        : 'Admin';
+        : 'Manager';
 
     const cards = [
         {
@@ -279,7 +279,7 @@ export default function Dashboard({
             <section className="mt-6">
                 <QuickActionsCard
                     actions={quickActions}
-                    title="Admin Quick Actions"
+                    title="Manager Quick Actions"
                     subtitle="Most-used operational tools"
                 />
             </section>

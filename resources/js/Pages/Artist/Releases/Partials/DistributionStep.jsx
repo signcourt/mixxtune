@@ -221,7 +221,7 @@ export default function DistributionStep({
                 {distributionStores.length === 0 ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                         No active distribution stores are available.
-                        Add stores from Admin Settings first.
+                        Add stores from Manager Settings first.
                     </div>
                 ) : (
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

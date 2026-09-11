@@ -62,7 +62,7 @@ export default function AdminLayout({ children, title = "Dashboard" }) {
     const accountName =
         user.username ||
         user.name ||
-        (isSuperAdmin ? "Super Admin" : "Administrator");
+        (isSuperAdmin ? "Super Admin" : "Manager");
 
     const accountSecondary = user.client_id || user.email || "";
 
@@ -130,7 +130,7 @@ export default function AdminLayout({ children, title = "Dashboard" }) {
                             Mixx Tune
                         </div>
                         <div className="text-xs text-slate-400">
-                            Admin Portal
+                            Manager Portal
                         </div>
                     </div>
                 </div>

@@ -56,7 +56,7 @@ export default function Edit({ payoutProfile = null }) {
             : role === "artist"
               ? "Artist"
               : role === "admin"
-                ? "Admin"
+                ? "Manager"
                 : role === "super_admin"
                   ? "Super Admin"
                   : role;

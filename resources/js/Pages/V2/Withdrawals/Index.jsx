@@ -113,7 +113,7 @@ export default function Index({
         blockers.push({
             title: 'KYC verification pending',
             detail:
-                'Admin verification is required before withdrawal.',
+                'Manager verification is required before withdrawal.',
             action: 'Review KYC profile',
         });
     }

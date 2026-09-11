@@ -12,17 +12,17 @@ export default function Index({
     return (
         <PanelLayout
             role={role}
-            title="Admins"
-            subtitle="Manage admin assignments"
+            title="Managers"
+            subtitle="Manage manager assignments"
         >
-            <Head title="Admins" />
+            <Head title="Managers" />
 
             <div className="mb-4 flex justify-end">
                 <Link
                     href="/v2/admin/users/create"
                     className="inline-flex items-center rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700"
                 >
-                    + Create Admin
+                    + Create Manager
                 </Link>
             </div>
 
@@ -31,7 +31,7 @@ export default function Index({
                     <thead className="bg-slate-50">
                         <tr>
                             {[
-                                'Admin',
+                                'Manager',
                                 'Role',
                                 'Status',
                                 'Artists',

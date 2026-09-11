@@ -341,7 +341,7 @@ export default function Index({
                                                             .value
                                                     )
                                                 }
-                                                placeholder="Admin note or rejection reason"
+                                                placeholder="Manager note or rejection reason"
                                                 className="min-h-24 w-full rounded-xl border border-slate-300 p-3 text-sm"
                                             />
 

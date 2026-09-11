@@ -30,7 +30,7 @@ export default function Index({
                         ],
                         [
                             'admin_reply',
-                            'Admin Reply',
+                            'Manager Reply',
                         ],
                         ['waiting', 'Waiting'],
                         ['closed', 'Closed'],

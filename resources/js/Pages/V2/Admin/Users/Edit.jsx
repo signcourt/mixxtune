@@ -357,7 +357,7 @@ export default function Edit({
                             onChange={(value) => setData("role", value)}
                             options={[
                                 ["super_admin", "Super Admin"],
-                                ["admin", "Admin"],
+                                ["admin", "Manager"],
                                 ["label", "Label"],
                                 ["artist", "Artist"],
                             ]}

@@ -81,7 +81,7 @@ export default function Index({
         <PanelLayout
             role={role}
             title="User Management"
-            subtitle="Manage admins, labels, artists and team accounts"
+            subtitle="Manage managers, labels, artists and team accounts"
         >
             <Head title="User Management" />
 
@@ -98,7 +98,7 @@ export default function Index({
                     />
 
                     <SummaryCard
-                        label="Admins"
+                        label="Managers"
                         value={summary.admins}
                     />
 
@@ -172,7 +172,7 @@ export default function Index({
                                 </option>
 
                                 <option value="admin">
-                                    Admin
+                                    Manager
                                 </option>
 
                                 <option value="label">

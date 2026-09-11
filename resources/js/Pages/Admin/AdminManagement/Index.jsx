@@ -45,18 +45,18 @@ export default function AdminManagement({
     };
 
     return (
-        <AdminLayout title="Admin Management">
-            <Head title="Admin Management" />
+        <AdminLayout title="Manager Management">
+            <Head title="Manager Management" />
 
             <div className="space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900">
-                            Admin Management
+                            Manager Management
                         </h1>
 
                         <p className="mt-1 text-sm text-slate-500">
-                            Create admins and assign Labels, Artists and permissions.
+                            Create managers and assign Labels, Artists and permissions.
                         </p>
                     </div>
 
@@ -65,7 +65,7 @@ export default function AdminManagement({
                         onClick={() => setShowCreate(true)}
                         className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white"
                     >
-                        + Create Admin
+                        + Create Manager
                     </button>
                 </div>
 
@@ -80,7 +80,7 @@ export default function AdminManagement({
                             onChange={(event) =>
                                 setSearch(event.target.value)
                             }
-                            placeholder="Search admin by name or email..."
+                            placeholder="Search manager by name or email..."
                             className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
                         />
 
@@ -95,7 +95,7 @@ export default function AdminManagement({
 
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="hidden border-b border-slate-200 bg-slate-50 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:grid-cols-[minmax(240px,1.4fr)_minmax(220px,1.2fr)_140px_140px_140px_260px]">
-                        <div>Admin</div>
+                        <div>Manager</div>
                         <div>Email</div>
                         <div>Labels</div>
                         <div>Artists</div>
@@ -107,7 +107,7 @@ export default function AdminManagement({
 
                     {(admins?.data ?? []).length === 0 ? (
                         <div className="px-6 py-20 text-center text-slate-500">
-                            No admins found.
+                            No managers found.
                         </div>
                     ) : (
                         <div className="divide-y divide-slate-100">
@@ -233,7 +233,7 @@ function CreateAdminModal({ onClose }) {
             >
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-slate-900">
-                        Create Admin
+                        Create Manager
                     </h2>
 
                     <button
@@ -254,7 +254,7 @@ function CreateAdminModal({ onClose }) {
                                 name: event.target.value,
                             })
                         }
-                        placeholder="Admin name"
+                        placeholder="Manager name"
                         className="w-full rounded-xl border border-slate-300 px-4 py-3"
                         required
                     />
@@ -319,7 +319,7 @@ function CreateAdminModal({ onClose }) {
                     >
                         {processing
                             ? 'Creating...'
-                            : 'Create Admin'}
+                            : 'Create Manager'}
                     </button>
                 </div>
             </form>

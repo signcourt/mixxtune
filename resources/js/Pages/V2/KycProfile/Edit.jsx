@@ -140,7 +140,7 @@ export default function Edit({ role, profile }) {
 
                         <p className="mx-auto mt-1 max-w-xl text-sm text-slate-500">
                             Your KYC and payout information has not yet been
-                            configured by the administrator.
+                            configured by the manager.
                         </p>
                     </section>
                 ) : (

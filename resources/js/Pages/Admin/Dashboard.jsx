@@ -31,7 +31,7 @@ const stats = [
 export default function AdminDashboard() {
     return (
         <AdminLayout title="Dashboard">
-            <Head title="Admin Dashboard" />
+            <Head title="Manager Dashboard" />
 
             <section className="mb-8 overflow-hidden rounded-3xl bg-[#0d1526] px-7 py-8 text-white shadow-xl lg:px-10">
                 <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
@@ -41,7 +41,7 @@ export default function AdminDashboard() {
                         </p>
 
                         <h2 className="text-3xl font-bold lg:text-4xl">
-                            Welcome back, Admin
+                            Welcome back, Manager
                         </h2>
 
                         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">

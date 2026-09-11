@@ -69,7 +69,7 @@ export default function Index({
                                     'Status',
                                     'KYC',
                                     'Releases',
-                                    'Assigned Admins',
+                                    'Assigned Managers',
                                     'Actions',
                                 ].map((heading) => (
                                     <th
@@ -161,7 +161,7 @@ export default function Index({
                                                             );
                                                         }}
                                                         className="min-w-[170px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                                                        title="Assign Admin"
+                                                        title="Assign Manager"
                                                     >
                                                         <option value="">
                                                             Unassigned

@@ -25,7 +25,7 @@ export default function UserSetPassword({
     const roleLabel = {
         artist: 'Artist',
         label: 'Label',
-        admin: 'Admin',
+        admin: 'Manager',
     }[invitedUser.role] ?? invitedUser.role;
 
     return (

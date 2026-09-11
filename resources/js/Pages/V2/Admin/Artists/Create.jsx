@@ -179,7 +179,7 @@ export default function Create({
                         {role === 'super_admin' && (
                             <label>
                                 <span className="text-sm font-semibold text-slate-700">
-                                    Assign Admin
+                                    Assign Manager
                                 </span>
 
                                 <select
@@ -193,7 +193,7 @@ export default function Create({
                                     className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
                                 >
                                     <option value="">
-                                        No Admin Assignment
+                                        No Manager Assignment
                                     </option>
 
                                     {admins.map((admin) => (

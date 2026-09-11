@@ -69,10 +69,10 @@ export default function Show({
     return (
         <PanelLayout
             role={role}
-            title="Admin Assignments"
+            title="Manager Assignments"
             subtitle={`${admin.name} • ${admin.email}`}
         >
-            <Head title="Admin Assignments" />
+            <Head title="Manager Assignments" />
 
             <form
                 onSubmit={submit}

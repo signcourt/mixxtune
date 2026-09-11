@@ -835,7 +835,7 @@ export default function Welcome({
                                         ],
                                     },
                                     {
-                                        label: 'Admin',
+                                        label: 'Manager',
                                         title: 'Operate the distribution business',
                                         items: [
                                             'Review and delivery workflows',

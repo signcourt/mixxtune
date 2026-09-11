@@ -243,7 +243,7 @@ export default function Create({
         <PanelLayout
             role={role}
             title="Create User"
-            subtitle="Create an admin, label or artist account"
+            subtitle="Create a manager, label or artist account"
         >
             <Head title="Create User" />
 
@@ -366,7 +366,7 @@ export default function Create({
                                 }
                                 className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                             >
-                                <option value="admin">Admin</option>
+                                <option value="admin">Manager</option>
 
                                 <option value="label">Label</option>
 

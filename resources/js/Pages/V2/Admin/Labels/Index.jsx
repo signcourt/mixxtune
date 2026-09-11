@@ -52,7 +52,7 @@ export default function Index({
                                     'Status',
                                     'Artists',
                                     'Releases',
-                                    'Assigned Admins',
+                                    'Assigned Managers',
                                     'Action',
                                 ].map((heading) => (
                                     <th

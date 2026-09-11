@@ -334,7 +334,7 @@ class DashboardController extends Controller
 
         $panelName = match ($role) {
             'super_admin' => 'Super Admin',
-            'admin' => 'Admin',
+            'admin' => 'Manager',
             'label' => 'Label',
             default => 'Artist',
         };
