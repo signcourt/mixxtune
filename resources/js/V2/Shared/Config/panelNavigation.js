@@ -441,6 +441,12 @@ const adminNavigation = (
             label: 'Financial',
             icon: icons.wallet,
             children: [
+                // MIXXTUNE_NAV_FINANCE_ROYALTIES_V1: admin statement finance page
+                {
+                    id: 'financial-finance-royalties',
+                    label: 'Finance & Royalties',
+                    href: '/v2/admin/finance',
+                },
                 {
                     id: 'financial-royalties',
                     label: 'Royalties',

@@ -102,6 +102,34 @@ class RoyaltyController extends Controller
                 );
         }
 
+        /*
+         * MIXXTUNE_ROYALTIES_IMPORT_STATUS_AWARE_V1
+         *
+         * Statements created by a report import are settled by
+         * ReportImportScheduledPublisher (wallet credit or unclaimed hold).
+         * Their legacy status stays "pending", so they are excluded from the
+         * pending/approved totals and reported separately.
+         */
+        $importJournal = function ($sub) {
+            $sub->select(DB::raw(1))
+                ->from('report_import_postings as rip')
+                ->whereColumn(
+                    'rip.royalty_statement_id',
+                    'royalty_statements.id'
+                );
+        };
+
+        $importCredited = function ($sub) use ($importJournal) {
+            $importJournal($sub);
+            $sub->whereIn('rip.status', ['posted', 'completed']);
+        };
+
+        $importHeld = function ($sub) use ($importJournal) {
+            $importJournal($sub);
+            $sub->where('rip.status', 'held_unclaimed');
+        };
+
+
         $summary = [
             'gross' =>
                 (float) (
@@ -118,6 +146,7 @@ class RoyaltyController extends Controller
                             'status',
                             'pending'
                         )
+                        ->whereNotExists($importJournal)
                         ->sum(
                             'net_payable'
                         )
@@ -130,6 +159,7 @@ class RoyaltyController extends Controller
                             'status',
                             'approved'
                         )
+                        ->whereNotExists($importJournal)
                         ->sum(
                             'net_payable'
                         )
@@ -159,6 +189,18 @@ class RoyaltyController extends Controller
                         )
                 ),
         ];
+        $summary['paid_via_import'] = (float) (
+            (clone $query)
+                ->whereExists($importCredited)
+                ->sum('net_payable')
+        );
+
+        $summary['held_via_import'] = (float) (
+            (clone $query)
+                ->whereExists($importHeld)
+                ->sum('net_payable')
+        );
+
 
         return Inertia::render(
             'V2/Royalties/Index',
@@ -171,6 +213,16 @@ class RoyaltyController extends Controller
 
                 'statements' =>
                     $query
+                        ->select('royalty_statements.*')
+                        ->addSelect([
+                            'import_posting_status' => DB::table('report_import_postings as rip')
+                                ->select('rip.status')
+                                ->whereColumn(
+                                    'rip.royalty_statement_id',
+                                    'royalty_statements.id'
+                                )
+                                ->limit(1),
+                        ])
                         ->orderByDesc(
                             'statement_month'
                         )

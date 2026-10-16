@@ -52,6 +52,15 @@ const summaryCards = [
         tone:
             'border-green-200 bg-green-50 text-green-700',
     },
+    {
+        // MIXXTUNE_ROYALTIES_IMPORT_STATUS_AWARE_V1
+        key: 'paid_via_import',
+        label: 'Credited via Import',
+        description: 'Already added to wallet',
+        symbol: '✓',
+        tone:
+            'border-emerald-200 bg-emerald-50 text-emerald-700',
+    },
 ];
 
 const statusClasses = {
@@ -180,7 +189,7 @@ export default function Index({
                 (item) => {
                     const matchesStatus =
                         !statusFilter ||
-                        item.status ===
+                        effectiveStatus(item) ===
                             statusFilter;
 
                     const matchesSearch =
@@ -493,6 +502,14 @@ export default function Index({
                                     Paid
                                 </option>
 
+                                <option value="import_paid">
+                                    Credited via import
+                                </option>
+
+                                <option value="import_held">
+                                    Held via import
+                                </option>
+
                                 <option value="cancelled">
                                     Cancelled
                                 </option>
@@ -711,11 +728,7 @@ function StatementRow({
             </td>
 
             <td className="px-5 py-4">
-                <StatusBadge
-                    status={
-                        item.status
-                    }
-                />
+                <ImportAwareStatus item={item} />
             </td>
 
             <td className="px-5 py-4 text-right">
@@ -894,5 +907,60 @@ function Pagination({
                 )
             )}
         </nav>
+    );
+}
+
+/*
+ * MIXXTUNE_ROYALTIES_IMPORT_STATUS_AWARE_V1
+ *
+ * Import statements keep the legacy status "pending" while their money is
+ * already credited (or held) by the scheduled publisher. Show the real state.
+ */
+const IMPORT_BADGES = {
+    import_paid: {
+        label: 'Credited to wallet',
+        className: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    },
+    import_held: {
+        label: 'Held · owner not linked',
+        className: 'bg-amber-50 text-amber-700 ring-amber-200',
+    },
+    import_scheduled: {
+        label: 'Scheduled · awaiting publish',
+        className: 'bg-slate-100 text-slate-700 ring-slate-200',
+    },
+};
+
+function effectiveStatus(item) {
+    const s = item?.import_posting_status;
+
+    if (!s) {
+        return item?.status;
+    }
+
+    if (s === 'posted' || s === 'completed') {
+        return 'import_paid';
+    }
+
+    if (s === 'held_unclaimed') {
+        return 'import_held';
+    }
+
+    return 'import_scheduled';
+}
+
+function ImportAwareStatus({ item }) {
+    const badge = IMPORT_BADGES[effectiveStatus(item)];
+
+    if (!badge) {
+        return <StatusBadge status={item.status} />;
+    }
+
+    return (
+        <span
+            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset ${badge.className}`}
+        >
+            {badge.label}
+        </span>
     );
 }
