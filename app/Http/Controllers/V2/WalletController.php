@@ -23,6 +23,39 @@ class WalletController extends Controller
         WithdrawalService $withdrawalService,
         AdminFinancialAccessService $adminFinancialAccess
     ): Response {
+        /*
+         * FF165_ADMIN_ALIAS_GUARD_WALLET
+         * The shared controller serves both normal account
+         * routes and /v2/admin aliases.
+         *
+         * Only the admin alias requires admin/super_admin.
+         */
+        if (
+            $request->route()
+            && str_starts_with(
+                (string) $request->route()->getName(),
+                'v2.admin.wallet.'
+            )
+        ) {
+            $adminAliasRole =
+                $permissions->role(
+                    $request->user()
+                );
+
+            abort_unless(
+                in_array(
+                    $adminAliasRole,
+                    [
+                        'admin',
+                        'super_admin',
+                    ],
+                    true
+                ),
+                403,
+                'Admin access required.'
+            );
+        }
+
         $actor = $request->user();
         $role = $permissions->role($actor);
 
@@ -142,6 +175,9 @@ class WalletController extends Controller
                     'minimumWithdrawal' =>
                         0,
 
+                    'withdrawalEnabled' =>
+                        true,
+
                     'wallet' =>
                         $wallet,
 
@@ -180,6 +216,11 @@ class WalletController extends Controller
 
                 'minimumWithdrawal' =>
                     $minimumWithdrawal,
+
+                'withdrawalEnabled' =>
+                    $withdrawalService->withdrawalEnabledFor(
+                        $financialOwner
+                    ),
 
                 'wallet' =>
                     $wallet,

@@ -24,6 +24,7 @@ class WalletTransaction extends Model
         'status',
         'effective_at',
         'posted_at',
+        'financial_month',
         'metadata',
         'created_by',
     ];
@@ -34,6 +35,7 @@ class WalletTransaction extends Model
         'balance_after' => 'decimal:8',
         'effective_at' => 'datetime',
         'posted_at' => 'datetime',
+        'financial_month' => 'date',
         'metadata' => 'array',
     ];
 

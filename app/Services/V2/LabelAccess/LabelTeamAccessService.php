@@ -39,11 +39,19 @@ class LabelTeamAccessService
          * label row for one user, so preserve deterministic
          * oldest-label resolution until explicit switching exists.
          */
-        return Label::query()
+        $base = Label::query()
             ->where('user_id', $user->id)
-            ->whereNull('deleted_at')
+            ->whereNull('deleted_at');
+
+        $active = (clone $base)
+            ->where('status', 'active')
             ->orderBy('id')
             ->first();
+
+        return $active
+            ?? $base
+                ->orderBy('id')
+                ->first();
     }
 
     /**
@@ -476,7 +484,75 @@ class LabelTeamAccessService
         }
 
         if ($this->isOwner($user, $label)) {
-            return $fullScope;
+            /*
+             * Legacy/migrated production data can contain
+             * multiple independent canonical labels owned
+             * by the same Label user.
+             *
+             * ownedLabel() intentionally remains the single
+             * deterministic identity label used by Team
+             * management. Catalogue/report visibility,
+             * however, must include every canonical label
+             * actually owned by this user.
+             *
+             * Preserve strict two-tier behavior:
+             * - every directly owned label is visible
+             * - direct children of every owned master are visible
+             * - grandchildren are never inherited
+             *
+             * This owner-only branch does not broaden Team
+             * User permissions.
+             */
+            $ownedLabels = Label::query()
+                ->where(
+                    'user_id',
+                    $user->id
+                )
+                ->whereNull('deleted_at')
+                ->where('status', 'active')
+                ->get([
+                    'id',
+                    'parent_label_id',
+                ]);
+
+            $ownedLabelIds =
+                $ownedLabels
+                    ->pluck('id')
+                    ->map(
+                        fn ($id) => (int) $id
+                    );
+
+            $ownedMasterIds =
+                $ownedLabels
+                    ->filter(
+                        fn (Label $ownedLabel) =>
+                            $ownedLabel->parent_label_id === null
+                    )
+                    ->pluck('id')
+                    ->map(
+                        fn ($id) => (int) $id
+                    );
+
+            $directChildIds =
+                $ownedMasterIds->isEmpty()
+                    ? collect()
+                    : Label::query()
+                        ->whereIn(
+                            'parent_label_id',
+                            $ownedMasterIds
+                        )
+                        ->whereNull('deleted_at')
+                        ->where('status', 'active')
+                        ->pluck('id')
+                        ->map(
+                            fn ($id) => (int) $id
+                        );
+
+            return $ownedLabelIds
+                ->merge($directChildIds)
+                ->unique()
+                ->sort()
+                ->values();
         }
 
         $member = $this->membership($user);

@@ -628,29 +628,6 @@ Route::middleware([
                 ]
             )->name('royalty-ledgers.show');
 
-            Route::post(
-                '/royalty-ledgers/{id}/approve',
-                [
-                    \App\Http\Controllers\Admin\RoyaltyLedgerController::class,
-                    'approve',
-                ]
-            )->name('royalty-ledgers.approve');
-
-            Route::post(
-                '/royalty-ledgers/{id}/cancel',
-                [
-                    \App\Http\Controllers\Admin\RoyaltyLedgerController::class,
-                    'cancel',
-                ]
-            )->name('royalty-ledgers.cancel');
-
-            Route::post(
-                '/royalty-ledgers/{id}/credit-wallet',
-                [
-                    \App\Http\Controllers\Admin\RoyaltyLedgerController::class,
-                    'creditWallet',
-                ]
-            )->name('royalty-ledgers.credit-wallet');
 
 
             /*
@@ -747,6 +724,175 @@ Route::middleware([
         ->middleware('role:super_admin')
         ->group(function () {
 
+            /*
+             * MIXXTUNE_SUPERADMIN_ROYALTY_LEDGER_LIFECYCLE_V1
+             *
+             * Manager keeps scoped read-only ledger access.
+             * Approval/cancellation/wallet posting are Super Admin only.
+             */
+            Route::get(
+                '/royalty-ledgers',
+                [
+                    \App\Http\Controllers\Admin\RoyaltyLedgerController::class,
+                    'index',
+                ]
+            )->name('royalty-ledgers.index');
+
+            /*
+             * FF431_K17C2_SUPERADMIN_LOCAL_PRECEDENCE
+             *
+             * Static Rights-import batch routes MUST stay above
+             * /royalty-ledgers/{id} inside this same Super Admin group.
+             */
+            /*
+             * FF431_K17B_RIGHTS_LEDGER_BATCH_ROUTES
+             *
+             * Exact Rights-import batch actions.
+             * Super Admin only because this block already lives inside
+             * the existing super_admin middleware group.
+             */
+            Route::post(
+                '/royalty-ledgers/rights-import/approve',
+                [
+                    \App\Http\Controllers\Admin\RoyaltyLedgerController::class,
+                    'approveRightsImportBatch',
+                ]
+            )->name(
+                'royalty-ledgers.rights-import.approve'
+            );
+
+            Route::post(
+                '/royalty-ledgers/rights-import/credit-wallet',
+                [
+                    \App\Http\Controllers\Admin\RoyaltyLedgerController::class,
+                    'creditRightsImportBatch',
+                ]
+            )->name(
+                'royalty-ledgers.rights-import.credit-wallet'
+            );
+
+
+            Route::get(
+                '/royalty-ledgers/{id}',
+                [
+                    \App\Http\Controllers\Admin\RoyaltyLedgerController::class,
+                    'show',
+                ]
+            )->name('royalty-ledgers.show');
+
+            Route::post(
+                '/royalty-ledgers/{id}/approve',
+                [
+                    \App\Http\Controllers\Admin\RoyaltyLedgerController::class,
+                    'approve',
+                ]
+            )->name('royalty-ledgers.approve');
+
+            Route::post(
+                '/royalty-ledgers/{id}/cancel',
+                [
+                    \App\Http\Controllers\Admin\RoyaltyLedgerController::class,
+                    'cancel',
+                ]
+            )->name('royalty-ledgers.cancel');
+
+            Route::post(
+                '/royalty-ledgers/{id}/credit-wallet',
+                [
+                    \App\Http\Controllers\Admin\RoyaltyLedgerController::class,
+                    'creditWallet',
+                ]
+            )->name('royalty-ledgers.credit-wallet');
+
+
+
+            /*
+             * Master Report Analyzer
+             *
+             * Super Admin only.
+             * Raw vendor/master report preprocessing and audit.
+             * Completely separate from the existing revenue import/mapping flow.
+             */
+            Route::get(
+                '/master-report-analyzer/batches',
+                [
+                    \App\Http\Controllers\V2\Admin\MasterReportAnalyzerController::class,
+                    'index',
+                ]
+            )->name('master-report-analyzer.index');
+
+            Route::post(
+                '/master-report-analyzer/upload',
+                [
+                    \App\Http\Controllers\V2\Admin\MasterReportAnalyzerController::class,
+                    'upload',
+                ]
+            )->name('master-report-analyzer.upload');
+
+            Route::get(
+                '/master-report-analyzer/{masterReportBatch}/overview',
+                [
+                    \App\Http\Controllers\V2\Admin\MasterReportAnalyzerController::class,
+                    'overview',
+                ]
+            )->name('master-report-analyzer.overview');
+
+            Route::get(
+                '/master-report-analyzer/{masterReportBatch}/stores',
+                [
+                    \App\Http\Controllers\V2\Admin\MasterReportAnalyzerController::class,
+                    'stores',
+                ]
+            )->name('master-report-analyzer.stores');
+
+            Route::get(
+                '/master-report-analyzer/{masterReportBatch}/tracks',
+                [
+                    \App\Http\Controllers\V2\Admin\MasterReportAnalyzerController::class,
+                    'tracks',
+                ]
+            )->name('master-report-analyzer.tracks');
+
+            Route::get(
+                '/master-report-analyzer/{masterReportBatch}/reconciliation',
+                [
+                    \App\Http\Controllers\V2\Admin\MasterReportAnalyzerController::class,
+                    'reconciliation',
+                ]
+            )->name('master-report-analyzer.reconciliation');
+
+            Route::get(
+                '/master-report-analyzer/{masterReportBatch}/filter-options',
+                [
+                    \App\Http\Controllers\V2\Admin\MasterReportAnalyzerController::class,
+                    'filterOptions',
+                ]
+            )->name('master-report-analyzer.filter-options');
+
+            Route::post(
+                '/master-report-analyzer/{masterReportBatch}/export',
+                [
+                    \App\Http\Controllers\V2\Admin\MasterReportAnalyzerController::class,
+                    'export',
+                ]
+            )->name('master-report-analyzer.export');
+
+            Route::get(
+                '/master-report-analyzer/{masterReportBatch}/original',
+                [
+                    \App\Http\Controllers\V2\Admin\MasterReportAnalyzerController::class,
+                    'downloadOriginal',
+                ]
+            )->name('master-report-analyzer.original');
+
+            Route::delete(
+                '/master-report-analyzer/{masterReportBatch}',
+                [
+                    \App\Http\Controllers\V2\Admin\MasterReportAnalyzerController::class,
+                    'destroy',
+                ]
+            )->name('master-report-analyzer.destroy');
+
             Route::get(
                 '/unmapped-revenue',
                 [
@@ -755,6 +901,31 @@ Route::middleware([
                 ]
             )->name('unmapped-revenue.index');
 
+            Route::get(
+                '/unmapped-revenue/export-mapping',
+                [
+                    \App\Http\Controllers\V2\Admin\UnmappedRevenueController::class,
+                    'exportMappingWorkbook',
+                ]
+            )->name('unmapped-revenue.export-mapping');
+
+            Route::post(
+                '/unmapped-revenue/preview-mapping',
+                [
+                    \App\Http\Controllers\V2\Admin\UnmappedRevenueController::class,
+                    'previewMappingWorkbook',
+                ]
+            )->name('unmapped-revenue.preview-mapping');
+
+
+            Route::post(
+                '/unmapped-revenue/apply-mapping',
+                [
+                    \App\Http\Controllers\V2\Admin\UnmappedRevenueController::class,
+                    'applyMappingWorkbook',
+                ]
+            )->name('unmapped-revenue.apply-mapping');
+
             Route::post(
                 '/unmapped-revenue',
                 [
@@ -762,6 +933,19 @@ Route::middleware([
                     'store',
                 ]
             )->name('unmapped-revenue.store');
+
+            /*
+             * MIXXTUNE_BULK_SELECTED_MAPPING_BACKEND_V1
+             */
+            Route::post(
+                '/unmapped-revenue/bulk-map-selected',
+                [
+                    \App\Http\Controllers\V2\Admin\UnmappedRevenueController::class,
+                    'bulkMapSelected',
+                ]
+            )->name(
+                'unmapped-revenue.bulk-map-selected'
+            );
             Route::post(
                 '/unmapped-revenue/create-and-map-label',
                 [
@@ -769,6 +953,19 @@ Route::middleware([
                     'createAndMapLabel',
                 ]
             )->name('unmapped-revenue.create-and-map-label');
+
+            /*
+             * MIXXTUNE_UNMAPPED_AUTO_RESOLVE_V1
+             */
+            Route::post(
+                '/unmapped-revenue/auto-resolve',
+                [
+                    \App\Http\Controllers\V2\Admin\UnmappedRevenueController::class,
+                    'autoResolve',
+                ]
+            )->name(
+                'unmapped-revenue.auto-resolve'
+            );
 
             Route::post(
                 '/unmapped-revenue/apply-all',
@@ -999,6 +1196,14 @@ Route::get('/sitemap.xml', function () {
 
 
 require __DIR__.'/auth.php';
+
+
+Route::middleware(['auth', 'verified'])
+    ->put(
+        '/v2/sidebar/navigation-order',
+        [\App\Http\Controllers\V2\SidebarPreferenceController::class, 'update']
+    )
+    ->name('v2.sidebar.navigation-order.update');
 
 
 Route::middleware(['auth', 'verified'])
@@ -1578,10 +1783,48 @@ Route::middleware(['auth', 'verified'])
 
 Route::middleware(['auth', 'verified'])
     ->get(
+        '/v2/admin/reports/imports/{reportImport}/view',
+        [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'show']
+    )
+    ->name('v2.admin.reports.imports.show');
+
+
+Route::middleware(['auth', 'verified'])
+    ->get(
         '/v2/admin/reports/imports/{reportImport}/download',
         [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'download']
     )
     ->name('v2.admin.reports.imports.download');
+
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/v2/admin/reports/imports/{reportImport}/re-detect-unmapped',
+        [
+            \App\Http\Controllers\V2\Admin\ReportImportController::class,
+            'reDetectUnmapped'
+        ]
+    )
+    ->name(
+        'v2.admin.reports.imports.re-detect-unmapped'
+    );
+
+
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/v2/admin/reports/imports/{reportImport}/approve-and-schedule',
+        [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'approveAndSchedule']
+    )
+    ->name(
+        'v2.admin.reports.imports.approve-and-schedule'
+    );
+
+            Route::post(
+                '/v2/admin/reports/imports/{reportImport}/missing-revenue-rates',
+                [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'saveMissingRevenueRates']
+            )->name(
+                'v2.admin.reports.imports.missing-revenue-rates'
+            );
+
 
 
 Route::middleware(['auth', 'verified'])
@@ -1612,6 +1855,53 @@ Route::middleware(['auth','verified'])
         [\App\Http\Controllers\V2\RoyaltyController::class,'index']
     )
     ->name('v2.admin.royalties.index');
+
+/*
+ * MIXXTUNE_RIGHTS_ROYALTY_UPLOAD_ROUTES_V1
+ *
+ * Rights royalty statement processing.
+ * No wallet posting at import stage.
+ */
+/*
+ * MIXXTUNE_RIGHTS_SUPERADMIN_LIFECYCLE_V1
+ *
+ * Raw Rights import inspection and every mutation are restricted
+ * to Super Admin. Manager/Label/Artist use scoped royalty views.
+ */
+Route::middleware([
+        'auth',
+        'verified',
+        'role:super_admin',
+    ])
+    ->prefix('v2/admin/royalties/rights')
+    ->name('v2.admin.royalties.rights.')
+    ->group(function () {
+        Route::post(
+            '/inspect',
+            [\App\Http\Controllers\V2\RightsRoyaltyImportController::class, 'inspect']
+        )->name('inspect');
+
+        Route::post(
+            '/imports',
+            [\App\Http\Controllers\V2\RightsRoyaltyImportController::class, 'store']
+        )->name('store');
+
+        Route::get(
+            '/imports/{import:public_id}',
+            [\App\Http\Controllers\V2\RightsRoyaltyImportController::class, 'show']
+        )->name('show');
+
+        Route::post(
+            '/imports/{import:public_id}/approve',
+            [\App\Http\Controllers\V2\RightsRoyaltyImportController::class, 'approve']
+        )->name('approve');
+
+        Route::post(
+            '/imports/{import:public_id}/publish',
+            [\App\Http\Controllers\V2\RightsRoyaltyImportController::class, 'publish']
+        )->name('publish');
+    });
+
 
 
 
@@ -1695,6 +1985,13 @@ Route::middleware(['auth', 'verified'])
         [\App\Http\Controllers\V2\PayoutProfileController::class, 'edit']
     )
     ->name('v2.kyc-profile.edit');
+
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/v2/kyc-profile/submit',
+        [\App\Http\Controllers\V2\PayoutProfileController::class, 'submit']
+    )
+    ->name('v2.kyc-profile.submit');
 
 
 
@@ -2011,6 +2308,47 @@ Route::middleware(['auth', 'verified'])
     ->name('v2.admin.labels.assign-admin');
 
 
+/*
+ * FF419-C — Canonical Label Revenue Rate
+ */
+/*
+ * MIXXTUNE_LABEL_BULK_ACTION_ROUTE_V2
+ */
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/v2/admin/labels/bulk-action',
+        [
+            \App\Http\Controllers\V2\Admin\AssignmentManagementController::class,
+            'bulkLabelAction',
+        ]
+    )
+    ->name('v2.admin.labels.bulk-action');
+
+
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/v2/admin/labels/{label}/revenue-rate',
+        [
+            \App\Http\Controllers\V2\Admin\AssignmentManagementController::class,
+            'updateLabelRevenueRate',
+        ]
+    )
+    ->name('v2.admin.labels.revenue-rate');
+
+
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/v2/admin/labels/{label}/withdrawal-status',
+        [
+            \App\Http\Controllers\V2\Admin\AssignmentManagementController::class,
+            'updateLabelWithdrawalStatus',
+        ]
+    )
+    ->name(
+        'v2.admin.labels.withdrawal-status'
+    );
+
+
 Route::middleware(['auth', 'verified'])
     ->patch(
         '/v2/admin/artists/{artist}/admin',
@@ -2113,6 +2451,49 @@ Route::middleware(['auth', 'verified'])
         [\App\Http\Controllers\V2\Admin\UserManagementController::class, 'update']
     )
     ->name('v2.admin.users.update');
+
+/*
+ * MIXXTUNE_QUICK_LABEL_ROUTE_V2
+ */
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/v2/admin/users/{user}/quick-label',
+        [
+            \App\Http\Controllers\V2\Admin\UserManagementController::class,
+            'quickLabel',
+        ]
+    )
+    ->name('v2.admin.users.quick-label');
+
+
+
+/*
+ * MIXXTUNE_QUICK_EDIT_FIELD_CONFIG_ROUTE_V1
+ */
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/v2/admin/users/{user}/quick-edit-fields',
+        [
+            \App\Http\Controllers\V2\Admin\UserManagementController::class,
+            'updateQuickEditFields',
+        ]
+    )
+    ->name('v2.admin.users.quick-edit-fields');
+
+
+/*
+ * MIXXTUNE_USER_QUICK_EDIT_ROUTE_V1
+ */
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/v2/admin/users/{user}/quick-update',
+        [
+            \App\Http\Controllers\V2\Admin\UserManagementController::class,
+            'quickUpdate',
+        ]
+    )
+    ->name('v2.admin.users.quick-update');
+
 
 
 Route::middleware(['auth', 'verified'])
@@ -2368,7 +2749,11 @@ Route::middleware(['auth'])->group(function () {
 
 
 /* MIXXTUNE_LABEL_HIERARCHY_ROUTES */
-Route::middleware(['auth'])
+Route::middleware([
+    'auth',
+    'verified',
+    'role:super_admin',
+])
     ->prefix('super-admin')
     ->group(function () {
         Route::get(

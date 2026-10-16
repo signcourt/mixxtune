@@ -98,4 +98,139 @@ class PayoutProfileController extends Controller
             ]
         );
     }
+
+    /**
+     * Submit the current financial owner's payout/KYC profile
+     * for Super Admin review.
+     *
+     * The profile remains user read-only. This endpoint only
+     * performs the explicit pending/rejected -> submitted
+     * lifecycle transition.
+     */
+    public function submit(\Illuminate\Http\Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $user = $request->user();
+
+        abort_unless($user, 401);
+
+        $role = str_replace('-', '_', (string) $user->role);
+
+        abort_unless(
+            in_array($role, ['label', 'artist'], true),
+            403,
+            'Only Label or Artist accounts can submit payout KYC.'
+        );
+
+        $profile = \App\Models\Finance\PayoutProfile::query()
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $profile) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'kyc' => 'Your payout/KYC profile has not been configured yet. Please contact support.',
+            ]);
+        }
+
+        if ($profile->kyc_status === 'verified') {
+            return back()->with(
+                'success',
+                'Your KYC is already verified.'
+            );
+        }
+
+        if ($profile->kyc_status === 'submitted') {
+            return back()->with(
+                'success',
+                'Your KYC is already submitted for verification.'
+            );
+        }
+
+        /*
+         * Required identity/address fields.
+         */
+        $required = [
+            'account_holder_name' => 'Account holder name',
+            'pan_number'          => 'PAN number',
+            'address_line_1'      => 'Address',
+            'city'                => 'City',
+            'state'               => 'State',
+            'postal_code'         => 'Postal code',
+            'country_code'        => 'Country',
+        ];
+
+        $missing = [];
+
+        foreach ($required as $field => $label) {
+            if (blank($profile->{$field})) {
+                $missing[] = $label;
+            }
+        }
+
+        /*
+         * At least one usable payout method is required.
+         */
+        $hasBank =
+            filled($profile->account_holder_name)
+            && filled($profile->bank_account_number)
+            && filled($profile->ifsc_code);
+
+        $hasUpi = filled($profile->upi_id);
+
+        if (! $hasBank && ! $hasUpi) {
+            $missing[] = 'Bank account + IFSC or UPI ID';
+        }
+
+        if ($missing !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'kyc' =>
+                    'KYC cannot be submitted. Missing: '
+                    .implode(', ', array_unique($missing))
+                    .'. Please contact support to complete the profile.',
+            ]);
+        }
+
+        /*
+         * GST is optional. It is intentionally not a submission
+         * requirement because non-GST payees are valid.
+         */
+        $profile->forceFill([
+            'kyc_status' => 'submitted',
+            'verified_at' => null,
+            'verified_by' => null,
+        ])->save();
+
+        /*
+         * Keep the legacy User-level status synchronized where
+         * the schema supports the submitted lifecycle value.
+         *
+         * Do not allow failure here to roll back the canonical
+         * payout profile submission.
+         */
+        try {
+            $column = \Illuminate\Support\Facades\DB::selectOne(
+                "SHOW COLUMNS FROM users LIKE 'kyc_status'"
+            );
+
+            if ($column) {
+                $type = strtolower((string) ($column->Type ?? ''));
+
+                if (
+                    ! str_contains($type, 'enum')
+                    || str_contains($type, "'submitted'")
+                ) {
+                    $user->forceFill([
+                        'kyc_status' => 'submitted',
+                    ])->save();
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return back()->with(
+            'success',
+            'KYC submitted for verification successfully.'
+        );
+    }
+
 }

@@ -52,6 +52,10 @@ const filterNavigationItem = (item, permissions) => {
         permissionAllowed(child, permissions),
     );
 
+    if (allowedChildren.length === 0) {
+        return null;
+    }
+
     return {
         ...item,
         children: allowedChildren,
@@ -68,20 +72,30 @@ export default function Sidebar({
     mobileOpen = false,
     onMobileClose = () => {},
 }) {
-    const { url } = usePage();
+    const page = usePage();
+    const { url } = page;
+    const authUser = page.props?.auth?.user ?? {};
 
     const [collapsed, setCollapsed] = useState(false);
 
     const [openMenus, setOpenMenus] = useState({});
 
     const [navigationOrder, setNavigationOrder] = useState(() => {
+        const serverOrder = authUser?.sidebar_navigation_order;
+
+        if (Array.isArray(serverOrder)) {
+            return serverOrder.map(String);
+        }
+
         if (typeof window === "undefined") {
             return [];
         }
 
         try {
             const key =
-                `mixxtune_sidebar_order_${String(role || "artist")}`;
+                `mixxtune_sidebar_order_v2_${String(
+                    authUser?.id ?? role ?? "artist",
+                )}`;
 
             const saved = window.localStorage.getItem(key);
 
@@ -102,17 +116,51 @@ export default function Sidebar({
     const [draggedItemId, setDraggedItemId] = useState(null);
     const [dropTarget, setDropTarget] = useState(null);
 
+    // Label and Artist navigation order is fixed.
+    // These account types must always use the canonical
+    // order returned by getPanelNavigation().
+    const navigationOrderLocked =
+        role === "label" || role === "artist";
+
     const currentPath = normalizePath(url);
+
+    const normalizedRole =
+        role === "super-admin" ? "super_admin" : role;
+
+    const dashboardHref =
+        normalizedRole === "super_admin"
+            ? "/super-admin/dashboard"
+            : normalizedRole === "admin"
+              ? "/admin/dashboard"
+              : normalizedRole === "label"
+                ? "/label/dashboard"
+                : "/artist/dashboard";
+
     const currentQuery = getQueryParams(url);
     const currentStatus =
         currentQuery.get("status") ?? "";
 
     const navigation = useMemo(
-        () =>
-            getPanelNavigation(role)
-                .map((item) => filterNavigationItem(item, permissions))
-                .filter(Boolean)
-                .filter(
+        () => {
+            const normalizedRole =
+                role === "super-admin" ? "super_admin" : role;
+
+            const panelNavigation =
+                getPanelNavigation(role);
+
+            const permissionFilteredNavigation =
+                normalizedRole === "super_admin"
+                    ? panelNavigation
+                    : panelNavigation
+                          .map((item) =>
+                              filterNavigationItem(
+                                  item,
+                                  permissions,
+                              ),
+                          )
+                          .filter(Boolean);
+
+            return permissionFilteredNavigation.filter(
                     (item) =>
                         ![
                             "notifications",
@@ -131,12 +179,16 @@ export default function Sidebar({
                             "Revenue Sharing",
                             "KYC & Profile",
                         ].includes(item.label),
-                ),
+                );
+        },
         [role, permissions],
     );
 
     const orderedNavigation = useMemo(() => {
-        if (!navigationOrder.length) {
+        if (
+            navigationOrderLocked ||
+            !navigationOrder.length
+        ) {
             return navigation;
         }
 
@@ -164,9 +216,30 @@ export default function Sidebar({
         });
 
         return result;
-    }, [navigation, navigationOrder]);
+    }, [
+        navigation,
+        navigationOrder,
+        navigationOrderLocked,
+    ]);
 
     useEffect(() => {
+        if (navigationOrderLocked) {
+            setNavigationOrder([]);
+
+            try {
+                const key =
+                    `mixxtune_sidebar_order_v2_${String(
+                        authUser?.id ?? role ?? "artist",
+                    )}`;
+
+                window.localStorage.removeItem(key);
+            } catch {
+                // Ignore localStorage errors.
+            }
+
+            return;
+        }
+
         const ids = navigation.map((item) => String(item.id));
 
         setNavigationOrder((current) => {
@@ -182,7 +255,9 @@ export default function Sidebar({
 
             try {
                 const key =
-                    `mixxtune_sidebar_order_${String(role || "artist")}`;
+                    `mixxtune_sidebar_order_v2_${String(
+                        authUser?.id ?? role ?? "artist",
+                    )}`;
 
                 window.localStorage.setItem(
                     key,
@@ -194,22 +269,63 @@ export default function Sidebar({
 
             return next;
         });
-    }, [navigation, role]);
+    }, [
+        navigation,
+        role,
+        navigationOrderLocked,
+    ]);
 
     const saveNavigationOrder = (next) => {
-        setNavigationOrder(next);
+        const normalizedNext = next.map(String);
+
+        setNavigationOrder(normalizedNext);
 
         try {
             const key =
-                `mixxtune_sidebar_order_${String(role || "artist")}`;
+                `mixxtune_sidebar_order_v2_${String(
+                    authUser?.id ?? role ?? "artist",
+                )}`;
 
             window.localStorage.setItem(
                 key,
-                JSON.stringify(next),
+                JSON.stringify(normalizedNext),
             );
         } catch {
-            // Ignore localStorage errors.
+            // localStorage is only a fallback cache.
         }
+
+        if (
+            navigationOrderLocked ||
+            !authUser?.id ||
+            typeof window === "undefined"
+        ) {
+            return;
+        }
+
+        const csrfToken =
+            document
+                .querySelector('meta[name="csrf-token"]')
+                ?.getAttribute("content") ?? "";
+
+        fetch("/v2/sidebar/navigation-order", {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+                ...(csrfToken
+                    ? {
+                          "X-CSRF-TOKEN": csrfToken,
+                      }
+                    : {}),
+            },
+            body: JSON.stringify({
+                order: normalizedNext,
+            }),
+        }).catch(() => {
+            // Keep the local cache if network persistence fails.
+        });
     };
 
     const moveNavigationItem = (itemId, direction) => {
@@ -352,12 +468,19 @@ export default function Sidebar({
         );
 
         if (activeParent) {
-            setOpenMenus((current) => ({
-                ...current,
+            setOpenMenus({
                 [activeParent.id]: true,
-            }));
+            });
+        } else {
+            setOpenMenus({});
         }
-    }, [currentPath, currentQuery, currentStatus, orderedNavigation]);
+
+        // Auto-open only when the actual route/query changes.
+        // Do not depend on orderedNavigation here because its array
+        // identity can change during render and reopen a menu that
+        // the user has manually collapsed.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPath, currentStatus, url]);
 
     const toggleSubmenu = (id) => {
         setOpenMenus((current) => {
@@ -395,9 +518,21 @@ export default function Sidebar({
                         : "-translate-x-full lg:translate-x-0",
                 ].join(" ")}
             >
-                <div
+                <a
+                    href={dashboardHref}
+                    onClick={(event) => {
+                        event.preventDefault();
+
+                        if (typeof window !== "undefined") {
+                            window.location.assign(
+                                dashboardHref,
+                            );
+                        }
+                    }}
+                    title={`${brandName} ${brandSubtitle}`}
+                    aria-label={`Go to ${brandName} dashboard`}
                     className={[
-                        "flex h-24 items-center border-b border-white/10 px-5",
+                        "flex h-24 cursor-pointer items-center border-b border-white/10 px-5 transition-colors hover:bg-white/5",
                         collapsed ? "justify-center" : "gap-3",
                     ].join(" ")}
                 >
@@ -426,20 +561,30 @@ export default function Sidebar({
                             </div>
                         </div>
                     )}
-                </div>
+                </a>
 
                 <nav className="flex-1 overflow-y-auto px-3 py-5">
                     <div className="space-y-1.5">
                         {orderedNavigation.map((item, index) => (
                             <div
                                 key={item.id}
-                                draggable={!collapsed}
-                                onDragStart={(event) =>
+                                draggable={
+                                    !collapsed &&
+                                    !navigationOrderLocked
+                                }
+                                onDragStart={(event) => {
+                                    if (
+                                        navigationOrderLocked
+                                    ) {
+                                        event.preventDefault();
+                                        return;
+                                    }
+
                                     handleSidebarDragStart(
                                         event,
                                         item.id,
-                                    )
-                                }
+                                    );
+                                }}
                                 onDragOver={(event) =>
                                     handleSidebarDragOver(
                                         event,
@@ -589,18 +734,15 @@ function SidebarItem({
                                     currentQuery,
                                 );
 
-                                return (
-                                    <Link
-                                        key={child.id}
-                                        href={child.href}
-                                        onClick={onNavigate}
-                                        className={[
-                                            "group flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition",
-                                            childActive
-                                                ? "font-semibold text-violet-400"
-                                                : "text-slate-400 hover:text-white",
-                                        ].join(" ")}
-                                    >
+                                const childClassName = [
+                                    "group flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition",
+                                    childActive
+                                        ? "font-semibold text-violet-400"
+                                        : "text-slate-400 hover:text-white",
+                                ].join(" ");
+
+                                const childContent = (
+                                    <>
                                         <span
                                             className={[
                                                 "h-2 w-2 rounded-full border",
@@ -613,6 +755,38 @@ function SidebarItem({
                                         <span className="truncate">
                                             {child.label}
                                         </span>
+                                    </>
+                                );
+
+                                if (
+                                    child.id ===
+                                    "financial-unmapped-revenue"
+                                ) {
+                                    return (
+                                        <a
+                                            key={child.id}
+                                            href={child.href}
+                                            onClick={(event) => {
+                                                event.preventDefault();
+                                                window.location.assign(
+                                                    child.href,
+                                                );
+                                            }}
+                                            className={childClassName}
+                                        >
+                                            {childContent}
+                                        </a>
+                                    );
+                                }
+
+                                return (
+                                    <Link
+                                        key={child.id}
+                                        href={child.href}
+                                        onClick={onNavigate}
+                                        className={childClassName}
+                                    >
+                                        {childContent}
                                     </Link>
                                 );
                             })}
@@ -727,7 +901,7 @@ function SidebarItem({
      * The page itself works correctly when opened directly,
      * but client-side Inertia navigation can fail to enter it.
      */
-    if (item.id === "unmapped-revenue") {
+    if (item.id === "financial-unmapped-revenue") {
         return (
             <a
                 href={item.href}
@@ -877,7 +1051,7 @@ function isItemActive(
         );
     }
 
-    if (item.id === "unmapped-revenue") {
+    if (item.id === "financial-unmapped-revenue") {
         return (
             currentPath ===
             "/super-admin/unmapped-revenue"

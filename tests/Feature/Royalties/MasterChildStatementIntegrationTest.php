@@ -117,4 +117,269 @@ class MasterChildStatementIntegrationTest extends TestCase
             0.00000001
         );
     }
+
+    public function test_negative_master_child_split_does_not_double_charge(): void
+    {
+        $master =
+            $this->label(
+                'R12 Negative Master'
+            );
+
+        $child =
+            $this->label(
+                'R12 Negative Child',
+                $master->id
+            );
+
+        LabelRevenueShare::query()->create([
+            'master_label_id' =>
+                $master->id,
+
+            'beneficiary_type' =>
+                'label',
+
+            'beneficiary_id' =>
+                $child->id,
+
+            'revenue_share_percent' =>
+                80,
+
+            'show_revenue_share' =>
+                true,
+
+            'is_active' =>
+                true,
+        ]);
+
+        $importId =
+            DB::table(
+                'report_imports'
+            )->insertGetId([
+                'public_id' =>
+                    (string) Str::ulid(),
+
+                'original_filename' =>
+                    'r12-negative-hierarchy.csv',
+
+                'stored_path' =>
+                    'testing/r12-negative-hierarchy.csv',
+
+                'status' =>
+                    'completed',
+
+                'total_rows' =>
+                    1,
+
+                'imported_rows' =>
+                    1,
+
+                'duplicate_rows' =>
+                    0,
+
+                'failed_rows' =>
+                    0,
+
+                'started_at' =>
+                    now(),
+
+                'completed_at' =>
+                    now(),
+
+                'created_at' =>
+                    now(),
+
+                'updated_at' =>
+                    now(),
+            ]);
+
+        DB::table(
+            'report_rows'
+        )->insert([
+            'report_import_id' =>
+                $importId,
+
+            'row_hash' =>
+                hash(
+                    'sha256',
+                    'r12-negative-hierarchy'
+                ),
+
+            'reporting_month' =>
+                '2026-08',
+
+            'sale_date' =>
+                '2026-08-15',
+
+            'sale_month' =>
+                '2026-08',
+
+            'track_title' =>
+                'R12 Negative Track',
+
+            'track_artist' =>
+                'R12 Artist',
+
+            /*
+             * New snapshot contract.
+             *
+             * Negative commercial rule has already
+             * captured the full source adjustment.
+             */
+            'collected_revenue' =>
+                -100,
+
+            'label_rate' =>
+                1.00,
+
+            'earnings' =>
+                -100,
+
+            'mapping_status' =>
+                'mapped',
+
+            'revenue_owner_type' =>
+                'label',
+
+            'revenue_owner_id' =>
+                $child->id,
+
+            'created_at' =>
+                now(),
+
+            'updated_at' =>
+                now(),
+        ]);
+
+        app(
+            OwnershipRoyaltyService::class
+        )->generateMonthlyStatements(
+            '2026-08',
+            0,
+            'INR'
+        );
+
+        $childStatement =
+            DB::table(
+                'royalty_statements'
+            )
+                ->where(
+                    'label_id',
+                    $child->id
+                )
+                ->where(
+                    'statement_month',
+                    '2026-08'
+                )
+                ->first();
+
+        $masterStatement =
+            DB::table(
+                'royalty_statements'
+            )
+                ->where(
+                    'label_id',
+                    $master->id
+                )
+                ->where(
+                    'statement_month',
+                    '2026-08'
+                )
+                ->first();
+
+        $this->assertNotNull(
+            $childStatement
+        );
+
+        $this->assertNotNull(
+            $masterStatement
+        );
+
+        $this->assertEqualsWithDelta(
+            -80.0,
+            (float)
+                $childStatement
+                    ->net_payable,
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            -20.0,
+            (float)
+                $masterStatement
+                    ->net_payable,
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            -100.0,
+            (float)
+                $childStatement
+                    ->net_payable
+            + (float)
+                $masterStatement
+                    ->net_payable,
+            0.00000001
+        );
+
+        $childAllocation =
+            DB::table(
+                'royalty_allocations'
+            )
+                ->where(
+                    'royalty_statement_id',
+                    $childStatement->id
+                )
+                ->first();
+
+        $masterAllocation =
+            DB::table(
+                'royalty_allocations'
+            )
+                ->where(
+                    'royalty_statement_id',
+                    $masterStatement->id
+                )
+                ->first();
+
+        $this->assertNotNull(
+            $childAllocation
+        );
+
+        $this->assertNotNull(
+            $masterAllocation
+        );
+
+        $this->assertEqualsWithDelta(
+            80.0,
+            (float)
+                $childAllocation
+                    ->share_percentage,
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            20.0,
+            (float)
+                $masterAllocation
+                    ->share_percentage,
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            -80.0,
+            (float)
+                $childAllocation
+                    ->gross_amount,
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            -20.0,
+            (float)
+                $masterAllocation
+                    ->gross_amount,
+            0.00000001
+        );
+    }
+
 }

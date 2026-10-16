@@ -59,7 +59,7 @@ export default function WalletIndex({
                     </h1>
 
                     <p className="mt-1 text-sm text-slate-500">
-                        Label balances, lifetime earnings and wallet transactions.
+                        Account balances, lifetime earnings and wallet transactions.
                     </p>
                 </div>
 
@@ -116,7 +116,7 @@ export default function WalletIndex({
                                     search: event.target.value,
                                 })
                             }
-                            placeholder="Label or wallet ID"
+                            placeholder="Account, email or wallet ID"
                             className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
                         />
 
@@ -188,7 +188,7 @@ export default function WalletIndex({
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <h2 className="font-semibold text-slate-900">
-                            Label Wallets
+                            Account Wallets
                         </h2>
                     </div>
 
@@ -197,7 +197,7 @@ export default function WalletIndex({
                             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                                 <tr>
                                     <th className="px-4 py-3">
-                                        Label
+                                        Account
                                     </th>
                                     <th className="px-4 py-3">
                                         Currency
@@ -227,8 +227,21 @@ export default function WalletIndex({
                                 {walletRows.map((wallet) => (
                                     <tr key={wallet.id}>
                                         <td className="px-4 py-4 font-semibold text-slate-900">
-                                            {wallet.label_name ||
-                                                'Unknown Label'}
+                                            {/* FF158_OWNER_DISPLAY */}
+                                            <div>
+                                                <div>
+                                                    {wallet.label_name ||
+                                                        wallet.user_name ||
+                                                        'Unknown Account'}
+                                                </div>
+
+                                                {!wallet.label_name &&
+                                                    wallet.user_email && (
+                                                        <div className="mt-1 text-xs font-normal text-slate-500">
+                                                            {wallet.user_email}
+                                                        </div>
+                                                    )}
+                                            </div>
                                         </td>
 
                                         <td className="px-4 py-4 text-slate-700">

@@ -41,6 +41,11 @@ class SuperAdminProfitController extends Controller
                         clone $query
                     ),
 
+                'monthly' =>
+                    $profit->monthly(
+                        clone $query
+                    ),
+
                 'filters' =>
                     $filters,
 
@@ -108,9 +113,9 @@ class SuperAdminProfitController extends Controller
                             'Account ID',
                             'Platform',
                             'Collected Revenue',
-                            'Assigned Rate',
+                            'Applied Rate',
                             'User Earning',
-                            'Super Admin Profit',
+                            'Platform Margin',
                         ]
                     );
 

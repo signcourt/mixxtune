@@ -526,7 +526,7 @@ function CreateLevelModal({
     const form = useForm({
         name: '',
         parent_label_id: parent.id,
-        revenue_share_percent: '100',
+        revenue_share_percent: '',
         status: 'active',
     });
 
@@ -677,7 +677,7 @@ function EditLevelModal({
             label.parent_label_id ?? '',
         revenue_share_percent:
             label.revenue_share_percentage ??
-            '100',
+            '',
         status: label.status ?? 'active',
     });
 

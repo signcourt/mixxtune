@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 
 const money = (value, currency = 'INR') =>
@@ -25,11 +25,16 @@ export default function RoyaltyLedgerShow({
     trackRows = {},
 }) {
     const rows = trackRows?.data ?? [];
+    const { auth } = usePage().props;
+    const isSuperAdmin = auth?.user?.role === 'super_admin';
+    const ledgerBaseUrl = isSuperAdmin
+        ? '/super-admin/royalty-ledgers'
+        : '/admin/royalty-ledgers';
 
     const approveLedger = () => {
         if (!confirm('Is royalty ledger ko approve karna hai?')) return;
 
-        router.post(`/royalty-ledgers/${ledger.id}/approve`, {}, {
+        router.post(`${ledgerBaseUrl}/${ledger.id}/approve`, {}, {
             preserveScroll: true,
         });
     };
@@ -37,7 +42,7 @@ export default function RoyaltyLedgerShow({
     const creditWallet = () => {
         if (!confirm('Approved royalty ko wallet me credit karna hai?')) return;
 
-        router.post(`/royalty-ledgers/${ledger.id}/credit-wallet`, {}, {
+        router.post(`${ledgerBaseUrl}/${ledger.id}/credit-wallet`, {}, {
             preserveScroll: true,
         });
     };
@@ -45,7 +50,7 @@ export default function RoyaltyLedgerShow({
     const cancelLedger = () => {
         if (!confirm('Is royalty ledger ko cancel karna hai?')) return;
 
-        router.post(`/royalty-ledgers/${ledger.id}/cancel`, {}, {
+        router.post(`${ledgerBaseUrl}/${ledger.id}/cancel`, {}, {
             preserveScroll: true,
         });
     };
@@ -63,7 +68,7 @@ export default function RoyaltyLedgerShow({
             <div className="space-y-6">
                 <div>
                     <Link
-                        href="/royalty-ledgers"
+                        href={ledgerBaseUrl}
                         className="text-sm font-semibold text-violet-600 hover:text-violet-700"
                     >
                         ← Back to Royalty Ledger
@@ -85,7 +90,7 @@ export default function RoyaltyLedgerShow({
                         <div className="flex flex-wrap items-center gap-3">
                             <StatusBadge status={ledger.status} />
 
-                            {['draft', 'posted'].includes(ledger.status) && (
+                            {isSuperAdmin && ['draft', 'posted'].includes(ledger.status) && (
                                 <button
                                     type="button"
                                     onClick={approveLedger}
@@ -95,7 +100,7 @@ export default function RoyaltyLedgerShow({
                                 </button>
                             )}
 
-                            {ledger.status === 'approved' && (
+                            {isSuperAdmin && ledger.status === 'approved' && (
                                 <button
                                     type="button"
                                     onClick={creditWallet}
@@ -105,7 +110,7 @@ export default function RoyaltyLedgerShow({
                                 </button>
                             )}
 
-                            {!['wallet_credited', 'paid', 'cancelled'].includes(
+                            {isSuperAdmin && !['wallet_credited', 'paid', 'cancelled'].includes(
                                 ledger.status
                             ) && (
                                 <button

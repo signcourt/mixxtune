@@ -290,6 +290,7 @@ export default function Dashboard({
                 }
                 currency="INR"
                 reportsHref="/v2/admin/reports/imports"
+                secondaryRevenueKey="collected_revenue"
             />
 
             <AdminOperationsSection

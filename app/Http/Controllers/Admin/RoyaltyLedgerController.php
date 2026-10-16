@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\Royalties\WalletPostingService;
+use App\Services\Royalties\RightsRoyaltyLedgerBatchService;
 use App\Services\V2\AdminFinancialAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +31,17 @@ class RoyaltyLedgerController extends Controller
             ),
             'search' => trim(
                 (string) $request->input('search', '')
+            ),
+
+            /*
+             * MIXXTUNE_RIGHTS_LEDGER_IMPORT_FILTER_V1
+             *
+             * Exact immutable Rights import batch filter.
+             * The public import ID is snapshotted into ledger metadata
+             * when Rights allocations are published.
+             */
+            'rights_import' => trim(
+                (string) $request->input('rights_import', '')
             ),
         ];
 
@@ -64,6 +76,18 @@ class RoyaltyLedgerController extends Controller
             'royalty_ledgers.label_id',
             'royalty_ledgers.artist_id'
         );
+
+        if ($filters['rights_import'] !== '') {
+            $query
+                ->where(
+                    'royalty_ledgers.source_type',
+                    'rights_royalty_allocation'
+                )
+                ->where(
+                    'royalty_ledgers.metadata->rights_royalty_import_public_id',
+                    $filters['rights_import']
+                );
+        }
 
         if ($filters['reporting_month'] !== '') {
             $query->whereDate(
@@ -481,5 +505,79 @@ class RoyaltyLedgerController extends Controller
         }
     }
 
+
+
+    /*
+     * FF431_K17B_RIGHTS_BATCH_CONTROLLER
+     *
+     * Super Admin route middleware is the authorization boundary.
+     * Exact source_type + Rights import scoping is enforced again
+     * inside RightsRoyaltyLedgerBatchService.
+     */
+    public function approveRightsImportBatch(
+        Request $request,
+        RightsRoyaltyLedgerBatchService $service
+    ) {
+        $validated = $request->validate([
+            'rights_import' => [
+                'required',
+                'string',
+                'max:191',
+            ],
+        ]);
+
+        try {
+            $result = $service->approveImport(
+                $validated['rights_import'],
+                (int) $request->user()->id
+            );
+        } catch (\RuntimeException $e) {
+            return back()->withErrors([
+                'rights_import' => $e->getMessage(),
+            ]);
+        }
+
+        return back()->with(
+            'success',
+            sprintf(
+                'Rights batch approved: %d ledger(s); %d already approved.',
+                $result['approved'],
+                $result['already_approved']
+            )
+        );
+    }
+
+    public function creditRightsImportBatch(
+        Request $request,
+        RightsRoyaltyLedgerBatchService $service
+    ) {
+        $validated = $request->validate([
+            'rights_import' => [
+                'required',
+                'string',
+                'max:191',
+            ],
+        ]);
+
+        try {
+            $result = $service->creditImport(
+                $validated['rights_import'],
+                (int) $request->user()->id
+            );
+        } catch (\RuntimeException $e) {
+            return back()->withErrors([
+                'rights_import' => $e->getMessage(),
+            ]);
+        }
+
+        return back()->with(
+            'success',
+            sprintf(
+                'Rights batch wallet posting complete: %d ledger(s); %d already credited.',
+                $result['credited'],
+                $result['already_credited']
+            )
+        );
+    }
 
 }

@@ -294,6 +294,7 @@ class WithdrawalController extends Controller
                 'direction' => 'debit',
                 'amount' => $amount,
                 'currency' => $wallet->currency,
+                'financial_month' => now()->startOfMonth()->toDateString(),
                 'balance_before' => $balanceBefore,
                 'balance_after' => $balanceAfter,
                 'reference_type' => 'withdrawal',
@@ -426,6 +427,12 @@ class WithdrawalController extends Controller
                 'direction' => 'credit',
                 'amount' => $amount,
                 'currency' => $withdrawal->currency,
+                'financial_month' =>
+                    $withdrawal->created_at
+                    ? \Illuminate\Support\Carbon::parse($withdrawal->created_at)
+                        ->startOfMonth()
+                        ->toDateString()
+                    : now()->startOfMonth()->toDateString(),
                 'balance_before' => $before,
                 'balance_after' => $after,
                 'reference_type' => 'withdrawal',

@@ -17,6 +17,7 @@ export default function DashboardAnalyticsSection({
     analytics = {},
     currency = 'INR',
     reportsHref = '/artist/reports',
+    secondaryRevenueKey = 'earnings',
 }) {
     const summary = analytics?.summary || {};
     const reportCurrency =
@@ -116,7 +117,7 @@ export default function DashboardAnalyticsSection({
                             emptyText="No platform analytics available."
                             labelKey="name"
                             valueKey="streams"
-                            secondaryKey="earnings"
+                            secondaryKey={secondaryRevenueKey}
                             formatValue={number}
                             formatSecondary={(value) =>
                                 money(
@@ -152,7 +153,7 @@ export default function DashboardAnalyticsSection({
                         emptyText="No track analytics available."
                         labelKey="title"
                         valueKey="streams"
-                        secondaryKey="earnings"
+                        secondaryKey={secondaryRevenueKey}
                         formatValue={number}
                         formatSecondary={(value) =>
                             money(
@@ -168,7 +169,7 @@ export default function DashboardAnalyticsSection({
                         emptyText="No country analytics available."
                         labelKey="country_code"
                         valueKey="streams"
-                        secondaryKey="earnings"
+                        secondaryKey={secondaryRevenueKey}
                         formatValue={number}
                         formatSecondary={(value) =>
                             money(

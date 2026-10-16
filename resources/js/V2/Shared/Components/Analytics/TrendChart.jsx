@@ -65,17 +65,19 @@ export default function TrendChart({
                         return (
                             <div
                                 key={`${row.month}-${index}`}
-                                className="flex min-w-[46px] flex-1 flex-col items-center justify-end"
+                                className="flex h-full min-w-[46px] flex-1 flex-col items-center"
                             >
-                                <div
-                                    title={String(value)}
-                                    className="w-full rounded-t-xl bg-gradient-to-t from-violet-600 to-fuchsia-400 transition hover:opacity-80"
-                                    style={{
-                                        height: `${height}%`,
-                                    }}
-                                />
+                                <div className="flex min-h-0 w-full flex-1 items-end">
+                                    <div
+                                        title={String(value)}
+                                        className="w-full rounded-t-xl bg-gradient-to-t from-violet-600 to-fuchsia-400 transition hover:opacity-80"
+                                        style={{
+                                            height: `${height}%`,
+                                        }}
+                                    />
+                                </div>
 
-                                <span className="mt-3 text-[10px] font-semibold text-slate-500">
+                                <span className="mt-3 shrink-0 text-[10px] font-semibold text-slate-500">
                                     {monthLabel(row.month)}
                                 </span>
                             </div>

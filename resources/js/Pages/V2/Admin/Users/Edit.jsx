@@ -1,3 +1,4 @@
+/* MIXXTUNE_FF429_FINAL_UI_V1 */
 import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 
 import { useEffect, useState } from "react";
@@ -20,6 +21,7 @@ const permissionOptions = [
 ];
 
 export default function Edit({
+    ownedLabels = [],
     role = "super_admin",
     managedUser,
     payoutProfile = null,
@@ -64,6 +66,13 @@ export default function Edit({
 
         revenue_share_percentage:
             managedUser?.revenue_share_percentage ?? "",
+
+        label_revenue_rates: Object.fromEntries(
+            (ownedLabels ?? []).map((label) => [
+                String(label.id),
+                label.revenue_share_percentage ?? "",
+            ]),
+        ),
 
         kyc_status: managedUser?.kyc_status ?? "pending",
 
@@ -110,7 +119,17 @@ export default function Edit({
 
         artist_ids: assignedArtistIds.map(Number),
 
-        label_ids: assignedLabelIds.map(Number),
+        label_ids:
+            managedUser?.role === "label"
+                ? Array.from(
+                      new Set([
+                          ...assignedLabelIds.map(Number),
+                          ...(ownedLabels ?? []).map((label) =>
+                              Number(label.id),
+                          ),
+                      ]),
+                  )
+                : assignedLabelIds.map(Number),
 
         new_labels: [""],
 
@@ -133,16 +152,6 @@ export default function Edit({
         const numberId = Number(id);
 
         const selected = data[field];
-
-        if (field === "label_ids") {
-            setData(
-                field,
-                selected.includes(numberId)
-                    ? []
-                    : [numberId],
-            );
-            return;
-        }
 
         setData(
             field,
@@ -174,6 +183,139 @@ export default function Edit({
         );
 
         setData("new_labels", next.length ? next : [""]);
+    };
+
+
+    /*
+     * MIXXTUNE_QUICK_EDIT_FIELD_TOGGLE_V1
+     *
+     * Each account controls which Full Edit fields are exposed
+     * in the compact Quick Edit modal.
+     */
+    // MIXXTUNE_QUICK_EDIT_NULL_EMPTY_SEMANTICS_V1
+    // null = legacy/default Quick Edit configuration
+    // []   = explicitly no Quick Edit fields
+    const legacyQuickEditFields = [
+        "name",
+        "email",
+        "account_status",
+        "label_revenue_rates",
+    ];
+
+    const [quickEditFields, setQuickEditFields] = useState(
+        Array.isArray(managedUser?.quick_edit_fields)
+            ? managedUser.quick_edit_fields
+            : legacyQuickEditFields,
+    );
+
+    const quickEditFieldEnabled = (field) =>
+        quickEditFields.includes(field);
+
+    const toggleQuickEditField = (field) => {
+        const next = quickEditFieldEnabled(field)
+            ? quickEditFields.filter((item) => item !== field)
+            : [...quickEditFields, field];
+
+        setQuickEditFields(next);
+
+        router.patch(
+            `/v2/admin/users/${managedUser.id}/quick-edit-fields`,
+            {
+                fields: next,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+            },
+        );
+    };
+
+    const quickEditFieldMap = {
+        "Full Name": "name",
+        "Email": "email",
+        "Phone": "phone",
+        "Country": "country",
+        "Role": "role",
+        "Assigned Revenue Rate (%)": "revenue_share_percentage",
+        "Account Status": "account_status",
+        "KYC Status": "kyc_status",
+
+        "Address Line 1": "address_line_1",
+        "Address Line 2": "address_line_2",
+        "City": "city",
+        "State": "state",
+        "Postal / PIN Code": "postal_code",
+        "Country Code": "country_code",
+
+        "PAN Number": "pan_number",
+        "GST Number": "gst_number",
+
+        "Account Holder Name": "account_holder_name",
+        "Bank Account Number": "bank_account_number",
+        "Bank Name": "bank_name",
+        "IFSC Code": "ifsc_code",
+        "Branch Name": "branch_name",
+        "UPI ID": "upi_id",
+    };
+
+    // MIXXTUNE_FF429_D3R_SWITCH_V1
+    const QuickEditToggle = ({ field }) => {
+        const enabled =
+            quickEditFieldEnabled(field);
+
+        return (
+            <button
+                type="button"
+                onClick={() =>
+                    toggleQuickEditField(field)
+                }
+                aria-pressed={enabled}
+                title={
+                    enabled
+                        ? "Enabled in Quick Edit"
+                        : "Disabled in Quick Edit"
+                }
+                className={[
+                    "inline-flex shrink-0 items-center gap-2 rounded-full border px-2 py-1 text-[10px] font-bold transition-all duration-200",
+                    enabled
+                        ? "border-violet-300 bg-violet-50 text-violet-700 shadow-sm"
+                        : "border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:text-violet-600",
+                ].join(" ")}
+            >
+                <span
+                    className={[
+                        "relative inline-flex h-[18px] w-8 shrink-0 rounded-full transition-colors duration-200",
+                        enabled
+                            ? "bg-violet-600"
+                            : "bg-slate-200",
+                    ].join(" ")}
+                >
+                    <span
+                        className={[
+                            "absolute top-[3px] h-3 w-3 rounded-full bg-white shadow-sm transition-all duration-200",
+                            enabled
+                                ? "left-[17px]"
+                                : "left-[3px]",
+                        ].join(" ")}
+                    />
+                </span>
+
+                <span>
+                    Quick Edit
+                </span>
+
+                <span
+                    className={[
+                        "min-w-[18px] text-[9px] font-extrabold",
+                        enabled
+                            ? "text-violet-700"
+                            : "text-slate-400",
+                    ].join(" ")}
+                >
+                    {enabled ? "ON" : "OFF"}
+                </span>
+            </button>
+        );
     };
 
     const submit = (event) => {
@@ -269,8 +411,10 @@ export default function Edit({
             <Head title="Edit User" />
 
             <form onSubmit={submit} className="space-y-6">
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
+
+                {/* MIXXTUNE_AUTO_INLINE_QUICK_EDIT_V1 */}
+                <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-violet-100 bg-violet-50/70 px-6 py-4">
                         <div>
                             <h2 className="text-lg font-semibold text-slate-900">
                                 Account Details
@@ -284,14 +428,16 @@ export default function Edit({
 
                         <Link
                             href="/v2/admin/users"
-                            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                            className="rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 px-4 py-2 text-sm font-semibold text-slate-700"
                         >
                             Back to Users
                         </Link>
                     </div>
 
-                    <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-5 p-6 md:grid-cols-2 xl:grid-cols-3">
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Full Name"
                             value={data.name}
                             error={errors.name}
@@ -300,9 +446,13 @@ export default function Edit({
                         />
 
                         <div>
-                            <span className="text-sm font-semibold text-slate-700">
-                                Username
-                            </span>
+                            <div className="flex min-h-[24px] items-center justify-between gap-3">
+                                <span className="text-sm font-semibold text-slate-700">
+                                    Username
+                                </span>
+
+                                <QuickEditToggle field="username" />
+                            </div>
 
                             <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
                                 {managedUser?.username || "—"}
@@ -314,9 +464,13 @@ export default function Edit({
                         </div>
 
                         <div>
-                            <span className="text-sm font-semibold text-slate-700">
-                                Client ID
-                            </span>
+                            <div className="flex min-h-[24px] items-center justify-between gap-3">
+                                <span className="text-sm font-semibold text-slate-700">
+                                    Client ID
+                                </span>
+
+                                <QuickEditToggle field="client_id" />
+                            </div>
 
                             <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm font-medium text-slate-700">
                                 {managedUser?.client_id || "—"}
@@ -328,6 +482,8 @@ export default function Edit({
                         </div>
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Email"
                             type="email"
                             value={data.email}
@@ -337,6 +493,8 @@ export default function Edit({
                         />
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Phone"
                             value={data.phone}
                             error={errors.phone}
@@ -344,6 +502,8 @@ export default function Edit({
                         />
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Country"
                             value={data.country}
                             error={errors.country}
@@ -351,6 +511,8 @@ export default function Edit({
                         />
 
                         <SelectField
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Role"
                             value={data.role}
                             error={errors.role}
@@ -363,8 +525,10 @@ export default function Edit({
                             ]}
                         />
 
-                        {["label", "artist"].includes(data.role) && (
+                        {data.role === "artist" && (
                             <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                                 label="Assigned Revenue Rate (%)"
                                 type="number"
                                 value={data.revenue_share_percentage}
@@ -379,7 +543,72 @@ export default function Edit({
                             />
                         )}
 
+                        {data.role === "label" && (
+                            <div className="md:col-span-2">
+                                <div className="mb-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="text-sm font-bold text-slate-900">
+                                            Revenue Rate by Label
+                                        </div>
+
+                                        <QuickEditToggle field="label_revenue_rates" />
+                                    </div>
+
+                                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                                        Each owned label has its own royalty rate.
+                                        Blank means Rate Pending.
+                                    </p>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {(ownedLabels ?? []).map((label) => (
+                                        <div
+                                            key={label.id}
+                                            className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                                        >
+                                            <div className="mb-2 text-sm font-bold text-slate-900">
+                                                {label.name}
+                                            </div>
+
+                                            <div className="mb-3 text-xs text-slate-500">
+                                                Label ID: {label.id}
+                                            </div>
+
+                                            <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
+                                                label="Revenue Rate (%)"
+                                                type="number"
+                                                value={
+                                                    data.label_revenue_rates?.[
+                                                        String(label.id)
+                                                    ] ?? ""
+                                                }
+                                                error={
+                                                    errors[
+                                                        `label_revenue_rates.${label.id}`
+                                                    ]
+                                                }
+                                                onChange={(value) =>
+                                                    setData(
+                                                        "label_revenue_rates",
+                                                        {
+                                                            ...data.label_revenue_rates,
+                                                            [String(label.id)]:
+                                                                value,
+                                                        },
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <SelectField
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Account Status"
                             value={data.account_status}
                             error={errors.account_status}
@@ -394,6 +623,8 @@ export default function Edit({
                         />
 
                         <SelectField
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="KYC Status"
                             value={data.kyc_status}
                             error={errors.kyc_status}
@@ -424,6 +655,8 @@ export default function Edit({
 
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Address Line 1"
                             value={data.address_line_1}
                             error={errors.address_line_1}
@@ -433,6 +666,8 @@ export default function Edit({
                         />
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Address Line 2"
                             value={data.address_line_2}
                             error={errors.address_line_2}
@@ -442,6 +677,8 @@ export default function Edit({
                         />
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="City"
                             value={data.city}
                             error={errors.city}
@@ -451,6 +688,8 @@ export default function Edit({
                         />
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="State"
                             value={data.state}
                             error={errors.state}
@@ -460,6 +699,8 @@ export default function Edit({
                         />
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Postal / PIN Code"
                             value={data.postal_code}
                             error={errors.postal_code}
@@ -469,6 +710,8 @@ export default function Edit({
                         />
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Country Code"
                             value={data.country_code}
                             error={errors.country_code}
@@ -499,6 +742,8 @@ export default function Edit({
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                         <div>
                             <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                                 label="PAN Number"
                                 value={data.pan_number}
                                 error={errors.pan_number}
@@ -522,6 +767,8 @@ export default function Edit({
                         </div>
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="GST Number"
                             value={data.gst_number}
                             error={errors.gst_number}
@@ -560,6 +807,8 @@ export default function Edit({
 
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Account Holder Name"
                             value={data.account_holder_name}
                             error={errors.account_holder_name}
@@ -573,6 +822,8 @@ export default function Edit({
 
                         <div>
                             <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                                 label="Bank Account Number"
                                 value={data.bank_account_number}
                                 error={errors.bank_account_number}
@@ -596,6 +847,8 @@ export default function Edit({
                         </div>
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Bank Name"
                             value={data.bank_name}
                             error={errors.bank_name}
@@ -605,6 +858,8 @@ export default function Edit({
                         />
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="IFSC Code"
                             value={data.ifsc_code}
                             error={errors.ifsc_code}
@@ -617,6 +872,8 @@ export default function Edit({
                         />
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="Branch Name"
                             value={data.branch_name}
                             error={errors.branch_name}
@@ -626,6 +883,8 @@ export default function Edit({
                         />
 
                         <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
                             label="UPI ID"
                             value={data.upi_id}
                             error={errors.upi_id}
@@ -672,21 +931,25 @@ export default function Edit({
                             Reset Password
                         </button>
 
-                        <button
-                            type="button"
-                            onClick={resendInvitation}
-                            className="rounded-xl border border-violet-300 bg-violet-50 px-5 py-3 text-sm font-semibold text-violet-700"
-                        >
-                            Resend Invitation
-                        </button>
+                        {managedUser.invitation_status !== "accepted" && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={resendInvitation}
+                                    className="rounded-xl border border-violet-300 bg-violet-50 px-5 py-3 text-sm font-semibold text-violet-700"
+                                >
+                                    Resend Invitation
+                                </button>
 
-                        <button
-                            type="button"
-                            onClick={getInvitationLink}
-                            className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
-                        >
-                            Get Invitation Link
-                        </button>
+                                <button
+                                    type="button"
+                                    onClick={getInvitationLink}
+                                    className="rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
+                                >
+                                    Get Invitation Link
+                                </button>
+                            </>
+                        )}
                     </div>
 
                     {temporaryPassword && (
@@ -721,6 +984,8 @@ export default function Edit({
                     <div className="grid gap-6 xl:grid-cols-2">
                         <SelectionBox
                             title="Assign Artists"
+                            quickEditField="artist_ids"
+                            QuickEditToggle={QuickEditToggle}
                             items={artists}
                             selected={data.artist_ids}
                             nameKey="stage_name"
@@ -736,6 +1001,8 @@ export default function Edit({
 
                         <SelectionBox
                             title="Assign Labels"
+                            quickEditField="label_ids"
+                            QuickEditToggle={QuickEditToggle}
                             items={labels}
                             selected={data.label_ids}
                             nameKey="name"
@@ -765,13 +1032,20 @@ export default function Edit({
                         </div>
 
                         <SelectionBox
-                            title="Select Label"
+                            title="Select Labels"
+                            quickEditField="label_ids"
+                            QuickEditToggle={QuickEditToggle}
                             items={labels}
                             selected={data.label_ids}
                             nameKey="name"
                             onToggle={(id) => toggleSelection("label_ids", id)}
+                            onSelectAll={() =>
+                                setData(
+                                    "label_ids",
+                                    labels.map((item) => Number(item.id)),
+                                )
+                            }
                             onClear={() => setData("label_ids", [])}
-                            singleSelect
                         />
 
                         {errors.label_ids && (
@@ -783,12 +1057,12 @@ export default function Edit({
                         <div className="mt-5 rounded-xl border border-violet-200 bg-white p-5">
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div>
-                                    <div className="text-sm font-semibold text-slate-900">
+                                    <div className="text-sm font-bold text-slate-900">
                                         Create New Labels
                                     </div>
 
                                     <div className="mt-1 text-xs text-slate-500">
-                                        Create one new label for this Label account.
+                                        Create additional labels for this Label account.
                                     </div>
                                 </div>
 
@@ -819,7 +1093,7 @@ export default function Edit({
                                                             event.target.value,
                                                         )
                                                     }
-                                                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                                                    className="w-full rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
                                                 />
 
                                                 {errors[
@@ -860,9 +1134,13 @@ export default function Edit({
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            Panel Permissions
-                        </h2>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-lg font-semibold text-slate-900">
+                                Panel Permissions
+                            </h2>
+
+                            <QuickEditToggle field="permissions" />
+                        </div>
 
                         <div className="flex gap-2">
                             <button
@@ -878,7 +1156,7 @@ export default function Edit({
                                         ),
                                     )
                                 }
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold"
+                                className="rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 px-3 py-2 text-xs font-semibold"
                             >
                                 Select All
                             </button>
@@ -896,7 +1174,7 @@ export default function Edit({
                                         ),
                                     )
                                 }
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold"
+                                className="rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 px-3 py-2 text-xs font-semibold"
                             >
                                 Clear
                             </button>
@@ -943,7 +1221,7 @@ export default function Edit({
                 <div className="sticky bottom-4 z-20 flex justify-end gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
                     <Link
                         href="/v2/admin/users"
-                        className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700"
+                        className="rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 px-6 py-3 text-sm font-semibold text-slate-700"
                     >
                         Cancel
                     </Link>
@@ -968,13 +1246,22 @@ function Field({
     type = "text",
     error,
     required = false,
+    quickEditFieldMap = {},
+    QuickEditToggle = null,
 }) {
     return (
         <label>
-            <span className="text-sm font-semibold text-slate-700">
-                {label}
+            <span className="flex min-h-[24px] items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-slate-700">
+                    {label}
+                    {required && <span className="ml-1 text-red-500">*</span>}
+                </span>
 
-                {required && <span className="ml-1 text-red-500">*</span>}
+                {QuickEditToggle && quickEditFieldMap[label] && (
+                    <span className="shrink-0">
+                        <QuickEditToggle field={quickEditFieldMap[label]} />
+                    </span>
+                )}
             </span>
 
             <input
@@ -992,11 +1279,27 @@ function Field({
     );
 }
 
-function SelectField({ label, value, onChange, options, error }) {
+function SelectField({
+    label,
+    value,
+    onChange,
+    options,
+    error,
+    quickEditFieldMap = {},
+    QuickEditToggle = null,
+}) {
     return (
         <label>
-            <span className="text-sm font-semibold text-slate-700">
-                {label}
+            <span className="flex min-h-[24px] items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-slate-700">
+                    {label}
+                </span>
+
+                {QuickEditToggle && quickEditFieldMap[label] && (
+                    <span className="shrink-0">
+                        <QuickEditToggle field={quickEditFieldMap[label]} />
+                    </span>
+                )}
             </span>
 
             <select
@@ -1077,6 +1380,8 @@ function SelectionBox({
     onToggle,
     onSelectAll,
     onClear,
+    quickEditField = null,
+    QuickEditToggle = null,
 }) {
     const [query, setQuery] = useState("");
     const [open, setOpen] = useState(false);
@@ -1128,9 +1433,15 @@ function SelectionBox({
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
-                    <h2 className="text-sm font-semibold text-slate-900">
-                        {title}
-                    </h2>
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-sm font-bold text-slate-900">
+                            {title}
+                        </h2>
+
+                        {quickEditField && QuickEditToggle && (
+                            <QuickEditToggle field={quickEditField} />
+                        )}
+                    </div>
 
                     <p className="mt-0.5 text-xs text-slate-500">
                         Search by name or email.
@@ -1145,7 +1456,7 @@ function SelectionBox({
             </div>
 
             <div className="relative">
-                <div className="flex min-h-[44px] flex-wrap items-center gap-2 rounded-lg border border-slate-300 bg-white px-2.5 py-2 focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100">
+                <div className="flex min-h-[44px] flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 bg-white px-2.5 py-2 focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100">
                     {selectedItems.map((item) => (
                         <span
                             key={item.id}
@@ -1234,7 +1545,7 @@ function SelectionBox({
                                     className="flex w-full items-center justify-between gap-4 rounded-md px-3 py-2.5 text-left hover:bg-violet-50"
                                 >
                                     <div className="min-w-0">
-                                        <div className="truncate text-sm font-semibold text-slate-900">
+                                        <div className="truncate text-sm font-bold text-slate-900">
                                             {item[nameKey]}
                                         </div>
 

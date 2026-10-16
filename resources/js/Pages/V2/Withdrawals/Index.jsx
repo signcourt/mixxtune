@@ -33,6 +33,7 @@ export default function Index({
     profile = null,
     withdrawals = {},
     minimumAmount = 0,
+    withdrawalEnabled = true,
 }) {
     const { flash = {} } = usePage().props;
 
@@ -85,6 +86,7 @@ export default function Index({
         amountValue <= availableBalance;
 
     const canWithdraw =
+        withdrawalEnabled &&
         profileExists &&
         isVerified &&
         selectedMethodReady &&
@@ -94,6 +96,10 @@ export default function Index({
     const submit = (event) => {
         event.preventDefault();
 
+        if (!withdrawalEnabled) {
+            return;
+        }
+
         post('/v2/withdrawals', {
             preserveScroll: true,
             onSuccess: () => reset(),
@@ -101,6 +107,15 @@ export default function Index({
     };
 
     const blockers = [];
+
+    if (!withdrawalEnabled) {
+        blockers.push({
+            title: 'Withdrawals suspended',
+            detail:
+                'New withdrawal requests are currently disabled for this account.',
+            action: null,
+        });
+    }
 
     if (!profileExists) {
         blockers.push({

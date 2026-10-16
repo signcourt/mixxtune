@@ -37,7 +37,10 @@ function ReportTable({
     requested = false,
     onDelete,
     deletingId = null,
+    role,
 }) {
+    const hidePdf =
+        ['label', 'artist'].includes(role);
     if (reports.length === 0) {
         return (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
@@ -79,9 +82,7 @@ function ReportTable({
                                 Royalty Amount
                             </th>
 
-                            <th className="px-5 py-4">
-                                Generation Date
-                            </th>
+                            
 
                             <th className="px-5 py-4">
                                 Status
@@ -105,22 +106,26 @@ function ReportTable({
                                 </td>
 
                                 <td className="px-5 py-4 text-sm font-semibold text-slate-900">
-                                    {typeof report.amount === 'number'
-                                        ? new Intl.NumberFormat(
-                                              'en-IN',
-                                              {
-                                                  style: 'currency',
-                                                  currency: 'INR',
-                                                  minimumFractionDigits: 2,
-                                                  maximumFractionDigits: 2,
-                                              }
-                                          ).format(report.amount)
-                                        : report.amount}
+                                    {report.rate_pending ? (
+                                        <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                                            Rate Pending
+                                        </span>
+                                    ) : typeof report.amount === 'number' ? (
+                                        new Intl.NumberFormat(
+                                            'en-IN',
+                                            {
+                                                style: 'currency',
+                                                currency: 'INR',
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            }
+                                        ).format(report.amount)
+                                    ) : (
+                                        report.amount
+                                    )}
                                 </td>
 
-                                <td className="px-5 py-4 text-sm text-slate-600">
-                                    {report.generatedAt}
-                                </td>
+                                
 
                                 <td className="px-5 py-4">
                                     {report.stale ? (
@@ -132,6 +137,14 @@ function ReportTable({
                                             className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700"
                                         >
                                             Outdated
+                                        </span>
+                                    ) : report.status ===
+                                      'rate_pending' ? (
+                                        <span
+                                            title="Revenue rate has not been assigned"
+                                            className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700"
+                                        >
+                                            Rate Pending
                                         </span>
                                     ) : report.status === 'completed' ||
                                     report.status === 'ready' ? (
@@ -193,6 +206,7 @@ function ReportTable({
                                                     />
                                                 </a>
 
+                                                {!hidePdf && (
                                                 <a
                                                     href={
                                                         report.status ===
@@ -229,6 +243,7 @@ function ReportTable({
                                                         size={16}
                                                     />
                                                 </a>
+                                                )}
 
                                                 <button
                                                     type="button"
@@ -255,31 +270,61 @@ function ReportTable({
                                                 periodToMonth(
                                                     report.period
                                                 )) ? (
-                                                    <>
-                                                        <a
-                                                            href={`/v2/reports/automatic/${report.month ?? periodToMonth(
-                                                                report.period
-                                                            )}/download`}
-                                                            title="Download Excel"
-                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                                                        >
-                                                            <Download
-                                                                size={16}
-                                                            />
-                                                        </a>
+                                                    report.rate_pending ? (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                disabled
+                                                                title="Revenue rate has not been assigned"
+                                                                className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 text-slate-300"
+                                                            >
+                                                                <Download
+                                                                    size={16}
+                                                                />
+                                                            </button>
 
-                                                        <a
-                                                            href={`/v2/reports/automatic/${report.month ?? periodToMonth(
-                                                                report.period
-                                                            )}/pdf`}
-                                                            title="Download PDF"
-                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                                                        >
-                                                            <FileText
-                                                                size={16}
-                                                            />
-                                                        </a>
-                                                    </>
+                                                            {!hidePdf && (
+                                                            <button
+                                                                type="button"
+                                                                disabled
+                                                                title="Revenue rate has not been assigned"
+                                                                className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 text-slate-300"
+                                                            >
+                                                                <FileText
+                                                                    size={16}
+                                                                />
+                                                            </button>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <a
+                                                                href={`/v2/reports/automatic/${report.month ?? periodToMonth(
+                                                                    report.period
+                                                                )}/download`}
+                                                                title="Download Excel"
+                                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                                            >
+                                                                <Download
+                                                                    size={16}
+                                                                />
+                                                            </a>
+
+                                                            {!hidePdf && (
+                                                            <a
+                                                                href={`/v2/reports/automatic/${report.month ?? periodToMonth(
+                                                                    report.period
+                                                                )}/pdf`}
+                                                                title="Download PDF"
+                                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                                            >
+                                                                <FileText
+                                                                    size={16}
+                                                                />
+                                                            </a>
+                                                            )}
+                                                        </>
+                                                    )
                                                 ) : (
                                                     <>
                                                         <button
@@ -293,6 +338,7 @@ function ReportTable({
                                                             />
                                                         </button>
 
+                                                        {!hidePdf && (
                                                         <button
                                                             type="button"
                                                             disabled
@@ -303,6 +349,7 @@ function ReportTable({
                                                                 size={16}
                                                             />
                                                         </button>
+                                                        )}
                                                     </>
                                                 )}
                                             </>
@@ -394,6 +441,7 @@ function StepHeader({ step, currentStep, title }) {
 }
 
 export default function ReportsIndex({
+    role,
     months = [],
     hierarchyOptions = {},
     automaticReports = [],
@@ -1110,6 +1158,7 @@ export default function ReportsIndex({
                         </div>
                     ) : (
                         <ReportTable
+                            role={role}
                             reports={reports}
                             requested={
                                 tab ===

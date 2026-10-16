@@ -10,6 +10,7 @@ import {
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 
+import RightsRoyaltyUploadPanel from "./RightsRoyaltyUploadPanel";
 const summaryCards = [
     {
         key: 'gross',
@@ -299,6 +300,11 @@ export default function Index({
             title={title}
             subtitle="Monthly royalty statements, earnings and payment status"
         >
+            {/* MIXXTUNE_RIGHTS_ROYALTY_PANEL_V1 */}
+            {role === 'super_admin' && (
+                <RightsRoyaltyUploadPanel role={role} />
+            )}
+
             <Head title={title} />
 
             <div className="space-y-6">

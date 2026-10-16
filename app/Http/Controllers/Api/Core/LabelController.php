@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Core\StoreLabelRequest;
 use App\Http\Requests\Core\UpdateLabelRequest;
 use App\Models\Core\Label;
+use App\Services\V2\LabelIdentityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -29,6 +30,26 @@ class LabelController extends Controller
     public function store(StoreLabelRequest $request): JsonResponse
     {
         $data = $request->validated();
+
+        $identity =
+            app(LabelIdentityService::class);
+
+        $collision =
+            $identity->representative(
+                $data['name']
+            );
+
+        if ($collision) {
+            return response()->json([
+                'success' => false,
+                'message' =>
+                    'A logically identical label already exists as "'.
+                    $collision->name.
+                    '" (ID '.
+                    $collision->id.
+                    ').',
+            ], 422);
+        }
 
 if ($response = $this->validateRoyaltySplit($data)) {
     return $response;
@@ -88,6 +109,37 @@ if ($response = $this->validateRoyaltySplit($data)) {
         Label $label
     ): JsonResponse {
         $data = $request->validated();
+
+        if (isset($data['name'])) {
+            $identity =
+                app(LabelIdentityService::class);
+
+            if (
+                $identity->normalize(
+                    $data['name']
+                )
+                !==
+                $identity->normalize(
+                    $label->name
+                )
+                && $identity->exists(
+                    $data['name']
+                )
+            ) {
+                $collision =
+                    $identity->representative(
+                        $data['name']
+                    );
+
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Another logical label already exists as "'.
+                        ($collision?->name ?? $data['name']).
+                        '".',
+                ], 422);
+            }
+        }
 
         $labelType = $data['label_type'] ?? $label->label_type;
         $parentLabelId = array_key_exists('parent_label_id', $data)

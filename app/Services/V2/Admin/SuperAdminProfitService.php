@@ -8,10 +8,7 @@ use Illuminate\Support\Facades\DB;
 
 class SuperAdminProfitService
 {
-    private array $accountRateCache = [];
-    private array $beneficiaryShareCache = [];
-
-    public function baseQuery(
+public function baseQuery(
         ?string $month = null,
         ?string $platform = null,
         ?string $ownerType = null,
@@ -96,38 +93,71 @@ class SuperAdminProfitService
     public function calculateRow(
         object $row
     ): array {
+        /*
+         * MIXX TUNE IMMUTABLE FINANCIAL SNAPSHOT
+         * ======================================
+         *
+         * Revenue is calculated once during import.
+         *
+         * report_rows.collected_revenue
+         *     = source CSV Collected Revenue
+         *
+         * report_rows.label_rate
+         *     = Applied Rate snapshot in decimal form
+         *       0.80 = 80%
+         *       1.00 = 100%
+         *
+         * report_rows.earnings
+         *     = final Label / Artist Earning
+         *
+         * Super Admin Platform Margin:
+         *
+         *     Collected Revenue - Earning
+         *
+         * Negative rows are imported at 100%, therefore:
+         *
+         *     -100 - (-100) = 0 platform margin
+         *
+         * Never recalculate historical rows using the
+         * account's current commercial rate.
+         */
+
         $collected = round(
-            (float) ($row->earnings ?? 0),
+            (float) (
+                $row->collected_revenue
+                ?? 0
+            ),
             8
         );
 
-        $storedRate = $this->canonicalRate(
-            $row
+        $storedRate = round(
+            (float) (
+                $row->label_rate
+                ?? 0
+            ),
+            8
+        );
+
+        $userEarning = round(
+            (float) (
+                $row->earnings
+                ?? 0
+            ),
+            8
         );
 
         /*
-         * MIXX TUNE FINANCIAL RULE
+         * Profit cannot be created from a negative
+         * adjustment.
          *
-         * Positive:
-         *   user = collected × assigned rate
-         *   profit = collected - user
+         * New imported negative rows already contain:
          *
-         * Negative:
-         *   effective rate = 100%
-         *   user receives full negative adjustment
-         *   super admin retained profit = 0
+         * collected = negative amount
+         * rate      = 1.00
+         * earning   = full negative amount
+         *
+         * So their margin naturally resolves to zero.
          */
-        $effectiveRate =
-            $collected < 0
-                ? 100.0
-                : $storedRate;
-
-        $userEarning = round(
-            $collected
-            * ($effectiveRate / 100),
-            8
-        );
-
         $profit =
             $collected < 0
                 ? 0.0
@@ -141,8 +171,24 @@ class SuperAdminProfitService
             'collected_revenue' =>
                 $collected,
 
+            /*
+             * Existing API field name is retained for
+             * backward compatibility.
+             *
+             * Value is now the stored decimal snapshot:
+             * 0.80 = 80%, 1.00 = 100%.
+             */
+            /*
+             * Public Profit API keeps percentage semantics
+             * for backward-compatible UI/display:
+             *
+             * stored label_rate 0.80 => assigned_rate 80.0
+             */
             'assigned_rate' =>
-                $effectiveRate,
+                round(
+                    $storedRate * 100,
+                    4
+                ),
 
             'stored_rate' =>
                 $storedRate,
@@ -364,6 +410,141 @@ class SuperAdminProfitService
             ->values();
     }
 
+    public function monthly(
+        $query
+    ): Collection {
+        /*
+         * Month-wise business analytics uses exactly the
+         * same immutable financial snapshots as summary()
+         * and breakdown().
+         *
+         * No current Label / Artist rate is recalculated.
+         */
+        $grouped = [];
+
+        foreach (
+            $query
+                ->orderBy('id')
+                ->cursor()
+            as $row
+        ) {
+            $month =
+                $this->effectiveMonth(
+                    $row
+                );
+
+            if ($month === '') {
+                continue;
+            }
+
+            if (! isset($grouped[$month])) {
+                $grouped[$month] = [
+                    'month' =>
+                        $month,
+
+                    'collected_revenue' =>
+                        0.0,
+
+                    'user_earning' =>
+                        0.0,
+
+                    'platform_margin' =>
+                        0.0,
+
+                    /*
+                     * Compatibility with existing internal
+                     * Profit naming.
+                     */
+                    'super_admin_profit' =>
+                        0.0,
+
+                    'negative_adjustments' =>
+                        0.0,
+
+                    'rows' =>
+                        0,
+                ];
+            }
+
+            $calc =
+                $this->calculateRow(
+                    $row
+                );
+
+            $grouped[$month][
+                'collected_revenue'
+            ] +=
+                $calc[
+                    'collected_revenue'
+                ];
+
+            $grouped[$month][
+                'user_earning'
+            ] +=
+                $calc[
+                    'user_earning'
+                ];
+
+            $grouped[$month][
+                'platform_margin'
+            ] +=
+                $calc[
+                    'super_admin_profit'
+                ];
+
+            $grouped[$month][
+                'super_admin_profit'
+            ] +=
+                $calc[
+                    'super_admin_profit'
+                ];
+
+            if (
+                $calc[
+                    'collected_revenue'
+                ] < 0
+            ) {
+                $grouped[$month][
+                    'negative_adjustments'
+                ] +=
+                    $calc[
+                        'collected_revenue'
+                    ];
+            }
+
+            $grouped[$month]['rows']++;
+        }
+
+        foreach (
+            $grouped as &$item
+        ) {
+            foreach (
+                [
+                    'collected_revenue',
+                    'user_earning',
+                    'platform_margin',
+                    'super_admin_profit',
+                    'negative_adjustments',
+                ]
+                as $field
+            ) {
+                $item[$field] =
+                    round(
+                        $item[$field],
+                        8
+                    );
+            }
+        }
+
+        unset($item);
+
+        return collect(
+            array_values($grouped)
+        )
+            ->sortByDesc('month')
+            ->values();
+    }
+
     public function months(): Collection
     {
         /*
@@ -507,291 +688,6 @@ class SuperAdminProfitService
         return trim(
             (string)
                 ($row->sale_month ?? '')
-        );
-    }
-
-    private function canonicalRate(
-        object $row
-    ): float {
-        $ownerType =
-            (string)
-                ($row->revenue_owner_type ?? '');
-
-        $ownerId =
-            (int)
-                ($row->revenue_owner_id ?? 0);
-
-        /*
-         * MASTER LABEL BENEFICIARY RULE
-         *
-         * report_rows.revenue_owner_id identifies
-         * the master label whose report contains the
-         * revenue.
-         *
-         * A row can then belong to a configured direct
-         * Artist or Sub-Label beneficiary.
-         *
-         * Resolution must match RevenueSharingController:
-         *
-         * 1. Artist takes precedence.
-         * 2. Otherwise direct Sub-Label.
-         * 3. Share must be active for the sale month/date.
-         * 4. If no beneficiary share matches, fall back
-         *    to the report owner's normal account rate.
-         */
-        if (
-            $ownerType === 'label'
-            && $ownerId > 0
-        ) {
-            $share =
-                $this->beneficiaryShare(
-                    $ownerId,
-                    $row
-                );
-
-            if ($share !== null) {
-                return $this->normalizeRate(
-                    $share
-                        ->revenue_share_percent
-                );
-            }
-        }
-
-        return $this->accountRate(
-            $ownerType,
-            $ownerId
-        );
-    }
-
-    private function beneficiaryShare(
-        int $masterLabelId,
-        object $row
-    ): ?object {
-        $candidates = [];
-
-        if (
-            isset($row->artist_id)
-            && (int) $row->artist_id > 0
-        ) {
-            $candidates[] = [
-                'type' => 'artist',
-                'id' =>
-                    (int) $row->artist_id,
-            ];
-        }
-
-        if (
-            isset($row->label_id)
-            && (int) $row->label_id > 0
-        ) {
-            $candidates[] = [
-                'type' => 'label',
-                'id' =>
-                    (int) $row->label_id,
-            ];
-        }
-
-        foreach ($candidates as $candidate) {
-            $cacheKey =
-                $masterLabelId
-                .':'.$candidate['type']
-                .':'.$candidate['id'];
-
-            if (
-                ! array_key_exists(
-                    $cacheKey,
-                    $this->beneficiaryShareCache
-                )
-            ) {
-                $this->beneficiaryShareCache[
-                    $cacheKey
-                ] =
-                    DB::table(
-                        'label_revenue_shares'
-                    )
-                        ->where(
-                            'master_label_id',
-                            $masterLabelId
-                        )
-                        ->where(
-                            'beneficiary_type',
-                            $candidate['type']
-                        )
-                        ->where(
-                            'beneficiary_id',
-                            $candidate['id']
-                        )
-                        ->where(
-                            'is_active',
-                            true
-                        )
-                        ->orderByDesc('id')
-                        ->get();
-            }
-
-            $shares =
-                $this->beneficiaryShareCache[
-                    $cacheKey
-                ];
-
-            foreach ($shares as $share) {
-                if (
-                    $this->shareAppliesToRow(
-                        $share,
-                        $row
-                    )
-                ) {
-                    return $share;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private function shareAppliesToRow(
-        object $share,
-        object $row
-    ): bool {
-        /*
-         * Keep this identical to the existing
-         * RevenueSharingController monthly rule.
-         *
-         * DSP revenue is allocated by sale month where
-         * sale_month is available.
-         */
-        if (! empty($row->sale_month)) {
-            $rowMonth = substr(
-                (string) $row->sale_month,
-                0,
-                7
-            );
-
-            if (! empty($share->effective_from)) {
-                $fromMonth = substr(
-                    (string)
-                        $share->effective_from,
-                    0,
-                    7
-                );
-
-                if ($rowMonth < $fromMonth) {
-                    return false;
-                }
-            }
-
-            if (! empty($share->effective_to)) {
-                $toMonth = substr(
-                    (string)
-                        $share->effective_to,
-                    0,
-                    7
-                );
-
-                if ($rowMonth > $toMonth) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        if (! empty($row->sale_date)) {
-            $date = substr(
-                (string) $row->sale_date,
-                0,
-                10
-            );
-
-            if (
-                ! empty($share->effective_from)
-                && $date <
-                    substr(
-                        (string)
-                            $share->effective_from,
-                        0,
-                        10
-                    )
-            ) {
-                return false;
-            }
-
-            if (
-                ! empty($share->effective_to)
-                && $date >
-                    substr(
-                        (string)
-                            $share->effective_to,
-                        0,
-                        10
-                    )
-            ) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function accountRate(
-        string $type,
-        int $id
-    ): float {
-        $cacheKey = $type.':'.$id;
-
-        if (
-            array_key_exists(
-                $cacheKey,
-                $this->accountRateCache
-            )
-        ) {
-            return $this->accountRateCache[
-                $cacheKey
-            ];
-        }
-
-        if ($type === 'label') {
-            $rate = DB::table('labels')
-                ->where('id', $id)
-                ->value(
-                    'revenue_share_percentage'
-                );
-        } elseif ($type === 'artist') {
-            $rate = DB::table('artists')
-                ->where('id', $id)
-                ->value(
-                    'revenue_share_percentage'
-                );
-        } else {
-            $rate = null;
-        }
-
-        $resolved =
-            $rate === null
-                ? 100.0
-                : $this->normalizeRate(
-                    $rate
-                );
-
-        $this->accountRateCache[
-            $cacheKey
-        ] = $resolved;
-
-        return $resolved;
-    }
-
-    private function normalizeRate(
-        mixed $rate
-    ): float {
-        return round(
-            max(
-                0.0,
-                min(
-                    100.0,
-                    (float) $rate
-                )
-            ),
-            4
         );
     }
 

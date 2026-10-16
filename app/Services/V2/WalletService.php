@@ -120,6 +120,79 @@ class WalletService
         );
     }
 
+    public function debitPending(
+        User $user,
+        float $amount,
+        string $category,
+        array $reference = []
+    ): WalletTransaction {
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' =>
+                    'Debit amount must be greater than zero.',
+            ]);
+        }
+
+        return DB::transaction(
+            function () use (
+                $user,
+                $amount,
+                $category,
+                $reference
+            ) {
+                $wallet = $this->account(
+                    $user,
+                    $reference['currency']
+                        ?? 'INR'
+                );
+
+                $wallet = WalletAccount::query()
+                    ->whereKey($wallet->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $before =
+                    (float) $wallet
+                        ->pending_balance;
+
+                /*
+                 * Revenue adjustments are authoritative.
+                 *
+                 * A negative royalty must be carried in full
+                 * even when the account has no positive pending
+                 * balance yet.
+                 *
+                 * Example:
+                 *   pending before = 50
+                 *   adjustment     = -100
+                 *   pending after  = -50
+                 */
+                $after =
+                    $before - $amount;
+
+                $wallet->update([
+                    'pending_balance' =>
+                        $after,
+
+                    'lifetime_debits' =>
+                        (float) $wallet
+                            ->lifetime_debits
+                        + $amount,
+                ]);
+
+                return $this->transaction(
+                    $wallet,
+                    'debit',
+                    $category,
+                    $amount,
+                    $before,
+                    $after,
+                    $reference
+                );
+            }
+        );
+    }
+
     public function releasePending(
         User $user,
         float $amount,
@@ -283,6 +356,126 @@ class WalletService
         );
     }
 
+    public function releasePendingDebit(
+        User $user,
+        float $amount,
+        array $reference = []
+    ): array {
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' =>
+                    'Release debit amount must be greater than zero.',
+            ]);
+        }
+
+        return DB::transaction(
+            function () use (
+                $user,
+                $amount,
+                $reference
+            ) {
+                $wallet = $this->account(
+                    $user,
+                    $reference['currency']
+                        ?? 'INR'
+                );
+
+                $wallet = WalletAccount::query()
+                    ->whereKey($wallet->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                /*
+                 * Approval already posted the negative royalty
+                 * into pending_balance:
+                 *
+                 *     0 - 100 = -100 pending
+                 *
+                 * Making the statement available transfers that
+                 * liability out of pending and into available:
+                 *
+                 *     pending  -100 -> 0
+                 *     available   0 -> -100
+                 *
+                 * Lifetime debit was recorded at approval time,
+                 * so it MUST NOT be incremented again here.
+                 */
+                $pendingBefore =
+                    (float) $wallet
+                        ->pending_balance;
+
+                $availableBefore =
+                    (float) $wallet
+                        ->available_balance;
+
+                $pendingAfter =
+                    $pendingBefore + $amount;
+
+                $availableAfter =
+                    $availableBefore - $amount;
+
+                $wallet->update([
+                    'pending_balance' =>
+                        $pendingAfter,
+
+                    'available_balance' =>
+                        $availableAfter,
+                ]);
+
+                /*
+                 * releasePending() returns two transactions.
+                 * Keep the same audit model here:
+                 *
+                 * 1. pending reversal / transfer
+                 * 2. available debit
+                 */
+                $pendingTransaction =
+                    $this->transaction(
+                        $wallet,
+                        'credit',
+                        'royalty_pending_release',
+                        $amount,
+                        $pendingBefore,
+                        $pendingAfter,
+                        array_merge(
+                            $reference,
+                            [
+                                'description' =>
+                                    $reference['description']
+                                    ?? 'Negative royalty pending released',
+                            ]
+                        )
+                    );
+
+                $availableTransaction =
+                    $this->transaction(
+                        $wallet,
+                        'debit',
+                        'royalty_available',
+                        $amount,
+                        $availableBefore,
+                        $availableAfter,
+                        array_merge(
+                            $reference,
+                            [
+                                'description' =>
+                                    $reference['description']
+                                    ?? 'Negative royalty made available',
+                            ]
+                        )
+                    );
+
+                return [
+                    'pending' =>
+                        $pendingTransaction,
+
+                    'available' =>
+                        $availableTransaction,
+                ];
+            }
+        );
+    }
+
     public function debitAvailable(
         User $user,
         float $amount,
@@ -430,6 +623,14 @@ class WalletService
 
             'currency' =>
                 $wallet->currency,
+ 
+              'financial_month' =>
+                  $reference['financial_month']
+                  ?? $reference['reporting_month']
+                  ?? $reference['statement_month']
+                  ?? $reference['sale_month']
+                  ?? null,
+
 
             'reference_type' =>
                 $referenceType,

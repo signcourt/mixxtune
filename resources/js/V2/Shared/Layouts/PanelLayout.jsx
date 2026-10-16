@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import Sidebar from "@/V2/Shared/Navigation/Sidebar";
 import ImpersonationBanner from "@/V2/Shared/Components/ImpersonationBanner";
+import MaintenanceExperience from "@/V2/Shared/Maintenance/MaintenanceExperience";
 
 export default function PanelLayout({
     role = null,
@@ -13,7 +14,6 @@ export default function PanelLayout({
     children,
 }) {
     const page = usePage();
-
     const props = page.props ?? {};
 
     const user = props.auth?.user ?? {};
@@ -473,7 +473,12 @@ export default function PanelLayout({
                         </div>
                     </header>
 
-                    <main className="p-5 lg:p-7">{children}</main>
+                    <main className="p-5 lg:p-7">
+                        <MaintenanceExperience
+                            maintenance={props.maintenance}
+                            children={children}
+                        />
+                    </main>
                     {props.brand?.footer_text && (
                         <footer className="border-t border-slate-200 bg-white px-5 py-4 text-center text-xs text-slate-500 lg:px-7">
                             {props.brand.footer_text}

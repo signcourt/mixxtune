@@ -106,6 +106,8 @@ class UserInvitationPasswordController extends Controller
                 now(),
             'account_status' =>
                 'active',
+            'last_login_at' =>
+                now(),
         ])->save();
 
         $request->session()->forget(

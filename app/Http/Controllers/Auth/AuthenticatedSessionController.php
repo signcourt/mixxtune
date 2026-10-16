@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Services\LoginEmailOtpService;
+
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
@@ -27,41 +29,67 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
-    {
-        $request->authenticate();
+    public function store(
+        LoginRequest $request,
+        LoginEmailOtpService $otpService
+    ): RedirectResponse {
+        $user = $request->authenticatedUser();
 
-        $request->session()->regenerate();
-
-        $user = $request->user();
-
-        $role = strtolower(
-            trim(
-                (string) $user->role
-            )
+        $otpService->send(
+            $user,
+            $request->ip(),
+            $request->userAgent()
         );
 
-        $destination = match ($role) {
-            'super_admin' =>
-                '/super-admin/dashboard',
+        $request->session()->put([
+            'login_otp_user_id' =>
+                $user->id,
 
-            'admin' =>
-                '/admin/dashboard',
+            'login_otp_remember' =>
+                $request->boolean('remember'),
 
-            'label' =>
-                '/label/dashboard',
+            'login_otp_masked_email' =>
+                $this->maskEmail(
+                    (string) $user->email
+                ),
+        ]);
 
-            default =>
-                '/artist/dashboard',
-        };
+        return redirect()->route(
+            'login.otp.show'
+        );
+    }
 
-        $request->session()->forget(
-            'url.intended'
+    private function maskEmail(
+        string $email
+    ): string {
+        [$local, $domain] =
+            array_pad(
+                explode('@', $email, 2),
+                2,
+                ''
+            );
+
+        if ($domain === '') {
+            return '***';
+        }
+
+        $visible = mb_substr(
+            $local,
+            0,
+            min(2, mb_strlen($local))
         );
 
-        return redirect()->to(
-            $destination
-        );
+        return $visible .
+            str_repeat(
+                '*',
+                max(
+                    3,
+                    mb_strlen($local) -
+                    mb_strlen($visible)
+                )
+            ) .
+            '@' .
+            $domain;
     }
 
     /**

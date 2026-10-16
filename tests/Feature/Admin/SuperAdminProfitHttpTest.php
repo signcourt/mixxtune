@@ -178,14 +178,53 @@ class SuperAdminProfitHttpTest extends TestCase
                 'sale_units' =>
                     100,
 
+                /*
+                 * Immutable financial snapshot fixture.
+                 *
+                 * HTTP helper call amount represents source
+                 * Collected Revenue. The test Label rate is
+                 * snapshotted here rather than recalculated
+                 * by SuperAdminProfitService.
+                 */
                 'label_rate' =>
-                    100,
+                    round(
+                        (
+                            (float)
+                                DB::table('labels')
+                                    ->where(
+                                        'id',
+                                        $labelId
+                                    )
+                                    ->value(
+                                        'revenue_share_percentage'
+                                    )
+                        ) / 100,
+                        8
+                    ),
 
                 'collected_revenue' =>
                     $earnings,
 
                 'earnings' =>
-                    $earnings,
+                    $earnings < 0
+                        ? $earnings
+                        : round(
+                            $earnings
+                            * (
+                                (
+                                    (float)
+                                        DB::table('labels')
+                                            ->where(
+                                                'id',
+                                                $labelId
+                                            )
+                                            ->value(
+                                                'revenue_share_percentage'
+                                            )
+                                ) / 100
+                            ),
+                            8
+                        ),
 
                 'created_at' =>
                     now(),
@@ -507,13 +546,13 @@ class SuperAdminProfitHttpTest extends TestCase
                     100,
 
                 'label_rate' =>
-                    100,
+                    0.80,
 
                 'collected_revenue' =>
                     100,
 
                 'earnings' =>
-                    100,
+                    80,
 
                 'created_at' =>
                     now(),

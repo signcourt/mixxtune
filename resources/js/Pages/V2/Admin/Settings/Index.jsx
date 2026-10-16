@@ -58,6 +58,20 @@ export default function Index({
             report_max_mb: Number(getValue("upload", "report_max_mb", 500)),
         },
 
+        maintenance: {
+            enabled: Boolean(
+                getValue("maintenance", "enabled", false),
+            ),
+            date: getValue("maintenance", "date", ""),
+            start_time: getValue("maintenance", "start_time", ""),
+            end_time: getValue("maintenance", "end_time", ""),
+            message: getValue(
+                "maintenance",
+                "message",
+                "Mixx Tune is undergoing scheduled maintenance. Please check back shortly.",
+            ),
+        },
+
         finance: {
             default_currency: getValue("finance", "default_currency", "INR"),
             minimum_withdrawal: Number(
@@ -483,6 +497,140 @@ export default function Index({
                                     </div>
                                 ),
                             )}
+                        </div>
+                    </div>
+                </Section>
+
+                <Section title="Scheduled Maintenance">
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h3 className="text-base font-semibold text-slate-900">
+                                    Scheduled Maintenance
+                                </h3>
+
+                                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                                    Schedule a maintenance window. Users will
+                                    first see a notification and confirmation
+                                    banner before the maintenance starts.
+                                </p>
+                            </div>
+
+                            <Toggle
+                                label="Enable Maintenance"
+                                checked={data.maintenance.enabled}
+                                onChange={(checked) =>
+                                    update(
+                                        "maintenance",
+                                        "enabled",
+                                        checked,
+                                    )
+                                }
+                            />
+                        </div>
+
+                        <div className="mt-5 grid gap-4 md:grid-cols-3">
+                            <Field
+                                label="Maintenance Date"
+                                type="date"
+                                value={data.maintenance.date}
+                                onChange={(value) =>
+                                    update(
+                                        "maintenance",
+                                        "date",
+                                        value,
+                                    )
+                                }
+                            />
+
+                            <Field
+                                label="Start Time"
+                                type="time"
+                                value={data.maintenance.start_time}
+                                onChange={(value) =>
+                                    update(
+                                        "maintenance",
+                                        "start_time",
+                                        value,
+                                    )
+                                }
+                            />
+
+                            <Field
+                                label="End Time"
+                                type="time"
+                                value={data.maintenance.end_time}
+                                onChange={(value) =>
+                                    update(
+                                        "maintenance",
+                                        "end_time",
+                                        value,
+                                    )
+                                }
+                            />
+                        </div>
+
+                        <div className="mt-4">
+                            <Field
+                                label="Maintenance Message"
+                                value={data.maintenance.message}
+                                onChange={(value) =>
+                                    update(
+                                        "maintenance",
+                                        "message",
+                                        value,
+                                    )
+                                }
+                                wide
+                            />
+                        </div>
+
+                        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                            <div className="border-b border-slate-100 px-5 py-4">
+                                <div className="text-sm font-semibold text-slate-900">
+                                    User Notification Preview
+                                </div>
+
+                                <div className="mt-1 text-xs text-slate-500">
+                                    This appears before the scheduled
+                                    maintenance begins.
+                                </div>
+                            </div>
+
+                            <div className="p-5">
+                                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-900">
+                                                Scheduled maintenance
+                                            </div>
+
+                                            <div className="mt-1 text-xs leading-5 text-slate-600">
+                                                The Mixx Tune platform will
+                                                undergo scheduled maintenance.
+                                                Please complete any pending
+                                                work before the maintenance
+                                                window.
+                                            </div>
+                                        </div>
+
+                                        <div className="shrink-0 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white">
+                                            I Understand
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 text-xs text-slate-500">
+                                    <span className="font-semibold text-slate-700">
+                                        Close / X:
+                                    </span>{" "}
+                                    Not available.
+                                    <span className="ml-3 font-semibold text-slate-700">
+                                        Not Now:
+                                    </span>{" "}
+                                    Not available.
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </Section>

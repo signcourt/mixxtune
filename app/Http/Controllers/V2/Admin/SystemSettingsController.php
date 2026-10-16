@@ -188,6 +188,32 @@ class SystemSettingsController extends Controller
                 'max:2048',
             ],
 
+            'maintenance.enabled' => [
+                'required',
+                'boolean',
+            ],
+
+            'maintenance.date' => [
+                'nullable',
+                'date_format:Y-m-d',
+            ],
+
+            'maintenance.start_time' => [
+                'nullable',
+                'date_format:H:i',
+            ],
+
+            'maintenance.end_time' => [
+                'nullable',
+                'date_format:H:i',
+            ],
+
+            'maintenance.message' => [
+                'nullable',
+                'string',
+                'max:1000',
+            ],
+
             'finance.default_currency' => [
                 'required',
                 'string',
@@ -413,6 +439,15 @@ class SystemSettingsController extends Controller
                 'upload.report_max_mb' => 500,
             ],
 
+            'maintenance' => [
+                'maintenance.enabled' => false,
+                'maintenance.date' => '',
+                'maintenance.start_time' => '',
+                'maintenance.end_time' => '',
+                'maintenance.message' =>
+                    'Mixx Tune is undergoing scheduled maintenance. Please check back shortly.',
+            ],
+
             'finance' => [
                 'finance.default_currency' => 'INR',
                 'finance.minimum_withdrawal' => 1000,
@@ -460,6 +495,14 @@ class SystemSettingsController extends Controller
                 'audio_max_mb' => 'integer',
                 'artwork_max_mb' => 'integer',
                 'report_max_mb' => 'integer',
+            ],
+
+            'maintenance' => [
+                'enabled' => 'boolean',
+                'date' => 'string',
+                'start_time' => 'string',
+                'end_time' => 'string',
+                'message' => 'string',
             ],
 
             'finance' => [

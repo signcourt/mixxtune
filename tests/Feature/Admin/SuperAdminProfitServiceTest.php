@@ -94,8 +94,21 @@ class SuperAdminProfitServiceTest extends TestCase
                     'reporting_month' =>
                         '2026-08',
 
-                    'earnings' =>
+                    'collected_revenue' =>
                         $earning,
+
+                    'label_rate' =>
+                        $earning < 0
+                            ? 1.00
+                            : 0.80,
+
+                    'earnings' =>
+                        $earning < 0
+                            ? $earning
+                            : round(
+                                $earning * 0.80,
+                                8
+                            ),
 
                     'mapping_status' =>
                         'mapped',
@@ -216,7 +229,7 @@ class SuperAdminProfitServiceTest extends TestCase
         );
     }
 
-    public function test_active_label_revenue_share_is_canonical_rate(): void
+    public function test_stored_snapshot_rate_is_canonical_for_historical_profit(): void
     {
         $masterUserId =
             DB::table('users')
@@ -329,7 +342,9 @@ class SuperAdminProfitServiceTest extends TestCase
             );
 
         $row = (object) [
-            'earnings' => 100,
+            'collected_revenue' => 100,
+            'label_rate' => 0.80,
+            'earnings' => 80,
             'sale_month' =>
                 '2026-08',
             'sale_date' =>
@@ -476,8 +491,14 @@ class SuperAdminProfitServiceTest extends TestCase
                 'reporting_month' =>
                     null,
 
-                'earnings' =>
+                'collected_revenue' =>
                     100,
+
+                'label_rate' =>
+                    0.80,
+
+                'earnings' =>
+                    80,
 
                 'mapping_status' =>
                     'mapped',
@@ -648,8 +669,14 @@ class SuperAdminProfitServiceTest extends TestCase
                     'sale_date' =>
                         '2026-08-15',
 
-                    'earnings' =>
+                    'collected_revenue' =>
                         100,
+
+                    'label_rate' =>
+                        0.80,
+
+                    'earnings' =>
+                        80,
 
                     'mapping_status' =>
                         'mapped',
@@ -702,6 +729,12 @@ class SuperAdminProfitServiceTest extends TestCase
 
                     'sale_date' =>
                         '2026-08-16',
+
+                    'collected_revenue' =>
+                        -10,
+
+                    'label_rate' =>
+                        1.00,
 
                     'earnings' =>
                         -10,
@@ -877,8 +910,14 @@ class SuperAdminProfitServiceTest extends TestCase
                     '2026-08',
                 'reporting_month' =>
                     null,
-                'earnings' =>
+                'collected_revenue' =>
                     100,
+
+                'label_rate' =>
+                    0.80,
+
+                'earnings' =>
+                    80,
                 'mapping_status' =>
                     'mapped',
                 'mapped_at' =>
@@ -985,6 +1024,8 @@ class SuperAdminProfitServiceTest extends TestCase
             );
 
         $row = (object) [
+            'collected_revenue' => -10,
+            'label_rate' => 1.00,
             'earnings' => -10,
             'revenue_owner_type' =>
                 'label',
@@ -1018,4 +1059,365 @@ class SuperAdminProfitServiceTest extends TestCase
             ]
         );
     }
+
+    public function test_monthly_business_analytics_uses_stored_snapshots(): void
+    {
+        $service =
+            app(
+                \App\Services\V2\Admin\SuperAdminProfitService::class
+            );
+
+        $userId =
+            \Illuminate\Support\Facades\DB::table(
+                'users'
+            )->insertGetId([
+                'name' =>
+                    'Monthly Profit Label',
+
+                'email' =>
+                    'monthly-profit-label@example.com',
+
+                'password' =>
+                    bcrypt('Password123'),
+
+                'role' =>
+                    'label',
+
+                'account_status' =>
+                    'active',
+
+                'email_verified_at' =>
+                    now(),
+
+                'created_at' =>
+                    now(),
+
+                'updated_at' =>
+                    now(),
+            ]);
+
+        $labelId =
+            \Illuminate\Support\Facades\DB::table(
+                'labels'
+            )->insertGetId([
+                'user_id' =>
+                    $userId,
+
+                'public_id' =>
+                    'LBL-R9-MONTHLY',
+
+                'name' =>
+                    'Monthly Profit Label',
+
+                'slug' =>
+                    'monthly-profit-label',
+
+                'revenue_share_percentage' =>
+                    5,
+
+                'created_at' =>
+                    now(),
+
+                'updated_at' =>
+                    now(),
+            ]);
+
+        $importId =
+            \Illuminate\Support\Facades\DB::table(
+                'report_imports'
+            )->insertGetId([
+                'public_id' =>
+                    'R9-MONTHLY-IMPORT',
+
+                'original_filename' =>
+                    'monthly-profit-test.csv',
+
+                'stored_path' =>
+                    'tests/monthly-profit-test.csv',
+
+                'status' =>
+                    'completed',
+
+                'total_rows' =>
+                    3,
+
+                'imported_rows' =>
+                    3,
+
+                'duplicate_rows' =>
+                    0,
+
+                'failed_rows' =>
+                    0,
+
+                'started_at' =>
+                    now(),
+
+                'completed_at' =>
+                    now(),
+
+                'created_at' =>
+                    now(),
+
+                'updated_at' =>
+                    now(),
+            ]);
+
+        $base = [
+            'report_import_id' =>
+                $importId,
+
+            'revenue_owner_type' =>
+                'label',
+
+            'revenue_owner_id' =>
+                $labelId,
+
+            'label_id' =>
+                $labelId,
+
+            'label_name' =>
+                'Monthly Profit Label',
+
+            'platform' =>
+                'Spotify',
+
+            'currency' =>
+                'INR',
+
+            'country_code' =>
+                'IN',
+
+            'sale_type' =>
+                'Stream',
+
+            'mapping_status' =>
+                'mapped',
+
+            'created_at' =>
+                now(),
+
+            'updated_at' =>
+                now(),
+        ];
+
+        $rows = [
+            array_merge(
+                $base,
+                [
+                    'row_hash' =>
+                        hash(
+                            'sha256',
+                            'r9-monthly-aug'
+                        ),
+
+                    'sale_date' =>
+                        '2026-08-15',
+
+                    'sale_month' =>
+                        '2026-08',
+
+                    'reporting_month' =>
+                        '2026-08',
+
+                    'collected_revenue' =>
+                        100,
+
+                    'label_rate' =>
+                        0.80,
+
+                    'earnings' =>
+                        80,
+                ]
+            ),
+
+            array_merge(
+                $base,
+                [
+                    'row_hash' =>
+                        hash(
+                            'sha256',
+                            'r9-monthly-sep-positive'
+                        ),
+
+                    'sale_date' =>
+                        '2026-09-10',
+
+                    'sale_month' =>
+                        '2026-09',
+
+                    'reporting_month' =>
+                        '2026-09',
+
+                    'collected_revenue' =>
+                        200,
+
+                    'label_rate' =>
+                        0.75,
+
+                    'earnings' =>
+                        150,
+                ]
+            ),
+
+            array_merge(
+                $base,
+                [
+                    'row_hash' =>
+                        hash(
+                            'sha256',
+                            'r9-monthly-sep-negative'
+                        ),
+
+                    'sale_date' =>
+                        '2026-09-20',
+
+                    'sale_month' =>
+                        '2026-09',
+
+                    'reporting_month' =>
+                        '2026-09',
+
+                    'collected_revenue' =>
+                        -20,
+
+                    'label_rate' =>
+                        1.00,
+
+                    'earnings' =>
+                        -20,
+                ]
+            ),
+        ];
+
+        \Illuminate\Support\Facades\DB::table(
+            'report_rows'
+        )->insert($rows);
+
+        /*
+         * Change the CURRENT account rate after snapshots
+         * exist. Monthly analytics must ignore this and
+         * continue using stored row snapshots.
+         */
+        \Illuminate\Support\Facades\DB::table(
+            'labels'
+        )
+            ->where(
+                'id',
+                $labelId
+            )
+            ->update([
+                'revenue_share_percentage' =>
+                    99,
+            ]);
+
+        $monthly =
+            $service
+                ->monthly(
+                    $service->baseQuery()
+                )
+                ->keyBy('month');
+
+        $this->assertCount(
+            2,
+            $monthly
+        );
+
+        $this->assertTrue(
+            $monthly->has(
+                '2026-08'
+            )
+        );
+
+        $this->assertTrue(
+            $monthly->has(
+                '2026-09'
+            )
+        );
+
+        $aug =
+            $monthly->get(
+                '2026-08'
+            );
+
+        $this->assertEqualsWithDelta(
+            100,
+            $aug[
+                'collected_revenue'
+            ],
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            80,
+            $aug[
+                'user_earning'
+            ],
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            20,
+            $aug[
+                'platform_margin'
+            ],
+            0.00000001
+        );
+
+        $this->assertSame(
+            1,
+            $aug['rows']
+        );
+
+        $sep =
+            $monthly->get(
+                '2026-09'
+            );
+
+        $this->assertEqualsWithDelta(
+            180,
+            $sep[
+                'collected_revenue'
+            ],
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            130,
+            $sep[
+                'user_earning'
+            ],
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            50,
+            $sep[
+                'platform_margin'
+            ],
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            50,
+            $sep[
+                'super_admin_profit'
+            ],
+            0.00000001
+        );
+
+        $this->assertEqualsWithDelta(
+            -20,
+            $sep[
+                'negative_adjustments'
+            ],
+            0.00000001
+        );
+
+        $this->assertSame(
+            2,
+            $sep['rows']
+        );
+    }
+
 }

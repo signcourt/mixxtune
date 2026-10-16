@@ -162,7 +162,7 @@ function Ranking({
     }
 
     const maximum = Math.max(
-        ...rows.map((row) => Number(row.earnings || 0)),
+        ...rows.map((row) => Number(row.collected_revenue || 0)),
         0
     );
 
@@ -172,7 +172,7 @@ function Ranking({
                 const width = maximum
                     ? Math.max(
                           4,
-                          (Number(row.earnings || 0) / maximum) * 100
+                          (Number(row.collected_revenue || 0) / maximum) * 100
                       )
                     : 0;
 
@@ -195,7 +195,7 @@ function Ranking({
                             </div>
 
                             <div className="shrink-0 text-sm font-bold text-slate-900">
-                                {moneyFormat(row.earnings, currency)}
+                                {moneyFormat(row.collected_revenue, currency)}
                             </div>
                         </div>
 
@@ -227,12 +227,13 @@ export default function Index({
     topLabels = [],
     currencySummary = [],
     financialAnalytics = {},
+    importedRevenueAnalytics = {},
 }) {
     const primaryCurrency =
         currencySummary?.[0]?.currency || 'INR';
 
     const [trackSort, setTrackSort] = useState({
-        key: 'earnings',
+        key: 'collected_revenue',
         direction: 'desc',
     });
 
@@ -266,14 +267,57 @@ export default function Index({
     const financialSummary =
         financialAnalytics?.summary || {};
 
+    /*
+     * Imported historical report analytics.
+     *
+     * These three presentation datasets come from scoped
+     * report_rows. They are informational label earnings,
+     * not wallet-posted payable allocations.
+     */
     const financialMonthly =
-        financialAnalytics?.monthly || [];
+        (importedRevenueAnalytics?.monthly || []).map(
+            (item) => ({
+                month: item.month,
+                gross_earnings: Number(
+                    item.collected_revenue || 0
+                ),
+                net_payable: Number(
+                    item.earnings || 0
+                ),
+            })
+        );
 
     const financialPlatforms =
-        financialAnalytics?.platforms || [];
+        (importedRevenueAnalytics?.platforms || []).map(
+            (item) => ({
+                platform:
+                    item.name ||
+                    item.platform ||
+                    'Unknown',
+                net_payable: Number(
+                    item.earnings || 0
+                ),
+                gross_earnings: Number(
+                    item.collected_revenue || 0
+                ),
+            })
+        );
 
     const financialCountries =
-        financialAnalytics?.countries || [];
+        (importedRevenueAnalytics?.countries || []).map(
+            (item) => ({
+                country:
+                    item.name ||
+                    item.country ||
+                    'Unknown',
+                net_payable: Number(
+                    item.earnings || 0
+                ),
+                gross_earnings: Number(
+                    item.collected_revenue || 0
+                ),
+            })
+        );
 
     const financialCurrencies =
         financialAnalytics?.currencies || [];
@@ -360,19 +404,15 @@ export default function Index({
                 <div className="space-y-6 p-5 lg:p-7">
 
                     {/* RAW REPORT KPI CARDS */}
+                    {!['label', 'artist'].includes(role) && (
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <Card
-                            title="Reported Earnings"
+                            title="Imported Gross Revenue"
                             value={moneyFormat(
-                                summary.earnings,
+                                summary.collected_revenue,
                                 primaryCurrency
                             )}
-                            subtitle={`${numberFormat(summary.rows)} report rows`}
-                            growth={
-                                growth.has_previous
-                                    ? growth.earnings_percent
-                                    : null
-                            }
+                            subtitle={`${numberFormat(summary.rows)} imported report rows`}
                             icon={BadgeIndianRupee}
                         />
 
@@ -397,17 +437,19 @@ export default function Index({
 
                         <Card
                             title="Active Stores"
-                            value={numberFormat(topPlatforms.length)}
+                            value={numberFormat(summary.active_platforms)}
                             subtitle="DSPs in selected period"
                             icon={Store}
                         />
                     </div>
 
+                    )}
+
                     {/* REPORTING RANGE */}
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                            <div className="w-full sm:max-w-xs">
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <div className="flex">
+                        <div className="inline-flex w-full flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:w-auto sm:flex-row sm:items-end">
+                            <div className="w-full sm:w-[190px]">
+                                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                                     From Month
                                 </label>
 
@@ -431,7 +473,7 @@ export default function Index({
                                             }
                                         )
                                     }
-                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                                 >
                                     {months.map((month) => (
                                         <option key={month} value={month}>
@@ -441,12 +483,12 @@ export default function Index({
                                 </select>
                             </div>
 
-                            <div className="hidden pb-2 text-slate-400 sm:block">
+                            <div className="hidden h-9 items-center px-1 text-sm text-slate-300 sm:flex">
                                 →
                             </div>
 
-                            <div className="w-full sm:max-w-xs">
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <div className="w-full sm:w-[190px]">
+                                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                                     To Month
                                 </label>
 
@@ -470,7 +512,7 @@ export default function Index({
                                             }
                                         )
                                     }
-                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                                 >
                                     {months.map((month) => (
                                         <option key={month} value={month}>
@@ -480,7 +522,7 @@ export default function Index({
                                 </select>
                             </div>
 
-                            <div className="pb-2 text-xs font-medium text-slate-400">
+                            <div className="hidden h-9 items-center border-l border-slate-100 pl-3 text-xs font-medium text-slate-400 lg:flex">
                                 Reporting period
                             </div>
                         </div>
@@ -491,8 +533,8 @@ export default function Index({
                             <div className="rounded-2xl border border-slate-200 bg-white p-5">
                                 <SectionHeader
                                     icon={Store}
-                                    title="Financial Revenue by Store"
-                                    subtitle="Net payable allocation by DSP / platform"
+                                    title="Revenue by Store"
+                                    subtitle="Label earnings from imported reports by DSP / platform"
                                 />
 
                                 {financialPlatforms.length ? (
@@ -641,15 +683,15 @@ export default function Index({
                                         </div>
                                     </div>
                                 ) : (
-                                    <EmptyState text="No financial platform allocation data available." />
+                                    <EmptyState text="No imported platform revenue data available." />
                                 )}
                             </div>
 
                         <div className="rounded-2xl border border-slate-200 bg-white p-5">
                             <SectionHeader
                                 icon={Globe2}
-                                title="Financial Revenue by Country"
-                                subtitle="Net payable royalty allocation by territory"
+                                title="Revenue by Country"
+                                subtitle="Label earnings from imported reports by territory"
                             />
 
                             {financialCountries.length ? (
@@ -797,17 +839,18 @@ export default function Index({
                                     </div>
                                 </div>
                             ) : (
-                                <EmptyState text="No financial country allocation data available." />
+                                <EmptyState text="No imported country revenue data available." />
                             )}
                         </div>
                     </div>
 
                     {/* FINANCIAL MONTHLY */}
+                    {!['label', 'artist'].includes(role) && (
                         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <SectionHeader
                             icon={BadgeIndianRupee}
-                            title="Monthly Financial Revenue"
-                            subtitle="Gross, commission and net payable by statement month"
+                            title="Monthly Imported Revenue"
+                            subtitle="Imported gross revenue and label earnings by reporting month"
                         />
 
                                 {financialMonthly.length ? (
@@ -891,9 +934,11 @@ export default function Index({
                                         </ResponsiveContainer>
                                     </div>
                                 ) : (
-                                    <EmptyState text="No financial statement data available for the selected period." />
+                                    <EmptyState text="No imported revenue data available for the selected period." />
                                 )}
                             </div>
+
+                    )}
 
                         {/* CANONICAL FINANCIAL DIMENSIONS */}
                         <div className="mt-4 grid gap-4 xl:grid-cols-2">
@@ -1050,7 +1095,7 @@ export default function Index({
                             <SectionHeader
                                 icon={Users}
                                 title="Top Artists"
-                                subtitle="Highest reported earnings contributors"
+                                subtitle="Highest imported gross revenue contributors"
                             />
 
                             <div className="mt-6">
@@ -1082,7 +1127,7 @@ export default function Index({
                             <SectionHeader
                                 icon={Layers3}
                                 title="Top Labels"
-                                subtitle="Reported earnings performance by label"
+                                subtitle="Imported gross revenue performance by label"
                             />
 
                             <div className="mt-6">
@@ -1128,13 +1173,13 @@ export default function Index({
                                             <th className="px-5 py-3 text-right">
                                                 <button
                                                     type="button"
-                                                    onClick={() => toggleTrackSort('earnings')}
+                                                    onClick={() => toggleTrackSort('collected_revenue')}
                                                     className="ml-auto inline-flex items-center gap-1 font-semibold uppercase tracking-wide text-slate-500 transition hover:text-violet-700"
-                                                    title="Sort by earnings"
+                                                    title="Sort by imported gross revenue"
                                                 >
-                                                    Earnings
+                                                    Gross Revenue
                                                     <span aria-hidden="true">
-                                                        {trackSortIndicator('earnings')}
+                                                        {trackSortIndicator('collected_revenue')}
                                                     </span>
                                                 </button>
                                             </th>
@@ -1175,7 +1220,7 @@ export default function Index({
 
                                                         <td className="px-5 py-4 text-right text-sm font-bold text-slate-950">
                                                             {moneyFormat(
-                                                                track.earnings,
+                                                                track.collected_revenue,
                                                                 primaryCurrency
                                                             )}
                                                         </td>

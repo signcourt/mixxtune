@@ -820,7 +820,7 @@ class WithdrawalManagementController extends Controller
 
         $query = PayoutProfile::query()
             ->with([
-                'user:id,name,email',
+                'user:id,name,email,role,phone,client_id,country,state_code,kyc_status',
             ]);
 
         if (
@@ -960,6 +960,14 @@ class WithdrawalManagementController extends Controller
             'verified_by' =>
                 $request->user()->id,
         ]);
+
+        // Keep the legacy users.kyc_status mirror aligned with
+        // the canonical payout profile lifecycle.
+        $profile->user()
+            ->update([
+                'kyc_status' =>
+                    $validated['status'],
+            ]);
 
         return back()->with(
             'success',

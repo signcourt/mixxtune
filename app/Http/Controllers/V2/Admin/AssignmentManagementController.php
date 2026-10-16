@@ -13,6 +13,7 @@ use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\User;
 use App\Services\V2\PermissionService;
+use App\Services\V2\ReportEarningsRecalculationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,9 +32,9 @@ class AssignmentManagementController extends Controller
         );
 
         $admins = User::query()
-            ->whereIn(
+            ->where(
                 'role',
-                ['admin', 'super_admin']
+                'admin'
             )
             ->withCount([
                 'assignedArtists',
@@ -62,13 +63,9 @@ class AssignmentManagementController extends Controller
         );
 
         abort_unless(
-            in_array(
-                $admin->role,
-                ['admin', 'super_admin'],
-                true
-            ),
+            $admin->role === 'admin',
             404,
-            'Admin not found.'
+            'Manager not found.'
         );
 
         $admin->load([
@@ -136,11 +133,7 @@ class AssignmentManagementController extends Controller
         );
 
         abort_unless(
-            in_array(
-                $admin->role,
-                ['admin', 'super_admin'],
-                true
-            ),
+            $admin->role === 'admin',
             404
         );
 
@@ -306,39 +299,78 @@ class AssignmentManagementController extends Controller
             }
         }
 
+        $normalizedName = strtolower(
+            preg_replace(
+                '/[^a-z0-9]+/i',
+                '',
+                trim((string) $label->name)
+            )
+        );
+
+        $groupLabelIds = Label::query()
+            ->whereNull('deleted_at')
+            ->get(['id', 'name'])
+            ->filter(
+                fn ($candidate) =>
+                    strtolower(
+                        preg_replace(
+                            '/[^a-z0-9]+/i',
+                            '',
+                            trim((string) $candidate->name)
+                        )
+                    ) === $normalizedName
+            )
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
         DB::transaction(function () use (
-            $label,
+            $groupLabelIds,
             $adminId,
             $request
         ) {
+            /*
+             * IMPORTANT:
+             * Remove only Manager assignments.
+             * Owner assignments must remain untouched.
+             */
             DB::table('admin_label_assignments')
-                ->where('label_id', $label->id)
+                ->whereIn('label_id', $groupLabelIds)
+                ->where('assignment_role', 'manager')
                 ->delete();
 
             if ($adminId) {
-                DB::table('admin_label_assignments')
-                    ->insert([
-                        'user_id' => $adminId,
-                        'label_id' => $label->id,
-                        'assignment_role' => 'manager',
-                        'can_view' => true,
-                        'can_edit' => true,
-                        'can_manage_releases' => true,
-                        'can_manage_team' => false,
-                        'can_manage_splits' => true,
-                        'assigned_by' =>
-                            $request->user()->id,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
+                $now = now();
+
+                $rows = $groupLabelIds
+                    ->map(
+                        fn ($labelId) => [
+                            'user_id' => $adminId,
+                            'label_id' => $labelId,
+                            'assignment_role' => 'manager',
+                            'can_view' => true,
+                            'can_edit' => true,
+                            'can_manage_releases' => true,
+                            'can_manage_team' => false,
+                            'can_manage_splits' => true,
+                            'assigned_by' =>
+                                $request->user()->id,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ]
+                    )
+                    ->all();
+
+                if ($rows !== []) {
+                    DB::table('admin_label_assignments')
+                        ->insert($rows);
+                }
             }
         });
 
         return back()->with(
             'success',
-            $adminId
-                ? 'Label admin assigned.'
-                : 'Label admin unassigned.'
+            'Manager assignment updated for the consolidated label account.'
         );
     }
 
@@ -453,7 +485,48 @@ class AssignmentManagementController extends Controller
         $labelId = $request->integer('label_id');
 
         if ($labelId > 0) {
+            $requestedLabel = Label::query()
+                ->whereKey($labelId)
+                ->whereNull('deleted_at')
+                ->first(['id', 'name']);
+
+            abort_unless(
+                $requestedLabel,
+                404,
+                'Label not found.'
+            );
+
+            $normalizedName = strtolower(
+                preg_replace(
+                    '/[^a-z0-9]+/i',
+                    '',
+                    trim((string) $requestedLabel->name)
+                )
+            );
+
+            $logicalLabelIds = Label::query()
+                ->whereNull('deleted_at')
+                ->get(['id', 'name'])
+                ->filter(
+                    fn ($candidate) =>
+                        strtolower(
+                            preg_replace(
+                                '/[^a-z0-9]+/i',
+                                '',
+                                trim((string) $candidate->name)
+                            )
+                        ) === $normalizedName
+                )
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
             if ($role === 'admin') {
+                /*
+                 * Manager must have access to this logical
+                 * label group. FF361D assigns every physical
+                 * member of the group together.
+                 */
                 $allowedLabel = DB::table(
                     'admin_label_assignments'
                 )
@@ -461,9 +534,9 @@ class AssignmentManagementController extends Controller
                         'user_id',
                         $request->user()->id
                     )
-                    ->where(
+                    ->whereIn(
                         'label_id',
-                        $labelId
+                        $logicalLabelIds
                     )
                     ->exists();
 
@@ -474,9 +547,13 @@ class AssignmentManagementController extends Controller
                 );
             }
 
-            $query->where(
+            /*
+             * Existing role scope above remains in place,
+             * so this filter cannot widen Manager access.
+             */
+            $query->whereIn(
                 'label_id',
-                $labelId
+                $logicalLabelIds
             );
         }
 
@@ -1245,7 +1322,60 @@ class AssignmentManagementController extends Controller
                 'required',
                 'boolean',
             ],
+            'can_withdraw' => [
+                'sometimes',
+                'boolean',
+            ],
         ]);
+
+        if ($role !== 'super_admin') {
+            unset($validated['can_withdraw']);
+        }
+
+        $withdrawalStatus = array_key_exists(
+            'can_withdraw',
+            $validated
+        )
+            ? (bool) $validated['can_withdraw']
+            : null;
+
+        /*
+         * Withdrawal eligibility belongs to the financial
+         * owner account because wallet / payout profile are
+         * User-level.
+         *
+         * Keep every non-deleted Label and Artist belonging
+         * to that owner synchronized.
+         */
+        if (
+            $role === 'super_admin'
+            && $withdrawalStatus !== null
+            && $artist->user_id
+        ) {
+            Label::query()
+                ->where(
+                    'user_id',
+                    $artist->user_id
+                )
+                ->whereNull('deleted_at')
+                ->update([
+                    'can_withdraw' =>
+                        $withdrawalStatus,
+                    'updated_at' => now(),
+                ]);
+
+            Artist::query()
+                ->where(
+                    'user_id',
+                    $artist->user_id
+                )
+                ->whereNull('deleted_at')
+                ->update([
+                    'can_withdraw' =>
+                        $withdrawalStatus,
+                    'updated_at' => now(),
+                ]);
+        }
 
         $validated['updated_by'] =
             $request->user()->id;
@@ -1314,6 +1444,598 @@ class AssignmentManagementController extends Controller
         );
     }
 
+    public function updateLabelWithdrawalStatus(
+        Request $request,
+        Label $label,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $this->authorizeSuperAdmin(
+            $request,
+            $permissions
+        );
+
+        $validated = $request->validate([
+            'can_withdraw' => [
+                'required',
+                'boolean',
+            ],
+        ]);
+
+        $ownerId = (int) $label->user_id;
+
+        abort_if(
+            $ownerId <= 0,
+            422,
+            'The label financial owner could not be resolved.'
+        );
+
+        $withdrawalStatus =
+            (bool) $validated['can_withdraw'];
+
+        /*
+         * Wallet / payout profile are User-level.
+         * Synchronize withdrawal status across every
+         * non-deleted Label and Artist owned by the same
+         * financial account.
+         */
+        Label::query()
+            ->where('user_id', $ownerId)
+            ->whereNull('deleted_at')
+            ->update([
+                'can_withdraw' =>
+                    $withdrawalStatus,
+                'updated_at' => now(),
+            ]);
+
+        Artist::query()
+            ->where('user_id', $ownerId)
+            ->whereNull('deleted_at')
+            ->update([
+                'can_withdraw' =>
+                    $withdrawalStatus,
+                'updated_at' => now(),
+            ]);
+
+        return back()->with(
+            'success',
+            $withdrawalStatus
+                ? 'Withdrawals enabled for this account.'
+                : 'Withdrawals suspended for this account.'
+        );
+    }
+
+    /**
+     * FF419-C
+     *
+     * Update the canonical commercial revenue rate for a label.
+     *
+     * Only review_pending report imports may be recalculated by
+     * ReportEarningsRecalculationService. Approved/published
+     * financial snapshots remain immutable.
+     */
+    public function updateLabelRevenueRate(
+        Request $request,
+        Label $label,
+        PermissionService $permissions,
+        ReportEarningsRecalculationService $recalculator
+    ): RedirectResponse {
+        $this->authorizeSuperAdmin(
+            $request,
+            $permissions
+        );
+
+        abort_if(
+            $label->deleted_at !== null,
+            404,
+            'Label not found.'
+        );
+
+        $validated = $request->validate([
+            'revenue_share_percentage' => [
+                'required',
+                'numeric',
+                'min:0',
+                'max:100',
+            ],
+        ]);
+
+        $rate = round(
+            (float) $validated['revenue_share_percentage'],
+            2
+        );
+
+        DB::transaction(
+            function () use (
+                $label,
+                $rate,
+                $recalculator
+            ): void {
+                $lockedLabel = Label::query()
+                    ->whereKey($label->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $lockedLabel->revenue_share_percentage =
+                    $rate;
+
+                $lockedLabel->save();
+
+                /*
+                 * Canonical recalculation.
+                 *
+                 * The service itself enforces the financial
+                 * lifecycle freeze and touches only mapped rows
+                 * belonging to review_pending imports.
+                 *
+                 * No wallet/publication operation occurs here.
+                 */
+                $recalculator->recalculateForLabel(
+                    $lockedLabel
+                );
+            }
+        );
+
+        return back()->with(
+            'success',
+            'Label revenue rate updated to '
+                .number_format($rate, 2)
+                .'%. Pending review earnings recalculated.'
+        );
+    }
+
+
+    /**
+     * MIXXTUNE_LABEL_BULK_ACTIONS_V1
+     *
+     * Bulk operations for labels selected from the consolidated
+     * Labels administration table.
+     *
+     * Financial safety:
+     * - Revenue Rate uses the canonical recalculation service.
+     * - That service only recalculates review_pending imports.
+     * - No wallet/publication operation occurs here.
+     *
+     * Withdrawal safety:
+     * - Withdrawal permission is financial-account/User level.
+     * - All Labels + Artists owned by the selected financial
+     *   account are synchronized, matching the single-row action.
+     */
+    public function bulkLabelAction(
+        Request $request,
+        PermissionService $permissions,
+        ReportEarningsRecalculationService $recalculator
+    ): RedirectResponse {
+        $this->authorizeSuperAdmin(
+            $request,
+            $permissions
+        );
+
+        $validated = $request->validate([
+            'label_ids' => [
+                'required',
+                'array',
+                'min:1',
+                'max:500',
+            ],
+            'label_ids.*' => [
+                'required',
+                'integer',
+                'distinct',
+                'exists:labels,id',
+            ],
+            'action' => [
+                'required',
+                'string',
+                'in:set_rate,assign_manager,unassign_manager,enable_withdrawal,suspend_withdrawal',
+            ],
+            'revenue_share_percentage' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:100',
+            ],
+            'admin_id' => [
+                'nullable',
+                'integer',
+                'exists:users,id',
+            ],
+        ]);
+
+        $labelIds = collect(
+            $validated['label_ids']
+        )
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        abort_if(
+            $labelIds->isEmpty(),
+            422,
+            'Select at least one label.'
+        );
+
+        $action = $validated['action'];
+
+        if ($action === 'set_rate') {
+            abort_unless(
+                array_key_exists(
+                    'revenue_share_percentage',
+                    $validated
+                )
+                && $validated[
+                    'revenue_share_percentage'
+                ] !== null,
+                422,
+                'Revenue Rate is required.'
+            );
+
+            $rate = round(
+                (float) $validated[
+                    'revenue_share_percentage'
+                ],
+                2
+            );
+
+            DB::transaction(
+                function () use (
+                    $labelIds,
+                    $rate,
+                    $recalculator
+                ): void {
+                    $labels = Label::query()
+                        ->whereIn(
+                            'id',
+                            $labelIds->all()
+                        )
+                        ->whereNull('deleted_at')
+                        ->lockForUpdate()
+                        ->get();
+
+                    abort_unless(
+                        $labels->count()
+                            === $labelIds->count(),
+                        422,
+                        'One or more selected labels are unavailable.'
+                    );
+
+                    foreach ($labels as $label) {
+                        $label
+                            ->revenue_share_percentage =
+                                $rate;
+
+                        $label->save();
+
+                        /*
+                         * Canonical calculation path.
+                         * Lifecycle freeze remains enforced
+                         * inside this service.
+                         */
+                        $recalculator
+                            ->recalculateForLabel(
+                                $label
+                            );
+                    }
+                }
+            );
+
+            return back()->with(
+                'success',
+                $labelIds->count()
+                    .' label(s) updated to '
+                    .number_format($rate, 2)
+                    .'%. Pending review earnings recalculated.'
+            );
+        }
+
+        /*
+         * MIXXTUNE_LABEL_BULK_MANAGER_WITHDRAWAL_FIX_V1
+         *
+         * Manager assignment mirrors assignLabelAdmin():
+         * - consolidated same-name physical labels
+         * - delete MANAGER assignments only
+         * - preserve OWNER assignments
+         * - admin_label_assignments uses user_id, not admin_id
+         *
+         * Withdrawal mirrors updateLabelWithdrawalStatus():
+         * - financial account/User-level permission
+         * - synchronize all non-deleted Labels + Artists
+         *   belonging to the selected owner account.
+         */
+        if (
+            $action === 'assign_manager'
+            || $action === 'unassign_manager'
+        ) {
+            $adminId = null;
+
+            if ($action === 'assign_manager') {
+                $adminId = (int) (
+                    $validated['admin_id'] ?? 0
+                );
+
+                if ($adminId <= 0) {
+                    throw ValidationException::withMessages([
+                        'admin_id' =>
+                            'Select a Manager.',
+                    ]);
+                }
+
+                $validAdmin = User::query()
+                    ->whereKey($adminId)
+                    ->where('role', 'admin')
+                    ->where(
+                        'account_status',
+                        'active'
+                    )
+                    ->exists();
+
+                if (! $validAdmin) {
+                    throw ValidationException::withMessages([
+                        'admin_id' =>
+                            'Selected user is not an active Admin.',
+                    ]);
+                }
+            }
+
+            /*
+             * UI rows are consolidated by normalized label name.
+             * Expand every selected representative ID back to all
+             * physical labels belonging to its consolidated group.
+             */
+            $selectedLabels = Label::query()
+                ->whereIn(
+                    'id',
+                    $labelIds->all()
+                )
+                ->whereNull('deleted_at')
+                ->get([
+                    'id',
+                    'name',
+                ]);
+
+            abort_unless(
+                $selectedLabels->count()
+                    === $labelIds->count(),
+                422,
+                'One or more selected labels are unavailable.'
+            );
+
+            $normalizedNames = $selectedLabels
+                ->map(
+                    fn ($label) =>
+                        strtolower(
+                            preg_replace(
+                                '/[^a-z0-9]+/i',
+                                '',
+                                trim(
+                                    (string) $label->name
+                                )
+                            )
+                        )
+                )
+                ->filter()
+                ->unique()
+                ->values();
+
+            $allLabels = Label::query()
+                ->whereNull('deleted_at')
+                ->get([
+                    'id',
+                    'name',
+                ]);
+
+            $groupLabelIds = $allLabels
+                ->filter(
+                    function ($candidate) use (
+                        $normalizedNames
+                    ) {
+                        $normalized =
+                            strtolower(
+                                preg_replace(
+                                    '/[^a-z0-9]+/i',
+                                    '',
+                                    trim(
+                                        (string)
+                                            $candidate->name
+                                    )
+                                )
+                            );
+
+                        return $normalizedNames
+                            ->contains($normalized);
+                    }
+                )
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            abort_if(
+                $groupLabelIds->isEmpty(),
+                422,
+                'No consolidated labels could be resolved.'
+            );
+
+            DB::transaction(
+                function () use (
+                    $groupLabelIds,
+                    $adminId,
+                    $request
+                ): void {
+                    /*
+                     * CRITICAL:
+                     * Never delete owner assignments.
+                     */
+                    DB::table(
+                        'admin_label_assignments'
+                    )
+                        ->whereIn(
+                            'label_id',
+                            $groupLabelIds->all()
+                        )
+                        ->where(
+                            'assignment_role',
+                            'manager'
+                        )
+                        ->delete();
+
+                    if ($adminId !== null) {
+                        $now = now();
+
+                        $rows = $groupLabelIds
+                            ->map(
+                                fn ($labelId) => [
+                                    'user_id' =>
+                                        $adminId,
+
+                                    'label_id' =>
+                                        $labelId,
+
+                                    'assignment_role' =>
+                                        'manager',
+
+                                    'can_view' =>
+                                        true,
+
+                                    'can_edit' =>
+                                        true,
+
+                                    'can_manage_releases' =>
+                                        true,
+
+                                    'can_manage_team' =>
+                                        false,
+
+                                    'can_manage_splits' =>
+                                        true,
+
+                                    'assigned_by' =>
+                                        $request
+                                            ->user()
+                                            ->id,
+
+                                    'created_at' =>
+                                        $now,
+
+                                    'updated_at' =>
+                                        $now,
+                                ]
+                            )
+                            ->all();
+
+                        if ($rows !== []) {
+                            DB::table(
+                                'admin_label_assignments'
+                            )->insert($rows);
+                        }
+                    }
+                }
+            );
+
+            return back()->with(
+                'success',
+                $action === 'assign_manager'
+                    ? $selectedLabels->count()
+                        .' consolidated label account(s) assigned to Manager.'
+                    : $selectedLabels->count()
+                        .' consolidated label account(s) unassigned from Manager.'
+            );
+        }
+
+        if (
+            $action === 'enable_withdrawal'
+            || $action === 'suspend_withdrawal'
+        ) {
+            $withdrawalStatus =
+                $action === 'enable_withdrawal';
+
+            $selectedLabels = Label::query()
+                ->whereIn(
+                    'id',
+                    $labelIds->all()
+                )
+                ->whereNull('deleted_at')
+                ->get([
+                    'id',
+                    'user_id',
+                ]);
+
+            abort_unless(
+                $selectedLabels->count()
+                    === $labelIds->count(),
+                422,
+                'One or more selected labels are unavailable.'
+            );
+
+            $ownerIds = $selectedLabels
+                ->pluck('user_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values();
+
+            abort_if(
+                $ownerIds->isEmpty(),
+                422,
+                'The selected label financial owner could not be resolved.'
+            );
+
+            DB::transaction(
+                function () use (
+                    $ownerIds,
+                    $withdrawalStatus
+                ): void {
+                    /*
+                     * Same canonical behavior as the
+                     * working single-label action.
+                     */
+                    Label::query()
+                        ->whereIn(
+                            'user_id',
+                            $ownerIds->all()
+                        )
+                        ->whereNull('deleted_at')
+                        ->update([
+                            'can_withdraw' =>
+                                $withdrawalStatus,
+                            'updated_at' =>
+                                now(),
+                        ]);
+
+                    Artist::query()
+                        ->whereIn(
+                            'user_id',
+                            $ownerIds->all()
+                        )
+                        ->whereNull('deleted_at')
+                        ->update([
+                            'can_withdraw' =>
+                                $withdrawalStatus,
+                            'updated_at' =>
+                                now(),
+                        ]);
+                }
+            );
+
+            return back()->with(
+                'success',
+                $ownerIds->count()
+                    .' financial account(s): withdrawals '
+                    .(
+                        $withdrawalStatus
+                            ? 'enabled.'
+                            : 'suspended.'
+                    )
+            );
+        }
+
+        abort(
+            422,
+            'Unsupported bulk action.'
+        );
+    }
+
+
     public function labels(
         Request $request,
         PermissionService $permissions
@@ -1323,7 +2045,62 @@ class AssignmentManagementController extends Controller
             $permissions
         );
 
+        $search = trim(
+            (string) $request->input(
+                'search',
+                ''
+            )
+        );
+
+        $status = trim(
+            (string) $request->input(
+                'status',
+                ''
+            )
+        );
+
+        $withdrawal = trim(
+            (string) $request->input(
+                'withdrawal',
+                ''
+            )
+        );
+
+        /*
+         * MIXXTUNE_LABEL_ADVANCED_FILTERS_V2
+         *
+         * Filters involving consolidated counts / managers /
+         * rates are applied after same-name label grouping.
+         */
+        $typeFilter = trim(
+            (string) $request->input('type', '')
+        );
+
+        $artistsFilter = trim(
+            (string) $request->input('artists', '')
+        );
+
+        $releasesFilter = trim(
+            (string) $request->input('releases', '')
+        );
+
+        $rateFilter = trim(
+            (string) $request->input('rate', '')
+        );
+
+        $managerFilter = trim(
+            (string) $request->input('manager', '')
+        );
+
+        $sortFilter = trim(
+            (string) $request->input(
+                'sort',
+                'label_asc'
+            )
+        );
+
         $query = Label::query()
+            ->whereNull('deleted_at')
             ->with([
                 'assignedAdmins:id,name,email',
             ])
@@ -1342,13 +2119,6 @@ class AssignmentManagementController extends Controller
                     )
             );
         }
-
-        $search = trim(
-            (string) $request->input(
-                'search',
-                ''
-            )
-        );
 
         if ($search !== '') {
             $query->where(
@@ -1373,16 +2143,539 @@ class AssignmentManagementController extends Controller
             );
         }
 
+        if (
+            in_array(
+                $status,
+                ['active', 'inactive'],
+                true
+            )
+        ) {
+            $query->where(
+                'status',
+                $status
+            );
+        }
+
+        if (
+            in_array(
+                $withdrawal,
+                ['enabled', 'suspended'],
+                true
+            )
+        ) {
+            $query->where(
+                'can_withdraw',
+                $withdrawal === 'enabled'
+            );
+        }
+
+        $physicalLabels = $query
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+
+        $groups = $physicalLabels
+            ->groupBy(
+                fn ($label) =>
+                    strtolower(
+                        preg_replace(
+                            '/[^a-z0-9]+/i',
+                            '',
+                            trim((string) $label->name)
+                        )
+                    )
+            )
+            ->filter(
+                fn ($group, $key) =>
+                    $key !== ''
+            )
+            ->map(function ($group, $key) {
+                /*
+                 * Prefer an active record as representative.
+                 * No physical records are merged or deleted.
+                 */
+                $representative =
+                    $group
+                        ->where('status', 'active')
+                        ->sortBy('id')
+                        ->first()
+                    ?? $group
+                        ->sortBy('id')
+                        ->first();
+
+                $labelIds = $group
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values();
+
+                /*
+                 * Assigned Managers only.
+                 * Owner pivot rows are intentionally excluded.
+                 */
+                $managerIds = DB::table(
+                    'admin_label_assignments'
+                )
+                    ->whereIn(
+                        'label_id',
+                        $labelIds
+                    )
+                    ->where(
+                        'assignment_role',
+                        'manager'
+                    )
+                    ->pluck('user_id')
+                    ->unique()
+                    ->values();
+
+                $managers = User::query()
+                    ->whereIn('id', $managerIds)
+                    ->get([
+                        'id',
+                        'name',
+                        'email',
+                    ])
+                    ->values();
+
+                return [
+                    'id' =>
+                        (int) $representative->id,
+
+                    'name' =>
+                        $representative->name,
+
+                    'email' =>
+                        $representative->email,
+
+                    'label_type' =>
+                        $representative->label_type,
+
+                    /*
+                     * FF419-C:
+                     * canonical commercial revenue rate.
+                     */
+                    'revenue_share_percentage' =>
+                        $representative->revenue_share_percentage !== null
+                            ? (float) $representative->revenue_share_percentage
+                            : null,
+
+                    'status' =>
+                        $group->contains(
+                            fn ($item) =>
+                                $item->status === 'active'
+                        )
+                            ? 'active'
+                            : $representative->status,
+
+                    'artists_count' =>
+                        (int) $group->sum(
+                            'artists_count'
+                        ),
+
+                    'releases_count' =>
+                        (int) $group->sum(
+                            'releases_count'
+                        ),
+
+                    'assigned_admins' =>
+                        $managers,
+
+                    'label_ids' =>
+                        $labelIds,
+
+                    'physical_count' =>
+                        $group->count(),
+
+                    'can_withdraw' =>
+                        $group->every(
+                            fn ($item) =>
+                                (bool) $item->can_withdraw
+                        ),
+
+                    'normalized_key' =>
+                        $key,
+                ];
+            })
+            ->sortBy(
+                fn ($label) =>
+                    strtolower(
+                        (string) $label['name']
+                    )
+            )
+            ->values();
+
+        /*
+         * MIXXTUNE_LABEL_GROUP_FILTER_PIPELINE_V2
+         *
+         * $groups now represents exactly what the table displays.
+         * Apply advanced filters here so duplicate physical label
+         * records cannot distort Artists / Releases / Manager data.
+         */
+
+        if ($typeFilter !== '') {
+            $groups = $groups
+                ->filter(
+                    fn ($label) =>
+                        strtolower(
+                            (string) (
+                                $label['label_type'] ?? ''
+                            )
+                        )
+                        === strtolower($typeFilter)
+                )
+                ->values();
+        }
+
+        if ($artistsFilter === 'zero') {
+            $groups = $groups
+                ->filter(
+                    fn ($label) =>
+                        (int) (
+                            $label['artists_count'] ?? 0
+                        ) === 0
+                )
+                ->values();
+        } elseif ($artistsFilter === 'has') {
+            $groups = $groups
+                ->filter(
+                    fn ($label) =>
+                        (int) (
+                            $label['artists_count'] ?? 0
+                        ) > 0
+                )
+                ->values();
+        }
+
+        if ($releasesFilter === 'zero') {
+            $groups = $groups
+                ->filter(
+                    fn ($label) =>
+                        (int) (
+                            $label['releases_count'] ?? 0
+                        ) === 0
+                )
+                ->values();
+        } elseif ($releasesFilter === 'has') {
+            $groups = $groups
+                ->filter(
+                    fn ($label) =>
+                        (int) (
+                            $label['releases_count'] ?? 0
+                        ) > 0
+                )
+                ->values();
+        }
+
+        if ($rateFilter === 'not_set') {
+            $groups = $groups
+                ->filter(
+                    fn ($label) =>
+                        (
+                            $label[
+                                'revenue_share_percentage'
+                            ] ?? null
+                        ) === null
+                )
+                ->values();
+        } elseif (
+            $rateFilter !== ''
+            && is_numeric($rateFilter)
+        ) {
+            $requestedRate =
+                (float) $rateFilter;
+
+            if (
+                $requestedRate >= 0
+                && $requestedRate <= 100
+            ) {
+                $groups = $groups
+                    ->filter(
+                        function ($label) use (
+                            $requestedRate
+                        ) {
+                            $rate =
+                                $label[
+                                    'revenue_share_percentage'
+                                ] ?? null;
+
+                            return $rate !== null
+                                && abs(
+                                    (float) $rate
+                                    - $requestedRate
+                                ) < 0.00001;
+                        }
+                    )
+                    ->values();
+            }
+        }
+
+        if ($managerFilter === 'assigned') {
+            $groups = $groups
+                ->filter(
+                    fn ($label) =>
+                        collect(
+                            $label[
+                                'assigned_admins'
+                            ] ?? []
+                        )->isNotEmpty()
+                )
+                ->values();
+        } elseif (
+            $managerFilter === 'unassigned'
+        ) {
+            $groups = $groups
+                ->filter(
+                    fn ($label) =>
+                        collect(
+                            $label[
+                                'assigned_admins'
+                            ] ?? []
+                        )->isEmpty()
+                )
+                ->values();
+        } elseif (
+            str_starts_with(
+                $managerFilter,
+                'manager:'
+            )
+        ) {
+            $managerId = (int) substr(
+                $managerFilter,
+                strlen('manager:')
+            );
+
+            if ($managerId > 0) {
+                $groups = $groups
+                    ->filter(
+                        fn ($label) =>
+                            collect(
+                                $label[
+                                    'assigned_admins'
+                                ] ?? []
+                            )
+                                ->pluck('id')
+                                ->map(
+                                    fn ($id) =>
+                                        (int) $id
+                                )
+                                ->contains(
+                                    $managerId
+                                )
+                    )
+                    ->values();
+            }
+        }
+
+        switch ($sortFilter) {
+            case 'label_desc':
+                $groups = $groups->sort(
+                    fn ($a, $b) =>
+                        strcasecmp(
+                            (string) (
+                                $b['name'] ?? ''
+                            ),
+                            (string) (
+                                $a['name'] ?? ''
+                            )
+                        )
+                );
+                break;
+
+            case 'artists_high':
+                $groups = $groups->sort(
+                    fn ($a, $b) =>
+                        (int) (
+                            $b['artists_count'] ?? 0
+                        )
+                        <=>
+                        (int) (
+                            $a['artists_count'] ?? 0
+                        )
+                );
+                break;
+
+            case 'artists_low':
+                $groups = $groups->sort(
+                    fn ($a, $b) =>
+                        (int) (
+                            $a['artists_count'] ?? 0
+                        )
+                        <=>
+                        (int) (
+                            $b['artists_count'] ?? 0
+                        )
+                );
+                break;
+
+            case 'releases_high':
+                $groups = $groups->sort(
+                    fn ($a, $b) =>
+                        (int) (
+                            $b['releases_count'] ?? 0
+                        )
+                        <=>
+                        (int) (
+                            $a['releases_count'] ?? 0
+                        )
+                );
+                break;
+
+            case 'releases_low':
+                $groups = $groups->sort(
+                    fn ($a, $b) =>
+                        (int) (
+                            $a['releases_count'] ?? 0
+                        )
+                        <=>
+                        (int) (
+                            $b['releases_count'] ?? 0
+                        )
+                );
+                break;
+
+            case 'rate_high':
+                $groups = $groups->sort(
+                    function ($a, $b) {
+                        $ar =
+                            $a[
+                                'revenue_share_percentage'
+                            ] ?? null;
+
+                        $br =
+                            $b[
+                                'revenue_share_percentage'
+                            ] ?? null;
+
+                        if (
+                            $ar === null
+                            && $br === null
+                        ) {
+                            return 0;
+                        }
+
+                        if ($ar === null) {
+                            return 1;
+                        }
+
+                        if ($br === null) {
+                            return -1;
+                        }
+
+                        return (float) $br
+                            <=>
+                            (float) $ar;
+                    }
+                );
+                break;
+
+            case 'rate_low':
+                $groups = $groups->sort(
+                    function ($a, $b) {
+                        $ar =
+                            $a[
+                                'revenue_share_percentage'
+                            ] ?? null;
+
+                        $br =
+                            $b[
+                                'revenue_share_percentage'
+                            ] ?? null;
+
+                        /*
+                         * Keep Not Set at the bottom for both
+                         * directions.
+                         */
+                        if (
+                            $ar === null
+                            && $br === null
+                        ) {
+                            return 0;
+                        }
+
+                        if ($ar === null) {
+                            return 1;
+                        }
+
+                        if ($br === null) {
+                            return -1;
+                        }
+
+                        return (float) $ar
+                            <=>
+                            (float) $br;
+                    }
+                );
+                break;
+
+            case 'label_asc':
+            default:
+                $groups = $groups->sort(
+                    fn ($a, $b) =>
+                        strcasecmp(
+                            (string) (
+                                $a['name'] ?? ''
+                            ),
+                            (string) (
+                                $b['name'] ?? ''
+                            )
+                        )
+                );
+                break;
+        }
+
+        $groups = $groups->values();
+
+        $perPage = 25;
+
+        $page = max(
+            1,
+            (int) $request->input(
+                'page',
+                1
+            )
+        );
+
+        $pageItems = $groups
+            ->forPage(
+                $page,
+                $perPage
+            )
+            ->values();
+
+        $labels = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pageItems,
+            $groups->count(),
+            $perPage,
+            $page,
+            [
+                'path' =>
+                    $request->url(),
+
+                'query' =>
+                    $request->query(),
+            ]
+        );
+
         return Inertia::render(
             'V2/Admin/Labels/Index',
             [
                 'role' => $role,
                 'search' => $search,
+                'statusFilter' => $status,
+                'withdrawalFilter' => $withdrawal,
+                'typeFilter' => $typeFilter,
+                'artistsFilter' => $artistsFilter,
+                'releasesFilter' => $releasesFilter,
+                'rateFilter' => $rateFilter,
+                'managerFilter' => $managerFilter,
+                'sortFilter' => $sortFilter,
 
                 'admins' =>
                     $role === 'super_admin'
                         ? User::query()
-                            ->where('role', 'admin')
+                            ->where(
+                                'role',
+                                'admin'
+                            )
                             ->where(
                                 'account_status',
                                 'active'
@@ -1396,10 +2689,7 @@ class AssignmentManagementController extends Controller
                         : collect(),
 
                 'labels' =>
-                    $query
-                        ->orderBy('name')
-                        ->paginate(25)
-                        ->withQueryString(),
+                    $labels,
             ]
         );
     }

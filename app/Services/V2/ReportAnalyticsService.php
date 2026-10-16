@@ -25,26 +25,64 @@ class ReportAnalyticsService
             $user
         );
 
+        /*
+         * MIXXTUNE_FINANCIAL_VISIBILITY_GATE
+         * ==================================
+         *
+         * Normal reports / analytics must only consume
+         * financially published imports.
+         *
+         * review_pending      => hidden
+         * approved_scheduled  => hidden
+         * published           => visible
+         *
+         * Super Admin Import Review intentionally uses
+         * separate admin queries and is not routed through
+         * this user-facing financial scope.
+         *
+         * Inner EXISTS also excludes orphan report_import_id
+         * rows from financial visibility.
+         */
         $query =
-            ReportRow::query();
+            ReportRow::query()
+                ->whereExists(
+                    function ($publishedImport) {
+                        $publishedImport
+                            ->selectRaw('1')
+                            ->from('report_imports as financial_import')
+                            ->whereColumn(
+                                'financial_import.id',
+                                'report_rows.report_import_id'
+                            )
+                            ->where(
+                                'financial_import.financial_status',
+                                'published'
+                            );
+                    }
+                );
 
         if ($role === 'super_admin') {
             return $query;
         }
 
         if ($role === 'artist') {
-            $artistId = DB::table('artists')
+            $artistIds = DB::table('artists')
                 ->where(
                     'user_id',
                     $user->id
                 )
                 ->whereNull('deleted_at')
-                ->value('id');
+                ->pluck('id')
+                ->map(
+                    fn ($id) => (int) $id
+                )
+                ->unique()
+                ->values();
 
-            return $artistId
-                ? $query->where(
+            return $artistIds->isNotEmpty()
+                ? $query->whereIn(
                     'artist_id',
-                    $artistId
+                    $artistIds
                 )
                 : $query->whereRaw('1 = 0');
         }
@@ -220,13 +258,6 @@ class ReportAnalyticsService
                     $filters['to_month']
                 );
             }
-        }
-
-        if (!empty($filters['sale_month'])) {
-            $query->where(
-                'sale_month',
-                $filters['sale_month']
-            );
         }
 
         if (!empty($filters['platform'])) {
@@ -452,6 +483,9 @@ class ReportAnalyticsService
                 'COALESCE(SUM(earnings), 0) as earnings'
             )
             ->selectRaw(
+                'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
+            )
+            ->selectRaw(
                 'COUNT(*) as rows_count'
             )
             ->first();
@@ -466,8 +500,23 @@ class ReportAnalyticsService
             'earnings' =>
                 (float) $result->earnings,
 
+            /*
+             * Imported DSP gross/reported revenue.
+             * This is informational historical revenue
+             * and MUST NOT be treated as payable royalty.
+             */
+            'collected_revenue' =>
+                (float) $result->collected_revenue,
+
             'rows' =>
                 (int) $result->rows_count,
+
+            'active_platforms' =>
+                (clone $query)
+                    ->whereNotNull('platform')
+                    ->where('platform', '!=', '')
+                    ->distinct()
+                    ->count('platform'),
         ];
     }
 
@@ -476,8 +525,9 @@ class ReportAnalyticsService
         int $limit = 12
     ): array {
         return (clone $query)
-            ->whereNotNull('reporting_month')
-            ->select('reporting_month')
+            ->whereNotNull('sale_month')
+            ->where('sale_month', '!=', '')
+            ->select('sale_month')
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
             )
@@ -487,15 +537,18 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(earnings), 0) as earnings'
             )
-            ->groupBy('reporting_month')
-            ->orderByDesc('reporting_month')
+            ->selectRaw(
+                'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
+            )
+            ->groupBy('sale_month')
+            ->orderByDesc('sale_month')
             ->limit($limit)
             ->get()
             ->reverse()
             ->values()
             ->map(fn ($row) => [
                 'month' =>
-                    $row->reporting_month,
+                    $row->sale_month,
 
                 'streams' =>
                     (float) $row->streams,
@@ -505,6 +558,9 @@ class ReportAnalyticsService
 
                 'earnings' =>
                     (float) $row->earnings,
+
+                'collected_revenue' =>
+                    (float) $row->collected_revenue,
             ])
             ->all();
     }
@@ -727,8 +783,11 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(earnings), 0) as earnings'
             )
+            ->selectRaw(
+                'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
+            )
             ->groupBy('platform')
-            ->orderByDesc('earnings')
+            ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
@@ -743,6 +802,9 @@ class ReportAnalyticsService
 
                 'earnings' =>
                     (float) $row->earnings,
+
+                'collected_revenue' =>
+                    (float) $row->collected_revenue,
             ])
             ->all();
     }
@@ -764,8 +826,11 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(earnings), 0) as earnings'
             )
+            ->selectRaw(
+                'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
+            )
             ->groupBy('country_code')
-            ->orderByDesc('earnings')
+            ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
@@ -780,6 +845,9 @@ class ReportAnalyticsService
 
                 'earnings' =>
                     (float) $row->earnings,
+
+                'collected_revenue' =>
+                    (float) $row->collected_revenue,
             ])
             ->all();
     }
@@ -813,6 +881,9 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(earnings), 0) as earnings'
             )
+            ->selectRaw(
+                'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
+            )
             ->groupBy([
                 'track_id',
                 'track_title',
@@ -821,7 +892,7 @@ class ReportAnalyticsService
                 'album_artist',
                 'isrc',
             ])
-            ->orderByDesc('earnings');
+            ->orderByDesc('collected_revenue');
 
         if ($limit !== null) {
             $tracks->limit($limit);
@@ -854,6 +925,9 @@ class ReportAnalyticsService
 
                 'earnings' =>
                     (float) $row->earnings,
+
+                'collected_revenue' =>
+                    (float) $row->collected_revenue,
             ])
             ->all();
     }
@@ -880,10 +954,13 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(earnings), 0) as earnings'
             )
+            ->selectRaw(
+                'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
+            )
             ->groupByRaw(
                 "COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), 'Unknown Artist')"
             )
-            ->orderByDesc('earnings')
+            ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
@@ -891,6 +968,7 @@ class ReportAnalyticsService
                 'streams' => (float) $row->streams,
                 'sale_units' => (float) $row->sale_units,
                 'earnings' => (float) $row->earnings,
+                'collected_revenue' => (float) $row->collected_revenue,
             ])
             ->all();
     }
@@ -916,12 +994,15 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(earnings), 0) as earnings'
             )
+            ->selectRaw(
+                'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
+            )
             ->groupBy([
                 'album_title',
                 'album_artist',
                 'upc',
             ])
-            ->orderByDesc('earnings')
+            ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
@@ -943,6 +1024,9 @@ class ReportAnalyticsService
 
                 'earnings' =>
                     (float) $row->earnings,
+
+                'collected_revenue' =>
+                    (float) $row->collected_revenue,
             ])
             ->all();
     }
@@ -964,8 +1048,11 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(earnings), 0) as earnings'
             )
+            ->selectRaw(
+                'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
+            )
             ->groupBy('label_name')
-            ->orderByDesc('earnings')
+            ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
@@ -973,6 +1060,7 @@ class ReportAnalyticsService
                 'streams' => (float) $row->streams,
                 'sale_units' => (float) $row->sale_units,
                 'earnings' => (float) $row->earnings,
+                'collected_revenue' => (float) $row->collected_revenue,
             ])
             ->all();
     }

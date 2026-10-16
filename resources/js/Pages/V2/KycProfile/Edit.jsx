@@ -1,5 +1,5 @@
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
-import { Head } from '@inertiajs/react';
+import { router, Head } from '@inertiajs/react';
 import {
     BadgeCheck,
     Landmark,
@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 
 function DisplayField({ label, value, mono = false, wide = false }) {
+
+
     return (
         <div
             className={[
@@ -89,6 +91,26 @@ export default function Edit({ role, profile }) {
     ]
         .filter(Boolean)
         .join(', ');
+
+    const submitKycForVerification = () => {
+        if (
+            !window.confirm(
+                "Submit your KYC profile for Super Admin verification?"
+            )
+        ) {
+            return;
+        }
+
+        router.post(
+            "/v2/kyc-profile/submit",
+            {},
+            {
+                preserveScroll: true,
+            }
+        );
+    };
+
+
 
     return (
         <PanelLayout
@@ -232,6 +254,56 @@ export default function Edit({ role, profile }) {
                     Payout and KYC information can only be changed by Super Admin.
                 </div>
             </div>
-        </PanelLayout>
+        
+                {["pending", "rejected"].includes(
+                    String(
+                        profile?.kyc_status ?? ""
+                    ).toLowerCase()
+                ) && (
+                    <section className="mt-6 rounded-2xl border border-violet-200 bg-violet-50 p-6">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+                            <div>
+                                <h2 className="text-base font-semibold text-slate-900">
+                                    KYC Verification
+                                </h2>
+
+                                <p className="mt-1 text-sm text-slate-600">
+                                    Submit your completed payout and KYC profile
+                                    for Super Admin review.
+                                </p>
+
+                                {String(
+                                    profile?.kyc_status ?? ""
+                                ).toLowerCase() === "rejected" && (
+                                    <p className="mt-2 text-sm font-medium text-red-700">
+                                        Your previous KYC verification was rejected.
+                                        Please review the details before resubmitting.
+                                    </p>
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={submitKycForVerification}
+                                className="shrink-0 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700"
+                            >
+                                Submit for Verification
+                            </button>
+
+                        </div>
+                    </section>
+                )}
+
+                {String(
+                    profile?.kyc_status ?? ""
+                ).toLowerCase() === "submitted" && (
+                    <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
+                        KYC has been submitted and is waiting for
+                        Super Admin verification.
+                    </div>
+                )}
+
+</PanelLayout>
     );
 }

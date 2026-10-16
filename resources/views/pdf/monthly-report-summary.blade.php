@@ -209,6 +209,25 @@
         </tr>
     </table>
 
+    <div class="section-title">
+        Royalty Earnings
+    </div>
+
+    <table class="summary-table">
+        <tr>
+            <td>
+                <div class="metric-label">
+                    Royalty Earnings
+                </div>
+
+                <div class="metric-value">
+                    {{ $currency }}
+                    {{ number_format($royaltyEarnings, 2) }}
+                </div>
+            </td>
+        </tr>
+    </table>
+
 
     <div class="section-title">
         Account / Label Revenue Summary
@@ -308,12 +327,6 @@
     </div>
 
 
-    <div class="footer">
-        Generated:
-        {{ $generatedAt }}
-        &nbsp;•&nbsp;
-        {{ config('app.name', 'Mixx Tune') }}
-    </div>
 
 </body>
 </html>

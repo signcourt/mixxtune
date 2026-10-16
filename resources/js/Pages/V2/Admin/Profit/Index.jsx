@@ -28,6 +28,7 @@ const rate = (value) =>
 export default function ProfitIndex({
     summary = {},
     breakdown = [],
+    monthly = [],
     filters = {},
     months = [],
     platforms = [],
@@ -119,7 +120,7 @@ export default function ProfitIndex({
             icon: Users,
         },
         {
-            title: 'Super Admin Profit',
+            title: 'Platform Margin',
             value: money(
                 summary.super_admin_profit
             ),
@@ -142,7 +143,7 @@ export default function ProfitIndex({
             title="Business Profit"
             subtitle="Revenue retained after Label and Artist earnings"
         >
-            <Head title="Super Admin Profit" />
+            <Head title="Business Profit" />
 
             <div className="space-y-6">
                 <section className="rounded-3xl border border-slate-800 bg-slate-950/70 p-6 shadow-xl">
@@ -353,13 +354,105 @@ export default function ProfitIndex({
                 <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70">
                     <div className="border-b border-slate-800 p-5">
                         <h2 className="text-lg font-bold text-white">
+                            Monthly Business Performance
+                        </h2>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                            Month-wise collected revenue,
+                            Label/Artist earnings and
+                            Mixx Tune Platform Margin.
+                        </p>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wider text-slate-500">
+                                <tr>
+                                    <th className="px-5 py-4">
+                                        Month
+                                    </th>
+
+                                    <th className="px-5 py-4 text-right">
+                                        Collected Revenue
+                                    </th>
+
+                                    <th className="px-5 py-4 text-right">
+                                        User Earnings
+                                    </th>
+
+                                    <th className="px-5 py-4 text-right">
+                                        Platform Margin
+                                    </th>
+
+                                    <th className="px-5 py-4 text-right">
+                                        Rows
+                                    </th>
+                                </tr>
+                            </thead>
+
+                            <tbody className="divide-y divide-slate-800">
+                                {monthly.length === 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan="5"
+                                            className="px-5 py-10 text-center text-slate-500"
+                                        >
+                                            No monthly business
+                                            data found for these
+                                            filters.
+                                        </td>
+                                    </tr>
+                                )}
+
+                                {monthly.map((item) => (
+                                    <tr
+                                        key={item.month}
+                                        className="text-slate-300"
+                                    >
+                                        <td className="px-5 py-4 font-semibold text-white">
+                                            {item.month}
+                                        </td>
+
+                                        <td className="px-5 py-4 text-right">
+                                            {money(
+                                                item.collected_revenue
+                                            )}
+                                        </td>
+
+                                        <td className="px-5 py-4 text-right">
+                                            {money(
+                                                item.user_earning
+                                            )}
+                                        </td>
+
+                                        <td className="px-5 py-4 text-right font-bold text-emerald-400">
+                                            {money(
+                                                item.platform_margin
+                                            )}
+                                        </td>
+
+                                        <td className="px-5 py-4 text-right text-slate-500">
+                                            {number(
+                                                item.rows
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70">
+                    <div className="border-b border-slate-800 p-5">
+                        <h2 className="text-lg font-bold text-white">
                             Label & Artist Profit Breakdown
                         </h2>
 
                         <p className="mt-1 text-sm text-slate-500">
                             Negative report entries use an
                             effective 100% user rate and
-                            generate no Super Admin profit.
+                            generate no Platform Margin.
                         </p>
                     </div>
 
@@ -374,7 +467,7 @@ export default function ProfitIndex({
                                         Type
                                     </th>
                                     <th className="px-5 py-4 text-right">
-                                        Assigned Rate
+                                        Applied Rate
                                     </th>
                                     <th className="px-5 py-4 text-right">
                                         Collected Revenue
@@ -383,7 +476,7 @@ export default function ProfitIndex({
                                         User Earning
                                     </th>
                                     <th className="px-5 py-4 text-right">
-                                        Profit
+                                        Platform Margin
                                     </th>
                                 </tr>
                             </thead>

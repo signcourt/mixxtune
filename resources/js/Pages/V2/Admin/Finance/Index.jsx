@@ -49,6 +49,24 @@ const monthName = (value) => {
     );
 };
 
+// MIXXTUNE_FINANCE_IMPORT_PAID_FLAG_V1
+const isImportPaid = (item) =>
+    item?.paid_via_import === true ||
+    Number(item?.paid_via_import) === 1;
+
+// MIXXTUNE_FINANCE_IMPORT_STATUS_AWARE_V2
+const importBadge = (status) => {
+    if (status === 'posted' || status === 'completed') {
+        return ['Paid via import · credited to wallet', 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'];
+    }
+
+    if (status === 'held_unclaimed') {
+        return ['Held via import · owner not linked', 'bg-amber-50 text-amber-700 ring-amber-600/20'];
+    }
+
+    return ['Scheduled via import · awaiting publish', 'bg-slate-100 text-slate-700 ring-slate-600/20'];
+};
+
 export default function Index({
     role = 'super_admin',
     summary = {},
@@ -173,6 +191,21 @@ export default function Index({
             label: 'Paid',
             value: summary.paid,
             note: 'Completed payouts',
+        },
+        {
+            label: 'Paid via Import',
+            value: summary.paid_via_import,
+            note: 'Already credited to wallets',
+        },
+        {
+            label: 'Held via Import',
+            value: summary.held_via_import,
+            note: 'Unclaimed - owner not linked',
+        },
+        {
+            label: 'Scheduled via Import',
+            value: summary.scheduled_via_import,
+            note: 'Materialized, awaiting publish',
         },
     ];
 
@@ -505,10 +538,9 @@ export default function Index({
                                                     PDF
                                                 </a>
 
-                                                {role ===
-                                                    'super_admin' &&
-                                                    item.status ===
-                                                        'pending' && (
+                                                {role === 'super_admin' &&
+                                                    !isImportPaid(item) &&
+                                                    item.status === 'pending' && (
                                                         <ActionButton
                                                             busy={
                                                                 actionId ===
@@ -526,10 +558,9 @@ export default function Index({
                                                         </ActionButton>
                                                     )}
 
-                                                {role ===
-                                                    'super_admin' &&
-                                                    item.status ===
-                                                        'approved' && (
+                                                {role === 'super_admin' &&
+                                                    !isImportPaid(item) &&
+                                                    item.status === 'approved' && (
                                                         <ActionButton
                                                             busy={
                                                                 actionId ===
@@ -547,12 +578,16 @@ export default function Index({
                                                         </ActionButton>
                                                     )}
 
-                                                {![
-                                                    'pending',
-                                                    'approved',
-                                                ].includes(
-                                                    item.status
-                                                ) && (
+                                                {isImportPaid(item) && (
+                                                    <span className={`rounded-lg px-3 py-2 text-xs font-semibold ring-1 ${importBadge(item.import_posting_status)[1]}`}>
+                                                        {importBadge(item.import_posting_status)[0]}
+                                                    </span>
+                                                )}
+
+                                                {!isImportPaid(item) &&
+                                                    !['pending', 'approved'].includes(
+                                                        item.status
+                                                    ) && (
                                                     <span className="px-2 py-2 text-xs text-slate-400">
                                                         No action required
                                                     </span>

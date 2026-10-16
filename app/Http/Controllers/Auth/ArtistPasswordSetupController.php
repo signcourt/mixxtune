@@ -82,6 +82,7 @@ class ArtistPasswordSetupController extends Controller
             'invitation_error' => null,
             'password_set_at' => now(),
             'account_status' => 'active',
+            'last_login_at' => now(),
         ]);
 
         $request->session()->forget('invited_artist_id');

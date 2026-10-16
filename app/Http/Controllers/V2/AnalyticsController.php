@@ -23,13 +23,6 @@ class AnalyticsController extends Controller
                 (string) $request->input('month', '')
             ),
 
-            'sale_month' => trim(
-                (string) $request->input(
-                    'sale_month',
-                    ''
-                )
-            ),
-
             'from_month' => trim(
                 (string) $request->input('from_month', '')
             ),
@@ -498,25 +491,6 @@ class AnalyticsController extends Controller
                 (string) $months->first();
         }
 
-        $saleMonthBase =
-            clone $base;
-
-        if (!empty($filters['month'])) {
-            $saleMonthBase->where(
-                'reporting_month',
-                $filters['month']
-            );
-        }
-
-        $saleMonths =
-            $saleMonthBase
-                ->whereNotNull('sale_month')
-                ->where('sale_month', '!=', '')
-                ->distinct()
-                ->orderByDesc('sale_month')
-                ->pluck('sale_month')
-                ->values();
-
         $platforms = (clone $base)
             ->whereNotNull('platform')
             ->where('platform', '!=', '')
@@ -763,35 +737,79 @@ class AnalyticsController extends Controller
         ];
 
         /*
+         * Label / Artist Analytics fast path.
+         * Their visible imported-revenue analytics only require
+         * platform and country breakdowns for the selected
+         * reporting_month period.
+         */
+        $isCompactAnalyticsRole =
+            in_array(
+                $role,
+                ['label', 'artist'],
+                true
+            );
+
+        /*
          * Historical trend ignores all month selectors.
          * Store and region filters remain active.
          */
-        $trendFilters = $filters;
-        $trendFilters['month'] = '';
-        $trendFilters['from_month'] = '';
-        $trendFilters['to_month'] = '';
+        $monthlyTrend = [];
+        $growth = [];
 
-        $trendQuery = $analytics->applyFilters(
-            clone $base,
-            $trendFilters
-        );
+        if (!$isCompactAnalyticsRole) {
+            $trendFilters = $filters;
+            $trendFilters['month'] = '';
+            $trendFilters['from_month'] = '';
+            $trendFilters['to_month'] = '';
 
-        $monthlyTrend = $analytics->monthlyTrend(
-            clone $trendQuery,
-            24
-        );
-
-        $growthMonth =
-            $filters['month']
-            ?: (
-                $filters['to_month']
-                ?: null
+            $trendQuery = $analytics->applyFilters(
+                clone $base,
+                $trendFilters
             );
 
-        $growth = $analytics->growthSummary(
-            $monthlyTrend,
-            $growthMonth
-        );
+            $monthlyTrend = $analytics->monthlyTrend(
+                clone $trendQuery,
+                24
+            );
+
+            $growthMonth =
+                $filters['month']
+                ?: (
+                    $filters['to_month']
+                    ?: null
+                );
+
+            $growth = $analytics->growthSummary(
+                $monthlyTrend,
+                $growthMonth
+            );
+        }
+
+        /*
+         * Imported historical revenue analytics.
+         * Read-only report_rows data; no wallet/statement posting.
+         */
+        $importedRevenueAnalytics = [
+            'monthly' =>
+                $isCompactAnalyticsRole
+                    ? []
+                    : $analytics->monthlyTrend(
+                        clone $filtered,
+                        24
+                    ),
+
+            'platforms' =>
+                $analytics->topPlatforms(
+                    clone $filtered,
+                    50
+                ),
+
+            'countries' =>
+                $analytics->topCountries(
+                    clone $filtered,
+                    50
+                ),
+        ];
 
         /*
          * Canonical payable financial analytics.
@@ -825,53 +843,64 @@ class AnalyticsController extends Controller
                 $filters
             );
 
-        $financialData = [
-            'summary' =>
-                $financialAnalytics->summary(
-                    clone $financialStatements,
-                    $filters
-                ),
+        $financialData =
+            $isCompactAnalyticsRole
+                ? [
+                    'summary' => [],
+                    'monthly' => [],
+                    'platforms' => [],
+                    'countries' => [],
+                    'saleTypes' => [],
+                    'currencies' => [],
+                    'cms' => [],
+                ]
+                : [
+                    'summary' =>
+                        $financialAnalytics->summary(
+                            clone $financialStatements,
+                            $filters
+                        ),
 
-            'monthly' =>
-                $financialAnalytics->monthly(
-                    clone $financialStatements,
-                    $filters
-                ),
+                    'monthly' =>
+                        $financialAnalytics->monthly(
+                            clone $financialStatements,
+                            $filters
+                        ),
 
-            'platforms' =>
-                $financialAnalytics->platformBreakdown(
-                    clone $financialStatements,
-                    $filters
-                ),
+                    'platforms' =>
+                        $financialAnalytics->platformBreakdown(
+                            clone $financialStatements,
+                            $filters
+                        ),
 
-            'countries' =>
-                $financialAnalytics->countryBreakdown(
-                    clone $financialStatements,
-                    $filters
-                ),
+                    'countries' =>
+                        $financialAnalytics->countryBreakdown(
+                            clone $financialStatements,
+                            $filters
+                        ),
 
-            'saleTypes' =>
-                $financialAnalytics->saleTypeBreakdown(
-                    clone $financialStatements,
-                    $filters
-                ),
+                    'saleTypes' =>
+                        $financialAnalytics->saleTypeBreakdown(
+                            clone $financialStatements,
+                            $filters
+                        ),
 
-            'currencies' =>
-                $role === 'super_admin'
-                    ? $financialAnalytics->currencyBreakdown(
-                        clone $financialStatements,
-                        $filters
-                    )
-                    : [],
+                    'currencies' =>
+                        $role === 'super_admin'
+                            ? $financialAnalytics->currencyBreakdown(
+                                clone $financialStatements,
+                                $filters
+                            )
+                            : [],
 
-            'cms' =>
-                $role === 'super_admin'
-                    ? $financialAnalytics->cmsBreakdown(
-                        clone $financialStatements,
-                        $filters
-                    )
-                    : [],
-        ];
+                    'cms' =>
+                        $role === 'super_admin'
+                            ? $financialAnalytics->cmsBreakdown(
+                                clone $financialStatements,
+                                $filters
+                            )
+                            : [],
+                ];
 
         return Inertia::render(
             'V2/Analytics/Index',
@@ -883,48 +912,61 @@ class AnalyticsController extends Controller
                 'financialAnalytics' =>
                     $financialData,
 
+                'importedRevenueAnalytics' =>
+                    $importedRevenueAnalytics,
+
                 'hierarchyOptions' =>
                     $hierarchyOptions,
 
                 'filterOptions' => [
                     'months' => $months,
-                    'saleMonths' => $saleMonths,
                     'platforms' => $platforms,
                     'countries' => $countries,
                     'saleTypes' => $saleTypeOptions,
                     'cms' => $cmsOptions,
                 ],
 
-                'summary' => $analytics->summary(
-                    clone $filtered
-                ),
+                'summary' =>
+                    $isCompactAnalyticsRole
+                        ? []
+                        : $analytics->summary(
+                            clone $filtered
+                        ),
 
                 'growth' => $growth,
 
                 'monthlyTrend' => $monthlyTrend,
 
                 'topPlatforms' =>
-                    $analytics->topPlatforms(
-                        clone $filtered,
-                        10
-                    ),
+                    $isCompactAnalyticsRole
+                        ? []
+                        : $analytics->topPlatforms(
+                            clone $filtered,
+                            10
+                        ),
 
                 'topCountries' =>
-                    $analytics->topCountries(
-                        clone $filtered,
-                        10
-                    ),
+                    $isCompactAnalyticsRole
+                        ? []
+                        : $analytics->topCountries(
+                            clone $filtered,
+                            10
+                        ),
 
                 'topTracks' =>
-                    $analytics->topTracks(
-                        clone $filtered,
-                        null
-                    ),
+                    $isCompactAnalyticsRole
+                        ? []
+                        : $analytics->topTracks(
+                            clone $filtered,
+                            null
+                        ),
 
                 'topArtists' =>
-                    $analytics->topArtists(
-                        clone $filtered
-                    ),
+                    $isCompactAnalyticsRole
+                        ? []
+                        : $analytics->topArtists(
+                            clone $filtered
+                        ),
 
                 'topAlbums' =>
                     $role === 'super_admin'
@@ -934,9 +976,11 @@ class AnalyticsController extends Controller
                         : [],
 
                 'topLabels' =>
-                    $analytics->topLabels(
-                        clone $filtered
-                    ),
+                    $isCompactAnalyticsRole
+                        ? []
+                        : $analytics->topLabels(
+                            clone $filtered
+                        ),
 
                 'saleTypes' =>
                     $role === 'super_admin'
@@ -1026,63 +1070,21 @@ class AnalyticsController extends Controller
                         $user
                     );
 
-                $accountRate = 100.0;
+                /*
+                 * FINANCIAL SNAPSHOT POLICY
+                 * =========================
+                 *
+                 * Historical exports must use the exact
+                 * values stored when the report was imported:
+                 *
+                 * collected_revenue = source revenue
+                 * label_rate        = applied rate snapshot
+                 * earnings          = final account earning
+                 *
+                 * Never reapply the account's current rate.
+                 */
 
-                if ($role === 'artist') {
-                    $rate =
-                        DB::table('artists')
-                            ->where(
-                                'user_id',
-                                $user->id
-                            )
-                            ->value(
-                                'revenue_share_percentage'
-                            );
-
-                    if ($rate !== null) {
-                        $accountRate =
-                            (float) $rate;
-                    }
-                } elseif ($role === 'label') {
-                    $rate =
-                        DB::table('labels')
-                            ->where(
-                                'user_id',
-                                $user->id
-                            )
-                            ->orderBy('id')
-                            ->value(
-                                'revenue_share_percentage'
-                            );
-
-                    if ($rate !== null) {
-                        $accountRate =
-                            (float) $rate;
-                    }
-                }
-
-                $accountRate =
-                    max(
-                        0.0,
-                        min(
-                            100.0,
-                            $accountRate
-                        )
-                    );
-
-                $rateHeading =
-                    match ($role) {
-                        'label' =>
-                            'Label Rate',
-
-                        'artist' =>
-                            'Artist Rate',
-
-                        default =>
-                            'Assigned Rate',
-                    };
-
-                fputcsv(
+fputcsv(
                     $handle,
                     [
                         'Sale Month',
@@ -1102,7 +1104,7 @@ class AnalyticsController extends Controller
                         'Streams',
                         'Units',
                         'Collected Revenue',
-                        $rateHeading,
+                        'Applied Rate',
                         'Earning',
                     ]
                 );
@@ -1112,12 +1114,28 @@ class AnalyticsController extends Controller
                     ->chunkById(
                         1000,
                         function ($rows) use (
-                            $handle,
-                            $role,
-                            $accountRate
+                            $handle
                         ) {
                             foreach ($rows as $row) {
                                 $collected =
+                                    round(
+                                        (float) (
+                                            $row->collected_revenue
+                                            ?? 0
+                                        ),
+                                        8
+                                    );
+
+                                $appliedRate =
+                                    round(
+                                        (float) (
+                                            $row->label_rate
+                                            ?? 0
+                                        ),
+                                        8
+                                    );
+
+                                $earning =
                                     round(
                                         (float) (
                                             $row->earnings
@@ -1125,40 +1143,6 @@ class AnalyticsController extends Controller
                                         ),
                                         8
                                     );
-
-                                /*
-                                 * Negative adjustment rule:
-                                 * effective rate is always 100%.
-                                 * Stored account rate is untouched.
-                                 */
-                                $effectiveRate =
-                                    $collected < 0
-                                        ? 100.0
-                                        : $accountRate;
-
-                                $earning =
-                                    $collected < 0
-                                        ? $collected
-                                        : round(
-                                            $collected
-                                            * (
-                                                $effectiveRate
-                                                / 100
-                                            ),
-                                            8
-                                        );
-
-                                /*
-                                 * Admin/Super Admin exports retain
-                                 * source economics at 100%.
-                                 */
-                                if (
-                                    $role === 'admin'
-                                    || $role === 'super_admin'
-                                ) {
-                                    $effectiveRate = 100.0;
-                                    $earning = $collected;
-                                }
 
                                 fputcsv(
                                     $handle,
@@ -1182,7 +1166,7 @@ class AnalyticsController extends Controller
                                         $row->streams,
                                         $row->sale_units,
                                         $collected,
-                                        $effectiveRate,
+                                        $appliedRate,
                                         $earning,
                                     ]
                                 );

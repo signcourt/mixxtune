@@ -49,18 +49,16 @@ class UsernameService
 
         $value = preg_replace(
             '/[^a-z0-9]+/',
-            '-',
+            '',
             $value
         ) ?? '';
-
-        $value = trim($value, '-');
 
         if ($value === '') {
             $value = 'user';
         }
 
         if (strlen($value) < 4) {
-            $value .= '-user';
+            $value .= 'account';
         }
 
         return substr($value, 0, 40);
@@ -81,7 +79,7 @@ class UsernameService
 
         if ($this->isReserved($base)) {
             $base = substr(
-                $base . '-account',
+                $base . 'account',
                 0,
                 40
             );
@@ -97,7 +95,7 @@ class UsernameService
             )
             || $this->isReserved($candidate)
         ) {
-            $suffix = '-' . $counter;
+            $suffix = (string) $counter;
 
             $candidate =
                 substr(
@@ -146,7 +144,7 @@ class UsernameService
     public function validateFormat(string $username): bool
     {
         return preg_match(
-            '/^[a-z0-9](?:[a-z0-9-]{2,38}[a-z0-9])?$/',
+            '/^[a-z0-9]{4,40}$/',
             $username
         ) === 1;
     }

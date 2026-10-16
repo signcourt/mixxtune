@@ -304,50 +304,51 @@ const adminNavigation = (
         },
     ];
 
-    if (role === 'super_admin') {
-        items.push(
-            {
-                id: 'users',
-                label: 'Users',
-                icon: icons.users,
-                href: routes.users,
-                permission: 'users.view',
-            },
-            {
-                id: 'admins',
-                label: 'Admins',
-                icon: icons.permissions,
-                href: routes.admins,
-                permission: 'admins.view',
-            }
-        );
-    }
-
     items.push(
         {
-            id: 'labels',
-            label: 'Labels',
-            icon: icons.labels,
-            href: routes.labels,
-            permission: 'labels.view',
-        },
-        ...(role === 'super_admin'
-            ? [
-                  {
-                      id: 'label-hierarchy',
-                      label: 'Level Management',
-                      icon: icons.labels,
-                      href: routes.labelHierarchy,
-                      permission: 'labels.view',
-                  },
-              ]
-            : []),
-        {
-            id: 'artists',
-            label: 'Artists',
-            icon: icons.artists,
-            href: routes.artists,
-            permission: 'artists.view',
+            id: 'account-management',
+            label: 'Accounts & Access',
+            icon: icons.users,
+            children: [
+                ...(role === 'super_admin'
+                    ? [
+                          {
+                              id: 'account-users',
+                              label: 'Users',
+                              href: routes.users,
+                              permission: 'users.view',
+                          },
+                          {
+                              id: 'account-managers',
+                              label: 'Managers',
+                              href: routes.admins,
+                              permission: 'admins.view',
+                          },
+                      ]
+                    : []),
+                {
+                    id: 'account-labels',
+                    label: 'Labels',
+                    href: routes.labels,
+                    permission: 'labels.view',
+                },
+                ...(role === 'super_admin'
+                    ? [
+                          {
+                              id: 'account-level-management',
+                              label: 'Level Management',
+                              href: routes.labelHierarchy,
+                              permission: 'labels.view',
+                          },
+                      ]
+                    : []),
+                {
+                    id: 'account-artists',
+                    label: 'Artists',
+                    href: routes.artists,
+                    permission: 'artists.view',
+                },
+            ],
         },
         {
             id: 'releases',
@@ -368,25 +369,29 @@ const adminNavigation = (
             permission: 'releases.create',
         },
         {
-            id: 'distribution',
-            label: 'Distribution',
+            id: 'distribution-operations',
+            label: 'Distribution & Stores',
             icon: icons.distribution,
-            href: routes.distribution,
-            permission: 'delivery.view',
-        },
-        {
-            id: 'identifiers',
-            label: 'ISRC & UPC',
-            icon: icons.identifiers,
-            href: routes.identifiers,
-            permission: 'identifiers.view',
-        },
-        {
-            id: 'stores',
-            label: 'DSP Stores',
-            icon: icons.stores,
-            href: routes.stores,
-            permission: 'stores.view',
+            children: [
+                {
+                    id: 'distribution-delivery',
+                    label: 'Distribution',
+                    href: routes.distribution,
+                    permission: 'delivery.view',
+                },
+                {
+                    id: 'distribution-identifiers',
+                    label: 'ISRC & UPC',
+                    href: routes.identifiers,
+                    permission: 'identifiers.view',
+                },
+                {
+                    id: 'distribution-stores',
+                    label: 'DSP Stores',
+                    href: routes.stores,
+                    permission: 'stores.view',
+                },
+            ],
         },
         {
             id: 'catalogue',
@@ -429,119 +434,102 @@ const adminNavigation = (
                               href: routes.catalogue,
                               permission: 'catalogue.view',
                           },
-                          {
-                              id: 'catalogue-ownership',
-                              label: 'Ownership Transfer',
-                              href: '/v2/admin/ownership',
-                              permission: 'catalogue.view',
-                          },
-                          {
-                              id: 'catalogue-transfer-history',
-                              label: 'Transfer History',
-                              href: '/v2/admin/ownership',
-                              permission: 'catalogue.view',
-                          },
-                          {
-                              id: 'catalogue-legacy-import',
-                              label: 'Legacy Import',
-                              href: routes.legacyCatalogueImports,
-                              permission: 'catalogue.view',
-                          },
                       ],
         },
         {
-            id: 'royalties',
-            label: 'Royalties',
-            icon: icons.royalties,
-            href: routes.royalties,
-            permission: 'royalties.view',
-        },
-        {
-            id: 'reports',
-            label: 'Reports',
-            icon: icons.reports,
-            href: routes.reports,
-            permission: 'reports.view',
-        },
-        {
-            id: 'analytics',
-            label: 'Analytics',
-            icon: icons.analytics,
-            href: routes.analytics,
-            permission: 'reports.view',
-        },
-        {
-            id: 'revenue-imports',
-            label: 'Revenue Imports',
-            icon: icons.reports,
-            href: '/v2/admin/reports/imports',
-            permission: 'reports.view',
-        },
-        {
-            id: 'unmapped-revenue',
-            label: 'Unmapped Revenue',
-            icon: icons.reports,
-            href: routes.unmappedRevenue,
-            permission: 'reports.view',
-        },
-        ...(role === 'super_admin'
-            ? [
-                  {
-                      id: 'recoupment-advances',
-                      label: 'Recoupment & Advances',
-                      icon: icons.recoupment,
-                      href: '/super-admin/finance/recoupment',
-                  },
-                  {
-                      id: 'financial-adjustments',
-                      label: 'Adjustments',
-                      icon: icons.wallet,
-                      href: '/super-admin/finance/adjustments',
-                  },
-              ]
-            : []),
-        {
-            id: 'wallet',
-            label: 'Wallet',
+            id: 'financial',
+            label: 'Financial',
             icon: icons.wallet,
-            href: routes.wallet,
-            permission: 'wallet.view',
+            children: [
+                {
+                    id: 'financial-royalties',
+                    label: 'Royalties',
+                    href: routes.royalties,
+                    permission: 'royalties.view',
+                },
+                {
+                    id: 'financial-reports',
+                    label: 'Reports',
+                    href: routes.reports,
+                    permission: 'reports.view',
+                },
+                {
+                    id: 'financial-analytics',
+                    label: 'Analytics',
+                    href: routes.analytics,
+                    permission: 'reports.view',
+                },
+                {
+                    id: 'financial-revenue-imports',
+                    label: 'Revenue Imports',
+                    href: '/v2/admin/reports/imports',
+                    permission: 'reports.view',
+                },
+                {
+                    id: 'financial-unmapped-revenue',
+                    label: 'Unmapped Revenue',
+                    href: routes.unmappedRevenue,
+                    permission: 'reports.view',
+                },
+                {
+                    id: 'financial-wallet',
+                    label: 'Wallet',
+                    href: routes.wallet,
+                    permission: 'wallet.view',
+                },
+                ...(role === 'super_admin'
+                    ? [
+                          {
+                              id: 'financial-recoupment-advances',
+                              label: 'Recoupment & Advances',
+                              href: '/super-admin/finance/recoupment',
+                          },
+                          {
+                              id: 'financial-adjustments',
+                              label: 'Adjustments',
+                              href: '/super-admin/finance/adjustments',
+                          },
+                      ]
+                    : []),
+                {
+                    id: 'financial-withdrawals',
+                    label: 'Withdraw Requests',
+                    href: routes.withdrawals,
+                    permission: 'withdrawals.manage',
+                },
+            ],
         },
         {
-            id: 'withdrawals',
-            label: 'Withdraw Requests',
-            icon: icons.withdrawals,
-            href: routes.withdrawals,
-            permission: 'withdrawals.manage',
-        },
-        {
-            id: 'kyc-reviews',
-            label: 'KYC Reviews',
-            icon: icons.kyc,
-            href: routes.kycReviews,
-            permission: 'withdrawals.manage',
-        },
-        {
-            id: 'support',
-            label: 'Support Tickets',
-            icon: icons.support,
-            href: routes.support,
-            permission: 'support.manage',
-        },
-        {
-            id: 'notifications',
-            label: 'Notifications',
-            icon: icons.notifications,
-            href: routes.notifications,
-            badgeKey: 'notifications',
-        },
-        {
-            id: 'settings',
-            label: 'Settings',
+            id: 'administration',
+            label: 'Administration',
             icon: icons.settings,
-            href: routes.settings,
-            permission: 'settings.view',
-        }
+            children: [
+                {
+                    id: 'administration-kyc',
+                    label: 'KYC Reviews',
+                    href: routes.kycReviews,
+                    permission: 'withdrawals.manage',
+                },
+                {
+                    id: 'administration-support',
+                    label: 'Support Tickets',
+                    href: routes.support,
+                    permission: 'support.manage',
+                },
+                {
+                    id: 'administration-notifications',
+                    label: 'Notifications',
+                    href: routes.notifications,
+                    badgeKey: 'notifications',
+                },
+                {
+                    id: 'administration-settings',
+                    label: 'Settings',
+                    href: routes.settings,
+                    permission: 'settings.view',
+                },
+            ],
+        },
     );
 
     return items;

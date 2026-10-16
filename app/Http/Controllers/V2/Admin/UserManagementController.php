@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\V2\Admin;
 
+use App\Services\V2\ReportEarningsRecalculationService;
 use App\Http\Controllers\Controller;
 use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\System\UserPanelPermission;
 use App\Models\User;
 use App\Services\V2\ClientIdService;
+use App\Services\V2\LabelIdentityService;
 use App\Services\V2\AuditLogService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\UserInvitationService;
@@ -26,6 +28,14 @@ class UserManagementController extends Controller
         Request $request,
         PermissionService $permissions
     ): Response {
+
+        /*
+         * MIXXTUNE_QUICK_EDIT_INDEX_CONFIG_V1
+         *
+         * users.quick_edit_fields is included with the normal User model
+         * payload and cast to an array by the User model.
+         */
+
         $this->authorizeSuperAdmin(
             $request,
             $permissions
@@ -52,10 +62,178 @@ class UserManagementController extends Controller
             )
         );
 
+        // MIXXTUNE_USER_STATS_INVITATION_FILTER_V1
+        $invitationFilter = trim(
+            (string) $request->input(
+                'invitation',
+                ''
+            )
+        );
+
         $query = User::query()
             ->with([
                 'assignedArtists:id,stage_name',
-                'assignedLabels:id,name',
+
+                'assignedLabels' => function ($query) {
+                    $query
+                        ->select([
+                            'labels.id',
+                            'labels.name',
+                            'labels.user_id',
+                            'labels.parent_label_id',
+                            'labels.revenue_share_percentage',
+                            'labels.status',
+                            'labels.can_withdraw',
+                        ]);
+                },
+            ])
+
+            // MIXXTUNE_QUICK_EDIT_INDEX_HYDRATION_V1
+            ->addSelect([
+                'quick_edit_permissions' =>
+                    UserPanelPermission::query()
+                        ->select(
+                            DB::raw(
+                                "JSON_OBJECT(
+                                    'can_view_catalogue', can_view_catalogue,
+                                    'can_create_releases', can_create_releases,
+                                    'can_manage_releases', can_manage_releases,
+                                    'can_view_reports', can_view_reports,
+                                    'can_view_royalties', can_view_royalties,
+                                    'can_manage_wallet', can_manage_wallet,
+                                    'can_manage_withdrawals', can_manage_withdrawals,
+                                    'can_manage_users', can_manage_users,
+                                    'can_manage_support', can_manage_support,
+                                    'can_manage_settings', can_manage_settings,
+                                    'can_manage_delivery', can_manage_delivery,
+                                    'can_manage_identifiers', can_manage_identifiers
+                                )"
+                            )
+                        )
+                        ->whereColumn(
+                            'user_panel_permissions.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'address_line_1' =>
+                    DB::table('payout_profiles')
+                        ->select('address_line_1')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'address_line_2' =>
+                    DB::table('payout_profiles')
+                        ->select('address_line_2')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'city' =>
+                    DB::table('payout_profiles')
+                        ->select('city')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'state' =>
+                    DB::table('payout_profiles')
+                        ->select('state')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'postal_code' =>
+                    DB::table('payout_profiles')
+                        ->select('postal_code')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'country_code' =>
+                    DB::table('payout_profiles')
+                        ->select('country_code')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                /*
+                 * Sensitive encrypted values intentionally excluded:
+                 * - pan_number
+                 * - bank_account_number
+                 */
+
+                'gst_number' =>
+                    DB::table('payout_profiles')
+                        ->select('gst_number')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'account_holder_name' =>
+                    DB::table('payout_profiles')
+                        ->select('account_holder_name')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'bank_name' =>
+                    DB::table('payout_profiles')
+                        ->select('bank_name')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'ifsc_code' =>
+                    DB::table('payout_profiles')
+                        ->select('ifsc_code')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'branch_name' =>
+                    DB::table('payout_profiles')
+                        ->select('branch_name')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+
+                'upi_id' =>
+                    DB::table('payout_profiles')
+                        ->select('upi_id')
+                        ->whereColumn(
+                            'payout_profiles.user_id',
+                            'users.id'
+                        )
+                        ->limit(1),
+            ])
+            ->addSelect([
+                'owned_labels_count' => Label::query()
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('labels.user_id', 'users.id'),
             ]);
 
         if ($search !== '') {
@@ -64,6 +242,11 @@ class UserManagementController extends Controller
                     $builder
                         ->where(
                             'name',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'username',
                             'like',
                             "%{$search}%"
                         )
@@ -97,6 +280,19 @@ class UserManagementController extends Controller
             $query->where(
                 'account_status',
                 $status
+            );
+        }
+
+        if ($invitationFilter === 'pending') {
+            $query->whereIn(
+                'invitation_status',
+                [
+                    'pending',
+                    'sent',
+                    'password_pending',
+                    'failed',
+                    'expired',
+                ]
             );
         }
 
@@ -167,11 +363,117 @@ class UserManagementController extends Controller
                 'summary' =>
                     $summary,
 
+                'searchSuggestions' =>
+                    User::query()
+                        ->select([
+                            'id',
+                            'name',
+                            'username',
+                            'email',
+                            'phone',
+                            'label_name',
+                            'role',
+                        ])
+                        ->orderBy('name')
+                        ->limit(500)
+                        ->get(),
+
                 'filters' => [
                     'search' => $search,
                     'role' => $roleFilter,
                     'status' => $status,
+                    'invitation' => $invitationFilter,
                 ],
+
+                /*
+                 * MIXXTUNE_USER_QUICK_EDIT_PAYLOAD_V1
+                 */
+                'quickEditManagers' =>
+                    User::query()
+                        ->where('role', 'admin')
+                        ->where(
+                            'account_status',
+                            'active'
+                        )
+                        ->orderBy('name')
+                        ->get([
+                            'id',
+                            'name',
+                            'username',
+                            'email',
+                        ]),
+
+                /*
+                 * MIXXTUNE_QUICK_AVAILABLE_LABELS_V1
+                 *
+                 * Existing labels eligible for Quick Add.
+                 * Do not expose labels owned by another account.
+                 */
+                // MIXXTUNE_QUICK_EDIT_AVAILABLE_ARTISTS_V1
+                'quickEditAvailableArtists' =>
+                    Artist::query()
+                        ->whereNull('deleted_at')
+                        ->orderBy('stage_name')
+                        ->get([
+                            'id',
+                            'stage_name',
+                            'user_id',
+                            'label_id',
+                        ]),
+
+                'quickEditAvailableLabels' =>
+                    Label::query()
+                        ->whereNull('deleted_at')
+                        ->whereNull('user_id')
+                        ->where('status', 'active')
+                        ->orderBy('name')
+                        ->get([
+                            'id',
+                            'name',
+                            'parent_label_id',
+                            'revenue_share_percentage',
+                        ]),
+
+                'quickEditMasterLabels' =>
+                    Label::query()
+                        ->whereNull('deleted_at')
+                        ->whereNull('parent_label_id')
+                        ->where('status', 'active')
+                        ->orderBy('name')
+                        ->get([
+                            'id',
+                            'name',
+                            'user_id',
+                            'revenue_share_percentage',
+                        ]),
+
+                'quickEditLabelManagers' =>
+                    \Illuminate\Support\Facades\DB::table(
+                        'admin_label_assignments as ala'
+                    )
+                        ->join(
+                            'users as manager_users',
+                            'manager_users.id',
+                            '=',
+                            'ala.user_id'
+                        )
+                        ->where(
+                            'ala.assignment_role',
+                            'manager'
+                        )
+                        ->where(
+                            'manager_users.role',
+                            'admin'
+                        )
+                        ->where(
+                            'manager_users.account_status',
+                            'active'
+                        )
+                        ->get([
+                            'ala.label_id',
+                            'ala.user_id as manager_id',
+                            'manager_users.name as manager_name',
+                        ]),
 
                 'users' =>
                     $query
@@ -270,12 +572,6 @@ class UserManagementController extends Controller
                 'required',
                 'string',
                 'in:admin,label,artist',
-            ],
-
-            'account_status' => [
-                'required',
-                'string',
-                'in:active,pending,suspended',
             ],
 
             'revenue_share_percentage' => [
@@ -456,24 +752,12 @@ class UserManagementController extends Controller
             }
 
             /*
-             * A Label login represents exactly one financial
-             * label identity. Admin users may still manage
-             * multiple labels through manager assignments.
+             * FF380-D:
+             * A Label login may own multiple independent canonical labels.
+             *
+             * At least one existing/new label is required, but multiple
+             * labels are valid. Each label keeps its own revenue rate.
              */
-            $requestedLabelCount =
-                count($existingLabelIds)
-                + $newLabelNames->count();
-
-            if ($requestedLabelCount !== 1) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'label_ids' => [
-                        'A Label account must be linked to exactly one label.',
-                    ],
-                    'new_labels' => [
-                        'Select one existing label OR add one new label, not multiple labels.',
-                    ],
-                ]);
-            }
 
             $duplicateNames =
                 $newLabelNames
@@ -547,7 +831,7 @@ class UserManagementController extends Controller
         ) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'username' =>
-                    'Username may contain lowercase letters, numbers and hyphens only.',
+                    'Username may contain lowercase letters and numbers only.',
             ]);
         }
 
@@ -630,10 +914,14 @@ class UserManagementController extends Controller
                     'role' =>
                         $validated['role'],
 
+                    /*
+                     * Account activation is system-controlled.
+                     * A newly created account remains pending
+                     * until the invitation is accepted and the
+                     * user sets their password.
+                     */
                     'account_status' =>
-                        $validated[
-                            'account_status'
-                        ],
+                        'pending',
 
                     'password' =>
                         Hash::make(
@@ -889,9 +1177,7 @@ class UserManagementController extends Controller
                             ],
 
                         'account_status' =>
-                            $validated[
-                                'account_status'
-                            ],
+                            'pending',
 
                         'kyc_status' =>
                             'pending',
@@ -1031,16 +1317,10 @@ class UserManagementController extends Controller
                         as $labelName
                     ) {
                         $existingLabel =
-                            Label::query()
-                                ->whereRaw(
-                                    'LOWER(name) = ?',
-                                    [
-                                        mb_strtolower(
-                                            $labelName
-                                        ),
-                                    ]
-                                )
-                                ->first();
+                            app(LabelIdentityService::class)
+                                ->representative(
+                                    $labelName
+                                );
 
                         if (
                             $existingLabel
@@ -1351,6 +1631,22 @@ class UserManagementController extends Controller
             $permissions
         );
 
+        abort_unless(
+            in_array(
+                $user->role,
+                ['admin', 'label', 'artist'],
+                true
+            ),
+            422,
+            'This user cannot receive an invitation.'
+        );
+
+        abort_unless(
+            $user->invitation_status !== 'accepted',
+            422,
+            'This invitation has already been accepted.'
+        );
+
         try {
             app(
                 UserInvitationService::class
@@ -1372,7 +1668,7 @@ class UserManagementController extends Controller
             [],
             [
                 'invitation_status' =>
-                    'pending',
+                    $user->fresh()->invitation_status,
             ],
             $user,
             $request
@@ -1440,8 +1736,45 @@ return Inertia::render(
             [
                 'role' => 'super_admin',
 
+                'ownedLabels' =>
+                    Label::query()
+                        ->where(
+                            'user_id',
+                            $user->id
+                        )
+                        ->whereNull('deleted_at')
+                        ->where('status', 'active')
+                        ->orderBy('id')
+                        ->get([
+                            'id',
+                            'name',
+                            'revenue_share_percentage',
+                        ])
+                        ->map(
+                            fn (Label $label) => [
+                                'id' =>
+                                    (int) $label->id,
+
+                                'name' =>
+                                    $label->name,
+
+                                'revenue_share_percentage' =>
+                                    $label->revenue_share_percentage !== null
+                                        ? (float) $label->revenue_share_percentage
+                                        : null,
+                            ]
+                        )
+                        ->values(),
+
                 'managedUser' => [
                     'id' => $user->id,
+
+                    /*
+                     * MIXXTUNE_QUICK_EDIT_FIELD_CONFIG_PAYLOAD_V1
+                     */
+                    'quick_edit_fields' =>
+                        $user->quick_edit_fields,
+
                     'name' => $user->name,
                     'username' => $user->username,
                     'client_id' => $user->client_id,
@@ -1578,6 +1911,1264 @@ return Inertia::render(
         );
     }
 
+    /**
+     * MIXXTUNE_USER_QUICK_EDIT_V1
+     *
+     * Compact User Management action.
+     *
+     * This endpoint intentionally updates only fields exposed
+     * by the Quick Edit modal. It does not replace the full
+     * User Edit workflow.
+     */
+    /*
+     * MIXXTUNE_QUICK_LABEL_OPERATION_V2
+     *
+     * Quick Edit label operation:
+     * 1. Add existing unowned label
+     * 2. Create/reuse canonical label
+     *
+     * Never transfers ownership from another account.
+     */
+    public function quickLabel(
+        Request $request,
+        User $user,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $this->authorizeSuperAdmin(
+            $request,
+            $permissions
+        );
+
+        if ($user->role !== 'label') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'label' => [
+                    'Labels can only be added to a Label account.',
+                ],
+            ]);
+        }
+
+        $validated = $request->validate([
+            'mode' => [
+                'required',
+                'string',
+                'in:existing,create',
+            ],
+
+            'label_id' => [
+                'nullable',
+                'integer',
+                'exists:labels,id',
+            ],
+
+            'name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'revenue_share_percentage' => [
+                'required',
+                'numeric',
+                'min:0',
+                'max:100',
+            ],
+        ]);
+
+        if (
+            $validated['mode'] === 'existing'
+            && empty($validated['label_id'])
+        ) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'label_id' => [
+                    'Please select an existing label.',
+                ],
+            ]);
+        }
+
+        if (
+            $validated['mode'] === 'create'
+            && trim(
+                (string) ($validated['name'] ?? '')
+            ) === ''
+        ) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'name' => [
+                    'Label name is required.',
+                ],
+            ]);
+        }
+
+        DB::transaction(
+            function () use (
+                $validated,
+                $request,
+                $user
+            ): void {
+                $actorId =
+                    (int) $request->user()->id;
+
+                $rate =
+                    (float) $validated[
+                        'revenue_share_percentage'
+                    ];
+
+                if (
+                    $validated['mode']
+                    === 'existing'
+                ) {
+                    $label =
+                        Label::query()
+                            ->whereNull(
+                                'deleted_at'
+                            )
+                            ->lockForUpdate()
+                            ->findOrFail(
+                                (int) $validated[
+                                    'label_id'
+                                ]
+                            );
+
+                    if (
+                        $label->user_id
+                        && (int) $label->user_id
+                            !== (int) $user->id
+                    ) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'label_id' => [
+                                "Label '{$label->name}' already belongs to another Label account.",
+                            ],
+                        ]);
+                    }
+                } else {
+                    $labelName =
+                        trim(
+                            (string)
+                            $validated['name']
+                        );
+
+                    /*
+                     * Reuse canonical identity.
+                     * Prevent creation of another
+                     * normalized duplicate.
+                     */
+                    $label =
+                        app(
+                            LabelIdentityService::class
+                        )->representative(
+                            $labelName
+                        );
+
+                    if (
+                        $label
+                        && $label->user_id
+                        && (int) $label->user_id
+                            !== (int) $user->id
+                    ) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'name' => [
+                                "Label '{$labelName}' already belongs to another Label account.",
+                            ],
+                        ]);
+                    }
+
+                    if (! $label) {
+                        $slugBase =
+                            Str::slug(
+                                $labelName
+                            );
+
+                        if ($slugBase === '') {
+                            $slugBase = 'label';
+                        }
+
+                        $slug =
+                            $slugBase
+                            .'-'
+                            .$user->id;
+
+                        while (
+                            Label::withTrashed()
+                                ->where(
+                                    'slug',
+                                    $slug
+                                )
+                                ->exists()
+                        ) {
+                            $slug =
+                                $slugBase
+                                .'-'
+                                .$user->id
+                                .'-'
+                                .Str::lower(
+                                    Str::random(5)
+                                );
+                        }
+
+                        do {
+                            $publicId =
+                                'LBL-'
+                                .Str::upper(
+                                    Str::random(12)
+                                );
+                        } while (
+                            Label::withTrashed()
+                                ->where(
+                                    'public_id',
+                                    $publicId
+                                )
+                                ->exists()
+                        );
+
+                        $label =
+                            Label::create([
+                                'user_id' =>
+                                    $user->id,
+
+                                'parent_label_id' =>
+                                    null,
+
+                                'label_type' =>
+                                    'label',
+
+                                'public_id' =>
+                                    $publicId,
+
+                                'name' =>
+                                    $labelName,
+
+                                'legal_name' =>
+                                    $labelName,
+
+                                'slug' =>
+                                    $slug,
+
+                                'email' =>
+                                    strtolower(
+                                        trim(
+                                            (string)
+                                            $user->email
+                                        )
+                                    ),
+
+                                'phone' =>
+                                    $user->phone
+                                    ?? null,
+
+                                'country' =>
+                                    $user->country
+                                    ?? 'India',
+
+                                'timezone' =>
+                                    'Asia/Kolkata',
+
+                                'currency' =>
+                                    'INR',
+
+                                'revenue_share_percentage' =>
+                                    $rate,
+
+                                'status' =>
+                                    'active',
+
+                                'created_by' =>
+                                    $actorId,
+
+                                'updated_by' =>
+                                    $actorId,
+                            ]);
+                    }
+                }
+
+                /*
+                 * Final ownership guard.
+                 */
+                if (
+                    $label->user_id
+                    && (int) $label->user_id
+                        !== (int) $user->id
+                ) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'label_id' => [
+                            "Label '{$label->name}' already belongs to another Label account.",
+                        ],
+                    ]);
+                }
+
+                $oldRate =
+                    $label
+                        ->revenue_share_percentage;
+
+                $label->forceFill([
+                    'user_id' =>
+                        $user->id,
+
+                    'revenue_share_percentage' =>
+                        $rate,
+
+                    'updated_by' =>
+                        $actorId,
+                ])->save();
+
+                /*
+                 * Add owner pivot WITHOUT detaching
+                 * the account's other labels.
+                 */
+                $user
+                    ->assignedLabels()
+                    ->syncWithoutDetaching([
+                        (int) $label->id => [
+                            'assignment_role' =>
+                                'owner',
+
+                            'can_view' =>
+                                true,
+
+                            'can_edit' =>
+                                true,
+
+                            'can_manage_releases' =>
+                                true,
+
+                            'can_manage_team' =>
+                                false,
+
+                            'can_manage_splits' =>
+                                false,
+
+                            'assigned_by' =>
+                                $actorId,
+                        ],
+                    ]);
+
+                if (
+                    $oldRate === null
+                    || (float) $oldRate
+                        !== $rate
+                ) {
+                    app(
+                        ReportEarningsRecalculationService::class
+                    )->recalculateForLabel(
+                        $label
+                    );
+                }
+            }
+        );
+
+        return back()->with(
+            'success',
+            $validated['mode'] === 'existing'
+                ? 'Label added successfully.'
+                : 'Label created and added successfully.'
+        );
+    }
+
+
+    
+    /**
+     * MIXXTUNE_QUICK_EDIT_FIELD_CONFIG_SAVE_V1
+     *
+     * Controls which Full Edit fields are exposed in Quick Edit.
+     * This changes presentation only; it does not change the field value.
+     */
+    public function updateQuickEditFields(
+        Request $request,
+        User $user,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $this->authorizeSuperAdmin(
+            $request,
+            $permissions
+        );
+
+        $allowed = [
+            'name',
+            'username',
+            'client_id',
+            'email',
+            'phone',
+            'country',
+            'role',
+            'revenue_share_percentage',
+            'label_revenue_rates',
+            'account_status',
+            'kyc_status',
+
+            'address_line_1',
+            'address_line_2',
+            'city',
+            'state',
+            'postal_code',
+            'country_code',
+
+            'pan_number',
+            'gst_number',
+
+            'account_holder_name',
+            'bank_account_number',
+            'bank_name',
+            'ifsc_code',
+            'branch_name',
+            'upi_id',
+
+            'artist_ids',
+            'label_ids',
+            'new_labels',
+            'permissions',
+        ];
+
+        $validated = $request->validate([
+            'fields' => [
+                'present',
+                'array',
+            ],
+            'fields.*' => [
+                'string',
+                \Illuminate\Validation\Rule::in($allowed),
+            ],
+        ]);
+
+        $fields = collect(
+            $validated['fields'] ?? []
+        )
+            ->map(
+                fn ($field) =>
+                    trim((string) $field)
+            )
+            ->filter(
+                fn ($field) =>
+                    in_array(
+                        $field,
+                        $allowed,
+                        true
+                    )
+            )
+            ->unique()
+            ->values()
+            ->all();
+
+        $user->forceFill([
+            'quick_edit_fields' => $fields,
+        ])->save();
+
+        return back()->with(
+            'success',
+            'Quick Edit fields updated.'
+        );
+    }
+
+
+public function quickUpdate(
+        Request $request,
+        User $user,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $this->authorizeSuperAdmin(
+            $request,
+            $permissions
+        );
+
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:150',
+            ],
+
+            'email' => [
+                'required',
+                'email',
+                'max:190',
+                Rule::unique(
+                    'users',
+                    'email'
+                )->ignore($user->id),
+            ],
+
+            'account_status' => [
+                'required',
+                'string',
+                'in:active,pending,suspended',
+            ],
+
+            // MIXXTUNE_QUICK_EDIT_ACCOUNT_FIELDS_V1
+            'phone' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
+
+            'country' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'role' => [
+                'nullable',
+                'string',
+                'in:admin,label,artist',
+            ],
+
+            'kyc_status' => [
+                'nullable',
+                'string',
+                'in:pending,verified,rejected',
+            ],
+
+            // MIXXTUNE_QUICK_EDIT_PAYOUT_VALIDATION_V1
+            'address_line_1' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'address_line_2' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'city' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'state' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'postal_code' => [
+                'nullable',
+                'string',
+                'max:30',
+            ],
+
+            'country_code' => [
+                'nullable',
+                'string',
+                'max:10',
+            ],
+
+            'pan_number' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
+
+            'gst_number' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
+
+            'account_holder_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'bank_account_number' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'bank_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'ifsc_code' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
+
+            'branch_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'upi_id' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            // MIXXTUNE_QUICK_EDIT_ASSIGNMENT_VALIDATION_V1
+            'artist_ids' => [
+                'sometimes',
+                'array',
+            ],
+
+            'artist_ids.*' => [
+                'integer',
+                Rule::exists(
+                    'artists',
+                    'id'
+                ),
+            ],
+
+            'label_ids' => [
+                'sometimes',
+                'array',
+            ],
+
+            'label_ids.*' => [
+                'integer',
+                Rule::exists(
+                    'labels',
+                    'id'
+                ),
+            ],
+
+            // MIXXTUNE_QUICK_EDIT_PERMISSION_VALIDATION_V1
+            'permissions' => [
+                'sometimes',
+                'array',
+            ],
+
+            'permissions.*' => [
+                'boolean',
+            ],
+
+            'labels' => [
+                'nullable',
+                'array',
+            ],
+
+            'labels.*.id' => [
+                'required',
+                'integer',
+                'exists:labels,id',
+            ],
+
+            'labels.*.name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'labels.*.parent_label_id' => [
+                'nullable',
+                'integer',
+                'exists:labels,id',
+            ],
+
+            'labels.*.revenue_share_percentage' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:100',
+            ],
+
+            'labels.*.manager_id' => [
+                'nullable',
+                'integer',
+                'exists:users,id',
+            ],
+
+            'labels.*.status' => [
+                'required',
+                'string',
+                'in:active,inactive',
+            ],
+
+            'labels.*.can_withdraw' => [
+                'required',
+                'boolean',
+            ],
+        ]);
+
+        DB::transaction(
+            function () use (
+                $validated,
+                $request,
+                $user
+            ): void {
+                $user->forceFill([
+                    'name' =>
+                        trim($validated['name']),
+
+                    'email' =>
+                        strtolower(
+                            trim($validated['email'])
+                        ),
+
+                    'account_status' =>
+                        $validated['account_status'],
+
+                    'phone' =>
+                        array_key_exists(
+                            'phone',
+                            $validated
+                        )
+                            ? $validated['phone']
+                            : $user->phone,
+
+                    'country' =>
+                        array_key_exists(
+                            'country',
+                            $validated
+                        )
+                            ? $validated['country']
+                            : $user->country,
+
+                    'role' =>
+                        array_key_exists(
+                            'role',
+                            $validated
+                        )
+                            ? $validated['role']
+                            : $user->role,
+
+                    'kyc_status' =>
+                        array_key_exists(
+                            'kyc_status',
+                            $validated
+                        )
+                            ? $validated['kyc_status']
+                            : $user->kyc_status,
+                ])->save();
+
+                // MIXXTUNE_QUICK_EDIT_PAYOUT_SAVE_V1
+                $payoutKeys = [
+                    'address_line_1',
+                    'address_line_2',
+                    'city',
+                    'state',
+                    'postal_code',
+                    'country_code',
+                    'pan_number',
+                    'gst_number',
+                    'account_holder_name',
+                    'bank_account_number',
+                    'bank_name',
+                    'ifsc_code',
+                    'branch_name',
+                    'upi_id',
+                ];
+
+                $payoutData = [];
+
+                foreach ($payoutKeys as $key) {
+                    if (
+                        array_key_exists(
+                            $key,
+                            $validated
+                        )
+                    ) {
+                        $value =
+                            $validated[$key];
+
+                        $payoutData[$key] =
+                            is_string($value)
+                                ? trim($value)
+                                : $value;
+                    }
+                }
+
+                $existingPayout =
+                    \App\Models\Finance\PayoutProfile::query()
+                        ->where(
+                            'user_id',
+                            $user->id
+                        )
+                        ->first();
+
+                /*
+                 * Blank sensitive values mean:
+                 * preserve existing encrypted value.
+                 */
+                if (
+                    empty(
+                        $payoutData[
+                            'bank_account_number'
+                        ] ?? null
+                    )
+                ) {
+                    unset(
+                        $payoutData[
+                            'bank_account_number'
+                        ]
+                    );
+                }
+
+                if (
+                    empty(
+                        $payoutData[
+                            'pan_number'
+                        ] ?? null
+                    )
+                ) {
+                    unset(
+                        $payoutData[
+                            'pan_number'
+                        ]
+                    );
+                }
+
+                if (
+                    isset(
+                        $payoutData[
+                            'country_code'
+                        ]
+                    )
+                    && $payoutData[
+                        'country_code'
+                    ] !== ''
+                ) {
+                    $payoutData[
+                        'country_code'
+                    ] =
+                        strtoupper(
+                            $payoutData[
+                                'country_code'
+                            ]
+                        );
+                }
+
+                if (
+                    isset(
+                        $payoutData[
+                            'ifsc_code'
+                        ]
+                    )
+                    && $payoutData[
+                        'ifsc_code'
+                    ] !== ''
+                ) {
+                    $payoutData[
+                        'ifsc_code'
+                    ] =
+                        strtoupper(
+                            $payoutData[
+                                'ifsc_code'
+                            ]
+                        );
+                }
+
+                if (
+                    isset(
+                        $payoutData[
+                            'pan_number'
+                        ]
+                    )
+                ) {
+                    $payoutData[
+                        'pan_number'
+                    ] =
+                        strtoupper(
+                            $payoutData[
+                                'pan_number'
+                            ]
+                        );
+                }
+
+                /*
+                 * Never fabricate an empty payout profile.
+                 */
+                $hasPayoutData =
+                    collect($payoutData)
+                        ->contains(
+                            fn ($value) =>
+                                $value !== null
+                                && $value !== ''
+                        );
+
+                if (
+                    $existingPayout
+                    || $hasPayoutData
+                ) {
+                    /*
+                     * payout_profiles.country_code is NOT NULL.
+                     */
+                    if (
+                        empty(
+                            $payoutData[
+                                'country_code'
+                            ] ?? null
+                        )
+                    ) {
+                        $payoutData[
+                            'country_code'
+                        ] =
+                            $existingPayout?->country_code
+                            ?: 'IN';
+                    }
+
+                    \App\Models\Finance\PayoutProfile::query()
+                        ->updateOrCreate(
+                            [
+                                'user_id' =>
+                                    $user->id,
+                            ],
+                            [
+                                'public_id' =>
+                                    $existingPayout?->public_id
+                                    ?: (string)
+                                        \Illuminate\Support\Str::ulid(),
+
+                                ...$payoutData,
+                            ]
+                        );
+                }
+
+                // MIXXTUNE_QUICK_EDIT_PERMISSION_SAVE_V1
+                if (
+                    array_key_exists(
+                        'permissions',
+                        $validated
+                    )
+                ) {
+                    $permissionData = [];
+
+                    foreach (
+                        $this->permissionFields()
+                        as $permissionField
+                    ) {
+                        $permissionData[
+                            $permissionField
+                        ] = (bool) (
+                            $validated[
+                                'permissions'
+                            ][
+                                $permissionField
+                            ] ?? false
+                        );
+                    }
+
+                    $permissionData[
+                        'updated_by'
+                    ] = $request->user()->id;
+
+                    UserPanelPermission::query()
+                        ->updateOrCreate(
+                            [
+                                'user_id' =>
+                                    $user->id,
+                            ],
+                            $permissionData
+                        );
+                }
+
+                // MIXXTUNE_QUICK_EDIT_ASSIGNMENT_SAVE_V1
+                if ($user->role === 'admin') {
+                    $assignmentPivot = [
+                        'assignment_role' =>
+                            'manager',
+
+                        'can_view' =>
+                            true,
+
+                        'can_edit' =>
+                            true,
+
+                        'can_manage_releases' =>
+                            true,
+
+                        'can_manage_team' =>
+                            false,
+
+                        'can_manage_splits' =>
+                            false,
+
+                        'assigned_by' =>
+                            $request->user()->id,
+                    ];
+
+                    /*
+                     * Only sync a relation when that field
+                     * was actually submitted by Quick Edit.
+                     *
+                     * This preserves hidden/disabled fields.
+                     */
+                    if (
+                        array_key_exists(
+                            'artist_ids',
+                            $validated
+                        )
+                    ) {
+                        $artistSync = [];
+
+                        foreach (
+                            $validated['artist_ids']
+                            as $artistId
+                        ) {
+                            $artistSync[
+                                (int) $artistId
+                            ] = $assignmentPivot;
+                        }
+
+                        $user
+                            ->assignedArtists()
+                            ->sync(
+                                $artistSync
+                            );
+                    }
+
+                    if (
+                        array_key_exists(
+                            'label_ids',
+                            $validated
+                        )
+                    ) {
+                        $labelSync = [];
+
+                        foreach (
+                            $validated['label_ids']
+                            as $labelId
+                        ) {
+                            $labelSync[
+                                (int) $labelId
+                            ] = $assignmentPivot;
+                        }
+
+                        $user
+                            ->assignedLabels()
+                            ->sync(
+                                $labelSync
+                            );
+                    }
+                }
+
+                foreach (
+                    $validated['labels'] ?? []
+                    as $labelData
+                ) {
+                    $label = Label::query()
+                        ->whereNull('deleted_at')
+                        ->where(
+                            'user_id',
+                            $user->id
+                        )
+                        ->lockForUpdate()
+                        ->findOrFail(
+                            (int) $labelData['id']
+                        );
+
+                    $newName = trim(
+                        $labelData['name']
+                    );
+
+                    /*
+                     * Prevent another active canonical label
+                     * with the same normalized name.
+                     */
+                    $normalizedName =
+                        mb_strtolower(
+                            preg_replace(
+                                '/[^a-z0-9]+/i',
+                                '',
+                                $newName
+                            )
+                        );
+
+                    $duplicate = Label::query()
+                        ->whereNull('deleted_at')
+                        ->where(
+                            'id',
+                            '<>',
+                            $label->id
+                        )
+                        ->get([
+                            'id',
+                            'name',
+                        ])
+                        ->first(
+                            function ($candidate) use (
+                                $normalizedName
+                            ) {
+                                return mb_strtolower(
+                                    preg_replace(
+                                        '/[^a-z0-9]+/i',
+                                        '',
+                                        trim(
+                                            (string)
+                                            $candidate->name
+                                        )
+                                    )
+                                ) === $normalizedName;
+                            }
+                        );
+
+                    if ($duplicate) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'labels' => [
+                                "Label '{$newName}' already exists as label #{$duplicate->id}.",
+                            ],
+                        ]);
+                    }
+
+                    $parentId =
+                        $labelData[
+                            'parent_label_id'
+                        ] ?? null;
+
+                    if ($parentId !== null) {
+                        $parentId =
+                            (int) $parentId;
+
+                        abort_if(
+                            $parentId ===
+                                (int) $label->id,
+                            422,
+                            'A label cannot be its own parent.'
+                        );
+
+                        $parent = Label::query()
+                            ->whereNull(
+                                'deleted_at'
+                            )
+                            ->where(
+                                'status',
+                                'active'
+                            )
+                            ->findOrFail(
+                                $parentId
+                            );
+
+                        abort_if(
+                            $parent->parent_label_id
+                                !== null,
+                            422,
+                            'Only a Master Label can be selected as parent.'
+                        );
+                    }
+
+                    $oldRate =
+                        $label
+                            ->revenue_share_percentage;
+
+                    $newRate =
+                        $labelData[
+                            'revenue_share_percentage'
+                        ] ?? null;
+
+                    $label->forceFill([
+                        'name' => $newName,
+
+                        'parent_label_id' =>
+                            $parentId,
+
+                        'revenue_share_percentage' =>
+                            $newRate === null
+                                || $newRate === ''
+                                ? null
+                                : (float) $newRate,
+
+                        'status' =>
+                            $labelData['status'],
+
+                        'can_withdraw' =>
+                            (bool) $labelData[
+                                'can_withdraw'
+                            ],
+
+                        'updated_by' =>
+                            $request->user()->id,
+                    ])->save();
+
+                    if (
+                        $newRate !== null
+                        && $newRate !== ''
+                        && (
+                            $oldRate === null
+                            || (float) $oldRate
+                                !== (float) $newRate
+                        )
+                    ) {
+                        app(
+                            ReportEarningsRecalculationService::class
+                        )->recalculateForLabel(
+                            $label
+                        );
+                    }
+
+                    /*
+                     * Manager assignment:
+                     * schema uses user_id, not admin_id.
+                     */
+                    DB::table(
+                        'admin_label_assignments'
+                    )
+                        ->where(
+                            'label_id',
+                            $label->id
+                        )
+                        ->where(
+                            'assignment_role',
+                            'manager'
+                        )
+                        ->delete();
+
+                    $managerId =
+                        $labelData[
+                            'manager_id'
+                        ] ?? null;
+
+                    if ($managerId) {
+                        $manager = User::query()
+                            ->whereKey(
+                                (int) $managerId
+                            )
+                            ->where(
+                                'role',
+                                'admin'
+                            )
+                            ->where(
+                                'account_status',
+                                'active'
+                            )
+                            ->firstOrFail();
+
+                        DB::table(
+                            'admin_label_assignments'
+                        )->insert([
+                            'user_id' =>
+                                $manager->id,
+
+                            'label_id' =>
+                                $label->id,
+
+                            'assignment_role' =>
+                                'manager',
+
+                            'can_view' => true,
+                            'can_edit' => true,
+
+                            'can_manage_releases' =>
+                                true,
+
+                            'can_manage_team' =>
+                                false,
+
+                            'can_manage_splits' =>
+                                false,
+
+                            'assigned_by' =>
+                                $request->user()->id,
+
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+            }
+        );
+
+        return back()->with(
+            'success',
+            'Quick Edit changes saved.'
+        );
+    }
+
+
     public function update(
         Request $request,
         User $user,
@@ -1639,7 +3230,19 @@ $validated = $request->validate([
 
             'revenue_share_percentage' => [
                 'nullable',
-                'required_if:role,label,artist',
+                'required_if:role,artist',
+                'numeric',
+                'min:0',
+                'max:100',
+            ],
+
+            'label_revenue_rates' => [
+                'nullable',
+                'array',
+            ],
+
+            'label_revenue_rates.*' => [
+                'nullable',
                 'numeric',
                 'min:0',
                 'max:100',
@@ -1803,30 +3406,17 @@ $validated = $request->validate([
             ) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'label_ids' => [
-                        'A Label account must have exactly one label.',
+                        'A Label account must have at least one label.',
                     ],
                 ]);
             }
 
             /*
-             * A Label login represents exactly one financial
-             * label identity. Admin users may still manage
-             * multiple labels through manager assignments.
+             * FF380-F:
+             * Label accounts may own multiple canonical labels.
+             * Each label can maintain its own revenue rate.
              */
-            $requestedLabelCount =
-                count($existingLabelIds)
-                + $newLabelNames->count();
 
-            if ($requestedLabelCount !== 1) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'label_ids' => [
-                        'A Label account must be linked to exactly one label.',
-                    ],
-                    'new_labels' => [
-                        'Select one existing label OR add one new label, not multiple labels.',
-                    ],
-                ]);
-            }
 
             $duplicateNames =
                 $newLabelNames
@@ -1936,12 +3526,16 @@ $oldValues = [
                  * this Super Admin endpoint.
                  */
                 if ($validated['role'] === 'artist') {
-                    Artist::query()
+                    $rateArtists = Artist::query()
                         ->where(
                             'user_id',
                             $user->id
                         )
-                        ->update([
+                        ->lockForUpdate()
+                        ->get();
+
+                    foreach ($rateArtists as $rateArtist) {
+                        $rateArtist->forceFill([
                             'revenue_share_percentage' =>
                                 (float) $validated[
                                     'revenue_share_percentage'
@@ -1949,22 +3543,78 @@ $oldValues = [
 
                             'updated_by' =>
                                 $request->user()->id,
-                        ]);
+                        ])->save();
+
+                        app(
+                            ReportEarningsRecalculationService::class
+                        )->recalculateForArtist(
+                            $rateArtist
+                        );
+                    }
                 } elseif ($validated['role'] === 'label') {
-                    Label::query()
-                        ->where(
-                            'user_id',
-                            $user->id
-                        )
-                        ->update([
+                    /*
+                     * Revenue rate is label-level commercial
+                     * configuration. A Label login may own
+                     * multiple independent canonical labels.
+                     *
+                     * Update only explicitly submitted owned
+                     * label rates. Never propagate one rate
+                     * across sibling/independent labels.
+                     */
+                    $submittedRates = collect(
+                        $validated['label_revenue_rates']
+                            ?? []
+                    );
+
+                    foreach (
+                        $submittedRates
+                        as $labelId => $submittedRate
+                    ) {
+                        if ($submittedRate === null
+                            || $submittedRate === '') {
+                            continue;
+                        }
+
+                        $rateLabel = Label::query()
+                            ->where(
+                                'user_id',
+                                $user->id
+                            )
+                            ->whereNull('deleted_at')
+                            ->where('status', 'active')
+                            ->lockForUpdate()
+                            ->findOrFail(
+                                (int) $labelId
+                            );
+
+                        $newRate =
+                            (float) $submittedRate;
+
+                        $oldRate =
+                            $rateLabel
+                                ->revenue_share_percentage;
+
+                        if (
+                            $oldRate !== null
+                            && (float) $oldRate === $newRate
+                        ) {
+                            continue;
+                        }
+
+                        $rateLabel->forceFill([
                             'revenue_share_percentage' =>
-                                (float) $validated[
-                                    'revenue_share_percentage'
-                                ],
+                                $newRate,
 
                             'updated_by' =>
                                 $request->user()->id,
-                        ]);
+                        ])->save();
+
+                        app(
+                            ReportEarningsRecalculationService::class
+                        )->recalculateForLabel(
+                            $rateLabel
+                        );
+                    }
                 }
 
                 if (
@@ -2126,15 +3776,14 @@ $oldValues = [
                             $label->save();
                         }
 
-                        $label->forceFill([
-                            'revenue_share_percentage' =>
-                                (float) $validated[
-                                    'revenue_share_percentage'
-                                ],
-
-                            'updated_by' =>
-                                $request->user()->id,
-                        ])->save();
+                        /*
+                         * FF373-D:
+                         * Revenue rate was already saved above from
+                         * label_revenue_rates[label_id].
+                         *
+                         * Do not overwrite it with the generic
+                         * revenue_share_percentage field here.
+                         */
 
                         $labelSync[
                             (int) $label->id
@@ -2170,16 +3819,10 @@ $oldValues = [
                         as $labelName
                     ) {
                         $label =
-                            Label::query()
-                                ->whereRaw(
-                                    'LOWER(name) = ?',
-                                    [
-                                        mb_strtolower(
-                                            $labelName
-                                        ),
-                                    ]
-                                )
-                                ->first();
+                            app(LabelIdentityService::class)
+                                ->representative(
+                                    $labelName
+                                );
 
                         if (
                             $label
@@ -2615,21 +4258,59 @@ $oldValues = [
                      * Verified or Rejected payout KYC state.
                      */
                 
-                    \App\Models\Finance\PayoutProfile::query()
-                        ->updateOrCreate(
-                            [
-                                'user_id' =>
-                                    $user->id,
-                            ],
-                            [
-                                'public_id' =>
-                                    $existingPayout?->public_id
-                                    ?: (string)
-                                        \Illuminate\Support\Str::ulid(),
-                
-                                ...$payoutData,
-                            ]
-                        );
+                    \App\Models\Finance\PayoutProfile::query();
+
+                    /*
+                     * Account/permission edits must not fabricate
+                     * an empty payout profile.
+                     */
+                    $hasPayoutData =
+                        collect($payoutData)
+                            ->contains(
+                                fn ($value) =>
+                                    $value !== null
+                                    && $value !== ''
+                            );
+
+                    if (
+                        $existingPayout
+                        || $hasPayoutData
+                    ) {
+                        /*
+                         * country_code is NOT NULL.
+                         * New payout profiles use the canonical
+                         * India default when none was supplied.
+                         */
+                        if (
+                            empty(
+                                $payoutData[
+                                    'country_code'
+                                ] ?? null
+                            )
+                        ) {
+                            $payoutData[
+                                'country_code'
+                            ] =
+                                $existingPayout?->country_code
+                                ?: 'IN';
+                        }
+
+                        \App\Models\Finance\PayoutProfile::query()
+                            ->updateOrCreate(
+                                [
+                                    'user_id' =>
+                                        $user->id,
+                                ],
+                                [
+                                    'public_id' =>
+                                        $existingPayout?->public_id
+                                        ?: (string)
+                                            \Illuminate\Support\Str::ulid(),
+
+                                    ...$payoutData,
+                                ]
+                            );
+                    }
                 }
 
             }

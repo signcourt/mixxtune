@@ -135,6 +135,8 @@ class HandleInertiaRequests extends Middleware
                         ->values()
                     : [],
 
+            'maintenance' => \App\Http\Middleware\EnforceMaintenanceMode::state($request),
+
             'auth' => [
                 'user' =>
                     $request->user(),

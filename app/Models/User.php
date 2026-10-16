@@ -53,7 +53,11 @@ class User extends Authenticatable
 
     protected function casts(): array
     {
-        return [
+return [
+            // MIXXTUNE_QUICK_EDIT_FIELDS_CAST_V1
+            'quick_edit_fields' => 'array',
+
+            'sidebar_navigation_order' => 'array',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'wallet_balance' => 'decimal:2',

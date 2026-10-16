@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\V2\LabelIdentityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -102,9 +103,26 @@ class RevenueLabelMappingController extends Controller
     public function createLabel(Request $request)
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:labels,name'],
+            'name' => ['required', 'string', 'max:255'],
             'royalty_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
+
+        $collision =
+            app(LabelIdentityService::class)
+                ->representative(
+                    $validated['name']
+                );
+
+        if ($collision) {
+            return back()->withErrors([
+                'name' =>
+                    'A logically identical label already exists as "'.
+                    $collision->name.
+                    '" (ID '.
+                    $collision->id.
+                    '). Select the existing label instead.',
+            ]);
+        }
 
         $baseSlug = Str::slug($validated['name']);
         $slug = $baseSlug;

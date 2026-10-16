@@ -185,9 +185,24 @@ class GeneratedReportService
             ]);
         }
 
+        /*
+         * REPORT FINANCIAL CONTRACT
+         * =========================
+         *
+         * gross_amount = source Collected Revenue
+         * net_amount   = final account Earning
+         *
+         * Example:
+         * Collected Revenue = 100
+         * Applied Rate      = 0.80
+         * Earning           = 80
+         * Platform Margin   = 20
+         */
         $grossAmount = round(
             (float)
-                (clone $query)->sum('earnings'),
+                (clone $query)->sum(
+                    'collected_revenue'
+                ),
             8
         );
 
@@ -356,6 +371,13 @@ class GeneratedReportService
         $excelRow = 2;
         $totalNet = 0.0;
 
+        /*
+         * chunkById requires ID-based ordering.
+         * Remove presentation ordering before chunking,
+         * otherwise rows can be skipped between chunks.
+         */
+        $query->reorder();
+
         $query->chunkById(
             1000,
             function ($rows) use (
@@ -495,37 +517,22 @@ class GeneratedReportService
         string $column,
         User $user
     ): string {
-        $role =
-            $this->permissions
-                ->role(
-                    $user
-                );
+        /*
+         * Canonical financial headings.
+         *
+         * Same wording for Super Admin, Manager,
+         * Label and Artist reports.
+         */
+        return match ($column) {
+            'Assigned Rate' =>
+                'Applied Rate',
 
-        if ($column === 'Assigned Rate') {
-            return match ($role) {
-                'label' =>
-                    'Label Rate',
+            'User Revenue' =>
+                'Earning',
 
-                'artist' =>
-                    'Artist Rate',
-
-                default =>
-                    'Assigned Rate',
-            };
-        }
-
-        if ($column === 'User Revenue') {
-            return match ($role) {
-                'label',
-                'artist' =>
-                    'Earning',
-
-                default =>
-                    'User Revenue',
-            };
-        }
-
-        return $column;
+            default =>
+                $column,
+        };
     }
 
     private function columnValue(
@@ -618,7 +625,54 @@ class GeneratedReportService
         $row,
         User $user
     ): array {
-        $collected =
+        /*
+         * MIXX TUNE FINAL REPORT SNAPSHOT RULE
+         * =====================================
+         *
+         * Report import is the authoritative financial
+         * calculation point.
+         *
+         * report_rows.collected_revenue
+         *     = original/source Collected Revenue
+         *
+         * report_rows.label_rate
+         *     = applied rate snapshot
+         *       80%  => 0.80
+         *       90%  => 0.90
+         *       100% => 1.00
+         *
+         * report_rows.earnings
+         *     = final row earning posted/displayed
+         *
+         * IMPORTANT:
+         * Never resolve the user's CURRENT commercial
+         * rate while downloading an old report.
+         *
+         * Never apply the percentage a second time.
+         *
+         * Negative rows were already stored at:
+         *     label_rate = 1.00
+         *     earnings   = full negative amount
+         */
+        $collectedRevenue =
+            round(
+                (float) (
+                    $row->collected_revenue
+                    ?? 0
+                ),
+                8
+            );
+
+        $appliedRate =
+            round(
+                (float) (
+                    $row->label_rate
+                    ?? 0
+                ),
+                8
+            );
+
+        $earning =
             round(
                 (float) (
                     $row->earnings
@@ -627,161 +681,15 @@ class GeneratedReportService
                 8
             );
 
-        $role =
-            $this->permissions
-                ->role(
-                    $user
-                );
-
-        /*
-         * Super Admin / Admin operational reports:
-         * show source economics without account deductions.
-         */
-        if (
-            $role === 'super_admin'
-            || $role === 'admin'
-        ) {
-            return [
-                'gross' => $collected,
-                'share' => 100.0,
-                'net' => $collected,
-            ];
-        }
-
-        /*
-         * Resolve the fixed commercial rate assigned by
-         * Super Admin to this account.
-         *
-         * IMPORTANT:
-         * Negative report rows do not modify this stored
-         * rate. They only use an effective 100% rate for
-         * that individual report row.
-         */
-        $accountRate = 100.0;
-
-        if ($role === 'artist') {
-            $rate =
-                DB::table('artists')
-                    ->where(
-                        'user_id',
-                        $user->id
-                    )
-                    ->value(
-                        'revenue_share_percentage'
-                    );
-
-            if ($rate !== null) {
-                $accountRate =
-                    (float) $rate;
-            }
-        } elseif ($role === 'label') {
-            /*
-             * Prefer the label attached to this report row
-             * when it belongs to the authenticated label
-             * account. This keeps multi-label accounts
-             * deterministic.
-             */
-            $rateQuery =
-                DB::table('labels')
-                    ->where(
-                        'user_id',
-                        $user->id
-                    );
-
-            if (!empty($row->label_id)) {
-                $rowRate =
-                    (clone $rateQuery)
-                        ->where(
-                            'id',
-                            (int) $row->label_id
-                        )
-                        ->value(
-                            'revenue_share_percentage'
-                        );
-
-                if ($rowRate !== null) {
-                    $accountRate =
-                        (float) $rowRate;
-                } else {
-                    $fallbackRate =
-                        $rateQuery
-                            ->orderBy('id')
-                            ->value(
-                                'revenue_share_percentage'
-                            );
-
-                    if ($fallbackRate !== null) {
-                        $accountRate =
-                            (float) $fallbackRate;
-                    }
-                }
-            } else {
-                $fallbackRate =
-                    $rateQuery
-                        ->orderBy('id')
-                        ->value(
-                            'revenue_share_percentage'
-                        );
-
-                if ($fallbackRate !== null) {
-                    $accountRate =
-                        (float) $fallbackRate;
-                }
-            }
-        }
-
-        $accountRate =
-            max(
-                0.0,
-                min(
-                    100.0,
-                    $accountRate
-                )
-            );
-
-        /*
-         * FINAL REVENUE RULE
-         * ------------------
-         *
-         * Positive / zero:
-         * Collected Revenue × Assigned Account Rate.
-         *
-         * Negative:
-         * 100% of the negative adjustment belongs to
-         * the user. Therefore effective Assigned Rate
-         * shown in that row becomes 100%.
-         *
-         * Example:
-         * +100 @ 80% = +80
-         *  -10 @100% = -10
-         * User Revenue = 70
-         */
-        $effectiveRate =
-            $collected < 0
-                ? 100.0
-                : $accountRate;
-
-        $userRevenue =
-            $collected < 0
-                ? $collected
-                : round(
-                    $collected
-                    * (
-                        $effectiveRate
-                        / 100
-                    ),
-                    8
-                );
-
         return [
             'gross' =>
-                $collected,
+                $collectedRevenue,
 
             'share' =>
-                $effectiveRate,
+                $appliedRate,
 
             'net' =>
-                $userRevenue,
+                $earning,
         ];
     }
 

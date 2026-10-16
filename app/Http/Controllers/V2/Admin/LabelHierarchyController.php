@@ -5,6 +5,7 @@ namespace App\Http\Controllers\V2\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Core\Label;
 use App\Services\V2\LabelHierarchyService;
+use App\Services\V2\LabelIdentityService;
 use App\Services\V2\LabelRevenueShareService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -180,6 +181,25 @@ class LabelHierarchyController extends Controller
             ],
         ]);
 
+        $identity =
+            app(LabelIdentityService::class);
+
+        $existingLogicalLabel =
+            $identity->representative(
+                $data['name']
+            );
+
+        if ($existingLogicalLabel) {
+            return back()->withErrors([
+                'name' =>
+                    'A logically identical label already exists as "'.
+                    $existingLogicalLabel->name.
+                    '" (ID '.
+                    $existingLogicalLabel->id.
+                    ').',
+            ]);
+        }
+
         $parent = Label::query()
             ->whereKey(
                 (int) $data['parent_label_id']
@@ -340,6 +360,38 @@ class LabelHierarchyController extends Controller
                 'max:100',
             ],
         ]);
+
+        $identity =
+            app(LabelIdentityService::class);
+
+        $currentKey =
+            $identity->normalize(
+                $label->name
+            );
+
+        $requestedKey =
+            $identity->normalize(
+                $data['name']
+            );
+
+        if (
+            $requestedKey !== $currentKey
+            && $identity->exists(
+                $data['name']
+            )
+        ) {
+            $collision =
+                $identity->representative(
+                    $data['name']
+                );
+
+            return back()->withErrors([
+                'name' =>
+                    'Another logical label already exists as "'.
+                    ($collision?->name ?? $data['name']).
+                    '".',
+            ]);
+        }
 
         $newParentId =
             isset($data['parent_label_id'])

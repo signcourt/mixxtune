@@ -415,84 +415,72 @@ class ReleaseController extends Controller
         }
 
         /*
-         * Optional Admin/Super Admin Label drill-down.
+         * Logical Label drill-down.
          *
-         * Existing role scope is applied first. This
-         * additional filter can only narrow that scope.
+         * Same normalized label names such as:
+         * 31 Beats / 31-Beats / 31beats
+         * are treated as one catalogue account.
+         *
+         * Role scoping above remains authoritative.
          */
-        $labelFilterId =
-            $request->integer('label_id');
+        $requestedLabelId = $request->integer('label_id');
 
-        if (
-            $labelFilterId > 0
-            && in_array(
-                $role,
-                ['admin', 'super_admin'],
-                true
-            )
-        ) {
-            if ($role === 'admin') {
-                $assignedLabelIds =
-                    app(
-                        AdminAssignmentService::class
-                    )->labelIds(
-                        $request->user()
-                    );
+        if ($requestedLabelId > 0) {
+            $requestedLabel = Label::query()
+                ->whereKey($requestedLabelId)
+                ->whereNull('deleted_at')
+                ->first(['id', 'name']);
 
-                abort_unless(
-                    $assignedLabelIds->contains(
-                        $labelFilterId
-                    ),
-                    403,
-                    'Label access denied.'
-                );
-            }
+            abort_unless(
+                $requestedLabel,
+                404,
+                'Label not found.'
+            );
 
-            $query->where(
+            $normalizedName = strtolower(
+                preg_replace(
+                    '/[^a-z0-9]+/i',
+                    '',
+                    trim((string) $requestedLabel->name)
+                )
+            );
+
+            $logicalLabelIds = Label::query()
+                ->whereNull('deleted_at')
+                ->get(['id', 'name'])
+                ->filter(
+                    fn ($candidate) =>
+                        strtolower(
+                            preg_replace(
+                                '/[^a-z0-9]+/i',
+                                '',
+                                trim((string) $candidate->name)
+                            )
+                        ) === $normalizedName
+                )
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            /*
+             * This whereIn is additive to the role scope
+             * already applied above. It cannot widen access.
+             */
+            $query->whereIn(
                 'label_id',
-                $labelFilterId
+                $logicalLabelIds
             );
         }
 
-        /*
-         * Optional Admin/Super Admin Artist drill-down.
-         *
-         * Existing role scope is applied first. This
-         * additional filter can only narrow that scope.
-         */
-        $artistFilterId =
-            $request->integer('artist_id');
+        $requestedArtistId = $request->integer('artist_id');
 
-        if (
-            $artistFilterId > 0
-            && in_array(
-                $role,
-                ['admin', 'super_admin'],
-                true
-            )
-        ) {
-            if ($role === 'admin') {
-                $assignedArtistIds =
-                    app(
-                        AdminAssignmentService::class
-                    )->artistIds(
-                        $request->user()
-                    );
-
-                abort_unless(
-                    $assignedArtistIds->contains(
-                        $artistFilterId
-                    ),
-                    403,
-                    'Artist access denied.'
-                );
-            }
-
+        if ($requestedArtistId > 0) {
             $query->where(
                 'artist_id',
-                $artistFilterId
+                $requestedArtistId
             );
         }
+
 
         /*
          * Draft privacy:
@@ -535,6 +523,19 @@ class ReleaseController extends Controller
          */
         $query
             ->addSelect([
+                /*
+                 * Resolve the display label directly from the
+                 * release label_id. This is presentation-only;
+                 * no release/label ownership data is changed.
+                 */
+                'label_name' => DB::table('labels')
+                    ->select('name')
+                    ->whereColumn(
+                        'labels.id',
+                        'releases.label_id'
+                    )
+                    ->limit(1),
+
                 'track_count' => DB::table('tracks')
                     ->selectRaw('COUNT(*)')
                     ->whereColumn(

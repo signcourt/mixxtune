@@ -278,6 +278,19 @@ class GeneratedReportController extends Controller
             'reports.view'
         );
 
+        $ratePending =
+            $this->automaticReportHasPendingRate(
+                $request,
+                $month,
+                $permissions
+            );
+
+        abort_if(
+            $ratePending,
+            409,
+            'Revenue rate has not been assigned.'
+        );
+
         $report =
             $service->generate(
                 $request->user(),
@@ -342,6 +355,19 @@ class GeneratedReportController extends Controller
             'reports.view'
         );
 
+        $ratePending =
+            $this->automaticReportHasPendingRate(
+                $request,
+                $month,
+                $permissions
+            );
+
+        abort_if(
+            $ratePending,
+            409,
+            'Revenue rate has not been assigned.'
+        );
+
         $query =
             $analytics->scopedQuery(
                 $request->user(),
@@ -359,6 +385,12 @@ class GeneratedReportController extends Controller
         $grossRevenue =
             (float)
             (clone $query)->sum(
+                'collected_revenue'
+            );
+
+        $royaltyEarnings =
+            (float)
+            (clone $query)->sum(
                 'earnings'
             );
 
@@ -370,7 +402,7 @@ class GeneratedReportController extends Controller
                     'mapped'
                 )
                 ->sum(
-                    'earnings'
+                    'collected_revenue'
                 );
 
         $unmappedRevenue =
@@ -381,7 +413,7 @@ class GeneratedReportController extends Controller
                     'unmapped'
                 )
                 ->sum(
-                    'earnings'
+                    'collected_revenue'
                 );
 
         $summaryRows =
@@ -412,7 +444,7 @@ class GeneratedReportController extends Controller
                     'COUNT(*) AS rows_count'
                 )
                 ->selectRaw(
-                    'COALESCE(SUM(report_rows.earnings), 0) AS gross'
+                    'COALESCE(SUM(report_rows.collected_revenue), 0) AS gross'
                 )
                 ->groupBy(
                     'report_rows.revenue_owner_type',
@@ -453,6 +485,9 @@ class GeneratedReportController extends Controller
                 'grossRevenue' =>
                     $grossRevenue,
 
+                'royaltyEarnings' =>
+                    $royaltyEarnings,
+
                 'mappedRevenue' =>
                     $mappedRevenue,
 
@@ -468,17 +503,6 @@ class GeneratedReportController extends Controller
                 'totalRows' =>
                     $totalRows,
 
-                'generatedAt' =>
-                    now()
-                        ->timezone(
-                            config(
-                                'app.timezone',
-                                'UTC'
-                            )
-                        )
-                        ->format(
-                            'd M Y, h:i A'
-                        ),
             ]
         )
             ->setPaper(
@@ -492,6 +516,218 @@ class GeneratedReportController extends Controller
             );
     }
 
+
+    private function automaticReportHasPendingRate(
+        Request $request,
+        string $month,
+        PermissionService $permissions
+    ): bool {
+        $analytics =
+            app(ReportAnalyticsService::class);
+
+        return $analytics
+            ->scopedQuery(
+                $request->user(),
+                $permissions
+            )
+            ->where(
+                'reporting_month',
+                $month
+            )
+            ->where(
+                'mapping_status',
+                'mapped'
+            )
+            ->where(
+                function ($query) {
+                    $query
+                        ->where(
+                            function ($q) {
+                                $q
+                                    ->whereNotNull(
+                                        'label_id'
+                                    )
+                                    ->whereNotExists(
+                                        function ($sub) {
+                                            $sub
+                                                ->selectRaw('1')
+                                                ->from('labels')
+                                                ->whereColumn(
+                                                    'labels.id',
+                                                    'report_rows.label_id'
+                                                )
+                                                ->whereNotNull(
+                                                    'labels.revenue_share_percentage'
+                                                );
+                                        }
+                                    )
+                                    ->where(
+                                        function ($fallback) {
+                                            $fallback
+                                                ->where(
+                                                    'revenue_owner_type',
+                                                    '!=',
+                                                    'label'
+                                                )
+                                                ->orWhereNull(
+                                                    'revenue_owner_id'
+                                                )
+                                                ->orWhereNotExists(
+                                                    function ($sub) {
+                                                        $sub
+                                                            ->selectRaw('1')
+                                                            ->from(
+                                                                'labels as owner_labels'
+                                                            )
+                                                            ->whereColumn(
+                                                                'owner_labels.id',
+                                                                'report_rows.revenue_owner_id'
+                                                            )
+                                                            ->whereNotNull(
+                                                                'owner_labels.revenue_share_percentage'
+                                                            );
+                                                    }
+                                                );
+                                        }
+                                    );
+                            }
+                        )
+                        ->orWhere(
+                            function ($q) {
+                                $q
+                                    ->whereNull(
+                                        'label_id'
+                                    )
+                                    ->whereNotNull(
+                                        'artist_id'
+                                    )
+                                    ->whereNotExists(
+                                        function ($sub) {
+                                            $sub
+                                                ->selectRaw('1')
+                                                ->from('artists')
+                                                ->whereColumn(
+                                                    'artists.id',
+                                                    'report_rows.artist_id'
+                                                )
+                                                ->whereNotNull(
+                                                    'artists.revenue_share_percentage'
+                                                );
+                                        }
+                                    )
+                                    ->where(
+                                        function ($fallback) {
+                                            $fallback
+                                                ->where(
+                                                    'revenue_owner_type',
+                                                    '!=',
+                                                    'artist'
+                                                )
+                                                ->orWhereNull(
+                                                    'revenue_owner_id'
+                                                )
+                                                ->orWhereNotExists(
+                                                    function ($sub) {
+                                                        $sub
+                                                            ->selectRaw('1')
+                                                            ->from(
+                                                                'artists as owner_artists'
+                                                            )
+                                                            ->whereColumn(
+                                                                'owner_artists.id',
+                                                                'report_rows.revenue_owner_id'
+                                                            )
+                                                            ->whereNotNull(
+                                                                'owner_artists.revenue_share_percentage'
+                                                            );
+                                                    }
+                                                );
+                                        }
+                                    );
+                            }
+                        )
+                        ->orWhere(
+                            function ($q) {
+                                $q
+                                    ->whereNull(
+                                        'label_id'
+                                    )
+                                    ->whereNull(
+                                        'artist_id'
+                                    )
+                                    ->where(
+                                        function ($owner) {
+                                            $owner
+                                                ->where(
+                                                    function ($labelOwner) {
+                                                        $labelOwner
+                                                            ->where(
+                                                                'revenue_owner_type',
+                                                                'label'
+                                                            )
+                                                            ->whereNotNull(
+                                                                'revenue_owner_id'
+                                                            )
+                                                            ->whereNotExists(
+                                                                function ($sub) {
+                                                                    $sub
+                                                                        ->selectRaw('1')
+                                                                        ->from(
+                                                                            'labels as owner_labels'
+                                                                        )
+                                                                        ->whereColumn(
+                                                                            'owner_labels.id',
+                                                                            'report_rows.revenue_owner_id'
+                                                                        )
+                                                                        ->whereNotNull(
+                                                                            'owner_labels.revenue_share_percentage'
+                                                                        );
+                                                                }
+                                                            );
+                                                    }
+                                                )
+                                                ->orWhere(
+                                                    function ($artistOwner) {
+                                                        $artistOwner
+                                                            ->where(
+                                                                'revenue_owner_type',
+                                                                'artist'
+                                                            )
+                                                            ->whereNotNull(
+                                                                'revenue_owner_id'
+                                                            )
+                                                            ->whereNotExists(
+                                                                function ($sub) {
+                                                                    $sub
+                                                                        ->selectRaw('1')
+                                                                        ->from(
+                                                                            'artists as owner_artists'
+                                                                        )
+                                                                        ->whereColumn(
+                                                                            'owner_artists.id',
+                                                                            'report_rows.revenue_owner_id'
+                                                                        )
+                                                                        ->whereNotNull(
+                                                                            'owner_artists.revenue_share_percentage'
+                                                                        );
+                                                                }
+                                                            );
+                                                    }
+                                                )
+                                                ->orWhereNull(
+                                                    'revenue_owner_type'
+                                                )
+                                                ->orWhereNull(
+                                                    'revenue_owner_id'
+                                                );
+                                        }
+                                    );
+                            }
+                        );
+                }
+            )
+            ->exists();
+    }
 
     public function destroy(
         Request $request,

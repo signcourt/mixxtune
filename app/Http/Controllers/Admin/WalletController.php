@@ -30,10 +30,26 @@ class WalletController extends Controller
                 '=',
                 'wallets.label_id'
             )
+            /*
+             * FF156_USER_WALLET_VISIBILITY
+             *
+             * Migrated WordPress closing balances are
+             * user-level wallets. Keep label wallets
+             * supported while exposing their user owner.
+             */
+            ->leftJoin(
+                'users',
+                'users.id',
+                '=',
+                'wallets.user_id'
+            )
             ->select([
                 'wallets.id',
                 'wallets.public_id',
                 'wallets.label_id',
+                'wallets.user_id',
+                'users.name as user_name',
+                'users.email as user_email',
                 'wallets.currency',
                 'wallets.available_balance',
                 'wallets.pending_balance',
@@ -65,6 +81,21 @@ class WalletController extends Controller
                 $query
                     ->where(
                         'labels.name',
+                        'like',
+                        "%{$search}%"
+                    )
+                    /*
+                     * FF158_OWNER_SEARCH
+                     * Search both native label wallets and
+                     * migrated user-level wallets.
+                     */
+                    ->orWhere(
+                        'users.name',
+                        'like',
+                        "%{$search}%"
+                    )
+                    ->orWhere(
+                        'users.email',
                         'like',
                         "%{$search}%"
                     )

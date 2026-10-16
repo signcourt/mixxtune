@@ -30,6 +30,7 @@ class ReportImportWorkflowTest extends TestCase
 
         $label = Label::factory()->create([
             'created_by' => $artistUser->id,
+            'revenue_share_percentage' => 80,
         ]);
 
         $artist = Artist::factory()->create([
@@ -134,8 +135,7 @@ class ReportImportWorkflowTest extends TestCase
             'Sale Month',
             'Streams',
             'Sale Units',
-            'Label Rate',
-            'Earnings',
+            'Collected Revenue',
         ];
     }
 
@@ -144,7 +144,7 @@ class ReportImportWorkflowTest extends TestCase
         string $upc = '890000000013',
         string $saleDate = '2026-07-15',
         string $saleMonth = '2026-07',
-        string $earnings = '125.50'
+        string $collectedRevenue = '100.00'
     ): array {
         return [
             'Test Artist',
@@ -163,8 +163,7 @@ class ReportImportWorkflowTest extends TestCase
             $saleMonth,
             '1000',
             '1000',
-            '0.1255',
-            $earnings,
+            $collectedRevenue,
         ];
     }
 
@@ -253,7 +252,17 @@ class ReportImportWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            125.50,
+            100.00,
+            (float) $row->collected_revenue
+        );
+
+        $this->assertEquals(
+            0.80,
+            (float) $row->label_rate
+        );
+
+        $this->assertEquals(
+            80.00,
             (float) $row->earnings
         );
     }
@@ -537,7 +546,7 @@ class ReportImportWorkflowTest extends TestCase
             'Stream',
             'Quantity',
             'Rate',
-            'Net Revenue',
+            'Collected Revenue',
         ];
 
         $file = $this->csvFile(
@@ -603,6 +612,16 @@ class ReportImportWorkflowTest extends TestCase
 
         $this->assertEquals(
             10.00,
+            (float) $row->collected_revenue
+        );
+
+        $this->assertEquals(
+            0.80,
+            (float) $row->label_rate
+        );
+
+        $this->assertEquals(
+            8.00,
             (float) $row->earnings
         );
     }
@@ -781,7 +800,7 @@ class ReportImportWorkflowTest extends TestCase
 
         $second = $this->standardRow(
             saleDate: '2026-07-16',
-            earnings: '250.75'
+            collectedRevenue: '250.75'
         );
 
         $second[7] = 'YouTube';
@@ -820,7 +839,13 @@ class ReportImportWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            376.25,
+            350.75,
+            (float) ReportRow::query()
+                ->sum('collected_revenue')
+        );
+
+        $this->assertEquals(
+            280.60,
             (float) ReportRow::query()
                 ->sum('earnings')
         );
@@ -1080,8 +1105,8 @@ class ReportImportWorkflowTest extends TestCase
         );
 
         $this->assertSame(
-            '125.50',
-            $row->raw_data['earnings']
+            '100.00',
+            $row->raw_data['collected revenue']
                 ?? null
         );
     }

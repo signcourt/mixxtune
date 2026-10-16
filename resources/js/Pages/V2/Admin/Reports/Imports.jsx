@@ -6,16 +6,79 @@ import {
 
 import {
     Download,
+    Eye,
     Pencil,
+    RefreshCw,
     Trash2,
     X,
 } from 'lucide-react';
 
 import {
+    useEffect,
     useState,
 } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+
+const formatReportingMonth = (value) => {
+    if (!value) return '—';
+
+    const [year, month] = value.split('-');
+
+    if (!year || !month) {
+        return value;
+    }
+
+    const date = new Date(
+        Number(year),
+        Number(month) - 1,
+        1
+    );
+
+    return new Intl.DateTimeFormat('en-IN', {
+        month: 'short',
+        year: 'numeric',
+    }).format(date);
+};
+
+const formatNumber = (value) =>
+    new Intl.NumberFormat('en-IN').format(
+        Number(value ?? 0)
+    );
+
+const formatUploadedAt = (value) => {
+    if (!value) {
+        return {
+            date: '—',
+            time: '',
+        };
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return {
+            date: value,
+            time: '',
+        };
+    }
+
+    return {
+        date: new Intl.DateTimeFormat('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            timeZone: 'Asia/Kolkata',
+        }).format(date),
+
+        time: new Intl.DateTimeFormat('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: 'Asia/Kolkata',
+        }).format(date),
+    };
+};
 
 export default function Imports({
     role = 'admin',
@@ -25,6 +88,37 @@ export default function Imports({
     const [editing, setEditing] = useState(null);
     const [editMonth, setEditMonth] = useState('');
     const [actionBusy, setActionBusy] = useState(false);
+
+    /*
+     * Revenue reports are processed by a background worker.
+     * Poll only while this page contains active imports.
+     */
+    useEffect(() => {
+        const hasActiveImport =
+            (imports.data ?? []).some(
+                (item) =>
+                    item.status === 'queued' ||
+                    item.status === 'processing'
+            );
+
+        if (!hasActiveImport) {
+            return undefined;
+        }
+
+        const timer = window.setInterval(
+            () => {
+                router.reload({
+                    only: ['imports'],
+                    preserveScroll: true,
+                    preserveState: true,
+                });
+            },
+            5000
+        );
+
+        return () =>
+            window.clearInterval(timer);
+    }, [imports.data]);
 
     const {
         data,
@@ -121,6 +215,41 @@ export default function Imports({
         );
     };
 
+    const reDetectUnmapped = (item) => {
+        const count =
+            Number(item.unmapped_rows_count || 0);
+
+        if (actionBusy) {
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `Re-detect ${count.toLocaleString()} currently unmapped row(s) in ${item.original_filename}?\n\n` +
+            'Latest catalogue ISRC ownership will be checked again.\n' +
+            'Already mapped rows will NOT be changed.\n' +
+            'Wallets will NOT be credited and the report will NOT be published.'
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setActionBusy(true);
+
+        router.post(
+            `/v2/admin/reports/imports/${item.id}/re-detect-unmapped`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+
+                onFinish: () => {
+                    setActionBusy(false);
+                },
+            }
+        );
+    };
+
     return (
         <PanelLayout
             role={role}
@@ -207,7 +336,7 @@ export default function Imports({
                         className="mt-5 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
                     >
                         {processing
-                            ? 'Importing...'
+                            ? 'Uploading...'
                             : 'Upload & Import'}
                     </button>
                 </form>
@@ -248,7 +377,7 @@ export default function Imports({
                                     </Cell>
 
                                     <Cell>
-                                        {item.reporting_month || '—'}
+                                        {formatReportingMonth(item.reporting_month)}
                                     </Cell>
 
                                     <Cell>
@@ -256,27 +385,82 @@ export default function Imports({
                                     </Cell>
 
                                     <Cell>
-                                        {item.total_rows}
+                                        {formatNumber(item.total_rows)}
                                     </Cell>
 
                                     <Cell>
-                                        {item.imported_rows}
+                                        {formatNumber(item.imported_rows)}
                                     </Cell>
 
                                     <Cell>
-                                        {item.duplicate_rows}
+                                        {formatNumber(item.duplicate_rows)}
                                     </Cell>
 
                                     <Cell>
-                                        {item.failed_rows}
+                                        {formatNumber(item.failed_rows)}
                                     </Cell>
 
                                     <Cell>
-                                        {item.created_at}
+                                        {(() => {
+                                            const uploaded =
+                                                formatUploadedAt(
+                                                    item.created_at
+                                                );
+
+                                            return (
+                                                <div className="leading-tight">
+                                                    <div className="font-medium text-slate-700">
+                                                        {uploaded.date}
+                                                    </div>
+
+                                                    {uploaded.time && (
+                                                        <div className="mt-1 text-xs text-slate-500">
+                                                            {uploaded.time} IST
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </Cell>
 
                                     <Cell>
                                         <div className="flex items-center gap-2">
+                                            <a
+                                                href={`/v2/admin/reports/imports/${item.id}/view`}
+                                                title="View report data"
+                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                                            >
+                                                <Eye size={16} />
+                                            </a>
+
+                                            {Number(item.unmapped_rows_count || 0) > 0 && (
+                                                <a
+                                                    href={`/super-admin/unmapped-revenue?report_import_id=${item.id}`}
+                                                    title={`${Number(item.unmapped_rows_count || 0).toLocaleString()} unmapped ISRC rows`}
+                                                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-amber-100"
+                                                >
+                                                    <span>Unmapped</span>
+                                                    <span className="rounded-full bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                                                        {Number(item.unmapped_rows_count || 0).toLocaleString()}
+                                                    </span>
+                                                </a>
+                                            )}
+
+                                            {Number(item.unmapped_rows_count || 0) > 0 &&
+                                                item.financial_status === 'review_pending' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            reDetectUnmapped(item)
+                                                        }
+                                                        disabled={actionBusy}
+                                                        title="Refresh / Re-detect unmapped ISRCs"
+                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 transition hover:border-cyan-300 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        <RefreshCw size={16} />
+                                                    </button>
+                                                )}
+
                                             <a
                                                 href={`/v2/admin/reports/imports/${item.id}/download`}
                                                 title="Download original report"

@@ -5,6 +5,8 @@ namespace App\Services\V2;
 use App\Services\Invoices\InvoiceGenerationService;
 use App\Models\Finance\PayoutProfile;
 use App\Models\Finance\WithdrawalRequest;
+use App\Models\Core\Artist;
+use App\Models\Core\Label;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,6 +20,38 @@ class WithdrawalService
         private readonly WalletService $walletService,
         private readonly InvoiceGenerationService $invoiceGenerationService
     ) {
+    }
+
+    public function withdrawalEnabledFor(
+        User $user
+    ): bool {
+        /*
+         * Wallets and payout profiles are User-level.
+         *
+         * Therefore withdrawal permission is also resolved
+         * at the financial-owner User account level.
+         *
+         * Every active Label / Artist entity belonging to
+         * the same financial owner must remain enabled.
+         * Super Admin update paths synchronize these flags.
+         */
+        $hasSuspendedLabel = Label::query()
+            ->where('user_id', $user->id)
+            ->whereNull('deleted_at')
+            ->where('can_withdraw', false)
+            ->exists();
+
+        if ($hasSuspendedLabel) {
+            return false;
+        }
+
+        $hasSuspendedArtist = Artist::query()
+            ->where('user_id', $user->id)
+            ->whereNull('deleted_at')
+            ->where('can_withdraw', false)
+            ->exists();
+
+        return ! $hasSuspendedArtist;
     }
 
     public function create(
@@ -37,6 +71,13 @@ class WithdrawalService
          * when no actor is supplied, financial owner is actor.
          */
         $actor ??= $user;
+
+        if (! $this->withdrawalEnabledFor($user)) {
+            throw ValidationException::withMessages([
+                'withdrawal' =>
+                    'Withdrawals are currently suspended for this account.',
+            ]);
+        }
 
 
         $amount = round($amount, 8);
@@ -281,6 +322,13 @@ class WithdrawalService
                     'currency' =>
                         $lockedWallet->currency,
 
+                    'financial_month' =>
+                        $withdrawal->created_at
+                        ? \Illuminate\Support\Carbon::parse($withdrawal->created_at)
+                            ->startOfMonth()
+                            ->toDateString()
+                        : now()->startOfMonth()->toDateString(),
+
                     'balance_before' =>
                         $availableBefore,
 
@@ -494,6 +542,13 @@ class WithdrawalService
 
                     'currency' =>
                         $withdrawal->currency,
+
+                    'financial_month' =>
+                        $withdrawal->created_at
+                        ? \Illuminate\Support\Carbon::parse($withdrawal->created_at)
+                            ->startOfMonth()
+                            ->toDateString()
+                        : now()->startOfMonth()->toDateString(),
 
                     'balance_before' =>
                         $availableBefore,
@@ -994,65 +1049,25 @@ class WithdrawalService
         User $user
     ): float {
         /*
-         * Label accounts use their own configured
-         * minimum withdrawal amount.
+         * Canonical withdrawal minimum is controlled
+         * globally by Super Admin System Settings.
+         *
+         * Legacy labels contain a historical default
+         * minimum_withdrawal_amount of 5000. That field
+         * is intentionally ignored here so Wallet UI
+         * and withdrawal validation use one source.
          */
-        $labelMinimum = DB::table('labels')
-            ->where(
-                'user_id',
-                $user->id
-            )
-            ->whereNull('deleted_at')
-            ->value(
-                'minimum_withdrawal_amount'
-            );
+        $minimum = app(
+            SystemSettingService::class
+        )->get(
+            'finance.minimum_withdrawal',
+            self::DEFAULT_MINIMUM_AMOUNT
+        );
 
-        if ($labelMinimum !== null) {
-            return max(
-                0,
-                (float) $labelMinimum
-            );
-        }
-
-        /*
-         * Artist accounts inherit the minimum from
-         * their parent/master label when available.
-         */
-        $artist = DB::table('artists')
-            ->where(
-                'user_id',
-                $user->id
-            )
-            ->whereNull('deleted_at')
-            ->first([
-                'id',
-                'label_id',
-            ]);
-
-        if (
-            $artist &&
-            $artist->label_id
-        ) {
-            $artistMinimum = DB::table('labels')
-                ->where(
-                    'id',
-                    $artist->label_id
-                )
-                ->whereNull('deleted_at')
-                ->value(
-                    'minimum_withdrawal_amount'
-                );
-
-            if ($artistMinimum !== null) {
-                return max(
-                    0,
-                    (float) $artistMinimum
-                );
-            }
-        }
-
-        return (float)
-            self::DEFAULT_MINIMUM_AMOUNT;
+        return max(
+            0,
+            (float) $minimum
+        );
     }
 
 }

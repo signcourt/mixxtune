@@ -16,9 +16,12 @@ function ShareRow({
         percent,
         setPercent,
     ] = useState(
-        Number(
-            item.revenue_share_percent ?? 0
-        )
+        item.revenue_share_percent === null ||
+        item.revenue_share_percent === undefined
+            ? ''
+            : Number(
+                  item.revenue_share_percent
+              )
     );
 
     const [
@@ -35,18 +38,35 @@ function ShareRow({
         setProcessing,
     ] = useState(false);
 
-    const safePercent = Math.min(
-        100,
-        Math.max(
-            0,
-            Number(percent) || 0
-        )
-    );
+    const hasConfiguredPercent =
+        percent !== '' &&
+        percent !== null &&
+        percent !== undefined &&
+        Number.isFinite(Number(percent));
+
+    const safePercent = hasConfiguredPercent
+        ? Math.min(
+              100,
+              Math.max(
+                  0,
+                  Number(percent)
+              )
+          )
+        : null;
 
     const masterPercent =
-        100 - safePercent;
+        safePercent !== null
+            ? 100 - safePercent
+            : null;
 
     const save = () => {
+        if (safePercent === null) {
+            window.alert(
+                'Enter the contractual revenue share percentage before saving.'
+            );
+            return;
+        }
+
         setProcessing(true);
 
         router.patch(
@@ -127,7 +147,7 @@ function ShareRow({
 
                     {!item.share_configured && (
                         <p className="mt-2 text-xs font-medium text-amber-600">
-                            No share configured — master keeps 100%
+                            Not Configured — Financial Hold
                         </p>
                     )}
                 </div>
@@ -165,7 +185,9 @@ function ShareRow({
                         </label>
 
                         <div className="rounded-xl bg-violet-50 px-4 py-3 text-sm font-bold text-violet-700">
-                            {masterPercent.toFixed(2)}%
+                            {masterPercent === null
+                                ? 'Not Configured'
+                                : `${masterPercent.toFixed(2)}%`}
                         </div>
                     </div>
 
@@ -257,13 +279,17 @@ function ShareRow({
                 ₹100 revenue example:
                 {' '}
                 <strong className="text-slate-900">
-                    ₹{safePercent.toFixed(2)}
+                    {safePercent === null
+                        ? 'Not Configured'
+                        : `₹${safePercent.toFixed(2)}`}
                 </strong>
                 {' '}
                 goes to {item.name} and
                 {' '}
                 <strong className="text-violet-700">
-                    ₹{masterPercent.toFixed(2)}
+                    {masterPercent === null
+                        ? 'Not Configured'
+                        : `₹${masterPercent.toFixed(2)}`}
                 </strong>
                 {' '}
                 remains with the master label.

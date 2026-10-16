@@ -128,6 +128,22 @@ class FinanceController extends Controller
             );
         }
 
+        /*
+         * MIXXTUNE_FINANCE_IMPORT_PAID_FLAG_V1
+         *
+         * Statements materialized from a report import are paid by
+         * ReportImportScheduledPublisher. They are never "pending
+         * approval" and must not be offered the legacy wallet actions.
+         */
+        $importJournal = function ($sub) {
+            $sub->select(DB::raw(1))
+                ->from('report_import_postings as rip')
+                ->whereColumn(
+                    'rip.royalty_statement_id',
+                    'statements.id'
+                );
+        };
+
         $summaryQuery = clone $query;
 
         $summary = [
@@ -144,6 +160,7 @@ class FinanceController extends Controller
                         'statements.status',
                         'pending'
                     )
+                    ->whereNotExists($importJournal)
                     ->sum(
                         'statements.net_payable'
                     )
@@ -155,6 +172,7 @@ class FinanceController extends Controller
                         'statements.status',
                         'approved'
                     )
+                    ->whereNotExists($importJournal)
                     ->sum(
                         'statements.net_payable'
                     )
@@ -183,9 +201,44 @@ class FinanceController extends Controller
             ),
         ];
 
+        /*
+         * MIXXTUNE_FINANCE_IMPORT_STATUS_AWARE_V2
+         *
+         * Split import-journal statements by their posting status:
+         * posted/completed = credited, held_unclaimed = held,
+         * anything else = materialized but not yet published.
+         */
+        $importSum = function (array $statuses, bool $exclude = false) use ($summaryQuery) {
+            return (float) (clone $summaryQuery)
+                ->whereExists(function ($sub) use ($statuses, $exclude) {
+                    $sub->select(DB::raw(1))
+                        ->from('report_import_postings as rip')
+                        ->whereColumn('rip.royalty_statement_id', 'statements.id');
+
+                    if ($exclude) {
+                        $sub->whereNotIn('rip.status', $statuses);
+                    } else {
+                        $sub->whereIn('rip.status', $statuses);
+                    }
+                })
+                ->sum('statements.net_payable');
+        };
+
+        $summary['paid_via_import'] = $importSum(['posted', 'completed']);
+        $summary['held_via_import'] = $importSum(['held_unclaimed']);
+        $summary['scheduled_via_import'] = $importSum(['posted', 'completed', 'held_unclaimed'], true);
+
         $statements = $query
             ->select([
                 'statements.*',
+
+                DB::raw(
+                    'EXISTS (SELECT 1 FROM report_import_postings rip WHERE rip.royalty_statement_id = statements.id) as paid_via_import'
+                ),
+
+                DB::raw(
+                    '(SELECT MIN(rip2.status) FROM report_import_postings rip2 WHERE rip2.royalty_statement_id = statements.id) as import_posting_status'
+                ),
 
                 DB::raw(
                     "COALESCE(

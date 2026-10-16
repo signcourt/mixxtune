@@ -28,6 +28,22 @@ class RoyaltyService
         float $commissionPercent = 0,
         string $currency = 'INR'
     ): array {
+
+        /*
+         * MIXXTUNE_ROYALTY_CUTOVER_2026_07
+         *
+         * Legacy WordPress closing balances already include
+         * historical finance through the migration cutover.
+         * Report sale months <= 2026-06 are therefore
+         * historical/read-only and must never be posted again.
+         */
+        if ($month < '2026-07') {
+            throw new \RuntimeException(
+                'Historical royalty month blocked by cutover: '.$month
+            );
+        }
+
+
         /*
          * Canonical V2 royalty engine.
          *
@@ -71,6 +87,25 @@ class RoyaltyService
                         ->whereKey($statement->id)
                         ->lockForUpdate()
                         ->firstOrFail();
+
+                /*
+                 * MIXXTUNE_IMPORT_JOURNAL_STATEMENT_WALLET_GUARD_V1
+                 *
+                 * Statements materialized from a report import are
+                 * paid exclusively by ReportImportScheduledPublisher.
+                 * The legacy approve / make-available wallet path must
+                 * never credit them a second time.
+                 */
+                abort_if(
+                    DB::table('report_import_postings')
+                        ->where(
+                            'royalty_statement_id',
+                            $lockedStatement->id
+                        )
+                        ->exists(),
+                    422,
+                    'This statement is paid through report import publication and cannot be processed here.'
+                );
 
                 abort_unless(
                     in_array(
@@ -238,40 +273,58 @@ class RoyaltyService
                  */
                 $walletTransaction = null;
 
-                if (
-                    (float)
-                    $lockedStatement->net_payable
-                    > 0
-                ) {
+                $netPayable =
+                    round(
+                        (float)
+                        $lockedStatement
+                            ->net_payable,
+                        8
+                    );
+
+                $walletReference = [
+                    'currency' =>
+                        $lockedStatement
+                            ->currency,
+
+                    'reference_type' =>
+                        RoyaltyStatement::class,
+
+                    'reference_id' =>
+                        $lockedStatement->id,
+
+                    'reference_code' =>
+                        $lockedStatement
+                            ->public_id,
+
+                    'description' =>
+                        "Royalty statement {$lockedStatement->statement_month}",
+
+                    'created_by' =>
+                        $admin->id,
+                ];
+
+                if ($netPayable > 0) {
                     $walletTransaction =
                         $this->wallet
                             ->creditPending(
                                 $owner,
-                                (float)
-                                $lockedStatement
-                                    ->net_payable,
+                                $netPayable,
                                 'royalty_statement',
-                                [
-                                    'currency' =>
-                                        $lockedStatement
-                                            ->currency,
-
-                                    'reference_type' =>
-                                        RoyaltyStatement::class,
-
-                                    'reference_id' =>
-                                        $lockedStatement->id,
-
-                                    'reference_code' =>
-                                        $lockedStatement
-                                            ->public_id,
-
-                                    'description' =>
-                                        "Royalty statement {$lockedStatement->statement_month}",
-
-                                    'created_by' =>
-                                        $admin->id,
-                                ]
+                                $walletReference
+                            );
+                } elseif ($netPayable < 0) {
+                    /*
+                     * Negative report earnings are a full
+                     * financial adjustment, not a percentage
+                     * deduction and not an optional charge.
+                     */
+                    $walletTransaction =
+                        $this->wallet
+                            ->debitPending(
+                                $owner,
+                                abs($netPayable),
+                                'royalty_statement',
+                                $walletReference
                             );
                 }
 
@@ -327,6 +380,25 @@ class RoyaltyService
                         ->lockForUpdate()
                         ->firstOrFail();
 
+                /*
+                 * MIXXTUNE_IMPORT_JOURNAL_STATEMENT_WALLET_GUARD_V1
+                 *
+                 * Statements materialized from a report import are
+                 * paid exclusively by ReportImportScheduledPublisher.
+                 * The legacy approve / make-available wallet path must
+                 * never credit them a second time.
+                 */
+                abort_if(
+                    DB::table('report_import_postings')
+                        ->where(
+                            'royalty_statement_id',
+                            $lockedStatement->id
+                        )
+                        ->exists(),
+                    422,
+                    'This statement is paid through report import publication and cannot be processed here.'
+                );
+
                 abort_unless(
                     $lockedStatement->status ===
                         'approved',
@@ -352,35 +424,48 @@ class RoyaltyService
                  * so only move pending funds when money is
                  * actually payable.
                  */
-                if (
-                    (float) $lockedStatement
-                        ->net_payable
-                    > 0
-                ) {
-                    $this->wallet->releasePending(
-                        $owner,
-                        (float) $lockedStatement
+                $netPayable =
+                    round(
+                        (float)
+                        $lockedStatement
                             ->net_payable,
-                        [
-                            'currency' =>
-                                $lockedStatement->currency,
-
-                            'reference_type' =>
-                                RoyaltyStatement::class,
-
-                            'reference_id' =>
-                                $lockedStatement->id,
-
-                            'reference_code' =>
-                                $lockedStatement->public_id,
-
-                            'description' =>
-                                "Royalty available for {$lockedStatement->statement_month}",
-
-                            'created_by' =>
-                                $admin->id,
-                        ]
+                        8
                     );
+
+                $walletReference = [
+                    'currency' =>
+                        $lockedStatement->currency,
+
+                    'reference_type' =>
+                        RoyaltyStatement::class,
+
+                    'reference_id' =>
+                        $lockedStatement->id,
+
+                    'reference_code' =>
+                        $lockedStatement->public_id,
+
+                    'description' =>
+                        "Royalty available for {$lockedStatement->statement_month}",
+
+                    'created_by' =>
+                        $admin->id,
+                ];
+
+                if ($netPayable > 0) {
+                    $this->wallet
+                        ->releasePending(
+                            $owner,
+                            $netPayable,
+                            $walletReference
+                        );
+                } elseif ($netPayable < 0) {
+                    $this->wallet
+                        ->releasePendingDebit(
+                            $owner,
+                            abs($netPayable),
+                            $walletReference
+                        );
                 }
 
                 $lockedStatement->update([
@@ -408,7 +493,29 @@ class RoyaltyService
             $commissionPercent,
             $currency
         ) {
+            /*
+             * MIXXTUNE_FINANCIAL_VISIBILITY_GATE
+             *
+             * A royalty statement must never be generated
+             * from an import that has not reached the
+             * published financial state.
+             */
             $baseQuery = ReportRow::query()
+                ->whereExists(
+                    function ($publishedImport) {
+                        $publishedImport
+                            ->selectRaw('1')
+                            ->from('report_imports as financial_import')
+                            ->whereColumn(
+                                'financial_import.id',
+                                'report_rows.report_import_id'
+                            )
+                            ->where(
+                                'financial_import.financial_status',
+                                'published'
+                            );
+                    }
+                )
                 ->where('reporting_month', $month)
                 ->where('artist_id', $artistId);
 
@@ -417,15 +524,15 @@ class RoyaltyService
                 8
             );
 
-            $commission = round(
-                $gross * ($commissionPercent / 100),
-                8
-            );
+            /*
+             * report_rows.earnings is already the final
+             * commercial earning snapshot.
+             *
+             * Do not apply commissionPercent again.
+             */
+            $commission = 0.0;
 
-            $net = round(
-                $gross - $commission,
-                8
-            );
+            $net = $gross;
 
             $existing = RoyaltyStatement::query()
                 ->where('artist_id', $artistId)
@@ -505,14 +612,7 @@ class RoyaltyService
 
                                 'net_amount' =>
                                     round(
-                                        $grossAmount
-                                        * (
-                                            1
-                                            - (
-                                                $commissionPercent
-                                                / 100
-                                            )
-                                        ),
+                                        $grossAmount,
                                         8
                                     ),
 

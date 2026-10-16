@@ -37,6 +37,7 @@ class Artist extends Model
         'kyc_status',
         'can_receive_splits',
         'can_create_releases',
+        'can_withdraw',
         'created_by',
         'updated_by',
     ];
@@ -45,6 +46,9 @@ class Artist extends Model
     {
         return [
             'revenue_share_percentage' => 'decimal:2',
+            'can_receive_splits' => 'boolean',
+            'can_create_releases' => 'boolean',
+            'can_withdraw' => 'boolean',
             'deleted_at' => 'datetime',
         ];
     }

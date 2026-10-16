@@ -2,6 +2,8 @@
 
 namespace App\Services\V2;
 
+use Illuminate\Database\Query\Builder as QueryBuilder;
+
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -40,12 +42,21 @@ class AdminFinancialAccessService
             ->values();
     }
 
+    /*
+     * FF161_RETURN_TYPE_COMPATIBILITY
+     * Accept and return both Eloquent Builder and
+     * DB Query Builder without changing scope logic.
+     *
+     * FF160_QUERY_BUILDER_COMPATIBILITY
+     * Financial screens use both Eloquent and DB query
+     * builders. Scope logic is identical for both.
+     */
     public function applyFinancialOwnerScope(
-        Builder $query,
+        Builder|QueryBuilder $query,
         User $user,
         string $labelColumn = 'label_id',
         string $artistColumn = 'artist_id'
-    ): Builder {
+    ): Builder|QueryBuilder {
         if (
             $user->role === 'super_admin'
         ) {

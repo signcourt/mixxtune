@@ -17,6 +17,7 @@ export default function Index({
     wallet = {},
     transactions = {},
     minimumWithdrawal = 0,
+    withdrawalEnabled = true,
 }) {
     const [historyOpen, setHistoryOpen] =
         useState(false);
@@ -32,7 +33,12 @@ export default function Index({
     const minimumWithdrawalAmount =
         Number(minimumWithdrawal ?? 0);
 
+    const isAdminMonitoring =
+        role === 'admin' ||
+        role === 'super_admin';
+
     const canRequestPayment =
+        withdrawalEnabled &&
         available >= minimumWithdrawalAmount &&
         minimumWithdrawalAmount > 0;
 
@@ -133,45 +139,61 @@ export default function Index({
                                 </div>
                             </div>
 
-                            {canRequestPayment ? (
-                                <Link
-                                    href="/v2/invoices"
-                                    className="mt-8 inline-flex min-h-12 items-center justify-center rounded-lg bg-violet-600 px-6 text-[15px] font-semibold text-white shadow-sm transition hover:bg-violet-700 focus:outline-none focus:ring-4 focus:ring-violet-100"
-                                >
-                                    Request my payment
-                                </Link>
-                            ) : (
-                                <div className="mt-8">
-                                    <button
-                                        type="button"
-                                        disabled
-                                        className="inline-flex min-h-12 cursor-not-allowed items-center justify-center rounded-lg bg-slate-200 px-6 text-[15px] font-semibold text-slate-500"
+                            {!isAdminMonitoring &&
+                                (canRequestPayment ? (
+                                    <Link
+                                        href="/v2/withdrawals"
+                                        className="mt-8 inline-flex min-h-12 items-center justify-center rounded-lg bg-violet-600 px-6 text-[15px] font-semibold text-white shadow-sm transition hover:bg-violet-700 focus:outline-none focus:ring-4 focus:ring-violet-100"
                                     >
                                         Request my payment
-                                    </button>
+                                    </Link>
+                                ) : (
+                                    <div className="mt-8">
+                                        <button
+                                            type="button"
+                                            disabled
+                                            className="inline-flex min-h-12 cursor-not-allowed items-center justify-center rounded-lg bg-slate-200 px-6 text-[15px] font-semibold text-slate-500"
+                                        >
+                                            Request my payment
+                                        </button>
 
-                                    <p className="mt-2 text-sm text-slate-500">
-                                        Minimum withdrawal amount is{' '}
-                                        <span className="font-semibold text-slate-700">
+                                        {!withdrawalEnabled && (
+                                            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                                                <p className="text-sm font-semibold text-amber-800">
+                                                    Withdrawals suspended
+                                                </p>
+                                                <p className="mt-1 text-xs leading-5 text-amber-700">
+                                                    New withdrawal requests are currently disabled for this account.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {withdrawalEnabled && (
+                                            <>
+                                                <p className="mt-2 text-sm text-slate-500">
+                                            Minimum withdrawal amount is{' '}
+                                            <span className="font-semibold text-slate-700">
+                                                {formatMoney(
+                                                    minimumWithdrawalAmount
+                                                )}
+                                            </span>
+                                        </p>
+
+                                        <p className="mt-1 text-xs text-slate-400">
+                                            You need{' '}
                                             {formatMoney(
-                                                minimumWithdrawalAmount
-                                            )}
-                                        </span>
-                                    </p>
-
-                                    <p className="mt-1 text-xs text-slate-400">
-                                        You need{' '}
-                                        {formatMoney(
-                                            Math.max(
-                                                minimumWithdrawalAmount -
-                                                    available,
-                                                0
-                                            )
-                                        )}{' '}
-                                        more before requesting payment.
-                                    </p>
-                                </div>
-                            )}
+                                                Math.max(
+                                                    minimumWithdrawalAmount -
+                                                        available,
+                                                    0
+                                                )
+                                            )}{' '}
+                                            more before requesting payment.
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
                         </div>
 
                         <div className="min-w-[280px] lg:text-right">
@@ -390,7 +412,11 @@ export default function Index({
                     />
 
                     <SummaryCard
-                        label="Lifetime Earnings"
+                        label={
+                            isAdminMonitoring
+                                ? 'Lifetime Credits'
+                                : 'Lifetime Earnings'
+                        }
                         value={formatMoney(
                             wallet.lifetime_earnings ??
                                 wallet.lifetime_credits ??

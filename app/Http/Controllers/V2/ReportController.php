@@ -19,6 +19,39 @@ class ReportController extends Controller
         ReportAnalyticsService $analytics,
         MasterRevenueVisibilityService $revenueVisibility
     ): Response {
+        /*
+         * FF165_ADMIN_ALIAS_GUARD_REPORT
+         * The shared controller serves both normal account
+         * routes and /v2/admin aliases.
+         *
+         * Only the admin alias requires admin/super_admin.
+         */
+        if (
+            $request->route()
+            && str_starts_with(
+                (string) $request->route()->getName(),
+                'v2.admin.reports.'
+            )
+        ) {
+            $adminAliasRole =
+                $permissions->role(
+                    $request->user()
+                );
+
+            abort_unless(
+                in_array(
+                    $adminAliasRole,
+                    [
+                        'admin',
+                        'super_admin',
+                    ],
+                    true
+                ),
+                403,
+                'Admin access required.'
+            );
+        }
+
         $permissions->authorize(
             $request->user(),
             'reports.view'
@@ -131,7 +164,61 @@ class ReportController extends Controller
                     'COUNT(*) as rows_count'
                 )
                 ->selectRaw(
+                    'COALESCE(SUM(collected_revenue), 0) as gross_amount'
+                )
+                ->selectRaw(
                     'COALESCE(SUM(earnings), 0) as amount'
+                )
+                ->selectRaw(
+                    "SUM(CASE
+                        WHEN mapping_status = 'mapped'
+                        AND NOT (
+                            (
+                                label_id IS NOT NULL
+                                AND EXISTS (
+                                    SELECT 1
+                                    FROM labels
+                                    WHERE labels.id = report_rows.label_id
+                                    AND labels.revenue_share_percentage IS NOT NULL
+                                )
+                            )
+                            OR
+                            (
+                                label_id IS NULL
+                                AND artist_id IS NOT NULL
+                                AND EXISTS (
+                                    SELECT 1
+                                    FROM artists
+                                    WHERE artists.id = report_rows.artist_id
+                                    AND artists.revenue_share_percentage IS NOT NULL
+                                )
+                            )
+                            OR
+                            (
+                                revenue_owner_type = 'label'
+                                AND revenue_owner_id IS NOT NULL
+                                AND EXISTS (
+                                    SELECT 1
+                                    FROM labels AS owner_labels
+                                    WHERE owner_labels.id = report_rows.revenue_owner_id
+                                    AND owner_labels.revenue_share_percentage IS NOT NULL
+                                )
+                            )
+                            OR
+                            (
+                                revenue_owner_type = 'artist'
+                                AND revenue_owner_id IS NOT NULL
+                                AND EXISTS (
+                                    SELECT 1
+                                    FROM artists AS owner_artists
+                                    WHERE owner_artists.id = report_rows.revenue_owner_id
+                                    AND owner_artists.revenue_share_percentage IS NOT NULL
+                                )
+                            )
+                        )
+                        THEN 1
+                        ELSE 0
+                    END) as rate_pending_rows"
                 )
                 ->groupBy('reporting_month')
                 ->orderByDesc('reporting_month')
@@ -167,11 +254,25 @@ class ReportController extends Controller
                             'amount' =>
                                 (float) $row->amount,
 
+                            'gross_amount' =>
+                                (float) $row->gross_amount,
+
+                            'rate_pending' =>
+                                (int) $row->rate_pending_rows > 0,
+
+                            'rate_pending_rows' =>
+                                (int) $row->rate_pending_rows,
+
                             'rows_count' =>
                                 (int) $row->rows_count,
 
+                            'generatedAt' =>
+                                now()->format('d M Y'),
+
                             'status' =>
-                                'ready',
+                                (int) $row->rate_pending_rows > 0
+                                    ? 'rate_pending'
+                                    : 'ready',
                         ];
                     }
                 )

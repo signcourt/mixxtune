@@ -139,7 +139,34 @@ class ReportImportService
         ],
     ];
 
+    /**
+     * Backwards-compatible synchronous import.
+     *
+     * Existing callers/tests can continue using import().
+     * HTTP uploads should use queueImport() instead.
+     */
     public function import(
+        UploadedFile $file,
+        User $user,
+        string $reportingMonth
+    ): ReportImport {
+        $import = $this->queueImport(
+            $file,
+            $user,
+            $reportingMonth
+        );
+
+        return $this->processQueuedImport(
+            $import
+        );
+    }
+
+    /**
+     * Store the uploaded source file and create a queued
+     * audit record without processing CSV rows inside the
+     * HTTP request.
+     */
+    public function queueImport(
         UploadedFile $file,
         User $user,
         string $reportingMonth
@@ -149,7 +176,7 @@ class ReportImportService
             'local'
         );
 
-        $import = ReportImport::query()->create([
+        return ReportImport::query()->create([
             'public_id' =>
                 (string) Str::ulid(),
 
@@ -163,21 +190,71 @@ class ReportImportService
                 $storedPath,
 
             'status' =>
-                'processing',
+                'queued',
 
             'uploaded_by' =>
                 $user->id,
 
             'started_at' =>
-                now(),
+                null,
+
+            'completed_at' =>
+                null,
+
+            'error_message' =>
+                null,
         ]);
+    }
+
+    /**
+     * Process one queued report.
+     *
+     * Atomic status claim prevents multiple queue workers
+     * from processing the same report concurrently.
+     *
+     * Report-row duplicate protection remains owned by the
+     * existing rowHash() logic.
+     */
+    public function processQueuedImport(
+        ReportImport $import
+    ): ReportImport {
+        $claimed =
+            ReportImport::query()
+                ->whereKey($import->id)
+                ->where('status', 'queued')
+                ->update([
+                    'status' =>
+                        'processing',
+
+                    'started_at' =>
+                        now(),
+
+                    'completed_at' =>
+                        null,
+
+                    'error_message' =>
+                        null,
+                ]);
+
+        /*
+         * A job may occasionally be delivered more than once.
+         * Only the worker which successfully claims "queued"
+         * is allowed to process the source file.
+         */
+        if ($claimed !== 1) {
+            return $import->fresh();
+        }
+
+        $import = $import->fresh();
 
         try {
             $this->processFile(
                 Storage::disk('local')
-                    ->path($storedPath),
+                    ->path($import->stored_path),
                 $import
             );
+
+            $import = $import->fresh();
 
             $import->update([
                 'status' =>
@@ -187,18 +264,27 @@ class ReportImportService
 
                 'completed_at' =>
                     now(),
-            ]);
-        } catch (Throwable $exception) {
-            $import->update([
-                'status' =>
-                    'failed',
 
                 'error_message' =>
-                    $exception->getMessage(),
-
-                'completed_at' =>
-                    now(),
+                    null,
             ]);
+        } catch (Throwable $exception) {
+            ReportImport::query()
+                ->whereKey($import->id)
+                ->update([
+                    'status' =>
+                        'failed',
+
+                    'error_message' =>
+                        mb_substr(
+                            $exception->getMessage(),
+                            0,
+                            65000
+                        ),
+
+                    'completed_at' =>
+                        now(),
+                ]);
 
             throw $exception;
         }
@@ -442,18 +528,83 @@ class ReportImportService
                     "{$this->normalizedIsrcSql()} = ?",
                     [$normalizedIsrc]
                 )
-                ->limit(2)
                 ->get()
             : collect();
 
-        $track = $trackMatches->count() === 1
-            ? $trackMatches->first()
-            : null;
-
-        $release = $track?->release;
+        $track = null;
+        $release = null;
 
         $ownerType = null;
         $ownerId = null;
+
+        /*
+         * CANONICAL ISRC OWNER CONSENSUS
+         * ------------------------------
+         *
+         * Multiple catalogue rows carrying the same canonical
+         * ISRC are safe only when every resolvable match points
+         * to the same financial owner.
+         *
+         * Different financial owners => no automatic payment.
+         * The row remains unmapped for manual review.
+         */
+        $catalogueCandidates = [];
+
+        foreach ($trackMatches as $candidateTrack) {
+            $candidateRelease = $candidateTrack->release;
+
+            if (!$candidateRelease) {
+                continue;
+            }
+
+            $candidateOwner = app(
+                CatalogueOwnershipService::class
+            )->resolveReleaseOwner(
+                $candidateRelease
+            );
+
+            $candidateOwnerType =
+                !empty($candidateOwner['type'])
+                    ? (string) $candidateOwner['type']
+                    : null;
+
+            $candidateOwnerId =
+                !empty($candidateOwner['id'])
+                    ? (int) $candidateOwner['id']
+                    : null;
+
+            if (
+                !$candidateOwnerType
+                || !$candidateOwnerId
+            ) {
+                continue;
+            }
+
+            $ownerKey =
+                $candidateOwnerType
+                . ':'
+                . $candidateOwnerId;
+
+            $catalogueCandidates[$ownerKey] ??= [
+                'track' => $candidateTrack,
+                'release' => $candidateRelease,
+                'owner_type' => $candidateOwnerType,
+                'owner_id' => $candidateOwnerId,
+            ];
+        }
+
+        /*
+         * Exactly one distinct financial owner means the ISRC
+         * is deterministic even if duplicate catalogue tracks
+         * exist.
+         */
+        if (count($catalogueCandidates) === 1) {
+            $candidate =
+                reset($catalogueCandidates);
+
+            $track = $candidate['track'];
+            $release = $candidate['release'];
+        }
 
         /*
          * DETERMINISTIC REVENUE OWNERSHIP
@@ -529,28 +680,17 @@ class ReportImportService
                             : null,
                 ];
             }
-        } elseif ($release) {
-            $resolvedOwner = app(
-                CatalogueOwnershipService::class
-            )->resolveReleaseOwner(
-                $release
-            );
+        } elseif (
+            count($catalogueCandidates) === 1
+        ) {
+            $candidate =
+                reset($catalogueCandidates);
 
             $ownerType =
-                !empty(
-                    $resolvedOwner['type']
-                )
-                    ? (string)
-                        $resolvedOwner['type']
-                    : null;
+                $candidate['owner_type'];
 
             $ownerId =
-                !empty(
-                    $resolvedOwner['id']
-                )
-                    ? (int)
-                        $resolvedOwner['id']
-                    : null;
+                $candidate['owner_id'];
         }
 
         $mappingStatus =
@@ -586,16 +726,8 @@ class ReportImportService
                 $mapped['collected_revenue']
             );
 
-        $importedRate =
-            $this->nullableNumber(
-                $mapped['label_rate']
-            );
-
-        $importedEarnings =
-            $this->nullableNumber(
-                $mapped['earnings']
-            );
-
+        
+        
         $assignedRate = null;
 
         if ($mappingStatus === 'mapped') {
@@ -668,29 +800,59 @@ class ReportImportService
          *   70% => 0.70
          *  100% => 1.00
          */
+        /*
+         * FINAL MIXX TUNE REPORTING RULE
+         * -------------------------------
+         *
+         * Positive / zero mapped revenue:
+         *   Account percentage is applied.
+         *
+         *   80% => label_rate 0.80
+         *   90% => label_rate 0.90
+         *
+         * Negative mapped revenue:
+         *   Always 100% charge to the mapped owner.
+         *
+         *   label_rate = 1.00
+         *   earnings   = full negative collected revenue
+         *
+         * Unmapped rows never generate payable earnings.
+         */
         if (
             $mappingStatus === 'mapped'
             && $collectedRevenue !== null
             && $assignedRate !== null
         ) {
-            $effectiveLabelRate =
-                round(
-                    $assignedRate / 100,
-                    8
-                );
+            if ($collectedRevenue < 0) {
+                $effectiveLabelRate = 1.0;
 
-            $effectiveEarnings =
-                round(
-                    $collectedRevenue
-                    * $effectiveLabelRate,
-                    8
-                );
+                $effectiveEarnings =
+                    round(
+                        $collectedRevenue,
+                        8
+                    );
+            } else {
+                $effectiveLabelRate =
+                    round(
+                        $assignedRate / 100,
+                        8
+                    );
+
+                $effectiveEarnings =
+                    round(
+                        $collectedRevenue
+                        * $effectiveLabelRate,
+                        8
+                    );
+            }
         } else {
-            $effectiveLabelRate =
-                $importedRate ?? 0.0;
-
-            $effectiveEarnings =
-                $importedEarnings ?? 0.0;
+            /*
+             * Keep source Collected Revenue for audit,
+             * but do not create payable earnings until
+             * ownership is genuinely mapped.
+             */
+            $effectiveLabelRate = 0.0;
+            $effectiveEarnings = 0.0;
         }
 
         ReportRow::query()->create([
@@ -912,19 +1074,97 @@ class ReportImportService
     private function rowHash(
         array $row
     ): string {
+        /*
+         * DUPLICATE FINANCIAL ROW IDENTITY
+         * ================================
+         *
+         * ISRC ownership already uses canonical
+         * uppercase/alphanumeric matching.
+         *
+         * Duplicate detection must use the same
+         * identifier semantics so formatting changes
+         * cannot bypass idempotency:
+         *
+         * IN-ABC-26-12345
+         * IN ABC 26 12345
+         * inabc2612345
+         *
+         * all hash as:
+         *
+         * INABC2612345
+         *
+         * Financial dimensions remain part of the hash,
+         * so genuinely different transactions are not
+         * collapsed merely because they share an ISRC.
+         */
+
+        $canonicalIsrc =
+            strtoupper(
+                preg_replace(
+                    '/[^A-Za-z0-9]/',
+                    '',
+                    trim(
+                        (string) (
+                            $row['isrc']
+                            ?? ''
+                        )
+                    )
+                )
+            );
+
+        $canonicalUpc =
+            (string) (
+                $this->normaliseUpc(
+                    isset($row['upc'])
+                        ? (string) $row['upc']
+                        : null
+                )
+                ?? ''
+            );
+
+        $canonicalText =
+            static function ($value): string {
+                return strtoupper(
+                    trim(
+                        preg_replace(
+                            '/\s+/',
+                            ' ',
+                            (string) (
+                                $value
+                                ?? ''
+                            )
+                        )
+                    )
+                );
+            };
+
         return hash(
             'sha256',
             implode('|', [
-                $row['isrc'] ?? '',
-                $row['upc'] ?? '',
-                $row['platform'] ?? '',
-                $row['country_code'] ?? '',
-                $row['sale_type'] ?? '',
-                $row['sale_date'] ?? '',
-                $row['sale_month'] ?? '',
-                $row['streams'] ?? '',
-                $row['sale_units'] ?? '',
-                $row['earnings'] ?? '',
+                $canonicalIsrc,
+                $canonicalUpc,
+                $canonicalText(
+                    $row['platform']
+                    ?? ''
+                ),
+                $canonicalText(
+                    $row['country_code']
+                    ?? ''
+                ),
+                $canonicalText(
+                    $row['sale_type']
+                    ?? ''
+                ),
+                $row['sale_date']
+                    ?? '',
+                $row['sale_month']
+                    ?? '',
+                $row['streams']
+                    ?? '',
+                $row['sale_units']
+                    ?? '',
+                $row['collected_revenue']
+                    ?? '',
             ])
         );
     }

@@ -153,13 +153,41 @@ class AgreementResolver
             return $this->defaultAgreement();
         }
 
+        /*
+         * FF179_FINANCIAL_HOLD
+         *
+         * Missing commercial terms must never
+         * silently become a 100% beneficiary payout.
+         *
+         * NULL means the account has no authoritative
+         * configured agreement/rate and must remain
+         * on financial hold.
+         */
+        /*
+         * FF179R_CANONICAL_REVENUE_RATE
+         *
+         * labels.revenue_share_percentage is the
+         * authoritative account-level commercial
+         * rate used by the current platform.
+         *
+         * Do not fall back to legacy
+         * royalty_share_percentage because old/default
+         * values such as 100% are not evidence of an
+         * approved commercial agreement.
+         */
+        if (
+            $label->revenue_share_percentage === null
+        ) {
+            return $this->holdAgreement(
+                'labels_fallback_missing_rate'
+            );
+        }
+
         $beneficiary =
             $this->boundPercentage(
-                (float) (
+                (float)
                     $label
-                        ->royalty_share_percentage
-                    ?? 100
-                )
+                        ->revenue_share_percentage
             );
 
         return [
@@ -195,24 +223,38 @@ class AgreementResolver
 
     private function defaultAgreement(): array
     {
+        /*
+         * FF179_FINANCIAL_HOLD
+         *
+         * No subject / no authoritative agreement
+         * is not permission to pay 100%.
+         */
+        return $this->holdAgreement(
+            'system_default_missing_rate'
+        );
+    }
+
+    private function holdAgreement(
+        string $source
+    ): array {
         return [
-            'source' =>
-                'system_default',
+            'source' => $source,
 
-            'agreement_id' =>
-                null,
+            'agreement_id' => null,
 
-            'beneficiary_percentage' =>
-                100.0,
+            /*
+             * NULL is intentional:
+             * unresolved commercial terms = HOLD.
+             */
+            'beneficiary_percentage' => null,
 
-            'company_retention_percentage' =>
-                0.0,
+            'company_retention_percentage' => null,
 
-            'parent_commission_percentage' =>
-                0.0,
+            'parent_commission_percentage' => null,
 
-            'currency' =>
-                'INR',
+            'currency' => 'INR',
+
+            'financial_hold' => true,
         ];
     }
 

@@ -60,6 +60,11 @@ class WithdrawalController extends Controller
                         $financialOwner
                     ),
 
+                'withdrawalEnabled' =>
+                    $withdrawalService->withdrawalEnabledFor(
+                        $financialOwner
+                    ),
+
                 'withdrawals' =>
                     WithdrawalRequest::query()
                         ->with([

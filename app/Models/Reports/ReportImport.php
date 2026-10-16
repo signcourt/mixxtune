@@ -22,12 +22,33 @@ class ReportImport extends Model
         'uploaded_by',
         'started_at',
         'completed_at',
+        'financial_status',
+        'publish_at',
+        'reviewed_at',
+        'reviewed_by',
+        'approved_at',
+        'approved_by',
+        'published_at',
+        'published_by',
+        'review_row_count',
+        'review_mapped_rows',
+        'review_unmapped_rows',
+        'review_collected_revenue',
+        'review_earnings',
+        'review_note',
     ];
 
     protected $casts = [
         'column_map' => 'array',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+    
+        'publish_at' => 'datetime',
+        'reviewed_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'published_at' => 'datetime',
+        'review_collected_revenue' => 'decimal:8',
+        'review_earnings' => 'decimal:8',
     ];
 
     public function rows()

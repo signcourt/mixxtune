@@ -37,6 +37,8 @@ export default function Edit({
             Boolean(
                 artist.can_receive_splits
             ),
+        can_withdraw:
+            artist.can_withdraw !== false,
     });
 
     const submit = (event) => {
@@ -229,6 +231,21 @@ export default function Edit({
                                 )
                             }
                         />
+
+                        {role === 'super_admin' && (
+                            <Toggle
+                                title="Withdrawal Enabled"
+                                checked={
+                                    data.can_withdraw
+                                }
+                                onChange={(checked) =>
+                                    setData(
+                                        'can_withdraw',
+                                        checked
+                                    )
+                                }
+                            />
+                        )}
                     </div>
                 </section>
 

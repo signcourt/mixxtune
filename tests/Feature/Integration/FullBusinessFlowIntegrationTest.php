@@ -64,6 +64,7 @@ class FullBusinessFlowIntegrationTest extends TestCase
         $artist = Artist::factory()->create([
             'user_id' => $artistUser->id,
             'label_id' => $label->id,
+            'revenue_share_percentage' => 100,
             'created_by' => $admin->id,
         ]);
 
@@ -424,8 +425,7 @@ class FullBusinessFlowIntegrationTest extends TestCase
             'Sale Month',
             'Streams',
             'Sale Units',
-            'Label Rate',
-            'Earnings',
+            'Collected Revenue',
         ];
 
         $rows = [
@@ -446,7 +446,6 @@ class FullBusinessFlowIntegrationTest extends TestCase
                 $month,
                 '20000',
                 '20000',
-                '0.10',
                 '2000',
             ],
         ];
@@ -509,39 +508,6 @@ class FullBusinessFlowIntegrationTest extends TestCase
             ]
         );
 
-        /*
-         * Canonicalize imported catalogue ownership before royalty
-         * generation.
-         *
-         * ReportImportService imports and matches catalogue metadata.
-         * The royalty engine consumes canonical mapped ownership.
-         *
-         * This E2E represents direct Artist-owned catalogue because
-         * the Release itself has label_id = null.
-         */
-        ReportRow::query()
-            ->where(
-                'sale_month',
-                $month
-            )
-            ->where(
-                'release_id',
-                $release->id
-            )
-            ->update([
-                'mapping_status' =>
-                    'mapped',
-
-                'mapped_at' =>
-                    now(),
-
-                'revenue_owner_type' =>
-                    'artist',
-
-                'revenue_owner_id' =>
-                    $artist->id,
-            ]);
-
         $this->assertDatabaseHas(
             'report_rows',
             [
@@ -562,6 +528,15 @@ class FullBusinessFlowIntegrationTest extends TestCase
 
                 'revenue_owner_id' =>
                     $artist->id,
+
+                'collected_revenue' =>
+                    2000,
+
+                'label_rate' =>
+                    1,
+
+                'earnings' =>
+                    2000,
             ]
         );
 
@@ -614,13 +589,13 @@ class FullBusinessFlowIntegrationTest extends TestCase
         );
 
         $this->assertEquals(
-            200,
+            0,
             (float) $statement
                 ->commission_amount
         );
 
         $this->assertEquals(
-            1800,
+            2000,
             (float) $statement
                 ->net_payable
         );
@@ -651,7 +626,7 @@ class FullBusinessFlowIntegrationTest extends TestCase
                 ->firstOrFail();
 
         $this->assertEquals(
-            1800,
+            2000,
             (float) $wallet
                 ->pending_balance
         );
@@ -677,7 +652,7 @@ class FullBusinessFlowIntegrationTest extends TestCase
         );
 
         $this->assertEquals(
-            1800,
+            2000,
             (float) $wallet
                 ->available_balance
         );
@@ -707,7 +682,7 @@ class FullBusinessFlowIntegrationTest extends TestCase
         );
 
         $this->assertEquals(
-            1800,
+            2000,
             (float) $invoice
                 ->total_amount
         );

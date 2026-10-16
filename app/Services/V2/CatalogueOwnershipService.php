@@ -54,32 +54,61 @@ class CatalogueOwnershipService
             ];
         }
 
+        if (!empty($release->artist_id)) {
+            return [
+                'type' => 'artist',
+                'id' => (int) $release->artist_id,
+            ];
+        }
+
+        /*
+         * MIXXTUNE_INVALID_CATALOGUE_OWNER_GUARD_V1
+         *
+         * A catalogue release without a valid label_id or
+         * artist_id has no deterministic financial owner.
+         *
+         * created_by is intentionally NOT used as a financial
+         * ownership fallback because one user may create
+         * releases for multiple catalogue labels.
+         */
         return [
-            'type' => 'artist',
-            'id' => (int) $release->artist_id,
+            'type' => null,
+            'id' => null,
         ];
     }
 
     public function remapReports(
         bool $onlyUnmapped = false,
-        ?string $month = null
+        ?string $month = null,
+        ?int $reportImportId = null
     ): array {
         $mapped = 0;
         $unmapped = 0;
 
-        $query = DB::table('report_rows')
+        $query = $this->applyFinancialSnapshotLock(
+                    DB::table('report_rows')
+                )
             ->select([
                 'id',
                 'isrc',
                 'upc',
                 'track_title',
                 'track_artist',
+                'label_id',
+                'artist_id',
             ])
             ->when(
                 $month !== null && trim($month) !== '',
                 fn ($query) => $query->where(
                     'reporting_month',
                     trim($month)
+                )
+            )
+            ->when(
+                $reportImportId !== null,
+                fn ($query) => $query->where(
+                    'report_import_id',
+                    $reportImportId
                 )
             )
             ->orderBy('id');
@@ -112,7 +141,69 @@ class CatalogueOwnershipService
                     );
 
                     if ($rule) {
-                        DB::table('report_rows')
+                        /*
+                         * MIXXTUNE_PERSISTENT_RULE_OWNER_GUARD_V1
+                         *
+                         * A persistent rule is authoritative only while
+                         * its financial owner still exists and is active.
+                         *
+                         * Broken/deleted owners must never convert a
+                         * report row into a financially mapped row.
+                         */
+                        $ruleOwnerType =
+                            $rule->owner_type ?? null;
+
+                        $ruleOwnerId =
+                            (int) ($rule->owner_id ?? 0);
+
+                        $ruleOwnerValid = false;
+
+                        if (
+                            $ruleOwnerType === 'label'
+                            && $ruleOwnerId > 0
+                        ) {
+                            $ruleOwnerValid =
+                                DB::table('labels')
+                                    ->where(
+                                        'id',
+                                        $ruleOwnerId
+                                    )
+                                    ->whereNull(
+                                        'deleted_at'
+                                    )
+                                    ->exists();
+                        } elseif (
+                            $ruleOwnerType === 'artist'
+                            && $ruleOwnerId > 0
+                        ) {
+                            $ruleOwnerValid =
+                                DB::table('artists')
+                                    ->where(
+                                        'id',
+                                        $ruleOwnerId
+                                    )
+                                    ->whereNull(
+                                        'deleted_at'
+                                    )
+                                    ->exists();
+                        }
+
+                        if (!$ruleOwnerValid) {
+                            /*
+                             * Ignore the stale rule and continue with
+                             * canonical catalogue ISRC resolution.
+                             *
+                             * We intentionally do NOT delete or modify
+                             * the persistent rule here.
+                             */
+                            $rule = null;
+                        }
+                    }
+
+                    if ($rule) {
+                        $this->applyFinancialSnapshotLock(
+                    DB::table('report_rows')
+                )
                             ->where('id', $row->id)
                             ->update([
                                 'revenue_owner_type' =>
@@ -184,7 +275,9 @@ class CatalogueOwnershipService
                     }
 
                     if (!$release) {
-                        DB::table('report_rows')
+                        $this->applyFinancialSnapshotLock(
+                    DB::table('report_rows')
+                )
                             ->where('id', $row->id)
                             ->update([
                                 'mapping_status' =>
@@ -225,7 +318,62 @@ class CatalogueOwnershipService
                             $release
                         );
 
+                    /*
+                     * MIXXTUNE_REMAP_VALID_OWNER_REQUIRED_V1
+                     *
+                     * Finding a catalogue ISRC is not enough.
+                     * The matched release must also have a valid,
+                     * deterministic financial owner.
+                     */
+                    if (
+                        !in_array(
+                            $owner['type'] ?? null,
+                            ['label', 'artist'],
+                            true
+                        )
+                        || (int) ($owner['id'] ?? 0) <= 0
+                    ) {
+                        $this->applyFinancialSnapshotLock(
+                            DB::table('report_rows')
+                        )
+                            ->where('id', $row->id)
+                            ->update([
+                                'mapping_status' =>
+                                    'unmapped',
+
+                                'release_id' =>
+                                    null,
+
+                                'track_id' =>
+                                    null,
+
+                                'artist_id' =>
+                                    null,
+
+                                'label_id' =>
+                                    null,
+
+                                'revenue_owner_type' =>
+                                    null,
+
+                                'revenue_owner_id' =>
+                                    null,
+
+                                'mapped_at' =>
+                                    null,
+
+                                'updated_at' =>
+                                    now(),
+                            ]);
+
+                        $unmapped++;
+
+                        continue;
+                    }
+
+                    $this->applyFinancialSnapshotLock(
                     DB::table('report_rows')
+                )
                         ->where('id', $row->id)
                         ->update([
                             'release_id' =>
@@ -268,6 +416,39 @@ class CatalogueOwnershipService
             'mapped' => $mapped,
             'unmapped' => $unmapped,
         ];
+    }
+
+
+    /*
+     * MIXXTUNE_FINANCIAL_SNAPSHOT_LOCK
+     *
+     * Financial report rows may only be mutated while
+     * their parent import is still review_pending.
+     *
+     * approved_scheduled and published imports are
+     * immutable accounting snapshots.
+     */
+    private function applyFinancialSnapshotLock(
+        $query
+    )
+    {
+        return $query->whereExists(
+            function ($financialImport) {
+                $financialImport
+                    ->selectRaw('1')
+                    ->from(
+                        'report_imports as financial_import'
+                    )
+                    ->whereColumn(
+                        'financial_import.id',
+                        'report_rows.report_import_id'
+                    )
+                    ->where(
+                        'financial_import.financial_status',
+                        'review_pending'
+                    );
+            }
+        );
     }
 
     public function transferRelease(
@@ -406,7 +587,9 @@ class CatalogueOwnershipService
                 )
                 ->pluck('ra.report_row_id');
 
-            DB::table('report_rows')
+            $this->applyFinancialSnapshotLock(
+                    DB::table('report_rows')
+                )
                 ->where(
                     'release_id',
                     $releaseId
@@ -552,7 +735,9 @@ class CatalogueOwnershipService
             );
 
         if ($scope === 'pending_and_future') {
-            DB::table('report_rows')
+            $this->applyFinancialSnapshotLock(
+                    DB::table('report_rows')
+                )
                 ->where('track_id', $trackId)
                 ->whereNotIn(
                     'id',

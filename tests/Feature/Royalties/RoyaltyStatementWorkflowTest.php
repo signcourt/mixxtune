@@ -49,6 +49,13 @@ class RoyaltyStatementWorkflowTest extends TestCase
             'user_id' => $artistUser->id,
             'label_id' => $label->id,
             'created_by' => $artistUser->id,
+
+            /*
+             * Current reporting contract:
+             * importer snapshots this commercial rate
+             * when Collected Revenue is processed.
+             */
+            'revenue_share_percentage' => 100,
         ]);
 
         static $releaseSequence = 1;
@@ -138,7 +145,6 @@ class RoyaltyStatementWorkflowTest extends TestCase
                 $month,
                 (string) (1000 * $index),
                 (string) (1000 * $index),
-                '0.10',
                 (string) (100 * $index),
             ];
         }
@@ -190,6 +196,41 @@ class RoyaltyStatementWorkflowTest extends TestCase
                     $artist->id,
             ]);
 
+        /*
+         * MIXXTUNE_TEST_FINANCIAL_PUBLISHED_FIXTURE
+         *
+         * Royalty generation intentionally reads only rows whose
+         * parent report import has reached the published financial
+         * state. These workflow tests exercise downstream royalty
+         * behaviour directly, so publish the test import fixture
+         * after canonical ownership has been established.
+         */
+        DB::table('report_imports')
+            ->whereIn(
+                'id',
+                ReportRow::query()
+                    ->where(
+                        'sale_month',
+                        $month
+                    )
+                    ->where(
+                        'release_id',
+                        $release->id
+                    )
+                    ->whereNotNull('report_import_id')
+                    ->pluck('report_import_id')
+                    ->unique()
+                    ->values()
+                    ->all()
+            )
+            ->update([
+                'financial_status' =>
+                    'published',
+
+                'published_at' =>
+                    now(),
+            ]);
+
         return [
             $artistUser,
             $label,
@@ -220,8 +261,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
             'Sale Month',
             'Streams',
             'Sale Units',
-            'Label Rate',
-            'Earnings',
+            'Collected Revenue',
         ];
     }
 
@@ -322,13 +362,21 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            30.00,
+            0.00,
             (float) $statement
                 ->commission_amount
         );
 
+        /*
+         * ReportImportService already applied the
+         * artist's commercial rate and snapshotted
+         * Earnings.
+         *
+         * Royalty generation must not apply another
+         * commission/rate.
+         */
         $this->assertEquals(
-            270.00,
+            300.00,
             (float) $statement
                 ->net_payable
         );
@@ -386,7 +434,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            90.00,
+            100.00,
             (float) $allocations
                 ->get(0)
                 ->net_amount
@@ -400,7 +448,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            180.00,
+            200.00,
             (float) $allocations
                 ->get(1)
                 ->net_amount
@@ -557,7 +605,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            270.00,
+            300.00,
             (float) RoyaltyAllocation::query()
                 ->where(
                     'royalty_statement_id',
@@ -655,7 +703,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
             ->firstOrFail();
 
         $this->assertEquals(
-            270.00,
+            300.00,
             (float) $wallet
                 ->pending_balance
         );
@@ -667,7 +715,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            270.00,
+            300.00,
             (float) $wallet
                 ->lifetime_earnings
         );
@@ -785,13 +833,13 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            270.00,
+            300.00,
             (float) $wallet
                 ->available_balance
         );
 
         $this->assertEquals(
-            270.00,
+            300.00,
             (float) $wallet
                 ->lifetime_earnings
         );
@@ -1255,7 +1303,11 @@ class RoyaltyStatementWorkflowTest extends TestCase
 
                     'updated_at' =>
                         now(),
-                ]);
+                
+                    /* MIXXTUNE_TEST_PUBLISHED_IMPORT_GATE_A23 */
+                    'financial_status' => 'published',
+                    'published_at' => now(),
+]);
 
         $reportRowId =
             DB::table('report_rows')
@@ -1862,7 +1914,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            270,
+            300,
             (float) $statement->net_payable
         );
 
@@ -1879,7 +1931,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
             ->firstOrFail();
 
         $this->assertEquals(
-            270,
+            300,
             (float) $wallet->pending_balance
         );
     }
@@ -1945,7 +1997,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            270,
+            300,
             (float) $statement->net_payable
         );
 
@@ -1962,7 +2014,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
             ->firstOrFail();
 
         $this->assertEquals(
-            270,
+            300,
             (float) $wallet->pending_balance
         );
     }
@@ -2257,6 +2309,315 @@ class RoyaltyStatementWorkflowTest extends TestCase
                     $artistUser->id
                 )
                 ->exists()
+        );
+    }
+
+
+    public function test_snapshot_allocation_metadata_uses_stored_rate(): void
+    {
+        $userId =
+            \Illuminate\Support\Facades\DB::table(
+                'users'
+            )->insertGetId([
+                'name' =>
+                    'R11 Snapshot Label',
+
+                'email' =>
+                    'r11-snapshot@example.com',
+
+                'username' =>
+                    'r11snapshot',
+
+                'role' =>
+                    'label',
+
+                'account_status' =>
+                    'active',
+
+                'email_verified_at' =>
+                    now(),
+
+                'password' =>
+                    bcrypt('password'),
+
+                'created_at' =>
+                    now(),
+
+                'updated_at' =>
+                    now(),
+            ]);
+
+        $labelId =
+            \Illuminate\Support\Facades\DB::table(
+                'labels'
+            )->insertGetId([
+                'user_id' =>
+                    $userId,
+
+                'public_id' =>
+                    'LBL-R11-SNAPSHOT',
+
+                'name' =>
+                    'R11 Snapshot Label',
+
+                'slug' =>
+                    'r11-snapshot-label',
+
+                'revenue_share_percentage' =>
+                    5,
+
+                'created_at' =>
+                    now(),
+
+                'updated_at' =>
+                    now(),
+            ]);
+
+        $importId =
+            \Illuminate\Support\Facades\DB::table(
+                'report_imports'
+            )->insertGetId([
+                'public_id' =>
+                    'R11-SNAPSHOT-IMPORT',
+
+                'original_filename' =>
+                    'r11-snapshot.csv',
+
+                'stored_path' =>
+                    'tests/r11-snapshot.csv',
+
+                'status' =>
+                    'completed',
+
+                'total_rows' =>
+                    2,
+
+                'imported_rows' =>
+                    2,
+
+                'duplicate_rows' =>
+                    0,
+
+                'failed_rows' =>
+                    0,
+
+                'started_at' =>
+                    now(),
+
+                'completed_at' =>
+                    now(),
+
+                'created_at' =>
+                    now(),
+
+                'updated_at' =>
+                    now(),
+            
+                /* MIXXTUNE_TEST_PUBLISHED_IMPORT_GATE_A23 */
+                'financial_status' => 'published',
+                'published_at' => now(),
+]);
+
+        $positiveRowId =
+            \Illuminate\Support\Facades\DB::table(
+                'report_rows'
+            )->insertGetId([
+                'report_import_id' =>
+                    $importId,
+
+                'row_hash' =>
+                    hash(
+                        'sha256',
+                        'r11-positive'
+                    ),
+
+                'reporting_month' =>
+                    '2026-08',
+
+                'sale_month' =>
+                    '2026-08',
+
+                'mapping_status' =>
+                    'mapped',
+
+                'revenue_owner_type' =>
+                    'label',
+
+                'revenue_owner_id' =>
+                    $labelId,
+
+                'collected_revenue' =>
+                    100,
+
+                'label_rate' =>
+                    0.80,
+
+                'earnings' =>
+                    80,
+
+                'created_at' =>
+                    now(),
+
+                'updated_at' =>
+                    now(),
+            ]);
+
+        $negativeRowId =
+            \Illuminate\Support\Facades\DB::table(
+                'report_rows'
+            )->insertGetId([
+                'report_import_id' =>
+                    $importId,
+
+                'row_hash' =>
+                    hash(
+                        'sha256',
+                        'r11-negative'
+                    ),
+
+                'reporting_month' =>
+                    '2026-08',
+
+                'sale_month' =>
+                    '2026-08',
+
+                'mapping_status' =>
+                    'mapped',
+
+                'revenue_owner_type' =>
+                    'label',
+
+                'revenue_owner_id' =>
+                    $labelId,
+
+                'collected_revenue' =>
+                    -20,
+
+                'label_rate' =>
+                    1.00,
+
+                'earnings' =>
+                    -20,
+
+                'created_at' =>
+                    now(),
+
+                'updated_at' =>
+                    now(),
+            ]);
+
+        /*
+         * Change live/current account rate after snapshot creation.
+         * Allocation metadata must still use stored report-row rate.
+         */
+        \Illuminate\Support\Facades\DB::table(
+            'labels'
+        )
+            ->where(
+                'id',
+                $labelId
+            )
+            ->update([
+                'revenue_share_percentage' =>
+                    99,
+            ]);
+
+        $service =
+            app(
+                \App\Services\V2\OwnershipRoyaltyService::class
+            );
+
+        $method =
+            new \ReflectionMethod(
+                \App\Services\V2\OwnershipRoyaltyService::class,
+                'buildAllocations'
+            );
+
+        $method->setAccessible(true);
+
+        $allocations =
+            $method->invoke(
+                $service,
+                '2026-08',
+                'label',
+                $labelId,
+                0.0
+            );
+
+        $byRow =
+            collect($allocations)
+                ->keyBy(
+                    'report_row_id'
+                );
+
+        $this->assertTrue(
+            $byRow->has(
+                $positiveRowId
+            )
+        );
+
+        $this->assertTrue(
+            $byRow->has(
+                $negativeRowId
+            )
+        );
+
+        $positive =
+            $byRow->get(
+                $positiveRowId
+            );
+
+        $negative =
+            $byRow->get(
+                $negativeRowId
+            );
+
+        $this->assertEquals(
+            80.0,
+            (float)
+                $positive[
+                    'gross_amount'
+                ]
+        );
+
+        $this->assertEquals(
+            80.0,
+            (float)
+                $positive[
+                    'net_amount'
+                ]
+        );
+
+        $this->assertEquals(
+            80.0,
+            (float)
+                $positive[
+                    'share_percentage'
+                ]
+        );
+
+        $this->assertEquals(
+            -20.0,
+            (float)
+                $negative[
+                    'gross_amount'
+                ]
+        );
+
+        $this->assertEquals(
+            -20.0,
+            (float)
+                $negative[
+                    'net_amount'
+                ]
+        );
+
+        $this->assertEquals(
+            100.0,
+            (float)
+                $negative[
+                    'share_percentage'
+                ]
         );
     }
 

@@ -1228,7 +1228,7 @@ class RevenueSharingController extends Controller
         $percent = $share
             ? (float)
                 $share->revenue_share_percent
-            : 0.0;
+            : null;
 
         return [
             'type' => $type,
@@ -1246,7 +1246,9 @@ class RevenueSharingController extends Controller
                 $percent,
 
             'master_share_percent' =>
-                100 - $percent,
+                $percent !== null
+                    ? 100 - $percent
+                    : null,
 
             'show_revenue_share' =>
                 $share

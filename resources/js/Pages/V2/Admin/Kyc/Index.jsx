@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
     Head,
     Link,
@@ -33,7 +34,18 @@ export default function Index({
         filters.status ??
         'submitted';
 
+    const [selectedProfileId, setSelectedProfileId] =
+        useState(null);
+
+    const selectedProfile =
+        (profiles.data ?? []).find(
+            (profile) =>
+                profile.id === selectedProfileId
+        ) ?? null;
+
     const changeStatus = (status) => {
+        setSelectedProfileId(null);
+
         router.get(
             '/v2/admin/kyc',
             { status },
@@ -111,32 +123,42 @@ export default function Index({
                 </section>
 
                 <section className="space-y-4">
-                    {(profiles.data ?? []).map(
-                        (profile) => (
+                    {selectedProfile ? (
+                        <>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setSelectedProfileId(
+                                        null
+                                    )
+                                }
+                                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-300 hover:text-violet-700"
+                            >
+                                ← Back to KYC List
+                            </button>
+
                             <KycCard
-                                key={profile.id}
-                                profile={profile}
+                                profile={
+                                    selectedProfile
+                                }
                             />
-                        )
-                    )}
-
-                    {(profiles.data ?? []).length ===
-                        0 && (
-                        <div className="rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
-                            <p className="text-lg font-bold text-slate-800">
-                                No{' '}
-                                {currentStatus.replaceAll(
-                                    '_',
-                                    ' '
-                                )}{' '}
-                                KYC profiles
-                            </p>
-
-                            <p className="mt-2 text-sm text-slate-500">
-                                Profiles matching this
-                                status will appear here.
-                            </p>
-                        </div>
+                        </>
+                    ) : (
+                        <KycList
+                            profiles={
+                                profiles.data ?? []
+                            }
+                            onView={(
+                                profileId
+                            ) =>
+                                setSelectedProfileId(
+                                    profileId
+                                )
+                            }
+                            currentStatus={
+                                currentStatus
+                            }
+                        />
                     )}
                 </section>
 
@@ -145,6 +167,164 @@ export default function Index({
                 />
             </div>
         </PanelLayout>
+    );
+}
+
+function KycList({
+    profiles,
+    onView,
+    currentStatus,
+}) {
+    if (!profiles.length) {
+        return (
+            <div className="rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+                <p className="text-lg font-bold text-slate-800">
+                    No{' '}
+                    {currentStatus.replaceAll(
+                        '_',
+                        ' '
+                    )}{' '}
+                    KYC profiles
+                </p>
+
+                <p className="mt-2 text-sm text-slate-500">
+                    Profiles matching this status
+                    will appear here.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                        <tr>
+                            {[
+                                'Name',
+                                'Client ID',
+                                'Account',
+                                'Email / Phone',
+                                'Tax Profile',
+                                'KYC Status',
+                                'Updated',
+                                'Action',
+                            ].map((heading) => (
+                                <th
+                                    key={heading}
+                                    className="whitespace-nowrap px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
+                                >
+                                    {heading}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                        {profiles.map(
+                            (profile) => (
+                                <tr
+                                    key={
+                                        profile.id
+                                    }
+                                    onClick={() =>
+                                        onView(
+                                            profile.id
+                                        )
+                                    }
+                                    className="cursor-pointer transition hover:bg-violet-50/50"
+                                >
+                                    <td className="px-5 py-4">
+                                        <p className="whitespace-nowrap font-bold text-slate-900">
+                                            {profile
+                                                .user
+                                                ?.name ??
+                                                'Unknown'}
+                                        </p>
+
+                                        <p className="mt-1 text-xs text-slate-400">
+                                            Profile #
+                                            {
+                                                profile.id
+                                            }
+                                        </p>
+                                    </td>
+
+                                    <td className="whitespace-nowrap px-5 py-4 text-sm font-semibold text-slate-700">
+                                        {profile
+                                            .user
+                                            ?.client_id ??
+                                            '—'}
+                                    </td>
+
+                                    <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-700">
+                                        {formatLabel(
+                                            profile
+                                                .user
+                                                ?.role
+                                        )}
+                                    </td>
+
+                                    <td className="px-5 py-4">
+                                        <p className="whitespace-nowrap text-sm font-medium text-slate-700">
+                                            {profile
+                                                .user
+                                                ?.email ??
+                                                '—'}
+                                        </p>
+
+                                        <p className="mt-1 whitespace-nowrap text-xs text-slate-400">
+                                            {profile
+                                                .user
+                                                ?.phone ??
+                                                'No phone'}
+                                        </p>
+                                    </td>
+
+                                    <td className="whitespace-nowrap px-5 py-4 text-sm font-semibold text-slate-700">
+                                        {profile.gst_number
+                                            ? 'GST Registered'
+                                            : 'Non-GST'}
+                                    </td>
+
+                                    <td className="whitespace-nowrap px-5 py-4">
+                                        <StatusBadge
+                                            status={
+                                                profile.kyc_status
+                                            }
+                                        />
+                                    </td>
+
+                                    <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
+                                        {formatDate(
+                                            profile.updated_at
+                                        )}
+                                    </td>
+
+                                    <td className="whitespace-nowrap px-5 py-4">
+                                        <button
+                                            type="button"
+                                            onClick={(
+                                                event
+                                            ) => {
+                                                event.stopPropagation();
+                                                onView(
+                                                    profile.id
+                                                );
+                                            }}
+                                            className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700"
+                                        >
+                                            View Details
+                                        </button>
+                                    </td>
+                                </tr>
+                            )
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     );
 }
 
@@ -231,7 +411,46 @@ function KycCard({ profile }) {
                 </div>
             </div>
 
-            <div className="grid gap-6 p-6 xl:grid-cols-3">
+            <div className="grid gap-6 p-6 xl:grid-cols-2 2xl:grid-cols-4">
+                <DetailSection
+                    title="Account Details"
+                    rows={[
+                        [
+                            'User ID',
+                            profile.user?.id
+                                ? `#${profile.user.id}`
+                                : '—',
+                        ],
+                        [
+                            'Client ID',
+                            profile.user?.client_id ??
+                                'Not assigned',
+                        ],
+                        [
+                            'Account Type',
+                            formatLabel(
+                                profile.user?.role
+                            ),
+                        ],
+                        [
+                            'Email',
+                            profile.user?.email ??
+                                'Not available',
+                        ],
+                        [
+                            'Phone',
+                            profile.user?.phone ??
+                                'Not added',
+                        ],
+                        [
+                            'Account KYC',
+                            formatLabel(
+                                profile.user?.kyc_status
+                            ),
+                        ],
+                    ]}
+                />
+
                 <DetailSection
                     title="Identity & Tax"
                     rows={[
@@ -245,9 +464,25 @@ function KycCard({ profile }) {
                                 'Not available',
                         ],
                         [
+                            'GST Status',
+                            profile.gst_number
+                                ? 'GST Registered'
+                                : 'Non-GST',
+                        ],
+                        [
                             'GSTIN',
                             profile.gst_number ??
                                 'Not registered',
+                        ],
+                        [
+                            'KYC Status',
+                            formatLabel(
+                                profile.kyc_status
+                            ),
+                        ],
+                        [
+                            'Profile ID',
+                            `#${profile.id}`,
                         ],
                     ]}
                 />
@@ -257,7 +492,8 @@ function KycCard({ profile }) {
                     rows={[
                         [
                             'Bank',
-                            profile.bank_name,
+                            profile.bank_name ??
+                                'Not added',
                         ],
                         [
                             'Account',
@@ -266,12 +502,27 @@ function KycCard({ profile }) {
                         ],
                         [
                             'IFSC',
-                            profile.ifsc_code,
+                            profile.ifsc_code ??
+                                'Not added',
+                        ],
+                        [
+                            'Branch',
+                            profile.branch_name ??
+                                'Not added',
                         ],
                         [
                             'UPI',
                             profile.upi_id ??
                                 'Not added',
+                        ],
+                        [
+                            'Payout Method',
+                            profile.masked_bank_account &&
+                            profile.ifsc_code
+                                ? 'Bank Transfer'
+                                : profile.upi_id
+                                  ? 'UPI'
+                                  : 'Not configured',
                         ],
                     ]}
                 />
@@ -280,8 +531,13 @@ function KycCard({ profile }) {
                     title="Billing Address"
                     rows={[
                         [
-                            'Address',
+                            'Address Line 1',
                             profile.address_line_1,
+                        ],
+                        [
+                            'Address Line 2',
+                            profile.address_line_2 ??
+                                '—',
                         ],
                         [
                             'City',
@@ -300,6 +556,31 @@ function KycCard({ profile }) {
                             profile.country_code,
                         ],
                     ]}
+                />
+            </div>
+
+            <div className="mx-6 mb-6 grid gap-4 md:grid-cols-3">
+                <MetaCard
+                    label="Submitted / Updated"
+                    value={formatDateTime(
+                        profile.updated_at
+                    )}
+                />
+
+                <MetaCard
+                    label="Verified At"
+                    value={formatDateTime(
+                        profile.verified_at
+                    )}
+                />
+
+                <MetaCard
+                    label="Verification"
+                    value={
+                        profile.verified_by
+                            ? `Admin #${profile.verified_by}`
+                            : 'Awaiting review'
+                    }
                 />
             </div>
 
@@ -424,6 +705,23 @@ function DetailSection({
     );
 }
 
+function MetaCard({
+    label,
+    value,
+}) {
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                {label}
+            </p>
+
+            <p className="mt-1 break-words text-sm font-semibold text-slate-800">
+                {value || '—'}
+            </p>
+        </div>
+    );
+}
+
 function SummaryCard({
     label,
     value,
@@ -499,6 +797,36 @@ function Pagination({ links }) {
                 />
             ))}
         </div>
+    );
+}
+
+function formatLabel(value) {
+    if (!value) {
+        return '—';
+    }
+
+    return String(value)
+        .replaceAll('_', ' ')
+        .replace(
+            /\b\w/g,
+            (char) => char.toUpperCase()
+        );
+}
+
+function formatDateTime(value) {
+    if (!value) {
+        return '—';
+    }
+
+    return new Date(value).toLocaleString(
+        'en-IN',
+        {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }
     );
 }
 
