@@ -49,6 +49,8 @@ class LabelAnalyticsIsolationTest extends TestCase
     {
         return DB::table('report_imports')
             ->insertGetId([
+                // MIXXTUNE_FINANCIAL_VISIBILITY_GATE: only published imports feed analytics
+                'financial_status' => 'published',
                 'public_id' => (string) Str::ulid(),
                 'original_filename' =>
                     'label-analytics-isolation.csv',
@@ -384,10 +386,10 @@ class LabelAnalyticsIsolationTest extends TestCase
                             'label'
                         )
                         ->where(
-                            'summary.earnings',
+                            'importedRevenueAnalytics.platforms',
                             fn ($value) =>
                                 abs(
-                                    (float) $value - 125.0
+                                    (float) collect($value)->sum('earnings') - 125.0
                                 ) < 0.000001
                         )
             );
@@ -809,10 +811,10 @@ class LabelAnalyticsIsolationTest extends TestCase
                             'label'
                         )
                         ->where(
-                            'summary.earnings',
+                            'importedRevenueAnalytics.platforms',
                             fn ($value) =>
                                 abs(
-                                    (float) $value
+                                    (float) collect($value)->sum('earnings')
                                     - 888.0
                                 ) < 0.000001
                         )
@@ -1019,10 +1021,10 @@ class LabelAnalyticsIsolationTest extends TestCase
                     fn (Assert $page) =>
                         $page
                             ->where(
-                                'summary.earnings',
+                                'importedRevenueAnalytics.platforms',
                                 fn ($value) =>
                                     abs(
-                                        (float) $value
+                                        (float) collect($value)->sum('earnings')
                                         - 1202.0
                                     ) < 0.000001
                             )
@@ -1263,10 +1265,10 @@ class LabelAnalyticsIsolationTest extends TestCase
                 ->assertInertia(
                     fn (Assert $page) =>
                         $page->where(
-                            'summary.earnings',
+                            'importedRevenueAnalytics.platforms',
                             fn ($value) =>
                                 abs(
-                                    (float) $value
+                                    (float) collect($value)->sum('earnings')
                                     - $case['expected']
                                 ) < 0.000001
                         )

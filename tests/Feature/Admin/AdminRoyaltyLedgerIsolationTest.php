@@ -107,14 +107,9 @@ class AdminRoyaltyLedgerIsolationTest extends TestCase
 
         $foreignLedger = $this->ledger($foreignLabel);
 
-        $this->actingAs($admin)
-            ->post(
-                route(
-                    'single.admin.royalty-ledgers.approve',
-                    $foreignLedger
-                )
-            )
-            ->assertForbidden();
+        // MIXXTUNE_LEDGER_ADMIN_MUTATIONS_REMOVED: only super-admin can mutate ledgers.
+        $response = $this->actingAs($admin)->post('/admin/royalty-ledgers/'.$foreignLedger.'/approve');
+        $this->assertContains($response->status(), [403, 404, 405]);
 
         $this->assertDatabaseHas(
             'royalty_ledgers',
@@ -136,14 +131,9 @@ class AdminRoyaltyLedgerIsolationTest extends TestCase
 
         $foreignLedger = $this->ledger($foreignLabel);
 
-        $this->actingAs($admin)
-            ->post(
-                route(
-                    'single.admin.royalty-ledgers.cancel',
-                    $foreignLedger
-                )
-            )
-            ->assertForbidden();
+        // MIXXTUNE_LEDGER_ADMIN_MUTATIONS_REMOVED: only super-admin can mutate ledgers.
+        $response = $this->actingAs($admin)->post('/admin/royalty-ledgers/'.$foreignLedger.'/cancel');
+        $this->assertContains($response->status(), [403, 404, 405]);
 
         $this->assertDatabaseHas(
             'royalty_ledgers',
@@ -165,14 +155,9 @@ class AdminRoyaltyLedgerIsolationTest extends TestCase
 
         $foreignLedger = $this->ledger($foreignLabel);
 
-        $this->actingAs($admin)
-            ->post(
-                route(
-                    'single.admin.royalty-ledgers.credit-wallet',
-                    $foreignLedger
-                )
-            )
-            ->assertForbidden();
+        // MIXXTUNE_LEDGER_ADMIN_MUTATIONS_REMOVED: only super-admin can mutate ledgers.
+        $response = $this->actingAs($admin)->post('/admin/royalty-ledgers/'.$foreignLedger.'/credit-wallet');
+        $this->assertContains($response->status(), [403, 404, 405]);
 
         $this->assertDatabaseHas(
             'royalty_ledgers',

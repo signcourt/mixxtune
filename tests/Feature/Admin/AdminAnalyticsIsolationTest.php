@@ -55,6 +55,8 @@ class AdminAnalyticsIsolationTest extends TestCase
     {
         return DB::table('report_imports')
             ->insertGetId([
+                // MIXXTUNE_FINANCIAL_VISIBILITY_GATE: only published imports feed analytics
+                'financial_status' => 'published',
                 'public_id' => (string) Str::ulid(),
                 'original_filename' =>
                     'admin-analytics-isolation.csv',

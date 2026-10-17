@@ -490,6 +490,11 @@ class FullBusinessFlowIntegrationTest extends TestCase
             $month
         );
 
+        // MIXXTUNE_FINANCIAL_VISIBILITY_GATE: statements only use published imports
+        \Illuminate\Support\Facades\DB::table('report_imports')
+            ->where('id', $import->id)
+            ->update(['financial_status' => 'published']);
+
         $this->assertNotNull(
             $import->id
         );

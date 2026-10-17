@@ -954,9 +954,9 @@ class AnalyticsController extends Controller
                         ),
 
                 'topTracks' =>
-                    $isCompactAnalyticsRole
-                        ? []
-                        : $analytics->topTracks(
+                    // MIXXTUNE_COMPACT_TOP_TRACKS_V1: label/artist also get their own (scoped) top tracks;
+                    // \$filtered is already limited to the viewer's catalogue.
+                    $analytics->topTracks(
                             clone $filtered,
                             null
                         ),

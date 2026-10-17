@@ -21,10 +21,20 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->post('/login', [
+        // MIXXTUNE_LOGIN_OTP_TEST_FLOW_V1: password step -> email OTP step
+        $this->mock(\App\Services\LoginEmailOtpService::class, function ($m) {
+            $m->shouldReceive('send')->andReturnNull();
+            $m->shouldReceive('verify')->andReturn(true);
+        });
+
+        $this->post('/login', [
             'email' => $user->email,
             'password' => 'password',
-        ]);
+        ])->assertRedirect(route('login.otp.show'));
+
+        $this->assertGuest();
+
+        $response = $this->post('/login/otp', ['otp' => '123456']);
 
         $this->assertAuthenticated();
 

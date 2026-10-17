@@ -52,6 +52,8 @@ class ArtistAnalyticsIsolationTest extends TestCase
     {
         return DB::table('report_imports')
             ->insertGetId([
+                // MIXXTUNE_FINANCIAL_VISIBILITY_GATE: only published imports feed analytics
+                'financial_status' => 'published',
                 'public_id' => (string) Str::ulid(),
                 'original_filename' =>
                     'artist-analytics-isolation.csv',
@@ -472,10 +474,10 @@ class ArtistAnalyticsIsolationTest extends TestCase
                             'artist'
                         )
                         ->where(
-                            'summary.earnings',
+                            'importedRevenueAnalytics.platforms',
                             fn ($value) =>
                                 abs(
-                                    (float) $value - 135.0
+                                    (float) collect($value)->sum('earnings') - 135.0
                                 ) < 0.000001
                         )
             );
@@ -883,10 +885,10 @@ class ArtistAnalyticsIsolationTest extends TestCase
                             'artist'
                         )
                         ->where(
-                            'summary.earnings',
+                            'importedRevenueAnalytics.platforms',
                             fn ($value) =>
                                 abs(
-                                    (float) $value
+                                    (float) collect($value)->sum('earnings')
                                     - 999.0
                                 ) < 0.000001
                         )
@@ -1071,10 +1073,10 @@ class ArtistAnalyticsIsolationTest extends TestCase
                     fn (Assert $page) =>
                         $page
                             ->where(
-                                'summary.earnings',
+                                'importedRevenueAnalytics.platforms',
                                 fn ($value) =>
                                     abs(
-                                        (float) $value
+                                        (float) collect($value)->sum('earnings')
                                         - 1203.0
                                     ) < 0.000001
                             )
@@ -1311,10 +1313,10 @@ class ArtistAnalyticsIsolationTest extends TestCase
                 ->assertInertia(
                     fn (Assert $page) =>
                         $page->where(
-                            'summary.earnings',
+                            'importedRevenueAnalytics.platforms',
                             fn ($value) =>
                                 abs(
-                                    (float) $value
+                                    (float) collect($value)->sum('earnings')
                                     - $case['expected']
                                 ) < 0.000001
                         )
