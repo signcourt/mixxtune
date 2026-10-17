@@ -153,6 +153,21 @@ export default function Login({
                     {processing ? 'Signing in...' : 'Login'}
                 </button>
             </form>
+
+            {/* MIXXTUNE_LEGACY_DASHBOARD_LINK_V1: plain external link only.
+                The old WordPress dashboard (backstagemixtune.com) stays a separate site;
+                no login sharing, nothing is activated from here. */}
+            <div className="mt-6 rounded-lg border border-gray-200 px-4 py-3 text-center text-sm text-gray-600">
+                Old earnings &amp; statements?{' '}
+                <a
+                    href="https://backstagemixtune.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-indigo-600 hover:underline"
+                >
+                    Open old dashboard ↗
+                </a>
+            </div>
         </GuestLayout>
     );
 }
