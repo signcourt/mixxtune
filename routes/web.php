@@ -2919,3 +2919,11 @@ Route::middleware(['auth', 'verified'])
         Route::post('otp', [\App\Http\Controllers\V2\Admin\LabelOwnershipController::class, 'sendOtp'])->middleware('throttle:10,1')->name('otp');
         Route::post('apply', [\App\Http\Controllers\V2\Admin\LabelOwnershipController::class, 'apply'])->middleware('throttle:20,1')->name('apply');
     });
+
+/* MIXXTUNE_USER_REQUIRED_FIELDS_V1 */
+Route::middleware(['auth', 'verified', 'throttle:30,1'])
+    ->post(
+        '/v2/admin/user-form/required-fields',
+        [\App\Http\Controllers\V2\Admin\UserRequiredFieldsController::class, 'update']
+    )
+    ->name('v2.admin.user-form.required-fields');

@@ -497,6 +497,10 @@ class UserManagementController extends Controller
             'V2/Admin/Users/Create',
             [
                 'role' => 'super_admin',
+                /* MIXXTUNE_USER_REQUIRED_FIELDS_V1 */
+                'requiredFields' => app(\App\Services\V2\UserFieldRequirementService::class)->all(),
+                'requiredFieldOptions' => \App\Services\V2\UserFieldRequirementService::options(),
+                'canEditRequiredFields' => request()->user()?->role === 'super_admin',
 
                 'artists' =>
                     Artist::query()
@@ -529,6 +533,12 @@ class UserManagementController extends Controller
             $permissions
         );
 
+        /* MIXXTUNE_USER_REQUIRED_FIELDS_V1: per-role required fields chosen by super admin */
+        $fieldRequirements = app(\App\Services\V2\UserFieldRequirementService::class);
+        $fieldReq = fn (string $field) => \Illuminate\Validation\Rule::requiredIf(
+            fn () => $fieldRequirements->isRequired((string) $request->input('role'), $field)
+        );
+
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -538,6 +548,7 @@ class UserManagementController extends Controller
 
             'username' => [
                 'nullable',
+                $fieldReq('username'),
                 'string',
                 'max:40',
             ],
@@ -551,6 +562,7 @@ class UserManagementController extends Controller
 
             'phone' => [
                 'nullable',
+                $fieldReq('phone'),
                 'string',
                 'max:30',
             ],
@@ -563,7 +575,7 @@ class UserManagementController extends Controller
 
             'state_code' => [
                 'nullable',
-                'required_if:role,label,artist',
+                $fieldReq('state'),
                 'string',
                 'max:10',
             ],
@@ -589,87 +601,91 @@ class UserManagementController extends Controller
 
             'account_holder_name' => [
                 'nullable',
-                'required_if:role,label,artist',
+                $fieldReq('account_holder_name'),
                 'string',
                 'max:190',
             ],
 
             'bank_account_number' => [
                 'nullable',
-                'required_if:role,label,artist',
+                $fieldReq('bank_account_number'),
                 'string',
                 'max:60',
             ],
 
             'bank_name' => [
                 'nullable',
-                'required_if:role,label,artist',
+                $fieldReq('bank_name'),
                 'string',
                 'max:190',
             ],
 
             'ifsc_code' => [
                 'nullable',
-                'required_if:role,label,artist',
+                $fieldReq('ifsc_code'),
                 'string',
                 'max:30',
             ],
 
             'branch_name' => [
                 'nullable',
+                $fieldReq('branch_name'),
                 'string',
                 'max:190',
             ],
 
             'upi_id' => [
                 'nullable',
+                $fieldReq('upi_id'),
                 'string',
                 'max:190',
             ],
 
             'pan_number' => [
                 'nullable',
-                'required_if:role,label,artist',
+                $fieldReq('pan_number'),
                 'string',
                 'max:30',
             ],
 
             'gst_number' => [
                 'nullable',
+                $fieldReq('gst_number'),
                 'string',
                 'max:40',
             ],
 
             'address_line_1' => [
                 'nullable',
-                'required_if:role,label,artist',
+                $fieldReq('address_line_1'),
                 'string',
                 'max:255',
             ],
 
             'address_line_2' => [
                 'nullable',
+                $fieldReq('address_line_2'),
                 'string',
                 'max:255',
             ],
 
             'city' => [
                 'nullable',
-                'required_if:role,label,artist',
+                $fieldReq('city'),
                 'string',
                 'max:120',
             ],
 
             'state' => [
                 'nullable',
-                'required_if:role,label,artist',
+                $fieldReq('state'),
                 'string',
                 'max:120',
             ],
 
             'postal_code' => [
                 'nullable',
-                'required_if:role,label,artist',
+                $fieldReq('postal_code'),
                 'string',
                 'max:30',
             ],
@@ -902,11 +918,11 @@ class UserManagementController extends Controller
                     'state_code' =>
                         isset($validated['state_code'])
                         && trim(
-                            (string) $validated['state_code']
+                            (string) ($validated['state_code'] ?? null)
                         ) !== ''
                             ? strtoupper(
                                 trim(
-                                    $validated['state_code']
+                                    ($validated['state_code'] ?? null)
                                 )
                             )
                             : null,
@@ -991,26 +1007,18 @@ class UserManagementController extends Controller
                                 $user->id,
 
                             'account_holder_name' =>
-                                $validated[
-                                    'account_holder_name'
-                                ],
+                                ($validated['account_holder_name'] ?? null),
 
                             'bank_account_number' =>
-                                $validated[
-                                    'bank_account_number'
-                                ],
+                                ($validated['bank_account_number'] ?? null),
 
                             'bank_name' =>
-                                $validated[
-                                    'bank_name'
-                                ],
+                                ($validated['bank_name'] ?? null),
 
                             'ifsc_code' =>
                                 strtoupper(
                                     trim(
-                                        $validated[
-                                            'ifsc_code'
-                                        ]
+                                        ($validated['ifsc_code'] ?? null)
                                     )
                                 ),
 
@@ -1029,31 +1037,23 @@ class UserManagementController extends Controller
                             'pan_number' =>
                                 strtoupper(
                                     trim(
-                                        $validated[
-                                            'pan_number'
-                                        ]
+                                        ($validated['pan_number'] ?? null)
                                     )
                                 ),
 
                             'gst_number' =>
                                 !empty(
-                                    $validated[
-                                        'gst_number'
-                                    ]
+                                    ($validated['gst_number'] ?? null)
                                 )
                                     ? strtoupper(
                                         trim(
-                                            $validated[
-                                                'gst_number'
-                                            ]
+                                            ($validated['gst_number'] ?? null)
                                         )
                                     )
                                     : null,
 
                             'address_line_1' =>
-                                $validated[
-                                    'address_line_1'
-                                ],
+                                ($validated['address_line_1'] ?? null),
 
                             'address_line_2' =>
                                 $validated[
@@ -1062,15 +1062,13 @@ class UserManagementController extends Controller
                                 ?? null,
 
                             'city' =>
-                                $validated['city'],
+                                ($validated['city'] ?? null),
 
                             'state' =>
-                                $validated['state'],
+                                ($validated['state'] ?? null),
 
                             'postal_code' =>
-                                $validated[
-                                    'postal_code'
-                                ],
+                                ($validated['postal_code'] ?? null),
 
                             'country_code' =>
                                 $countryCode,

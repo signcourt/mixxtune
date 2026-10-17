@@ -1,3 +1,4 @@
+import UserRequiredFieldsPanel from "@/V2/Admin/UserRequiredFieldsPanel";
 import { useState } from "react";
 import { Head, Link, useForm } from "@inertiajs/react";
 
@@ -108,6 +109,9 @@ const permissionDefaultsForRole = (role) => {
 
 export default function Create({
     role = "super_admin",
+    requiredFields = {},
+    requiredFieldOptions = {},
+    canEditRequiredFields = false,
     artists = [],
     labels = [],
 }) {
@@ -257,6 +261,14 @@ export default function Create({
             subtitle="Create and configure a Manager, Label or Artist account"
         >
             <Head title="Create User" />
+            {/* MIXXTUNE_USER_REQUIRED_FIELDS_V1 */}
+            {canEditRequiredFields && (
+                <UserRequiredFieldsPanel
+                    requiredFields={requiredFields}
+                    options={requiredFieldOptions}
+                    currentRole={data.role}
+                />
+            )}
 
             <form onSubmit={submit} className="space-y-5">
 
@@ -305,6 +317,7 @@ export default function Create({
                         <div>
                             <Field
                                 label="Username"
+                                required={fieldRequired(requiredFields, data.role, "username")}
                                 value={data.username}
                                 error={errors.username}
                                 onChange={(value) =>
@@ -343,6 +356,7 @@ export default function Create({
 
                         <Field
                             label="Phone"
+                            required={fieldRequired(requiredFields, data.role, "phone")}
                             value={data.phone}
                             error={errors.phone}
                             onChange={(value) => setData("phone", value)}
@@ -638,7 +652,7 @@ export default function Create({
                                 label="Address Line 1"
                                 value={data.address_line_1}
                                 error={errors.address_line_1}
-                                required
+                                required={fieldRequired(requiredFields, data.role, "address_line_1")}
                                 onChange={(value) =>
                                     setData("address_line_1", value)
                                 }
@@ -646,6 +660,7 @@ export default function Create({
 
                             <Field
                                 label="Address Line 2"
+                                required={fieldRequired(requiredFields, data.role, "address_line_2")}
                                 value={data.address_line_2}
                                 error={errors.address_line_2}
                                 onChange={(value) =>
@@ -657,14 +672,14 @@ export default function Create({
                                 label="City"
                                 value={data.city}
                                 error={errors.city}
-                                required
+                                required={fieldRequired(requiredFields, data.role, "city")}
                                 onChange={(value) => setData("city", value)}
                             />
 
                             <label>
                                 <span className="text-sm font-semibold text-slate-700">
                                     State / Region
-                                    <span className="ml-1 text-red-500">*</span>
+                                    {fieldRequired(requiredFields, data.role, "state") && (<span className="ml-1 text-red-500">*</span>)}
                                 </span>
 
                                 {data.country_code === "IN" ? (
@@ -682,7 +697,7 @@ export default function Create({
                                             }));
                                         }}
                                         className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                                        required
+                                        required={fieldRequired(requiredFields, data.role, "state")}
                                     >
                                         <option value="">Select State</option>
 
@@ -703,7 +718,7 @@ export default function Create({
                                             )
                                         }
                                         className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                                        required
+                                        required={fieldRequired(requiredFields, data.role, "state")}
                                     />
                                 )}
 
@@ -718,7 +733,7 @@ export default function Create({
                                 label="Postal Code"
                                 value={data.postal_code}
                                 error={errors.postal_code}
-                                required
+                                required={fieldRequired(requiredFields, data.role, "postal_code")}
                                 onChange={(value) =>
                                     setData("postal_code", value)
                                 }
@@ -793,7 +808,7 @@ export default function Create({
                                 label="PAN Number"
                                 value={data.pan_number}
                                 error={errors.pan_number}
-                                required
+                                required={fieldRequired(requiredFields, data.role, "pan_number")}
                                 onChange={(value) =>
                                     setData(
                                         "pan_number",
@@ -806,6 +821,7 @@ export default function Create({
 
                             <Field
                                 label="GST Number"
+                                required={fieldRequired(requiredFields, data.role, "gst_number")}
                                 value={data.gst_number}
                                 error={errors.gst_number}
                                 onChange={(value) =>
@@ -845,7 +861,7 @@ export default function Create({
                                 label="Account Holder Name"
                                 value={data.account_holder_name}
                                 error={errors.account_holder_name}
-                                required
+                                required={fieldRequired(requiredFields, data.role, "account_holder_name")}
                                 onChange={(value) =>
                                     setData("account_holder_name", value)
                                 }
@@ -855,7 +871,7 @@ export default function Create({
                                 label="Bank Account Number"
                                 value={data.bank_account_number}
                                 error={errors.bank_account_number}
-                                required
+                                required={fieldRequired(requiredFields, data.role, "bank_account_number")}
                                 onChange={(value) =>
                                     setData("bank_account_number", value)
                                 }
@@ -865,7 +881,7 @@ export default function Create({
                                 label="Bank Name"
                                 value={data.bank_name}
                                 error={errors.bank_name}
-                                required
+                                required={fieldRequired(requiredFields, data.role, "bank_name")}
                                 onChange={(value) =>
                                     setData("bank_name", value)
                                 }
@@ -875,7 +891,7 @@ export default function Create({
                                 label="IFSC Code"
                                 value={data.ifsc_code}
                                 error={errors.ifsc_code}
-                                required
+                                required={fieldRequired(requiredFields, data.role, "ifsc_code")}
                                 onChange={(value) =>
                                     setData(
                                         "ifsc_code",
@@ -888,6 +904,7 @@ export default function Create({
 
                             <Field
                                 label="Branch Name"
+                                required={fieldRequired(requiredFields, data.role, "branch_name")}
                                 value={data.branch_name}
                                 error={errors.branch_name}
                                 onChange={(value) =>
@@ -897,6 +914,7 @@ export default function Create({
 
                             <Field
                                 label="UPI ID"
+                                required={fieldRequired(requiredFields, data.role, "upi_id")}
                                 value={data.upi_id}
                                 error={errors.upi_id}
                                 onChange={(value) =>
@@ -1321,4 +1339,8 @@ function SelectionBox({
             )}
         </section>
     );
+}
+
+function fieldRequired(requiredFields, role, field) {
+    return Boolean(requiredFields?.[role]?.[field]);
 }
