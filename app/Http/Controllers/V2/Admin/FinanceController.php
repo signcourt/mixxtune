@@ -240,6 +240,15 @@ class FinanceController extends Controller
                     '(SELECT MIN(rip2.status) FROM report_import_postings rip2 WHERE rip2.royalty_statement_id = statements.id) as import_posting_status'
                 ),
 
+                // MIXXTUNE_FINANCE_HOLD_RELEASE_V1
+                DB::raw(
+                    "(SELECT MIN(ruh.id) FROM report_unclaimed_revenues ruh WHERE ruh.royalty_statement_id = statements.id AND ruh.status = 'held') as unclaimed_hold_id"
+                ),
+
+                DB::raw(
+                    'COALESCE(labels.user_id, artists.user_id) as owner_user_id'
+                ),
+
                 DB::raw(
                     "COALESCE(
                         artists.stage_name,
@@ -356,6 +365,44 @@ class FinanceController extends Controller
         return back()->with(
             'success',
             'Royalty statement approved and added to pending wallet balance.'
+        );
+    }
+
+    /*
+     * MIXXTUNE_FINANCE_HOLD_RELEASE_V1
+     *
+     * Super-admin releases an unclaimed import hold to the owner's
+     * canonical wallet once the label / artist is linked to an active
+     * user. All money rules live in ReportUnclaimedRevenueReleaser.
+     */
+    public function releaseHold(
+        Request $request,
+        int $hold,
+        PermissionService $permissions,
+        \App\Services\V2\ReportUnclaimedRevenueReleaser $releaser
+    ): RedirectResponse {
+        abort_unless(
+            $permissions->role(
+                $request->user()
+            ) === 'super_admin',
+            403
+        );
+
+        try {
+            $result = $releaser->release(
+                $hold,
+                (int) $request->user()->id,
+                'Released from Finance & Royalties page'
+            );
+        } catch (\RuntimeException $e) {
+            return back()->withErrors([
+                'release' => $e->getMessage(),
+            ]);
+        }
+
+        return back()->with(
+            'success',
+            'Held revenue of '.number_format((float) $result['amount'], 2).' released to the owner wallet.'
         );
     }
 

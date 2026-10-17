@@ -584,6 +584,31 @@ export default function Index({
                                                     </span>
                                                 )}
 
+                                                {/* MIXXTUNE_FINANCE_HOLD_RELEASE_V1 */}
+                                                {role === 'super_admin' &&
+                                                    item.import_posting_status === 'held_unclaimed' &&
+                                                    item.unclaimed_hold_id &&
+                                                    item.owner_user_id && (
+                                                        <ActionButton
+                                                            busy={actionId === item.id}
+                                                            onClick={() => {
+                                                                if (
+                                                                    window.confirm(
+                                                                        `Release ${money(item.net_payable, item.currency)} to the linked owner's wallet? This cannot be undone.`
+                                                                    )
+                                                                ) {
+                                                                    run(
+                                                                        `/v2/admin/finance/holds/${item.unclaimed_hold_id}/release`,
+                                                                        item.id
+                                                                    );
+                                                                }
+                                                            }}
+                                                            className="bg-amber-600 hover:bg-amber-700"
+                                                        >
+                                                            Release to owner
+                                                        </ActionButton>
+                                                    )}
+
                                                 {!isImportPaid(item) &&
                                                     !['pending', 'approved'].includes(
                                                         item.status

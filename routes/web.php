@@ -1979,6 +1979,16 @@ Route::middleware(['auth', 'verified'])
     ->name('v2.admin.finance.available');
 
 
+// MIXXTUNE_FINANCE_HOLD_RELEASE_V1
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/v2/admin/finance/holds/{hold}/release',
+        [\App\Http\Controllers\V2\Admin\FinanceController::class, 'releaseHold']
+    )
+    ->whereNumber('hold')
+    ->name('v2.admin.finance.hold.release');
+
+
 Route::middleware(['auth', 'verified'])
     ->get(
         '/v2/kyc-profile',
