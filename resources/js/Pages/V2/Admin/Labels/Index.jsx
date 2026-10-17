@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import LabelOwnershipPanel from '@/V2/Admin/LabelOwnershipPanel';
 
 export default function Index({
     role = 'admin',
@@ -526,6 +527,17 @@ export default function Index({
                         </div>
                     </div>
                 </div>
+
+                {/* MIXXTUNE_LABEL_OWNERSHIP_OTP_V1 */}
+                {role === 'super_admin' && (
+                    <LabelOwnershipPanel
+                        selectedLabelIds={selectedLabelIds}
+                        onDone={() => {
+                            setSelectedLabelIds([]);
+                            router.reload({ preserveScroll: true });
+                        }}
+                    />
+                )}
 
                 {/* MIXXTUNE_LABEL_BULK_ACTION_UI_V2 */}
                 {role === 'super_admin' && (
