@@ -2905,3 +2905,16 @@ Route::middleware([
             ]
         )->name('documents.download');
     });
+
+/*
+ * MIXXTUNE_LABEL_OWNERSHIP_OTP_V1
+ * Super-admin only: assign / transfer label ownership with e-mail OTP confirmation.
+ */
+Route::middleware(['auth', 'verified'])
+    ->prefix('v2/admin/labels/ownership')
+    ->name('v2.admin.labels.ownership.')
+    ->group(function () {
+        Route::get('users', [\App\Http\Controllers\V2\Admin\LabelOwnershipController::class, 'users'])->name('users');
+        Route::post('otp', [\App\Http\Controllers\V2\Admin\LabelOwnershipController::class, 'sendOtp'])->middleware('throttle:10,1')->name('otp');
+        Route::post('apply', [\App\Http\Controllers\V2\Admin\LabelOwnershipController::class, 'apply'])->middleware('throttle:20,1')->name('apply');
+    });
