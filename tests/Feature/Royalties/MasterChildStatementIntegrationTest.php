@@ -50,6 +50,8 @@ class MasterChildStatementIntegrationTest extends TestCase
             'original_filename' => 'master-child-test.csv',
             'stored_path' => 'testing/master-child-test.csv',
             'status' => 'completed',
+            // MIXXTUNE_FINANCIAL_VISIBILITY_GATE: only published imports produce statements
+            'financial_status' => 'published',
             'total_rows' => 1,
             'imported_rows' => 1,
             'duplicate_rows' => 0,
@@ -166,6 +168,10 @@ class MasterChildStatementIntegrationTest extends TestCase
 
                 'status' =>
                     'completed',
+
+                // MIXXTUNE_FINANCIAL_VISIBILITY_GATE: only published imports produce statements
+
+                'financial_status' => 'published',
 
                 'total_rows' =>
                     1,

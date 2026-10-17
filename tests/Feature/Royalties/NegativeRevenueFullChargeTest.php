@@ -38,6 +38,8 @@ class NegativeRevenueFullChargeTest extends TestCase
             'original_filename' => 'negative-rule.csv',
             'stored_path' => 'tests/negative-rule.csv',
             'status' => 'completed',
+            // MIXXTUNE_FINANCIAL_VISIBILITY_GATE: only published imports produce statements
+            'financial_status' => 'published',
             'total_rows' => 2,
             'imported_rows' => 2,
             'duplicate_rows' => 0,
