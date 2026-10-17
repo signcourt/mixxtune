@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\V2\LabelOwnershipService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /*
@@ -41,6 +42,34 @@ class LabelOwnershipController extends Controller
             ->get(['id', 'name', 'email', 'account_status']);
 
         return response()->json(['users' => $users]);
+    }
+
+    /*
+     * Label picker for the Labels page panel: search by name, optionally
+     * only labels that have no owner yet.
+     */
+    public function labels(Request $request): JsonResponse
+    {
+        $this->superAdmin($request);
+        $q = trim((string) $request->query('q', ''));
+        $onlyUnowned = $request->boolean('unowned');
+
+        $rows = DB::table('labels as l')
+            ->leftJoin('users as u', 'u.id', '=', 'l.user_id')
+            ->whereNull('l.deleted_at')
+            ->when($q !== '', fn ($query) => $query->where('l.name', 'like', '%'.$q.'%'))
+            ->when($onlyUnowned, fn ($query) => $query->whereNull('l.user_id'))
+            ->orderBy('l.name')
+            ->limit(50)
+            ->get(['l.id', 'l.name', 'u.name as owner_name', 'u.email as owner_email']);
+
+        return response()->json([
+            'labels' => $rows->map(fn ($r) => [
+                'id' => (int) $r->id,
+                'name' => $r->name,
+                'owner' => $r->owner_name ? $r->owner_name.' <'.$r->owner_email.'>' : null,
+            ])->values(),
+        ]);
     }
 
     private function validatedPayload(Request $request, bool $withOtp): array

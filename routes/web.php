@@ -2915,6 +2915,7 @@ Route::middleware(['auth', 'verified'])
     ->name('v2.admin.labels.ownership.')
     ->group(function () {
         Route::get('users', [\App\Http\Controllers\V2\Admin\LabelOwnershipController::class, 'users'])->name('users');
+        Route::get('labels', [\App\Http\Controllers\V2\Admin\LabelOwnershipController::class, 'labels'])->name('labels');
         Route::post('otp', [\App\Http\Controllers\V2\Admin\LabelOwnershipController::class, 'sendOtp'])->middleware('throttle:10,1')->name('otp');
         Route::post('apply', [\App\Http\Controllers\V2\Admin\LabelOwnershipController::class, 'apply'])->middleware('throttle:20,1')->name('apply');
     });

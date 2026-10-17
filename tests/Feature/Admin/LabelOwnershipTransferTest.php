@@ -141,6 +141,23 @@ class LabelOwnershipTransferTest extends TestCase
         $this->assertSame(2, DB::table('labels')->whereIn('id', [$label1, $label2])->where('user_id', $created->id)->count());
     }
 
+    public function test_label_search_for_super_admin_only_with_unowned_filter(): void
+    {
+        $super = $this->makeUser('super_admin');
+        $admin = $this->makeUser('admin');
+        $owner = $this->makeUser('label');
+        $free = $this->makeLabel(null, 'Zebra Search Free');
+        $this->makeLabel($owner->id, 'Zebra Search Owned');
+
+        $this->actingAs($admin)->getJson('/v2/admin/labels/ownership/labels?q=Zebra')->assertForbidden();
+
+        $all = $this->actingAs($super)->getJson('/v2/admin/labels/ownership/labels?q=Zebra')->assertOk()->json('labels');
+        $this->assertCount(2, $all);
+
+        $unowned = $this->actingAs($super)->getJson('/v2/admin/labels/ownership/labels?q=Zebra&unowned=1')->assertOk()->json('labels');
+        $this->assertSame([$free], array_column($unowned, 'id'));
+    }
+
     public function test_owner_must_be_a_label_account_and_resend_is_throttled(): void
     {
         $super = $this->makeUser('super_admin');

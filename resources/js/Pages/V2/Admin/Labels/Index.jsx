@@ -532,6 +532,7 @@ export default function Index({
                 {role === 'super_admin' && (
                     <LabelOwnershipPanel
                         selectedLabelIds={selectedLabelIds}
+                        pageLabels={labels?.data ?? []}
                         onDone={() => {
                             setSelectedLabelIds([]);
                             router.reload({ preserveScroll: true });
