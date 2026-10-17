@@ -2,6 +2,7 @@
 
 namespace App\Services\V2;
 
+use App\Http\Controllers\V2\Admin\UserManagementController;
 use App\Mail\LabelOwnershipOtpMail;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -11,23 +12,58 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /*
  * MIXXTUNE_LABEL_OWNERSHIP_OTP_V1
  *
  * Assign / transfer label ownership (labels.user_id) to a Label account.
- * Every change requires an e-mailed one-time code that is bound to the
- * exact payload (label ids + target), so a code can never be reused for
- * a different change. New owner accounts are created as `pending` and
- * receive the normal invitation e-mail (activation stays system-controlled).
+ * Every change needs an e-mailed one-time code bound to the exact payload.
+ * New owners are created through the standard Users module (same as the
+ * Users > Create page: client id, profile/KYC/payout, invitation), as
+ * role=label and pending until the invitation is accepted.
  */
 class LabelOwnershipService
 {
     public const EXPIRY_MINUTES = 5;
     public const RESEND_SECONDS = 60;
     public const MAX_ATTEMPTS = 5;
+
+    public const NEW_USER_FIELDS = [
+        'name', 'username', 'email', 'phone', 'address_line_1', 'address_line_2', 'country', 'country_code', 'state_code', 'state', 'city', 'postal_code',
+        'revenue_share_percentage', 'account_holder_name', 'bank_account_number', 'bank_name', 'ifsc_code',
+        'branch_name', 'upi_id', 'pan_number', 'gst_number',
+    ];
+
+    public function normalizeNewUser(?array $newUser): ?array
+    {
+        if (!$newUser) {
+            return null;
+        }
+
+        $out = [];
+
+        foreach (self::NEW_USER_FIELDS as $field) {
+            $value = $newUser[$field] ?? null;
+            $value = (is_string($value) || is_numeric($value)) ? trim((string) $value) : null;
+            $out[$field] = $value === '' ? null : $value;
+        }
+
+        if ($out['email'] !== null) {
+            $out['email'] = strtolower($out['email']);
+        }
+
+        foreach (['ifsc_code', 'pan_number', 'gst_number', 'state_code', 'country_code'] as $field) {
+            if ($out[$field] !== null) {
+                $out[$field] = strtoupper($out[$field]);
+            }
+        }
+
+        $out['country'] = $out['country'] ?? 'India';
+        $out['country_code'] = $out['country_code'] ?? 'IN';
+
+        return $out;
+    }
 
     public function fingerprint(array $labelIds, ?int $targetUserId, ?array $newUser): string
     {
@@ -37,11 +73,7 @@ class LabelOwnershipService
         return hash('sha256', json_encode([
             'labels' => $ids,
             'target' => $targetUserId,
-            'new' => $newUser ? [
-                'name' => trim((string) ($newUser['name'] ?? '')),
-                'email' => strtolower(trim((string) ($newUser['email'] ?? ''))),
-                'phone' => trim((string) ($newUser['phone'] ?? '')),
-            ] : null,
+            'new' => $this->normalizeNewUser($newUser),
         ]));
     }
 
@@ -146,52 +178,80 @@ class LabelOwnershipService
             ->all();
     }
 
+    /*
+     * Create the owner through UserManagementController@store exactly like
+     * the Users > Create page does (role=label, invitation e-mail).
+     */
+    private function createOwnerViaUsersModule(User $admin, array $newUser, array $unownedLabelIds, ?Request $request): array
+    {
+        $payload = $newUser;
+        $payload['role'] = 'label';
+        $payload['send_invitation'] = true;
+        $payload['label_ids'] = array_values($unownedLabelIds);
+        $payload['new_labels'] = [];
+        $payload['artist_ids'] = [];
+
+        foreach ($payload as $key => $value) {
+            if ($value === null) {
+                unset($payload[$key]);
+            }
+        }
+
+        $sub = Request::create('/v2/admin/users', 'POST', $payload);
+        $sub->setUserResolver(fn () => $admin);
+        $session = app('session.store');
+        $sub->setLaravelSession($session);
+
+        if ($request) {
+            $sub->server->set('REMOTE_ADDR', $request->ip());
+            $sub->headers->set('User-Agent', (string) $request->userAgent());
+        }
+
+        $session->forget(['errors', 'warning', 'success']);
+        $previous = app('request');
+        app()->instance('request', $sub);
+
+        try {
+            app()->call([app(UserManagementController::class), 'store'], ['request' => $sub]);
+        } finally {
+            app()->instance('request', $previous);
+        }
+
+        $warning = $session->pull('warning');
+        $session->forget('success');
+        $owner = User::query()->where('email', (string) $payload['email'])->first();
+
+        if (!$owner) {
+            $errors = $session->pull('errors');
+            $messages = $errors ? $errors->getBag('default')->getMessages() : [];
+
+            throw ValidationException::withMessages(
+                $messages ?: ['new_user' => ['The owner account could not be created.']]
+            );
+        }
+
+        return [$owner, $warning];
+    }
+
     public function apply(User $admin, array $labelIds, ?int $targetUserId, ?array $newUser, ?Request $request = null): array
     {
         $labelIds = array_values(array_unique(array_map('intval', $labelIds)));
         $audit = app(AuditLogService::class);
+        $created = false;
+        $invitationWarning = null;
+        $recalcError = null;
 
-        [$target, $created, $changes] = DB::transaction(function () use ($admin, $labelIds, $targetUserId, $newUser, $audit, $request) {
-            $created = false;
+        $before = DB::table('labels')->whereIn('id', $labelIds)->get(['id', 'user_id', 'revenue_share_percentage'])->keyBy('id');
 
-            if ($newUser) {
-                $email = strtolower(trim((string) $newUser['email']));
+        if ($newUser) {
+            $unowned = $before->filter(fn ($row) => !$row->user_id)->keys()->map(fn ($id) => (int) $id)->all();
+            [$owner, $invitationWarning] = $this->createOwnerViaUsersModule($admin, $this->normalizeNewUser($newUser), $unowned, $request);
+            $created = true;
+            $targetUserId = (int) $owner->id;
+        }
 
-                if (User::query()->where('email', $email)->exists()) {
-                    throw ValidationException::withMessages([
-                        'new_email' => 'A user with this e-mail already exists.',
-                    ]);
-                }
-
-                $phone = trim((string) ($newUser['phone'] ?? ''));
-
-                $target = User::query()->create([
-                    'name' => trim((string) $newUser['name']),
-                    'email' => $email,
-                    'phone' => $phone !== '' ? $phone : null,
-                    'role' => 'label',
-                    'account_status' => 'pending',
-                    'password' => Hash::make(Str::random(32)),
-                    'email_verified_at' => null,
-                    'invitation_status' => 'pending',
-                    'invitation_sent_at' => null,
-                    'invitation_expires_at' => null,
-                    'invitation_count' => 0,
-                ]);
-                $created = true;
-
-                $this->recordAudit($audit, 
-                    'user.created',
-                    'users',
-                    "User {$target->email} created from Labels page (owner assignment).",
-                    [],
-                    $target->only(['id', 'name', 'email', 'role', 'account_status']),
-                    $target,
-                    $request
-                );
-            } else {
-                $target = User::query()->whereKey($targetUserId)->lockForUpdate()->first();
-            }
+        [$target, $changes] = DB::transaction(function () use ($admin, $labelIds, $targetUserId, $before, $audit, $request) {
+            $target = User::query()->whereKey($targetUserId)->lockForUpdate()->first();
 
             if (!$target || $target->role !== 'label') {
                 throw ValidationException::withMessages([
@@ -214,29 +274,26 @@ class LabelOwnershipService
             $changes = [];
 
             foreach ($labels as $label) {
-                $old = $label->user_id ? (int) $label->user_id : null;
+                $old = isset($before[$label->id]) && $before[$label->id]->user_id ? (int) $before[$label->id]->user_id : null;
+
+                if ((int) ($label->user_id ?? 0) !== (int) $target->id) {
+                    DB::table('labels')->where('id', $label->id)->update([
+                        'user_id' => $target->id,
+                        'updated_by' => $admin->id,
+                        'updated_at' => now(),
+                    ]);
+                }
 
                 if ($old === (int) $target->id) {
-                    $changes[] = [
-                        'label_id' => (int) $label->id,
-                        'label_name' => $label->name,
-                        'old_owner_id' => $old,
-                        'new_owner_id' => (int) $target->id,
-                        'status' => 'unchanged',
-                    ];
+                    $changes[] = ['label_id' => (int) $label->id, 'label_name' => $label->name, 'old_owner_id' => $old, 'new_owner_id' => (int) $target->id, 'status' => 'unchanged'];
 
                     continue;
                 }
 
-                DB::table('labels')->where('id', $label->id)->update([
-                    'user_id' => $target->id,
-                    'updated_by' => $admin->id,
-                    'updated_at' => now(),
-                ]);
-
                 $status = $old ? 'transferred' : 'assigned';
 
-                $this->recordAudit($audit, 
+                $this->recordAudit(
+                    $audit,
                     'label.owner_'.$status,
                     'labels',
                     "Label {$label->name} (#{$label->id}) owner {$status}: "
@@ -247,26 +304,37 @@ class LabelOwnershipService
                     $request
                 );
 
-                $changes[] = [
-                    'label_id' => (int) $label->id,
-                    'label_name' => $label->name,
-                    'old_owner_id' => $old,
-                    'new_owner_id' => (int) $target->id,
-                    'status' => $status,
-                ];
+                $changes[] = ['label_id' => (int) $label->id, 'label_name' => $label->name, 'old_owner_id' => $old, 'new_owner_id' => (int) $target->id, 'status' => $status];
             }
 
-            return [$target, $created, $changes];
+            return [$target, $changes];
         });
 
-        $invitationError = null;
-
         if ($created) {
+            /*
+             * Labels that already had their own revenue % keep it; only labels
+             * without a % take the new owner's %. Then pending-review earnings
+             * are recalculated through the canonical service.
+             */
+            foreach ($before as $labelId => $row) {
+                if ($row->revenue_share_percentage !== null) {
+                    DB::table('labels')->where('id', $labelId)->update(['revenue_share_percentage' => $row->revenue_share_percentage]);
+                }
+            }
+
             try {
-                app(UserInvitationService::class)->send($target);
+                $recalculator = app(ReportEarningsRecalculationService::class);
+
+                foreach ($labelIds as $labelId) {
+                    $label = \App\Models\Core\Label::query()->find($labelId);
+
+                    if ($label) {
+                        $recalculator->recalculateForLabel($label);
+                    }
+                }
             } catch (\Throwable $exception) {
                 report($exception);
-                $invitationError = $exception->getMessage();
+                $recalcError = $exception->getMessage();
             }
         }
 
@@ -274,7 +342,8 @@ class LabelOwnershipService
             'owner' => $target->fresh()->only(['id', 'name', 'email', 'account_status']),
             'created' => $created,
             'changes' => $changes,
-            'invitation_error' => $invitationError,
+            'invitation_error' => $invitationWarning,
+            'recalculation_error' => $recalcError,
         ];
     }
 }

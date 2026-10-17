@@ -2,11 +2,64 @@ import axios from 'axios';
 import { useEffect, useState } from 'react';
 
 /*
- * MIXXTUNE_LABEL_OWNERSHIP_OTP_V1 (+ label picker basket)
- * Super admin: search & tick labels (ticks are kept across searches),
- * then assign / transfer them to one owner. Every change needs an
- * e-mail OTP sent to the acting super admin.
+ * MIXXTUNE_LABEL_OWNERSHIP_OTP_V1 (+ label picker basket, full new-owner form)
+ * Super admin: search & tick labels (ticks kept across searches), then
+ * assign / transfer them to one Label account. A new owner is created with
+ * the same details as Users > Create (role = Label). E-mail OTP required.
  */
+const indiaStates = [
+    ["AN", "Andaman and Nicobar Islands"],
+    ["AP", "Andhra Pradesh"],
+    ["AR", "Arunachal Pradesh"],
+    ["AS", "Assam"],
+    ["BR", "Bihar"],
+    ["CH", "Chandigarh"],
+    ["CG", "Chhattisgarh"],
+    ["DN", "Dadra and Nagar Haveli and Daman and Diu"],
+    ["DL", "Delhi"],
+    ["GA", "Goa"],
+    ["GJ", "Gujarat"],
+    ["HR", "Haryana"],
+    ["HP", "Himachal Pradesh"],
+    ["JK", "Jammu and Kashmir"],
+    ["JH", "Jharkhand"],
+    ["KA", "Karnataka"],
+    ["KL", "Kerala"],
+    ["LA", "Ladakh"],
+    ["LD", "Lakshadweep"],
+    ["MP", "Madhya Pradesh"],
+    ["MH", "Maharashtra"],
+    ["MN", "Manipur"],
+    ["ML", "Meghalaya"],
+    ["MZ", "Mizoram"],
+    ["NL", "Nagaland"],
+    ["OD", "Odisha"],
+    ["PY", "Puducherry"],
+    ["PB", "Punjab"],
+    ["RJ", "Rajasthan"],
+    ["SK", "Sikkim"],
+    ["TN", "Tamil Nadu"],
+    ["TS", "Telangana"],
+    ["TR", "Tripura"],
+    ["UP", "Uttar Pradesh"],
+    ["UK", "Uttarakhand"],
+    ["WB", "West Bengal"],
+];
+
+const emptyNewUser = {
+    name: '', username: '', email: '', phone: '',
+    country: 'India', country_code: 'IN', address_line_1: '', address_line_2: '', state_code: '', state: '', city: '', postal_code: '',
+    revenue_share_percentage: '',
+    account_holder_name: '', bank_account_number: '', bank_name: '', ifsc_code: '', branch_name: '', upi_id: '',
+    pan_number: '', gst_number: '',
+};
+
+const requiredNewUser = {
+    name: 'Owner name', email: 'Owner e-mail', address_line_1: 'Address line 1', state_code: 'State', city: 'City', postal_code: 'Pincode',
+    revenue_share_percentage: 'Revenue %', account_holder_name: 'Account holder name',
+    bank_account_number: 'Bank account number', bank_name: 'Bank name', ifsc_code: 'IFSC code', pan_number: 'PAN',
+};
+
 export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels = [], onDone }) {
     const [open, setOpen] = useState(false);
     const [basket, setBasket] = useState([]);
@@ -18,9 +71,7 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
     const [query, setQuery] = useState('');
     const [users, setUsers] = useState([]);
     const [targetId, setTargetId] = useState('');
-    const [newName, setNewName] = useState('');
-    const [newEmail, setNewEmail] = useState('');
-    const [newPhone, setNewPhone] = useState('');
+    const [newUser, setNewUser] = useState(emptyNewUser);
     const [step, setStep] = useState('form');
     const [preview, setPreview] = useState(null);
     const [otp, setOtp] = useState('');
@@ -73,6 +124,8 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
         return () => clearTimeout(timer);
     }, [query, mode, open]);
 
+    const setField = (key, value) => setNewUser((current) => ({ ...current, [key]: value }));
+
     const inBasket = (id) => basketIds.includes(Number(id));
 
     const toggleLabel = (label) => {
@@ -115,7 +168,7 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
     const payload = () =>
         mode === 'existing'
             ? { label_ids: basketIds, mode, target_user_id: targetId ? Number(targetId) : null }
-            : { label_ids: basketIds, mode, new_name: newName, new_email: newEmail, new_phone: newPhone };
+            : { label_ids: basketIds, mode, new_user: newUser };
 
     const errorMessage = (exception) => {
         const data = exception?.response?.data;
@@ -140,9 +193,15 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
             return;
         }
 
-        if (mode === 'new' && (!newName.trim() || !newEmail.trim())) {
-            setError('Enter name and e-mail for the new owner.');
-            return;
+        if (mode === 'new') {
+            const missing = Object.entries(requiredNewUser)
+                .filter(([key]) => !String(newUser[key] ?? '').trim())
+                .map(([, label]) => label);
+
+            if (missing.length) {
+                setError(`Please fill: ${missing.join(', ')}.`);
+                return;
+            }
         }
 
         setBusy(true);
@@ -184,13 +243,21 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
         setError('');
         setBasket([]);
         setTargetId('');
-        setNewName('');
-        setNewEmail('');
-        setNewPhone('');
+        setNewUser(emptyNewUser);
     };
 
     const input = 'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700';
     const changeCount = (status) => (result?.changes ?? []).filter((change) => change.status === status).length;
+
+    const field = (key, label, extra = {}) => (
+        <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">
+                {label}
+                {requiredNewUser[key] ? ' *' : ''}
+            </span>
+            <input value={newUser[key]} onChange={(event) => setField(key, event.target.value)} className={input} {...extra} />
+        </label>
+    );
 
     return (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 shadow-sm">
@@ -299,7 +366,7 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
                                     </label>
                                     <label className="flex items-center gap-2">
                                         <input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} />
-                                        Create new owner account
+                                        Create new owner account (Label user)
                                     </label>
                                 </div>
 
@@ -326,13 +393,77 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
                                 )}
 
                                 {mode === 'new' && (
-                                    <div className="mt-2 grid gap-2 md:grid-cols-3">
-                                        <input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Owner name" className={input} />
-                                        <input value={newEmail} onChange={(event) => setNewEmail(event.target.value)} placeholder="Owner e-mail" type="email" className={input} />
-                                        <input value={newPhone} onChange={(event) => setNewPhone(event.target.value)} placeholder="Phone (optional)" className={input} />
-                                        <div className="text-xs text-slate-500 md:col-span-3">
-                                            The new account is created as <b>Pending</b> and receives an invitation e-mail. It becomes Active after
-                                            the owner accepts the invitation; bank / PAN details can be added later from Users.
+                                    <div className="mt-3 space-y-4">
+                                        <div>
+                                            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Account</div>
+                                            <div className="grid gap-3 md:grid-cols-2">
+                                                {field('name', 'Owner name (account name)')}
+                                                {field('username', 'Username (optional)')}
+                                                {field('email', 'Owner e-mail', { type: 'email' })}
+                                                {field('phone', 'Phone')}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Address</div>
+                                            <div className="grid gap-3 md:grid-cols-3">
+                                                <label className="block">
+                                                    <span className="mb-1 block text-xs font-medium text-slate-600">State *</span>
+                                                    <select
+                                                        value={newUser.state_code}
+                                                        onChange={(event) => {
+                                                            const code = event.target.value;
+                                                            const found = indiaStates.find(([stateCode]) => stateCode === code);
+                                                            setNewUser((current) => ({ ...current, state_code: code, state: found ? found[1] : '' }));
+                                                        }}
+                                                        className={input}
+                                                    >
+                                                        <option value="">Select state…</option>
+                                                        {indiaStates.map(([code, name]) => (
+                                                            <option key={code} value={code}>{name}</option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                                {field('city', 'City')}
+                                                {field('postal_code', 'Pincode')}
+                                                {field('address_line_1', 'Address line 1')}
+                                                {field('address_line_2', 'Address line 2 (optional)')}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Revenue</div>
+                                            <div className="grid gap-3 md:grid-cols-3">
+                                                {field('revenue_share_percentage', 'Revenue %', { inputMode: 'decimal' })}
+                                            </div>
+                                            <div className="mt-1 text-xs text-slate-500">
+                                                Labels that already have their own % keep it; this % is used for labels without a %.
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Bank details</div>
+                                            <div className="grid gap-3 md:grid-cols-3">
+                                                {field('account_holder_name', 'Account holder name')}
+                                                {field('bank_account_number', 'Bank account number')}
+                                                {field('bank_name', 'Bank name')}
+                                                {field('ifsc_code', 'IFSC code')}
+                                                {field('branch_name', 'Branch name')}
+                                                {field('upi_id', 'UPI ID')}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Tax</div>
+                                            <div className="grid gap-3 md:grid-cols-3">
+                                                {field('pan_number', 'PAN')}
+                                                {field('gst_number', 'GST (optional)')}
+                                            </div>
+                                        </div>
+
+                                        <div className="text-xs text-slate-500">
+                                            Created exactly like Users → Create (role <b>Label</b>). The account is <b>Pending</b> and gets an
+                                            invitation e-mail; it becomes Active after the owner accepts it.
                                         </div>
                                     </div>
                                 )}
@@ -417,7 +548,12 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
                             </div>
                             {result.invitation_error && (
                                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                                    Account created, but the invitation e-mail failed: {result.invitation_error}. Resend it from Users.
+                                    {result.invitation_error} — resend it from Users.
+                                </div>
+                            )}
+                            {result.recalculation_error && (
+                                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                    Owner saved, but pending-report earnings could not be recalculated: {result.recalculation_error}
                                 </div>
                             )}
                             <button

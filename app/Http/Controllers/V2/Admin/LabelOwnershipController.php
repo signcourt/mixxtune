@@ -16,6 +16,29 @@ use Illuminate\Validation\Rule;
  */
 class LabelOwnershipController extends Controller
 {
+    private const ATTRIBUTES = [
+        'new_user.name' => 'owner name',
+        'new_user.username' => 'username',
+        'new_user.email' => 'owner e-mail',
+        'new_user.phone' => 'phone',
+        'new_user.state_code' => 'state',
+        'new_user.state' => 'state',
+        'new_user.address_line_1' => 'address line 1',
+        'new_user.address_line_2' => 'address line 2',
+        'new_user.city' => 'city',
+        'new_user.postal_code' => 'pincode',
+        'new_user.country_code' => 'country code',
+        'new_user.revenue_share_percentage' => 'revenue %',
+        'new_user.account_holder_name' => 'account holder name',
+        'new_user.bank_account_number' => 'bank account number',
+        'new_user.bank_name' => 'bank name',
+        'new_user.ifsc_code' => 'IFSC code',
+        'new_user.branch_name' => 'branch name',
+        'new_user.upi_id' => 'UPI ID',
+        'new_user.pan_number' => 'PAN',
+        'new_user.gst_number' => 'GST',
+    ];
+
     private function superAdmin(Request $request): User
     {
         $user = $request->user();
@@ -74,26 +97,46 @@ class LabelOwnershipController extends Controller
 
     private function validatedPayload(Request $request, bool $withOtp): array
     {
+        $req = fn (string $max) => ['nullable', 'required_if:mode,new', 'string', $max];
+        $opt = fn (string $max) => ['nullable', 'string', $max];
+
         $rules = [
             'label_ids' => ['required', 'array', 'min:1', 'max:500'],
             'label_ids.*' => ['integer', 'distinct', Rule::exists('labels', 'id')->whereNull('deleted_at')],
             'mode' => ['required', 'in:existing,new'],
             'target_user_id' => ['nullable', 'required_if:mode,existing', 'integer', Rule::exists('users', 'id')],
-            'new_name' => ['nullable', 'required_if:mode,new', 'string', 'max:255'],
-            'new_email' => ['nullable', 'required_if:mode,new', 'email', 'max:255', Rule::unique('users', 'email')],
-            'new_phone' => ['nullable', 'string', 'max:30'],
+            'new_user' => ['nullable', 'required_if:mode,new', 'array'],
+            'new_user.name' => $req('max:150'),
+            'new_user.username' => $opt('max:40'),
+            'new_user.email' => ['nullable', 'required_if:mode,new', 'email', 'max:190', Rule::unique('users', 'email')],
+            'new_user.phone' => $opt('max:30'),
+            'new_user.country' => $opt('max:100'),
+            'new_user.country_code' => ['nullable', 'required_if:mode,new', 'string', 'size:2', 'regex:/^[A-Za-z]{2}$/'],
+            'new_user.state_code' => ['nullable', 'required_if:mode,new', 'string', 'size:2', 'regex:/^[A-Za-z]{2}$/'],
+            'new_user.state' => $req('max:120'),
+            'new_user.address_line_1' => $req('max:255'),
+            'new_user.address_line_2' => $opt('max:255'),
+            'new_user.city' => $req('max:120'),
+            'new_user.postal_code' => $req('max:30'),
+            'new_user.revenue_share_percentage' => ['nullable', 'required_if:mode,new', 'numeric', 'min:0', 'max:100'],
+            'new_user.account_holder_name' => $req('max:190'),
+            'new_user.bank_account_number' => $req('max:60'),
+            'new_user.bank_name' => $req('max:190'),
+            'new_user.ifsc_code' => $req('max:30'),
+            'new_user.branch_name' => $opt('max:190'),
+            'new_user.upi_id' => $opt('max:190'),
+            'new_user.pan_number' => $req('max:30'),
+            'new_user.gst_number' => $opt('max:40'),
         ];
 
         if ($withOtp) {
             $rules['otp'] = ['required', 'digits:6'];
         }
 
-        $v = $request->validate($rules);
+        $v = $request->validate($rules, [], self::ATTRIBUTES);
         $ids = array_values(array_unique(array_map('intval', $v['label_ids'])));
         $targetId = $v['mode'] === 'existing' ? (int) $v['target_user_id'] : null;
-        $new = $v['mode'] === 'new'
-            ? ['name' => $v['new_name'], 'email' => $v['new_email'], 'phone' => $v['new_phone'] ?? '']
-            : null;
+        $new = $v['mode'] === 'new' ? (array) ($v['new_user'] ?? []) : null;
 
         return [$ids, $targetId, $new, $v];
     }
@@ -122,7 +165,8 @@ class LabelOwnershipController extends Controller
 
             $description = $target->name.' <'.$target->email.'>';
         } else {
-            $description = 'NEW: '.trim((string) $new['name']).' <'.strtolower(trim((string) $new['email'])).'>';
+            $normalized = $service->normalizeNewUser($new);
+            $description = 'NEW: '.$normalized['name'].' <'.$normalized['email'].'>';
         }
 
         $service->sendOtp($admin, $service->fingerprint($ids, $targetId, $new), count($ids), $description);
