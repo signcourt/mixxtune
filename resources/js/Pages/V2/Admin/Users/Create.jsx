@@ -109,12 +109,19 @@ const permissionDefaultsForRole = (role) => {
 
 export default function Create({
     role = "super_admin",
+    accountType = "user",
     requiredFields = {},
     requiredFieldOptions = {},
     canEditRequiredFields = false,
     artists = [],
     labels = [],
 }) {
+    /* MIXXTUNE_CREATE_USER_LAYOUT_V2: Users page creates Label/Artist only;
+       Managers are created from Accounts & Access → Managers. */
+    const isManagerForm = accountType === "manager";
+    const initialRole = isManagerForm ? "admin" : "label";
+    const backHref = isManagerForm ? "/v2/admin/admins" : "/v2/admin/users";
+
     const { data, setData, post, processing, errors } = useForm({
         name: "",
         username: "",
@@ -122,7 +129,7 @@ export default function Create({
         phone: "",
         country: "India",
         state_code: "",
-        role: "admin",
+        role: initialRole,
         revenue_share_percentage: "",
         send_invitation: true,
 
@@ -145,9 +152,12 @@ export default function Create({
 
         artist_ids: [],
         label_ids: [],
-        new_labels: [""],
-        permissions: permissionDefaultsForRole("admin"),
+        new_labels: initialRole === "label" ? [""] : [],
+        permissions: permissionDefaultsForRole(initialRole),
     });
+
+    const isPayee = ["label", "artist"].includes(data.role);
+    const req = (field) => fieldRequired(requiredFields, data.role, field);
 
     const toggleSelection = (field, id) => {
         const numberId = Number(id);
@@ -206,14 +216,6 @@ export default function Create({
         );
     };
 
-    const addNewLabel = () => {
-        if ((data.new_labels ?? []).length >= 1) {
-            return;
-        }
-
-        setData("new_labels", [""]);
-    };
-
     const updateNewLabel = (index, value) => {
         const next = [...(data.new_labels ?? [])];
 
@@ -222,12 +224,8 @@ export default function Create({
         setData("new_labels", next);
     };
 
-    const removeNewLabel = (index) => {
-        const next = (data.new_labels ?? []).filter(
-            (_, itemIndex) => itemIndex !== index,
-        );
-
-        setData("new_labels", next.length ? next : [""]);
+    const clearNewLabel = () => {
+        setData("new_labels", [""]);
     };
 
     const generateUsername = () => {
@@ -246,6 +244,15 @@ export default function Create({
         setData("username", generated);
     };
 
+    const setAllPermissions = (value) => {
+        setData(
+            "permissions",
+            Object.fromEntries(
+                permissionOptions.map(([field]) => [field, value]),
+            ),
+        );
+    };
+
     const submit = (event) => {
         event.preventDefault();
 
@@ -254,13 +261,26 @@ export default function Create({
         });
     };
 
+    const nameLabel =
+        data.role === "label"
+            ? "Owner name (account name)"
+            : data.role === "artist"
+              ? "Artist name (account name)"
+              : "Manager name";
+
+    const pageTitle = isManagerForm ? "Create Manager" : "Create User";
+
     return (
         <PanelLayout
             role={role}
-            title="Create User"
-            subtitle="Create and configure a Manager, Label or Artist account"
+            title={pageTitle}
+            subtitle={
+                isManagerForm
+                    ? "Create a Manager account and choose the Artists and Labels they handle"
+                    : "Create a Label or Artist account"
+            }
         >
-            <Head title="Create User" />
+            <Head title={pageTitle} />
             {/* MIXXTUNE_USER_REQUIRED_FIELDS_V1 */}
             {canEditRequiredFields && (
                 <UserRequiredFieldsPanel
@@ -271,43 +291,82 @@ export default function Create({
             )}
 
             <form onSubmit={submit} className="space-y-5">
-
                 {/* =====================================================
-                    1. ACCOUNT & ACCESS
+                    1. ACCOUNT
                 ====================================================== */}
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <Card>
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
-                            <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
-                                Step 1
-                            </div>
-
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                                Account & Access
+                            <h2 className="text-lg font-semibold text-slate-900">
+                                {isManagerForm ? "Manager account" : "Account type"}
                             </h2>
 
                             <p className="mt-1 text-sm text-slate-500">
-                                Login identity and account role.
+                                {isManagerForm
+                                    ? "Login details for the new Manager."
+                                    : "Choose what kind of account you are creating."}
                             </p>
                         </div>
 
                         <Link
-                            href="/v2/admin/users"
+                            href={backHref}
                             className="text-sm font-semibold text-slate-500 hover:text-slate-900"
                         >
-                            Back to Users
+                            {isManagerForm ? "Back to Managers" : "Back to Users"}
                         </Link>
                     </div>
 
-                    <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {!isManagerForm && (
+                        <div className="mt-4 flex flex-wrap gap-3">
+                            {[
+                                ["label", "Label", "Owns one label and receives its earnings"],
+                                ["artist", "Artist", "Individual artist account with own earnings"],
+                            ].map(([value, title, help]) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => applyRoleDefaults(value)}
+                                    className={[
+                                        "min-w-[220px] flex-1 rounded-xl border px-4 py-3 text-left transition sm:flex-none",
+                                        data.role === value
+                                            ? "border-violet-500 bg-violet-50 ring-2 ring-violet-100"
+                                            : "border-slate-300 bg-white hover:bg-slate-50",
+                                    ].join(" ")}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span
+                                            className={[
+                                                "flex h-4 w-4 items-center justify-center rounded-full border",
+                                                data.role === value
+                                                    ? "border-violet-600"
+                                                    : "border-slate-400",
+                                            ].join(" ")}
+                                        >
+                                            {data.role === value && (
+                                                <span className="h-2 w-2 rounded-full bg-violet-600" />
+                                            )}
+                                        </span>
+                                        <span className="text-sm font-semibold text-slate-900">
+                                            {title}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 pl-6 text-xs text-slate-500">
+                                        {help}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {errors.role && (
+                        <div className="mt-2 text-xs text-red-600">{errors.role}</div>
+                    )}
+
+                    <SubHeading>Account</SubHeading>
+
+                    <div className="grid gap-4 md:grid-cols-2">
                         <Field
-                            label={
-                                data.role === "label"
-                                    ? "Label Name"
-                                    : data.role === "artist"
-                                      ? "Artist Name"
-                                      : "Manager Name"
-                            }
+                            label={nameLabel}
                             value={data.name}
                             error={errors.name}
                             required
@@ -317,7 +376,7 @@ export default function Create({
                         <div>
                             <Field
                                 label="Username"
-                                required={fieldRequired(requiredFields, data.role, "username")}
+                                required={req("username")}
                                 value={data.username}
                                 error={errors.username}
                                 onChange={(value) =>
@@ -330,7 +389,7 @@ export default function Create({
                                 }
                             />
 
-                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                                 <button
                                     type="button"
                                     onClick={generateUsername}
@@ -339,14 +398,16 @@ export default function Create({
                                     Generate username
                                 </button>
 
-                                <span className="text-xs text-slate-400">
-                                    Optional — generated automatically if blank.
-                                </span>
+                                {!req("username") && (
+                                    <span className="text-xs text-slate-400">
+                                        Generated automatically if blank.
+                                    </span>
+                                )}
                             </div>
                         </div>
 
                         <Field
-                            label="Email"
+                            label={isManagerForm ? "Email" : "Owner e-mail"}
                             type="email"
                             value={data.email}
                             error={errors.email}
@@ -356,78 +417,243 @@ export default function Create({
 
                         <Field
                             label="Phone"
-                            required={fieldRequired(requiredFields, data.role, "phone")}
+                            required={req("phone")}
                             value={data.phone}
                             error={errors.phone}
                             onChange={(value) => setData("phone", value)}
                         />
-
-                        <label>
-                            <span className="text-sm font-semibold text-slate-700">
-                                Role
-                                <span className="ml-1 text-red-500">*</span>
-                            </span>
-
-                            <select
-                                value={data.role}
-                                onChange={(event) =>
-                                    applyRoleDefaults(event.target.value)
-                                }
-                                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                            >
-                                <option value="admin">Manager</option>
-                                <option value="label">Label</option>
-                                <option value="artist">Artist</option>
-                            </select>
-
-                            {errors.role && (
-                                <div className="mt-1 text-xs text-red-600">
-                                    {errors.role}
-                                </div>
-                            )}
-                        </label>
-
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                                Activation
-                            </div>
-
-                            <div className="mt-1 text-sm font-semibold text-amber-900">
-                                Pending
-                            </div>
-
-                            <p className="mt-1 text-xs leading-5 text-amber-700">
-                                Account becomes Active automatically after the
-                                invitation is accepted and password is set.
-                            </p>
-                        </div>
                     </div>
-                </section>
+                </Card>
 
                 {/* =====================================================
-                    2. BUSINESS & REVENUE
+                    2. LABEL (label accounts only)
                 ====================================================== */}
-                {["label", "artist"].includes(data.role) && (
-                    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div>
-                            <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
-                                Step 2
-                            </div>
+                {data.role === "label" && (
+                    <Card>
+                        <h2 className="text-lg font-semibold text-slate-900">
+                            Label
+                        </h2>
 
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                                Business & Revenue
-                            </h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Link one existing Label <span className="font-semibold">or</span> type the name of a new Label.
+                        </p>
 
-                            <p className="mt-1 text-sm text-slate-500">
-                                Commercial settings used for reporting and royalty
-                                calculation.
-                            </p>
+                        <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                            <SelectionBox
+                                title="Existing Label"
+                                items={labels}
+                                selected={data.label_ids}
+                                nameKey="name"
+                                onToggle={(id) =>
+                                    toggleSelection("label_ids", id)
+                                }
+                                onClear={() => setData("label_ids", [])}
+                            />
+
+                            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <h2 className="text-sm font-semibold text-slate-900">
+                                    New Label
+                                </h2>
+
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    Only when the Label does not exist yet.
+                                </p>
+
+                                <div className="mt-3 flex items-start gap-3">
+                                    <div className="flex-1">
+                                        <input
+                                            type="text"
+                                            value={(data.new_labels ?? [""])[0] ?? ""}
+                                            placeholder="New label name"
+                                            onChange={(event) =>
+                                                updateNewLabel(0, event.target.value)
+                                            }
+                                            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                                        />
+
+                                        {errors["new_labels.0"] && (
+                                            <p className="mt-1 text-xs font-medium text-red-600">
+                                                {errors["new_labels.0"]}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {((data.new_labels ?? [""])[0] ?? "") !== "" && (
+                                        <button
+                                            type="button"
+                                            onClick={clearNewLabel}
+                                            className="rounded-lg border border-red-200 px-3 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                                            title="Clear new label"
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
+                            </section>
                         </div>
 
-                        <div className="mt-5 grid gap-5 md:grid-cols-2">
+                        {errors.label_ids && (
+                            <p className="mt-3 text-sm font-medium text-red-600">
+                                {errors.label_ids}
+                            </p>
+                        )}
+
+                        {errors.new_labels && (
+                            <p className="mt-3 text-sm font-medium text-red-600">
+                                {errors.new_labels}
+                            </p>
+                        )}
+                    </Card>
+                )}
+
+                {/* =====================================================
+                    3. DETAILS (label / artist)
+                ====================================================== */}
+                {isPayee && (
+                    <Card>
+                        <h2 className="text-lg font-semibold text-slate-900">
+                            Details
+                        </h2>
+
+                        <SubHeading>Address</SubHeading>
+
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <label>
+                                <FieldLabel
+                                    label="State"
+                                    required={req("state")}
+                                />
+
+                                {data.country_code === "IN" ? (
+                                    <select
+                                        value={data.state_code}
+                                        onChange={(event) => {
+                                            const code = event.target.value;
+
+                                            setData((current) => ({
+                                                ...current,
+                                                state_code: code,
+                                                state:
+                                                    indiaStateNameByCode[code] ??
+                                                    "",
+                                            }));
+                                        }}
+                                        className={inputClass(errors.state || errors.state_code)}
+                                        required={req("state")}
+                                    >
+                                        <option value="">Select state...</option>
+
+                                        {indiaStates.map(([code, name]) => (
+                                            <option key={code} value={code}>
+                                                {name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={data.state}
+                                        onChange={(event) =>
+                                            setData(
+                                                "state",
+                                                event.target.value,
+                                            )
+                                        }
+                                        className={inputClass(errors.state || errors.state_code)}
+                                        required={req("state")}
+                                    />
+                                )}
+
+                                {(errors.state || errors.state_code) && (
+                                    <p className="mt-1 text-xs text-red-600">
+                                        {errors.state || errors.state_code}
+                                    </p>
+                                )}
+                            </label>
+
+                            <Field
+                                label="City"
+                                value={data.city}
+                                error={errors.city}
+                                required={req("city")}
+                                onChange={(value) => setData("city", value)}
+                            />
+
+                            <Field
+                                label="Pincode"
+                                value={data.postal_code}
+                                error={errors.postal_code}
+                                required={req("postal_code")}
+                                onChange={(value) =>
+                                    setData("postal_code", value)
+                                }
+                            />
+
+                            <Field
+                                label="Address line 1"
+                                value={data.address_line_1}
+                                error={errors.address_line_1}
+                                required={req("address_line_1")}
+                                onChange={(value) =>
+                                    setData("address_line_1", value)
+                                }
+                            />
+
+                            <Field
+                                label="Address line 2"
+                                required={req("address_line_2")}
+                                value={data.address_line_2}
+                                error={errors.address_line_2}
+                                onChange={(value) =>
+                                    setData("address_line_2", value)
+                                }
+                            />
+
+                            <label>
+                                <FieldLabel label="Country" required />
+
+                                <select
+                                    value={data.country_code}
+                                    onChange={(event) => {
+                                        const code = event.target.value;
+
+                                        setData((current) => ({
+                                            ...current,
+                                            country:
+                                                code === "IN"
+                                                    ? "India"
+                                                    : "",
+                                            country_code: code,
+                                            state: "",
+                                            state_code: "",
+                                        }));
+                                    }}
+                                    className={inputClass(errors.country || errors.country_code)}
+                                    required
+                                >
+                                    <option value="">
+                                        Select country
+                                    </option>
+
+                                    <option value="IN">
+                                        India
+                                    </option>
+                                </select>
+
+                                {(errors.country || errors.country_code) && (
+                                    <p className="mt-1 text-xs text-red-600">
+                                        {errors.country || errors.country_code}
+                                    </p>
+                                )}
+                            </label>
+                        </div>
+
+                        <SubHeading>Revenue</SubHeading>
+
+                        <div className="grid gap-4 md:grid-cols-3">
                             <div>
                                 <Field
-                                    label="Revenue Share (%)"
+                                    label="Revenue %"
                                     type="number"
                                     value={data.revenue_share_percentage}
                                     error={errors.revenue_share_percentage}
@@ -439,50 +665,135 @@ export default function Create({
                                         )
                                     }
                                 />
-
-                                <p className="mt-2 text-xs leading-5 text-slate-500">
-                                    Positive collected revenue is paid using this
-                                    percentage. Negative adjustments are passed
-                                    through at 100%.
-                                </p>
                             </div>
 
-                            <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4">
-                                <div className="text-sm font-semibold text-slate-900">
-                                    Revenue example
-                                </div>
-
-                                <p className="mt-2 text-xs leading-5 text-slate-600">
-                                    At an 80% share, ₹100 positive collected
-                                    revenue produces ₹80 earning. A ₹100 negative
-                                    adjustment remains −₹100.
-                                </p>
-                            </div>
-                        </div>
-                    </section>
-                )}
-
-                {/* =====================================================
-                    3. ACCOUNT ASSIGNMENT
-                ====================================================== */}
-                {data.role === "admin" && (
-                    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div className="mb-4">
-                            <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
-                                Step 2
-                            </div>
-
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                                Manager Assignments
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Select the Artists and Labels this Manager is
-                                responsible for.
+                            <p className="self-end pb-1 text-xs leading-5 text-slate-500 md:col-span-2">
+                                Positive collected revenue is paid at this %
+                                (at 80%, ₹100 collected = ₹80 earning). Negative
+                                adjustments pass through at 100%.
                             </p>
                         </div>
 
-                        <div className="grid gap-4 xl:grid-cols-2">
+                        <SubHeading>Bank details</SubHeading>
+
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <Field
+                                label="Account holder name"
+                                value={data.account_holder_name}
+                                error={errors.account_holder_name}
+                                required={req("account_holder_name")}
+                                onChange={(value) =>
+                                    setData("account_holder_name", value)
+                                }
+                            />
+
+                            <Field
+                                label="Bank account number"
+                                value={data.bank_account_number}
+                                error={errors.bank_account_number}
+                                required={req("bank_account_number")}
+                                onChange={(value) =>
+                                    setData("bank_account_number", value)
+                                }
+                            />
+
+                            <Field
+                                label="Bank name"
+                                value={data.bank_name}
+                                error={errors.bank_name}
+                                required={req("bank_name")}
+                                onChange={(value) =>
+                                    setData("bank_name", value)
+                                }
+                            />
+
+                            <Field
+                                label="IFSC code"
+                                value={data.ifsc_code}
+                                error={errors.ifsc_code}
+                                required={req("ifsc_code")}
+                                onChange={(value) =>
+                                    setData(
+                                        "ifsc_code",
+                                        value
+                                            .toUpperCase()
+                                            .replace(/\s+/g, ""),
+                                    )
+                                }
+                            />
+
+                            <Field
+                                label="Branch name"
+                                required={req("branch_name")}
+                                value={data.branch_name}
+                                error={errors.branch_name}
+                                onChange={(value) =>
+                                    setData("branch_name", value)
+                                }
+                            />
+
+                            <Field
+                                label="UPI ID"
+                                required={req("upi_id")}
+                                value={data.upi_id}
+                                error={errors.upi_id}
+                                onChange={(value) =>
+                                    setData("upi_id", value)
+                                }
+                            />
+                        </div>
+
+                        <SubHeading>Tax</SubHeading>
+
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <Field
+                                label="PAN"
+                                value={data.pan_number}
+                                error={errors.pan_number}
+                                required={req("pan_number")}
+                                onChange={(value) =>
+                                    setData(
+                                        "pan_number",
+                                        value
+                                            .toUpperCase()
+                                            .replace(/\s+/g, ""),
+                                    )
+                                }
+                            />
+
+                            <Field
+                                label="GST"
+                                required={req("gst_number")}
+                                value={data.gst_number}
+                                error={errors.gst_number}
+                                onChange={(value) =>
+                                    setData(
+                                        "gst_number",
+                                        value
+                                            .toUpperCase()
+                                            .replace(/\s+/g, ""),
+                                    )
+                                }
+                            />
+                        </div>
+                    </Card>
+                )}
+
+                {/* =====================================================
+                    MANAGER ASSIGNMENTS (manager form only)
+                ====================================================== */}
+                {isManagerForm && (
+                    <Card>
+                        <h2 className="text-lg font-semibold text-slate-900">
+                            Manager assignments
+                        </h2>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                            Select the Artists and Labels this Manager is
+                            responsible for.
+                        </p>
+
+                        <div className="mt-4 grid gap-4 xl:grid-cols-2">
                             <SelectionBox
                                 title="Assigned Artists"
                                 items={artists}
@@ -511,473 +822,37 @@ export default function Create({
                                 onClear={() => setData("label_ids", [])}
                             />
                         </div>
-                    </section>
-                )}
-
-                {data.role === "label" && (
-                    <section className="rounded-2xl border border-violet-200 bg-violet-50/30 p-5 shadow-sm">
-                        <div className="mb-4">
-                            <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
-                                Step 3
-                            </div>
-
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                                Label Assignment
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Link one existing Label or create one new Label
-                                for this account.
-                            </p>
-                        </div>
-
-                        <SelectionBox
-                            title="Existing Label"
-                            items={labels}
-                            selected={data.label_ids}
-                            nameKey="name"
-                            onToggle={(id) =>
-                                toggleSelection("label_ids", id)
-                            }
-                            onClear={() => setData("label_ids", [])}
-                        />
-
-                        {errors.label_ids && (
-                            <p className="mt-3 text-sm font-medium text-red-600">
-                                {errors.label_ids}
-                            </p>
-                        )}
-
-                        <div className="mt-4 rounded-xl border border-violet-200 bg-white p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <div className="text-sm font-semibold text-slate-900">
-                                        Create New Label
-                                    </div>
-
-                                    <div className="mt-1 text-xs text-slate-500">
-                                        Use this only when the Label does not
-                                        already exist in the catalogue.
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={addNewLabel}
-                                    className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
-                                >
-                                    + Add Label
-                                </button>
-                            </div>
-
-                            <div className="mt-4 space-y-2">
-                                {(data.new_labels ?? []).map(
-                                    (labelName, index) => (
-                                        <div
-                                            key={index}
-                                            className="flex items-start gap-3"
-                                        >
-                                            <div className="flex-1">
-                                                <input
-                                                    type="text"
-                                                    value={labelName}
-                                                    placeholder="New label name"
-                                                    onChange={(event) =>
-                                                        updateNewLabel(
-                                                            index,
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                                                />
-
-                                                {errors[
-                                                    `new_labels.${index}`
-                                                ] && (
-                                                    <p className="mt-1 text-xs font-medium text-red-600">
-                                                        {
-                                                            errors[
-                                                                `new_labels.${index}`
-                                                            ]
-                                                        }
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    removeNewLabel(index)
-                                                }
-                                                className="rounded-xl border border-red-200 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50"
-                                                title="Clear new label"
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-                                    ),
-                                )}
-                            </div>
-
-                            {errors.new_labels && (
-                                <p className="mt-3 text-sm font-medium text-red-600">
-                                    {errors.new_labels}
-                                </p>
-                            )}
-                        </div>
-                    </section>
-                )}
-
-                {/* =====================================================
-                    4. REGISTERED ADDRESS
-                ====================================================== */}
-                {["label", "artist"].includes(data.role) && (
-                    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div>
-                            <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
-                                {data.role === "label" ? "Step 4" : "Step 3"}
-                            </div>
-
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                                Registered Address
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Legal and correspondence address for this account.
-                            </p>
-                        </div>
-
-                        <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                            <Field
-                                label="Address Line 1"
-                                value={data.address_line_1}
-                                error={errors.address_line_1}
-                                required={fieldRequired(requiredFields, data.role, "address_line_1")}
-                                onChange={(value) =>
-                                    setData("address_line_1", value)
-                                }
-                            />
-
-                            <Field
-                                label="Address Line 2"
-                                required={fieldRequired(requiredFields, data.role, "address_line_2")}
-                                value={data.address_line_2}
-                                error={errors.address_line_2}
-                                onChange={(value) =>
-                                    setData("address_line_2", value)
-                                }
-                            />
-
-                            <Field
-                                label="City"
-                                value={data.city}
-                                error={errors.city}
-                                required={fieldRequired(requiredFields, data.role, "city")}
-                                onChange={(value) => setData("city", value)}
-                            />
-
-                            <label>
-                                <span className="text-sm font-semibold text-slate-700">
-                                    State / Region
-                                    {fieldRequired(requiredFields, data.role, "state") && (<span className="ml-1 text-red-500">*</span>)}
-                                </span>
-
-                                {data.country_code === "IN" ? (
-                                    <select
-                                        value={data.state_code}
-                                        onChange={(event) => {
-                                            const code = event.target.value;
-
-                                            setData((current) => ({
-                                                ...current,
-                                                state_code: code,
-                                                state:
-                                                    indiaStateNameByCode[code] ??
-                                                    "",
-                                            }));
-                                        }}
-                                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                                        required={fieldRequired(requiredFields, data.role, "state")}
-                                    >
-                                        <option value="">Select State</option>
-
-                                        {indiaStates.map(([code, name]) => (
-                                            <option key={code} value={code}>
-                                                {name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                ) : (
-                                    <input
-                                        type="text"
-                                        value={data.state}
-                                        onChange={(event) =>
-                                            setData(
-                                                "state",
-                                                event.target.value,
-                                            )
-                                        }
-                                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                                        required={fieldRequired(requiredFields, data.role, "state")}
-                                    />
-                                )}
-
-                                {(errors.state || errors.state_code) && (
-                                    <p className="mt-1 text-xs text-red-600">
-                                        {errors.state || errors.state_code}
-                                    </p>
-                                )}
-                            </label>
-
-                            <Field
-                                label="Postal Code"
-                                value={data.postal_code}
-                                error={errors.postal_code}
-                                required={fieldRequired(requiredFields, data.role, "postal_code")}
-                                onChange={(value) =>
-                                    setData("postal_code", value)
-                                }
-                            />
-
-                            <label>
-                                <span className="text-sm font-semibold text-slate-700">
-                                    Country
-                                    <span className="ml-1 text-red-500">*</span>
-                                </span>
-
-                                <select
-                                    value={data.country_code}
-                                    onChange={(event) => {
-                                        const code = event.target.value;
-
-                                        setData((current) => ({
-                                            ...current,
-                                            country:
-                                                code === "IN"
-                                                    ? "India"
-                                                    : "",
-                                            country_code: code,
-                                            state: "",
-                                            state_code: "",
-                                        }));
-                                    }}
-                                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                                    required
-                                >
-                                    <option value="">
-                                        Select Country
-                                    </option>
-
-                                    <option value="IN">
-                                        India
-                                    </option>
-                                </select>
-
-                                {(errors.country || errors.country_code) && (
-                                    <p className="mt-1 text-xs text-red-600">
-                                        {errors.country || errors.country_code}
-                                    </p>
-                                )}
-                            </label>
-                        </div>
-                    </section>
-                )}
-
-                {/* =====================================================
-                    5. TAX
-                ====================================================== */}
-                {["label", "artist"].includes(data.role) && (
-                    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div>
-                            <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
-                                {data.role === "label" ? "Step 5" : "Step 4"}
-                            </div>
-
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                                Tax Information
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Tax identifiers used for finance and payout
-                                documentation.
-                            </p>
-                        </div>
-
-                        <div className="mt-5 grid gap-5 md:grid-cols-2">
-                            <Field
-                                label="PAN Number"
-                                value={data.pan_number}
-                                error={errors.pan_number}
-                                required={fieldRequired(requiredFields, data.role, "pan_number")}
-                                onChange={(value) =>
-                                    setData(
-                                        "pan_number",
-                                        value
-                                            .toUpperCase()
-                                            .replace(/\s+/g, ""),
-                                    )
-                                }
-                            />
-
-                            <Field
-                                label="GST Number"
-                                required={fieldRequired(requiredFields, data.role, "gst_number")}
-                                value={data.gst_number}
-                                error={errors.gst_number}
-                                onChange={(value) =>
-                                    setData(
-                                        "gst_number",
-                                        value
-                                            .toUpperCase()
-                                            .replace(/\s+/g, ""),
-                                    )
-                                }
-                            />
-                        </div>
-                    </section>
-                )}
-
-                {/* =====================================================
-                    6. PAYOUT
-                ====================================================== */}
-                {["label", "artist"].includes(data.role) && (
-                    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div>
-                            <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
-                                {data.role === "label" ? "Step 6" : "Step 5"}
-                            </div>
-
-                            <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                                Payout Information
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Verified banking details used for royalty payouts.
-                            </p>
-                        </div>
-
-                        <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                            <Field
-                                label="Account Holder Name"
-                                value={data.account_holder_name}
-                                error={errors.account_holder_name}
-                                required={fieldRequired(requiredFields, data.role, "account_holder_name")}
-                                onChange={(value) =>
-                                    setData("account_holder_name", value)
-                                }
-                            />
-
-                            <Field
-                                label="Bank Account Number"
-                                value={data.bank_account_number}
-                                error={errors.bank_account_number}
-                                required={fieldRequired(requiredFields, data.role, "bank_account_number")}
-                                onChange={(value) =>
-                                    setData("bank_account_number", value)
-                                }
-                            />
-
-                            <Field
-                                label="Bank Name"
-                                value={data.bank_name}
-                                error={errors.bank_name}
-                                required={fieldRequired(requiredFields, data.role, "bank_name")}
-                                onChange={(value) =>
-                                    setData("bank_name", value)
-                                }
-                            />
-
-                            <Field
-                                label="IFSC Code"
-                                value={data.ifsc_code}
-                                error={errors.ifsc_code}
-                                required={fieldRequired(requiredFields, data.role, "ifsc_code")}
-                                onChange={(value) =>
-                                    setData(
-                                        "ifsc_code",
-                                        value
-                                            .toUpperCase()
-                                            .replace(/\s+/g, ""),
-                                    )
-                                }
-                            />
-
-                            <Field
-                                label="Branch Name"
-                                required={fieldRequired(requiredFields, data.role, "branch_name")}
-                                value={data.branch_name}
-                                error={errors.branch_name}
-                                onChange={(value) =>
-                                    setData("branch_name", value)
-                                }
-                            />
-
-                            <Field
-                                label="UPI ID"
-                                required={fieldRequired(requiredFields, data.role, "upi_id")}
-                                value={data.upi_id}
-                                error={errors.upi_id}
-                                onChange={(value) =>
-                                    setData("upi_id", value)
-                                }
-                            />
-                        </div>
-                    </section>
+                    </Card>
                 )}
 
                 {/* =====================================================
                     PANEL PERMISSIONS
                 ====================================================== */}
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <Card>
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
                             <h2 className="text-lg font-semibold text-slate-900">
-                                Panel Permissions
+                                Panel permissions
                             </h2>
 
                             <p className="mt-1 text-sm text-slate-500">
-                                Control which platform modules this account can
-                                access. Recommended defaults are applied when the
-                                role changes.
+                                Recommended defaults are already ticked for this
+                                account type.
                             </p>
                         </div>
 
                         <div className="flex gap-2">
                             <button
                                 type="button"
-                                onClick={() =>
-                                    setData(
-                                        "permissions",
-                                        Object.fromEntries(
-                                            permissionOptions.map(
-                                                ([field]) => [
-                                                    field,
-                                                    true,
-                                                ],
-                                            ),
-                                        ),
-                                    )
-                                }
+                                onClick={() => setAllPermissions(true)}
                                 className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                             >
-                                Select All
+                                Select all
                             </button>
 
                             <button
                                 type="button"
-                                onClick={() =>
-                                    setData(
-                                        "permissions",
-                                        Object.fromEntries(
-                                            permissionOptions.map(
-                                                ([field]) => [
-                                                    field,
-                                                    false,
-                                                ],
-                                            ),
-                                        ),
-                                    )
-                                }
+                                onClick={() => setAllPermissions(false)}
                                 className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                             >
                                 Clear
@@ -985,12 +860,12 @@ export default function Create({
                         </div>
                     </div>
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                         {permissionOptions.map(([field, label]) => (
                             <label
                                 key={field}
                                 className={[
-                                    "flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition",
+                                    "flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition",
                                     data.permissions[field]
                                         ? "border-violet-400 bg-violet-50"
                                         : "border-slate-200 bg-white",
@@ -1013,24 +888,13 @@ export default function Create({
                             </label>
                         ))}
                     </div>
-                </section>
+                </Card>
 
                 {/* =====================================================
                     LOGIN & INVITATION
                 ====================================================== */}
                 <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
-                    <div>
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            Login & Invitation
-                        </h2>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                            Account activation is controlled automatically by
-                            invitation acceptance.
-                        </p>
-                    </div>
-
-                    <label className="mt-5 flex cursor-pointer items-start gap-4 rounded-xl border border-violet-200 bg-white p-4">
+                    <label className="flex cursor-pointer items-start gap-4">
                         <input
                             type="checkbox"
                             checked={data.send_invitation}
@@ -1045,25 +909,24 @@ export default function Create({
 
                         <div>
                             <div className="text-sm font-semibold text-slate-900">
-                                Send account invitation by email
+                                Send account invitation by e-mail
                             </div>
 
                             <p className="mt-1 text-xs leading-5 text-slate-500">
-                                A secure password setup link will be sent to the
-                                user and will remain valid for seven days.
+                                The account is created as{" "}
+                                <span className="font-semibold text-amber-700">Pending</span>{" "}
+                                and becomes Active after the invitation is
+                                accepted and a password is set (link valid for
+                                seven days).
                             </p>
-
-                            <div className="mt-3 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                                Pending until invitation is accepted
-                            </div>
                         </div>
                     </label>
 
                     {!data.send_invitation && (
                         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-                            Invitation is disabled. The account will be created
-                            as Pending and will not become Active until a valid
-                            invitation is later issued and accepted.
+                            Invitation is disabled. The account stays Pending
+                            until a valid invitation is later issued and
+                            accepted.
                         </div>
                     )}
                 </section>
@@ -1077,6 +940,7 @@ export default function Create({
 
                 <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
                     <div className="text-xs text-slate-500">
+                        <span className="text-red-500">*</span> = required.
                         New accounts are created as{" "}
                         <span className="font-semibold text-amber-700">
                             Pending
@@ -1086,7 +950,7 @@ export default function Create({
 
                     <div className="flex gap-3">
                         <Link
-                            href="/v2/admin/users"
+                            href={backHref}
                             className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                         >
                             Cancel
@@ -1098,13 +962,55 @@ export default function Create({
                             className="rounded-xl bg-violet-600 px-7 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {processing
-                                ? "Creating User..."
-                                : "Create User"}
+                                ? "Creating..."
+                                : isManagerForm
+                                  ? "Create Manager"
+                                  : data.role === "artist"
+                                    ? "Create Artist"
+                                    : "Create Label User"}
                         </button>
                     </div>
                 </div>
             </form>
         </PanelLayout>
+    );
+}
+
+function Card({ children }) {
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            {children}
+        </section>
+    );
+}
+
+function SubHeading({ children }) {
+    return (
+        <div className="mb-2 mt-5 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+            {children}
+        </div>
+    );
+}
+
+function inputClass(error) {
+    return [
+        "mt-1.5 w-full rounded-xl border bg-white px-4 py-2.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100",
+        error ? "border-red-400" : "border-slate-300",
+    ].join(" ");
+}
+
+function FieldLabel({ label, required = false }) {
+    return (
+        <span className="text-sm font-semibold text-slate-700">
+            {label}
+            {required ? (
+                <span className="ml-1 text-red-500">*</span>
+            ) : (
+                <span className="ml-1 text-xs font-normal text-slate-400">
+                    (optional)
+                </span>
+            )}
+        </span>
     );
 }
 
@@ -1118,19 +1024,13 @@ function Field({
 }) {
     return (
         <label>
-            <span className="text-sm font-semibold text-slate-700">
-                {label}
-                {required && <span className="ml-1 text-red-500">*</span>}
-            </span>
+            <FieldLabel label={label} required={required} />
 
             <input
                 type={type}
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className={[
-                    "mt-2 w-full rounded-xl border px-4 py-3 text-sm",
-                    error ? "border-red-400" : "border-slate-300",
-                ].join(" ")}
+                className={inputClass(error)}
             />
 
             {error && <div className="mt-1 text-xs text-red-600">{error}</div>}

@@ -501,6 +501,7 @@ class UserManagementController extends Controller
                 'requiredFields' => app(\App\Services\V2\UserFieldRequirementService::class)->all(),
                 'requiredFieldOptions' => \App\Services\V2\UserFieldRequirementService::options(),
                 'canEditRequiredFields' => request()->user()?->role === 'super_admin',
+                'accountType' => request()->query('type') === 'manager' ? 'manager' : 'user',
 
                 'artists' =>
                     Artist::query()

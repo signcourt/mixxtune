@@ -123,4 +123,19 @@ class UserRequiredFieldsTest extends TestCase
                 ->where('canEditRequiredFields', true)
                 ->has('requiredFieldOptions.fields.label'));
     }
+
+    public function test_manager_form_opens_only_from_managers_link(): void
+    {
+        $admin = $this->account('super_admin');
+
+        $this->actingAs($admin)
+            ->get('/v2/admin/users/create?type=manager')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('accountType', 'manager'));
+
+        $this->actingAs($admin)
+            ->get('/v2/admin/users/create')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('accountType', 'user'));
+    }
 }

@@ -19,7 +19,7 @@ export default function Index({
 
             <div className="mb-4 flex justify-end">
                 <Link
-                    href="/v2/admin/users/create"
+                    href="/v2/admin/users/create?type=manager"
                     className="inline-flex items-center rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700"
                 >
                     + Create Manager
