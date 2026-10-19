@@ -21,5 +21,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vite::prefetch(concurrency: 3);
+
+        /* MIXXTUNE_LABEL_RATE_HISTORY_V1 */
+        \App\Models\Core\Label::observe(\App\Observers\LabelRateObserver::class);
     }
 }

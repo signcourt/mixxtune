@@ -2939,3 +2939,8 @@ Route::middleware(['auth', 'verified'])
         Route::post('confirm', [\App\Http\Controllers\V2\Admin\LabelOwnershipBulkController::class, 'confirm'])->middleware('throttle:20,1')->name('confirm');
         Route::post('run', [\App\Http\Controllers\V2\Admin\LabelOwnershipBulkController::class, 'run'])->middleware('throttle:120,1')->name('run');
     });
+
+/* MIXXTUNE_LABEL_RATE_HISTORY_V1 */
+Route::middleware(['auth', 'verified'])
+    ->get('/v2/admin/labels/rate-history', [\App\Http\Controllers\V2\Admin\LabelRateHistoryController::class, 'show'])
+    ->name('v2.admin.labels.rate-history');

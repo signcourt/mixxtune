@@ -11,6 +11,7 @@ import {
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import LabelOwnershipPanel from '@/V2/Admin/LabelOwnershipPanel';
 import LabelOwnershipBulkImport from '@/V2/Admin/LabelOwnershipBulkImport';
+import LabelRateHistory from '@/V2/Admin/LabelRateHistory';
 
 export default function Index({
     role = 'admin',
@@ -548,6 +549,13 @@ export default function Index({
                     />
                 )}
 
+                {/* MIXXTUNE_LABEL_RATE_HISTORY_V1 */}
+                {role === 'super_admin' && (
+                    <div className="flex justify-end">
+                        <LabelRateHistory buttonText="All label rate changes" />
+                    </div>
+                )}
+
                 {/* MIXXTUNE_LABEL_BULK_ACTION_UI_V2 */}
                 {role === 'super_admin' && (
                     <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 shadow-sm">
@@ -798,9 +806,16 @@ export default function Index({
 
                                         <Cell>
                                             {role === 'super_admin' ? (
-                                                <LabelRateEditor
-                                                    label={label}
-                                                />
+                                                <>
+                                                    <LabelRateEditor
+                                                        label={label}
+                                                    />
+                                                    {/* MIXXTUNE_LABEL_RATE_HISTORY_V1 */}
+                                                    <LabelRateHistory
+                                                        labelId={label.id}
+                                                        labelName={label.name}
+                                                    />
+                                                </>
                                             ) : (
                                                 <span className="font-medium text-slate-700">
                                                     {label.revenue_share_percentage === null ||

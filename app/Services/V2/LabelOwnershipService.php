@@ -245,7 +245,10 @@ class LabelOwnershipService
 
         if ($newUser) {
             $unowned = $before->filter(fn ($row) => !$row->user_id)->keys()->map(fn ($id) => (int) $id)->all();
-            [$owner, $invitationWarning] = $this->createOwnerViaUsersModule($admin, $this->normalizeNewUser($newUser), $unowned, $request);
+            /* MIXXTUNE_LABEL_RATE_HISTORY_V1: the net % change is logged below. */
+            [$owner, $invitationWarning] = LabelRateHistoryService::muted(
+                fn () => $this->createOwnerViaUsersModule($admin, $this->normalizeNewUser($newUser), $unowned, $request)
+            );
             $created = true;
             $targetUserId = (int) $owner->id;
         }
@@ -312,13 +315,24 @@ class LabelOwnershipService
 
         if ($created) {
             /*
-             * Labels that already had their own revenue % keep it; only labels
-             * without a % take the new owner's %. Then pending-review earnings
+             * Every label keeps the revenue % it had before (the Users module
+             * may set the owner's % on labels it touches). Then pending-review earnings
              * are recalculated through the canonical service.
              */
             foreach ($before as $labelId => $row) {
                 if ($row->revenue_share_percentage !== null) {
                     DB::table('labels')->where('id', $labelId)->update(['revenue_share_percentage' => $row->revenue_share_percentage]);
+                }
+            }
+
+            $history = app(LabelRateHistoryService::class);
+            $after = DB::table('labels')->whereIn('id', $labelIds)->pluck('revenue_share_percentage', 'id');
+
+            foreach ($before as $labelId => $row) {
+                $label = \App\Models\Core\Label::query()->find($labelId);
+
+                if ($label) {
+                    $history->record($label, $row->revenue_share_percentage, $after[$labelId] ?? null, 'label_ownership', 'New owner '.$target->email.' created.');
                 }
             }
 

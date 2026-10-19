@@ -437,7 +437,7 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
                                                 {field('revenue_share_percentage', 'Revenue %', { inputMode: 'decimal' })}
                                             </div>
                                             <div className="mt-1 text-xs text-slate-500">
-                                                Labels that already have their own % keep it; this % is used for labels without a %.
+                                                Every label keeps its own % (a label without % stays without %). This is the owner account's default %.
                                             </div>
                                         </div>
 
