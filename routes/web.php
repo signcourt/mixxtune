@@ -2927,3 +2927,15 @@ Route::middleware(['auth', 'verified', 'throttle:30,1'])
         [\App\Http\Controllers\V2\Admin\UserRequiredFieldsController::class, 'update']
     )
     ->name('v2.admin.user-form.required-fields');
+
+/* MIXXTUNE_LABEL_OWNER_BULK_IMPORT_V1 */
+Route::middleware(['auth', 'verified'])
+    ->prefix('v2/admin/labels/ownership/bulk')
+    ->name('v2.admin.labels.ownership.bulk.')
+    ->group(function () {
+        Route::get('template', [\App\Http\Controllers\V2\Admin\LabelOwnershipBulkController::class, 'template'])->name('template');
+        Route::post('preview', [\App\Http\Controllers\V2\Admin\LabelOwnershipBulkController::class, 'preview'])->middleware('throttle:20,1')->name('preview');
+        Route::post('otp', [\App\Http\Controllers\V2\Admin\LabelOwnershipBulkController::class, 'sendOtp'])->middleware('throttle:10,1')->name('otp');
+        Route::post('confirm', [\App\Http\Controllers\V2\Admin\LabelOwnershipBulkController::class, 'confirm'])->middleware('throttle:20,1')->name('confirm');
+        Route::post('run', [\App\Http\Controllers\V2\Admin\LabelOwnershipBulkController::class, 'run'])->middleware('throttle:120,1')->name('run');
+    });

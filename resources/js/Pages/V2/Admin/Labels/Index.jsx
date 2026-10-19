@@ -10,6 +10,7 @@ import {
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import LabelOwnershipPanel from '@/V2/Admin/LabelOwnershipPanel';
+import LabelOwnershipBulkImport from '@/V2/Admin/LabelOwnershipBulkImport';
 
 export default function Index({
     role = 'admin',
@@ -537,6 +538,13 @@ export default function Index({
                             setSelectedLabelIds([]);
                             router.reload({ preserveScroll: true });
                         }}
+                    />
+                )}
+
+                {/* MIXXTUNE_LABEL_OWNER_BULK_IMPORT_V1 */}
+                {role === 'super_admin' && (
+                    <LabelOwnershipBulkImport
+                        onDone={() => router.reload({ preserveScroll: true })}
                     />
                 )}
 
