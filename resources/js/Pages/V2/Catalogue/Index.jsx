@@ -40,44 +40,6 @@ const statusClasses = {
         'bg-slate-200 text-slate-700 ring-slate-300',
 };
 
-const countCards = [
-    {
-        key: 'total',
-        label: 'Total Releases',
-        description: 'Complete catalogue',
-        tone: 'bg-violet-50 text-violet-700',
-    },
-    {
-        key: 'visible',
-        label: 'Visible',
-        description: 'Available to panel',
-        tone: 'bg-cyan-50 text-cyan-700',
-    },
-    {
-        key: 'approved',
-        label: 'Approved',
-        description: 'Ready for delivery',
-        tone: 'bg-emerald-50 text-emerald-700',
-    },
-    {
-        key: 'processing',
-        label: 'Processing',
-        description: 'Delivery in progress',
-        tone: 'bg-blue-50 text-blue-700',
-    },
-    {
-        key: 'delivered',
-        label: 'Delivered',
-        description: 'Sent to stores',
-        tone: 'bg-indigo-50 text-indigo-700',
-    },
-    {
-        key: 'live',
-        label: 'Live',
-        description: 'Available on DSPs',
-        tone: 'bg-green-50 text-green-700',
-    },
-];
 
 const formatDate = (value) => {
     if (!value) {
@@ -142,6 +104,7 @@ export default function Index({
     catalogue = {},
     counts = {},
     filters = {},
+    labelOptions = [],
 }) {
     const rows = catalogue.data ?? [];
 
@@ -230,464 +193,294 @@ export default function Index({
         });
     };
 
+    /* MIXXTUNE_CATALOGUE_LIST_V2: v2 list design (count cards removed) */
+    const monthValue =
+        filters.date_from
+        && /^\d{4}-\d{2}-01$/.test(filters.date_from)
+            ? filters.date_from.slice(0, 7)
+            : '';
+
+    const changeMonth = (value) => {
+        if (!value) {
+            updateFilter({
+                date_from: '',
+                date_to: '',
+            });
+
+            return;
+        }
+
+        const [year, month] = value
+            .split('-')
+            .map(Number);
+
+        const lastDay = new Date(
+            year,
+            month,
+            0
+        ).getDate();
+
+        updateFilter({
+            date_from: `${value}-01`,
+            date_to: `${value}-${String(lastDay).padStart(2, '0')}`,
+        });
+    };
+
+    const hasFilters = Boolean(
+        filters.search
+        || filters.status
+        || filters.label
+        || filters.product_type
+        || filters.date_from
+        || filters.date_to
+        || filters.artist
+        || filters.visibility
+    );
+
+    const selectClass =
+        'h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-500';
+
     return (
         <PanelLayout
             role={role}
             title={title}
-            subtitle="Released music, identifiers and DSP delivery status"
+            subtitle="Every release with its artwork, label and store status"
         >
             <Head title={title} />
 
-            <div className="space-y-6">
-                <header className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
-                        <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-violet-700">
-                                    Mixx Tune
-                                </span>
+            <div className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-baseline gap-3">
+                        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-[28px]">
+                            All Releases
+                        </h1>
 
-                                <span className="text-xs font-medium text-slate-500">
-                                    Catalogue Management
-                                </span>
-                            </div>
-
-                            <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-                                {title}
-                            </h1>
-
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                                View release metadata,
-                                identifiers, tracks and DSP
-                                delivery progress from one
-                                workspace.
-                            </p>
-                        </div>
-
-                        <div className="flex flex-wrap gap-3">
-                            <Link
-                                href="/v2/releases/create"
-                                className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-violet-700"
-                            >
-                                + Create Release
-                            </Link>
-
-                            <Link
-                                href="/v2/releases"
-                                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                            >
-                                All Releases
-                            </Link>
-                        </div>
+                        <span className="text-sm text-slate-500">
+                            {Number(
+                                pageSummary.total
+                            ).toLocaleString('en-IN')}
+                            {' '}
+                            releases
+                        </span>
                     </div>
-                </header>
 
-                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-                    {countCards.map(
-                        (card) => {
-                            const active =
-                                card.key ===
-                                'visible'
-                                    ? filters.visibility ===
-                                      'visible'
-                                    : card.key ===
-                                        'total'
-                                      ? !filters.status &&
-                                        !filters.visibility
-                                      : filters.status ===
-                                        card.key;
+                    <Link
+                        href="/v2/releases/create"
+                        className="inline-flex h-11 items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-bold text-white transition hover:bg-violet-700"
+                    >
+                        <span className="text-lg leading-none">
+                            +
+                        </span>
+                        Create Release
+                    </Link>
+                </div>
 
-                            return (
-                                <button
-                                    key={
-                                        card.key
-                                    }
-                                    type="button"
-                                    onClick={() =>
-                                        updateFilter(
-                                            {
-                                                status:
-                                                    card.key ===
-                                                        'total' ||
-                                                    card.key ===
-                                                        'visible'
-                                                        ? ''
-                                                        : card.key,
+                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 p-3 sm:p-4">
+                        <label className="flex h-11 min-w-[240px] flex-1 items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 focus-within:border-violet-500">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" aria-hidden="true">
+                                <circle cx="11" cy="11" r="7" />
+                                <path d="M20 20l-4-4" />
+                            </svg>
 
-                                                visibility:
-                                                    card.key ===
-                                                    'visible'
-                                                        ? 'visible'
-                                                        : '',
-                                            }
-                                        )
-                                    }
-                                    className={[
-                                        'group rounded-2xl border bg-white p-5 text-left shadow-sm transition',
-                                        active
-                                            ? 'border-violet-400 ring-2 ring-violet-100'
-                                            : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md',
-                                    ].join(
-                                        ' '
-                                    )}
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div
-                                            className={[
-                                                'rounded-xl px-3 py-2 text-xs font-bold',
-                                                card.tone,
-                                            ].join(
-                                                ' '
-                                            )}
-                                        >
-                                            {card.label}
-                                        </div>
-
-                                        <span className="text-lg text-slate-300 transition group-hover:text-violet-500">
-                                            ↗
-                                        </span>
-                                    </div>
-
-                                    <div className="mt-5 text-3xl font-black tracking-tight text-slate-950">
-                                        {counts[
-                                            card.key
-                                        ] ?? 0}
-                                    </div>
-
-                                    <div className="mt-1 text-xs font-medium text-slate-500">
-                                        {
-                                            card.description
-                                        }
-                                    </div>
-                                </button>
-                            );
-                        }
-                    )}
-                </section>
-
-                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                        <div className="flex min-w-0 flex-1 overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100">
-                            <span className="flex items-center px-3 text-slate-400">
-                                ⌕
+                            <span className="sr-only">
+                                Search releases
                             </span>
 
                             <input
                                 type="search"
                                 value={searchValue}
-                                placeholder="Search by release title, artist, UPC, ISRC or catalogue number"
+                                placeholder="Search title, artist, label, UPC or ISRC"
                                 onChange={(event) =>
                                     setSearchValue(
                                         event.target.value
                                     )
                                 }
                                 onKeyDown={(event) => {
-                                    if (
-                                        event.key ===
-                                        'Enter'
-                                    ) {
+                                    if (event.key === 'Enter') {
                                         applySearch();
                                     }
                                 }}
-                                className="min-w-0 flex-1 border-0 px-0 py-2.5 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-800 outline-none focus:ring-0"
                             />
+                        </label>
+
+                        <select
+                            aria-label="Status"
+                            value={filters.status ?? ''}
+                            onChange={(event) =>
+                                updateFilter({
+                                    status: event.target.value,
+                                })
+                            }
+                            className={selectClass}
+                        >
+                            <option value="">Status: All</option>
+                            <option value="draft">Draft</option>
+                            <option value="submitted">Under Review</option>
+                            <option value="approved">Approved</option>
+                            <option value="processing">Processing</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="live">Live</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="takedown_requested">Takedown Requested</option>
+                            <option value="taken_down">Taken Down</option>
+                        </select>
+
+                        {labelOptions.length > 1 && (
+                            <select
+                                aria-label="Label"
+                                value={filters.label ?? ''}
+                                onChange={(event) =>
+                                    updateFilter({
+                                        label: event.target.value,
+                                    })
+                                }
+                                className={`${selectClass} max-w-[220px]`}
+                            >
+                                <option value="">Label: All</option>
+                                {labelOptions.map((name) => (
+                                    <option key={name} value={name}>
+                                        {name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+
+                        <label className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                            <span>Release date</span>
+                            <input
+                                type="month"
+                                value={monthValue}
+                                onChange={(event) =>
+                                    changeMonth(
+                                        event.target.value
+                                    )
+                                }
+                                className="border-0 bg-transparent p-0 text-sm text-slate-700 outline-none focus:ring-0"
+                            />
+                        </label>
+
+                        <select
+                            aria-label="Type"
+                            value={filters.product_type ?? ''}
+                            onChange={(event) =>
+                                updateFilter({
+                                    product_type: event.target.value,
+                                })
+                            }
+                            className={selectClass}
+                        >
+                            <option value="">Type: All</option>
+                            <option value="single">Single</option>
+                            <option value="ep">EP</option>
+                            <option value="album">Album</option>
+                        </select>
+
+                        <select
+                            aria-label="Sort"
+                            value={filters.sort ?? 'latest'}
+                            onChange={(event) =>
+                                updateFilter({
+                                    sort: event.target.value,
+                                })
+                            }
+                            className={selectClass}
+                        >
+                            <option value="latest">Latest added</option>
+                            <option value="release_date">Release date</option>
+                            <option value="oldest">Oldest added</option>
+                            <option value="title_asc">Title A–Z</option>
+                            <option value="title_desc">Title Z–A</option>
+                        </select>
+
+                        <div className="flex h-11 overflow-hidden rounded-xl border border-slate-200">
+                            <button
+                                type="button"
+                                aria-label="List view"
+                                onClick={() =>
+                                    setViewMode('table')
+                                }
+                                className={`flex w-11 items-center justify-center ${
+                                    viewMode === 'table'
+                                        ? 'bg-violet-100 text-violet-700'
+                                        : 'bg-white text-slate-500'
+                                }`}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                                </svg>
+                            </button>
 
                             <button
                                 type="button"
-                                onClick={applySearch}
-                                className="m-1 rounded-md bg-slate-900 px-4 text-xs font-bold text-white transition hover:bg-violet-700"
+                                aria-label="Grid view"
+                                onClick={() =>
+                                    setViewMode('grid')
+                                }
+                                className={`flex w-11 items-center justify-center border-l border-slate-200 ${
+                                    viewMode === 'grid'
+                                        ? 'bg-violet-100 text-violet-700'
+                                        : 'bg-white text-slate-500'
+                                }`}
                             >
-                                Search
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                    <rect x="3" y="3" width="7" height="7" />
+                                    <rect x="14" y="3" width="7" height="7" />
+                                    <rect x="3" y="14" width="7" height="7" />
+                                    <rect x="14" y="14" width="7" height="7" />
+                                </svg>
                             </button>
                         </div>
 
-                        <button
-                            type="button"
-                            onClick={() =>
-                                setShowAdvanced(
-                                    (value) => !value
-                                )
-                            }
-                            className={[
-                                'inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-bold transition',
-                                showAdvanced
-                                    ? 'border-violet-300 bg-violet-50 text-violet-700'
-                                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-                            ].join(' ')}
-                        >
-                            ⚙ Advanced
-                            <span className="text-[10px]">
-                                {showAdvanced
-                                    ? '▲'
-                                    : '▼'}
-                            </span>
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() =>
-                                window.print()
-                            }
-                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                        >
-                            ⇩ Export
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={clearFilters}
-                            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
-                        >
-                            Clear
-                        </button>
+                        {hasFilters && (
+                            <button
+                                type="button"
+                                onClick={clearFilters}
+                                className="h-11 rounded-xl px-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                            >
+                                Clear
+                            </button>
+                        )}
                     </div>
 
-                    {showAdvanced && (
-                        <div className="mt-4 border-t border-slate-200 pt-4">
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-                                <FilterField label="Status">
-                                    <select
-                                        value={
-                                            filters.status ??
-                                            ''
-                                        }
-                                        onChange={(event) =>
-                                            updateFilter({
-                                                status:
-                                                    event
-                                                        .target
-                                                        .value,
-                                            })
-                                        }
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-violet-500"
-                                    >
-                                        <option value="">
-                                            All Statuses
-                                        </option>
-                                        <option value="draft">
-                                            Draft
-                                        </option>
-                                        <option value="submitted">
-                                            Under Review
-                                        </option>
-                                        <option value="approved">
-                                            Approved
-                                        </option>
-                                        <option value="processing">
-                                            Processing
-                                        </option>
-                                        <option value="delivered">
-                                            Delivered
-                                        </option>
-                                        <option value="live">
-                                            Live
-                                        </option>
-                                        <option value="rejected">
-                                            Rejected
-                                        </option>
-                                        <option value="takedown_requested">
-                                            Takedown Requested
-                                        </option>
-                                        <option value="taken_down">
-                                            Taken Down
-                                        </option>
-                                    </select>
-                                </FilterField>
-
-                                <FilterField label="Product Type">
-                                    <select
-                                        value={
-                                            filters.product_type ??
-                                            ''
-                                        }
-                                        onChange={(event) =>
-                                            updateFilter({
-                                                product_type:
-                                                    event
-                                                        .target
-                                                        .value,
-                                            })
-                                        }
-                                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-violet-500"
-                                    >
-                                        <option value="">
-                                            All Types
-                                        </option>
-                                        <option value="single">
-                                            Single
-                                        </option>
-                                        <option value="ep">
-                                            EP
-                                        </option>
-                                        <option value="album">
-                                            Album
-                                        </option>
-                                    </select>
-                                </FilterField>
-
-                                <FilterField label="Label">
-                                    <input
-                                        type="text"
-                                        value={
-                                            filters.label ??
-                                            ''
-                                        }
-                                        placeholder="All labels"
-                                        onChange={(event) =>
-                                            updateFilter({
-                                                label:
-                                                    event
-                                                        .target
-                                                        .value,
-                                            })
-                                        }
-                                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
-                                    />
-                                </FilterField>
-
-                                <FilterField label="Artist">
-                                    <input
-                                        type="text"
-                                        value={
-                                            filters.artist ??
-                                            ''
-                                        }
-                                        placeholder="All artists"
-                                        onChange={(event) =>
-                                            updateFilter({
-                                                artist:
-                                                    event
-                                                        .target
-                                                        .value,
-                                            })
-                                        }
-                                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
-                                    />
-                                </FilterField>
-
-                                <FilterField label="From">
-                                    <input
-                                        type="date"
-                                        value={
-                                            filters.date_from ??
-                                            ''
-                                        }
-                                        onChange={(event) =>
-                                            updateFilter({
-                                                date_from:
-                                                    event
-                                                        .target
-                                                        .value,
-                                            })
-                                        }
-                                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
-                                    />
-                                </FilterField>
-
-                                <FilterField label="To">
-                                    <input
-                                        type="date"
-                                        value={
-                                            filters.date_to ??
-                                            ''
-                                        }
-                                        onChange={(event) =>
-                                            updateFilter({
-                                                date_to:
-                                                    event
-                                                        .target
-                                                        .value,
-                                            })
-                                        }
-                                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-500"
-                                    />
-                                </FilterField>
-                            </div>
-
-                            <div className="mt-3 flex justify-end">
-                                <select
-                                    value={
-                                        filters.sort ??
-                                        'latest'
-                                    }
-                                    onChange={(event) =>
-                                        updateFilter({
-                                            sort:
-                                                event.target
-                                                    .value,
-                                        })
-                                    }
-                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                                >
-                                    <option value="latest">
-                                        Latest Added
-                                    </option>
-                                    <option value="oldest">
-                                        Oldest Added
-                                    </option>
-                                    <option value="title_asc">
-                                        Title A–Z
-                                    </option>
-                                    <option value="title_desc">
-                                        Title Z–A
-                                    </option>
-                                    <option value="release_date">
-                                        Release Date
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-                    )}
-                </section>
-
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h2 className="font-bold text-slate-900">
-                                Catalogue Releases
-                            </h2>
-
-                            <p className="mt-1 text-xs text-slate-500">
-                                Showing{' '}
-                                {
-                                    pageSummary.from
-                                }
-                                –
-                                {
-                                    pageSummary.to
-                                }{' '}
-                                of{' '}
-                                {
-                                    pageSummary.total
-                                }{' '}
-                                releases
-                            </p>
-                        </div>
-
-                        <div className="text-xs font-semibold text-slate-500">
-                            50 releases per page
-                        </div>
-                    </div>
-
-                    {rows.length > 0 ? (
-                        <CatalogueTable
-                            rows={rows}
-                        />
-                    ) : (
+                    {rows.length === 0 ? (
                         <EmptyState
                             clearFilters={
                                 clearFilters
                             }
                         />
+                    ) : viewMode === 'grid' ? (
+                        <div className="grid gap-5 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                            {rows.map((item) => (
+                                <CatalogueCard
+                                    key={item.id}
+                                    item={item}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <CatalogueTable
+                            rows={rows}
+                        />
                     )}
-                </section>
 
-                <Pagination
-                    links={
-                        catalogue.links ??
-                        []
-                    }
-                />
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3.5 text-sm text-slate-500">
+                        <span>
+                            Showing {pageSummary.from}–{pageSummary.to} of{' '}
+                            {Number(
+                                pageSummary.total
+                            ).toLocaleString('en-IN')}
+                        </span>
+
+                        <Pagination
+                            links={
+                                catalogue.links ??
+                                []
+                            }
+                        />
+                    </div>
+                </section>
             </div>
         </PanelLayout>
     );
@@ -698,40 +491,18 @@ function CatalogueTable({
 }) {
     return (
         <div className="overflow-x-auto">
-            <table className="w-full min-w-[1380px] border-collapse">
+            <table className="w-full min-w-[1100px] border-collapse">
                 <thead>
-                    <tr className="border-b border-slate-200 bg-white text-left">
-                        <TableHeading>
-                            Status
-                        </TableHeading>
-
-                        <TableHeading>
-                            Release Date
-                        </TableHeading>
-
-                        <TableHeading>
-                            Release
-                        </TableHeading>
-
-                        <TableHeading>
-                            Label Name
-                        </TableHeading>
-
-                        <TableHeading>
-                            Artist
-                        </TableHeading>
-
-                        <TableHeading>
-                            Track
-                        </TableHeading>
-
-                        <TableHeading>
-                            UPC
-                        </TableHeading>
-
-                        <TableHeading align="right">
-                            Action
-                        </TableHeading>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <th className="px-5 py-3.5">Release</th>
+                        <th className="px-5 py-3.5">Label</th>
+                        <th className="px-5 py-3.5">Release date</th>
+                        <th className="px-5 py-3.5">UPC</th>
+                        <th className="px-5 py-3.5">Stores</th>
+                        <th className="px-5 py-3.5">Status</th>
+                        <th className="px-5 py-3.5 text-right">
+                            <span className="sr-only">Actions</span>
+                        </th>
                     </tr>
                 </thead>
 
@@ -748,6 +519,36 @@ function CatalogueTable({
     );
 }
 
+const pillMeta = {
+    live: ['Live', 'bg-emerald-50 text-emerald-800 ring-emerald-200'],
+    delivered: ['Delivered', 'bg-teal-50 text-teal-800 ring-teal-200'],
+    approved: ['Approved', 'bg-blue-50 text-blue-800 ring-blue-200'],
+    submitted: ['In Review', 'bg-amber-50 text-amber-800 ring-amber-200'],
+    processing: ['Processing', 'bg-amber-50 text-amber-800 ring-amber-200'],
+    rejected: ['Rejected', 'bg-rose-50 text-rose-800 ring-rose-200'],
+    takedown_requested: ['Takedown Requested', 'bg-orange-50 text-orange-800 ring-orange-200'],
+    taken_down: ['Taken Down', 'bg-slate-100 text-slate-700 ring-slate-200'],
+    draft: ['Draft', 'bg-slate-100 text-slate-700 ring-slate-200'],
+};
+
+function StatusPill({
+    status,
+}) {
+    const value = String(status || 'draft').toLowerCase();
+    const [label, classes] =
+        pillMeta[value]
+        ?? [
+            value.replace(/_/g, ' '),
+            'bg-slate-100 text-slate-700 ring-slate-200',
+        ];
+
+    return (
+        <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold capitalize ring-1 ring-inset ${classes}`}>
+            {label}
+        </span>
+    );
+}
+
 function CatalogueRow({
     item,
 }) {
@@ -758,42 +559,38 @@ function CatalogueRow({
     const trackCount =
         Number(item.track_count ?? 0);
 
+    const delivery =
+        item.delivery_summary ?? {};
+
+    const storesTotal = Math.max(
+        Number(delivery.total ?? 0),
+        0
+    );
+
+    const storesLive = Math.min(
+        Math.max(Number(delivery.live ?? 0), 0),
+        storesTotal
+    );
+
+    const viewPath = `/v2/catalogue/${item.id}`;
+
     return (
-        <tr className="group border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50/70">
-            <td className="px-5 py-4">
-                <CatalogueStatusIcon
-                    status={
-                        item.release_status
-                    }
-                />
-            </td>
-
-            <td className="px-5 py-4">
-                <span className="whitespace-nowrap text-sm font-medium text-slate-700">
-                    {formatDate(
-                        item.digital_release_date ||
-                            item.original_release_date
-                    )}
-                </span>
-            </td>
-
-            <td className="px-5 py-4">
-                <div className="flex min-w-[330px] items-center gap-3">
+        <tr className="border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50/70">
+            <td className="px-5 py-3">
+                <div className="flex min-w-[300px] items-center gap-3.5">
                     <Link
-                        href={`/v2/catalogue/${item.id}`}
-                        className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm"
+                        href={viewPath}
+                        className="flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 shadow-sm ring-1 ring-slate-200"
                     >
                         {artwork ? (
                             <img
                                 src={artwork}
-                                alt={
-                                    item.title ??
-                                    'Release artwork'
-                                }
+                                alt={item.title ?? 'Release artwork'}
                                 className="h-full w-full object-cover"
+                                loading="lazy"
                             />
                         ) : (
-                            <span className="text-2xl font-semibold text-violet-600">
+                            <span className="text-2xl font-semibold text-violet-600" aria-hidden="true">
                                 ♪
                             </span>
                         )}
@@ -801,103 +598,86 @@ function CatalogueRow({
 
                     <div className="min-w-0">
                         <Link
-                            href={`/v2/catalogue/${item.id}`}
-                            title={
-                                item.title ??
-                                'Untitled Release'
-                            }
-                            className="block max-w-[290px] truncate text-sm font-bold text-slate-900 transition hover:text-violet-700"
+                            href={viewPath}
+                            title={item.title ?? 'Untitled Release'}
+                            className="block max-w-[300px] truncate text-[15px] font-bold text-slate-900 transition hover:text-violet-700"
                         >
-                            {item.title ??
-                                'Untitled Release'}
+                            {item.title ?? 'Untitled Release'}
                         </Link>
 
-                        <p className="mt-1 text-xs font-medium capitalize text-slate-400">
-                            {item.release_type ||
-                                'Single'}
+                        <p className="mt-1 max-w-[300px] truncate text-[13px] text-slate-500">
+                            {item.primary_artist_name || 'Unknown Artist'}
+                            {' · '}
+                            <span className="capitalize">
+                                {item.release_type || 'single'}
+                            </span>
+                            {' · '}
+                            {trackCount} {trackCount === 1 ? 'track' : 'tracks'}
                         </p>
                     </div>
                 </div>
             </td>
 
-            <td className="px-5 py-4">
-                <span
-                    title={
-                        item.label_name || ''
-                    }
-                    className="block max-w-[220px] truncate text-sm font-medium text-slate-700"
-                >
-                    {item.label_name ||
-                        '—'}
+            <td className="px-5 py-3">
+                <span title={item.label_name || ''} className="block max-w-[200px] truncate text-sm text-slate-700">
+                    {item.label_name || '—'}
                 </span>
             </td>
 
-            <td className="px-5 py-4">
-                <span
-                    title={
-                        item.primary_artist_name ||
-                        ''
-                    }
-                    className="block max-w-[240px] truncate text-sm font-medium text-slate-700"
-                >
-                    {item.primary_artist_name ||
-                        'Unknown Artist'}
+            <td className="px-5 py-3">
+                <span className="whitespace-nowrap text-sm text-slate-700">
+                    {formatDate(
+                        item.digital_release_date ||
+                            item.original_release_date
+                    )}
                 </span>
             </td>
 
-            <td className="px-5 py-4">
-                <div className="inline-flex items-center gap-2.5 whitespace-nowrap">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-lg font-semibold text-violet-600">
-                        ♪
-                    </span>
-
-                    <span className="text-sm font-semibold text-slate-700">
-                        {trackCount}{' '}
-                        {trackCount === 1
-                            ? 'Track'
-                            : 'Tracks'}
-                    </span>
-                </div>
-            </td>
-
-            <td className="px-5 py-4">
+            <td className="px-5 py-3">
                 {item.upc ? (
-                    <span className="whitespace-nowrap text-sm font-medium text-slate-700">
+                    <span className="whitespace-nowrap font-mono text-[13px] text-slate-700">
                         {item.upc}
                     </span>
                 ) : (
-                    <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-600 ring-1 ring-inset ring-amber-200">
+                    <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
                         Pending
                     </span>
                 )}
             </td>
 
-            <td className="px-5 py-4">
+            <td className="px-5 py-3">
+                {storesTotal > 0 ? (
+                    <div className="w-32">
+                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                            <div
+                                className={`h-full rounded-full ${storesLive === storesTotal ? 'bg-emerald-600' : 'bg-blue-600'}`}
+                                style={{ width: `${Math.round((storesLive / storesTotal) * 100)}%` }}
+                            />
+                        </div>
+                        <p className="mt-1.5 text-xs text-slate-500">
+                            {storesLive} / {storesTotal} stores
+                        </p>
+                    </div>
+                ) : (
+                    <span className="text-sm text-slate-400">—</span>
+                )}
+            </td>
+
+            <td className="px-5 py-3">
+                <StatusPill status={item.release_status} />
+            </td>
+
+            <td className="px-5 py-3">
                 <div className="flex justify-end">
                     <Link
-                        href={`/v2/catalogue/${item.id}`}
+                        href={viewPath}
                         title="View release"
                         aria-label="View release"
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
                     >
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            className="h-5 w-5"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            aria-hidden="true"
-                        >
-                            <path
-                                d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                            <circle
-                                cx="12"
-                                cy="12"
-                                r="2.75"
-                            />
+                        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" strokeLinecap="round" strokeLinejoin="round" />
+                            <circle cx="12" cy="12" r="2.75" />
                         </svg>
                     </Link>
                 </div>

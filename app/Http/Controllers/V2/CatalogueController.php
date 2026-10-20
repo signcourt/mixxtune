@@ -299,6 +299,16 @@ class CatalogueController extends Controller
                 'filters' => $filters,
                 'counts' => $counts,
                 'catalogue' => $items,
+
+                /* MIXXTUNE_CATALOGUE_LIST_V2: label names the viewer can see, for the Label filter */
+                'labelOptions' => $baseQuery()
+                    ->reorder()
+                    ->whereNotNull('label_name')
+                    ->where('label_name', '!=', '')
+                    ->distinct()
+                    ->orderBy('label_name')
+                    ->pluck('label_name')
+                    ->values(),
             ]
         );
     }
