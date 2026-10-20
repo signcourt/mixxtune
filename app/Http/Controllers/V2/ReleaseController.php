@@ -185,6 +185,22 @@ class ReleaseController extends Controller
                     'latest'
                 )
             ),
+
+            /* MIXXTUNE_RELEASES_LIST_V2: extra filters for the All Releases list */
+            'release_type' => in_array(
+                $request->input('release_type'),
+                ['single', 'ep', 'album'],
+                true
+            ) ? (string) $request->input('release_type') : '',
+
+            'month' => preg_match(
+                '/^\d{4}-\d{2}$/',
+                (string) $request->input('month', '')
+            ) ? (string) $request->input('month') : '',
+
+            'label_id' => $request->integer('label_id') > 0
+                ? (string) $request->integer('label_id')
+                : '',
         ];
 
         $query = Release::query()
@@ -423,6 +439,9 @@ class ReleaseController extends Controller
          *
          * Role scoping above remains authoritative.
          */
+        /* MIXXTUNE_RELEASES_LIST_V2: role scope only, before the label filter */
+        $labelOptionsQuery = clone $query;
+
         $requestedLabelId = $request->integer('label_id');
 
         if ($requestedLabelId > 0) {
@@ -544,6 +563,22 @@ class ReleaseController extends Controller
                     )
                     ->whereNull('tracks.deleted_at'),
 
+                /* MIXXTUNE_RELEASES_LIST_V2: store delivery progress */
+                'stores_total' => DB::table('release_store_deliveries')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn(
+                        'release_store_deliveries.release_id',
+                        'releases.id'
+                    ),
+
+                'stores_live' => DB::table('release_store_deliveries')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn(
+                        'release_store_deliveries.release_id',
+                        'releases.id'
+                    )
+                    ->where('release_store_deliveries.status', 'live'),
+
                 'total_audio_duration_seconds' => DB::table('tracks')
                     ->selectRaw(
                         'ROUND(SUM(COALESCE(NULLIF(audio_duration_seconds, 0), NULLIF(duration_seconds, 0), 0)))'
@@ -576,8 +611,35 @@ class ReleaseController extends Controller
                         'upc',
                         'like',
                         "%{$search}%"
+                    )
+                    /* MIXXTUNE_RELEASES_LIST_V2: also catalogue no, label name, track ISRC */
+                    ->orWhere(
+                        'catalog_number',
+                        'like',
+                        "%{$search}%"
+                    )
+                    ->orWhereIn(
+                        'label_id',
+                        DB::table('labels')
+                            ->select('id')
+                            ->where('name', 'like', "%{$search}%")
+                    )
+                    ->orWhereIn(
+                        'releases.id',
+                        DB::table('tracks')
+                            ->select('release_id')
+                            ->whereNull('deleted_at')
+                            ->where('isrc', 'like', "%{$search}%")
                     );
             });
+        }
+
+        if ($filters['release_type'] !== '') {
+            $query->where('release_type', $filters['release_type']);
+        }
+
+        if ($filters['month'] !== '') {
+            $query->where('digital_release_date', 'like', $filters['month'].'%');
         }
 
         if ($filters['status'] !== '') {
@@ -612,6 +674,19 @@ class ReleaseController extends Controller
                     ),
 
                 'filters' => $filters,
+
+                /* MIXXTUNE_RELEASES_LIST_V2: labels the viewer can see, for the Label filter */
+                'labelOptions' => Label::query()
+                    ->whereIn(
+                        'id',
+                        (clone $labelOptionsQuery)
+                            ->whereNotNull('label_id')
+                            ->distinct()
+                            ->pluck('label_id')
+                    )
+                    ->whereNull('deleted_at')
+                    ->orderBy('name')
+                    ->get(['id', 'name']),
 
                 'releases' =>
                     $query
