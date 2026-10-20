@@ -207,6 +207,16 @@ class RecoupmentController extends Controller
             Auth::user()
         );
 
+        /* MIXXTUNE_FINANCE_SAFETY_V1 */
+        \App\Services\V2\FinanceAudit::log(
+            'finance.recoupment_plan_created',
+            'Recoupment plan created for user #'.$user->id.' ('.($user->email ?? '-').').',
+            is_object($plan) && method_exists($plan, 'getAttributes')
+                ? array_filter($plan->getAttributes(), fn ($v) => is_scalar($v) || $v === null)
+                : ['user_id' => $user->id],
+            is_object($plan) ? $plan : $user
+        );
+
         return back()->with(
             'success',
             'Recoupment plan created.'
@@ -221,6 +231,16 @@ class RecoupmentController extends Controller
             $plan,
             $request->validated(),
             Auth::user()
+        );
+
+        /* MIXXTUNE_FINANCE_SAFETY_V1 */
+        \App\Services\V2\FinanceAudit::log(
+            'finance.recoupment_expense_added',
+            'Expense added to recoupment plan #'.$plan->id.'.',
+            is_object($expense) && method_exists($expense, 'getAttributes')
+                ? array_filter($expense->getAttributes(), fn ($v) => is_scalar($v) || $v === null)
+                : array_filter($request->validated(), fn ($v) => is_scalar($v) || $v === null),
+            $plan
         );
 
         return back()->with(

@@ -629,11 +629,22 @@ class WithdrawalManagementController extends Controller
             'Financial object outside assigned scope.'
         );
 
+        $before = \App\Services\V2\FinanceAudit::pick($withdrawal, ['id', 'withdrawal_number', 'user_id', 'amount', 'currency', 'status', 'payment_method', 'payment_reference']);
+
         $service
             ->deleteOpenWithdrawal(
                 $withdrawal,
                 $request->user()
             );
+
+        /* MIXXTUNE_FINANCE_SAFETY_V1 */
+        \App\Services\V2\FinanceAudit::log(
+            'finance.withdrawal_deleted',
+            'Withdrawal '.($withdrawal->withdrawal_number ?: '#'.$withdrawal->id).' deleted; reserved balance returned to the owner.',
+            [],
+            $withdrawal,
+            $before
+        );
 
         return back()->with(
             'success',
@@ -676,11 +687,22 @@ class WithdrawalManagementController extends Controller
             ],
         ]);
 
+        $before = \App\Services\V2\FinanceAudit::pick($withdrawal, ['id', 'withdrawal_number', 'user_id', 'amount', 'currency', 'status', 'payment_method', 'payment_reference']);
+
         $service->approve(
             $withdrawal,
             $request->user(),
             $validated['admin_note']
                 ?? null
+        );
+
+        /* MIXXTUNE_FINANCE_SAFETY_V1 */
+        \App\Services\V2\FinanceAudit::log(
+            'finance.withdrawal_approved',
+            'Withdrawal '.($withdrawal->withdrawal_number ?: '#'.$withdrawal->id).' approved.',
+            \App\Services\V2\FinanceAudit::pick($withdrawal->fresh(), ['id', 'withdrawal_number', 'user_id', 'amount', 'currency', 'status', 'payment_method', 'payment_reference']) + ['admin_note' => $validated['admin_note'] ?? null],
+            $withdrawal,
+            $before
         );
 
         return back()->with(
@@ -725,12 +747,23 @@ class WithdrawalManagementController extends Controller
             ],
         ]);
 
+        $before = \App\Services\V2\FinanceAudit::pick($withdrawal, ['id', 'withdrawal_number', 'user_id', 'amount', 'currency', 'status', 'payment_method', 'payment_reference']);
+
         $service->reject(
             $withdrawal,
             $request->user(),
             $validated[
                 'rejection_reason'
             ]
+        );
+
+        /* MIXXTUNE_FINANCE_SAFETY_V1 */
+        \App\Services\V2\FinanceAudit::log(
+            'finance.withdrawal_rejected',
+            'Withdrawal '.($withdrawal->withdrawal_number ?: '#'.$withdrawal->id).' rejected: '.$validated['rejection_reason'],
+            \App\Services\V2\FinanceAudit::pick($withdrawal->fresh(), ['id', 'withdrawal_number', 'user_id', 'amount', 'currency', 'status', 'payment_method', 'payment_reference']),
+            $withdrawal,
+            $before
         );
 
         return back()->with(
@@ -789,6 +822,8 @@ class WithdrawalManagementController extends Controller
             'mark withdrawal #'.$withdrawal->id.' as paid'
         );
 
+        $before = \App\Services\V2\FinanceAudit::pick($withdrawal, ['id', 'withdrawal_number', 'user_id', 'amount', 'currency', 'status', 'payment_method', 'payment_reference']);
+
         $service->markPaid(
             $withdrawal,
             $request->user(),
@@ -797,6 +832,15 @@ class WithdrawalManagementController extends Controller
             ],
             $validated['admin_note']
                 ?? null
+        );
+
+        /* MIXXTUNE_FINANCE_SAFETY_V1 */
+        \App\Services\V2\FinanceAudit::log(
+            'finance.withdrawal_paid',
+            'Withdrawal '.($withdrawal->withdrawal_number ?: '#'.$withdrawal->id).' marked paid, UTR '.$validated['payment_reference'].'.',
+            \App\Services\V2\FinanceAudit::pick($withdrawal->fresh(), ['id', 'withdrawal_number', 'user_id', 'amount', 'currency', 'status', 'payment_method', 'payment_reference']),
+            $withdrawal,
+            $before
         );
 
         return back()->with(

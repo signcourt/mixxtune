@@ -8,6 +8,8 @@ use App\Http\Requests\V3\Finance\StoreFinancialAdjustmentRequest;
 use App\Models\Finance\FinancialAdjustment;
 use App\Models\User;
 use App\Services\V3\FinancialAdjustmentService;
+use App\Services\V2\ActionOtpGuard;
+use App\Services\V2\FinanceAudit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -121,7 +123,23 @@ class FinancialAdjustmentController extends Controller
                 $data['user_id']
             );
 
-        $this->service->post(
+        /*
+         * MIXXTUNE_FINANCE_SAFETY_V1: a wallet credit / debit changes an
+         * owner's balance directly, so it needs the e-mailed code (one code
+         * covers exactly this owner, direction and amount).
+         */
+        $amountText = number_format((float) $data['amount'], 2, '.', '');
+
+        app(ActionOtpGuard::class)->require(
+            Auth::user(),
+            'adjustment.post:'.$user->id.':'.$data['direction'].':'.$amountText,
+            ($data['direction'] === 'debit' ? 'debit' : 'credit')
+                .' '.$amountText.' '.strtoupper($data['currency'] ?? 'INR')
+                .' '.($data['direction'] === 'debit' ? 'from' : 'to')
+                .' the wallet of '.($user->name ?: $user->email)
+        );
+
+        $adjustment = $this->service->post(
             $user,
             $data['direction'],
             (float) $data['amount'],
@@ -163,6 +181,15 @@ class FinancialAdjustmentController extends Controller
             Auth::user()
         );
 
+        FinanceAudit::log(
+            'finance.adjustment_posted',
+            'Wallet '.$data['direction'].' of '.$amountText.' for user #'.$user->id.' ('.($user->email ?? '-').'): '.$data['reason'],
+            FinanceAudit::pick($adjustment instanceof FinancialAdjustment ? $adjustment : null, [
+                'id', 'adjustment_number', 'user_id', 'direction', 'amount', 'type', 'reason', 'reference_number', 'status',
+            ]) ?: ['user_id' => $user->id, 'direction' => $data['direction'], 'amount' => $amountText],
+            $adjustment instanceof FinancialAdjustment ? $adjustment : $user
+        );
+
         return back()->with(
             'success',
             'Financial adjustment posted.'
@@ -173,10 +200,26 @@ class FinancialAdjustmentController extends Controller
         ReverseFinancialAdjustmentRequest $request,
         FinancialAdjustment $adjustment
     ): RedirectResponse {
+        app(ActionOtpGuard::class)->require(
+            Auth::user(),
+            'adjustment.reverse:'.$adjustment->id,
+            'reverse adjustment '.($adjustment->adjustment_number ?: '#'.$adjustment->id)
+        );
+
+        $before = FinanceAudit::pick($adjustment, ['id', 'adjustment_number', 'user_id', 'direction', 'amount', 'status']);
+
         $this->service->reverse(
             $adjustment,
             $request->validated()['reason'],
             Auth::user()
+        );
+
+        FinanceAudit::log(
+            'finance.adjustment_reversed',
+            'Adjustment '.($adjustment->adjustment_number ?: '#'.$adjustment->id).' reversed: '.$request->validated()['reason'],
+            FinanceAudit::pick($adjustment->fresh(), ['id', 'status', 'reversed_by', 'reversed_at']),
+            $adjustment,
+            $before
         );
 
         return back()->with(

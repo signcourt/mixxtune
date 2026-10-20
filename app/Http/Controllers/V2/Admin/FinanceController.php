@@ -328,15 +328,30 @@ class FinanceController extends Controller
             ],
         ]);
 
-        $result = $royalties
-            ->generateMonthlyStatements(
-                $validated['month'],
-                (float) (
-                    $validated[
-                        'commission_percent'
-                    ] ?? 0
-                )
-            );
+        /* MIXXTUNE_FINANCE_SAFETY_V1: blocked months show a message instead of an error page. */
+        try {
+            $result = $royalties
+                ->generateMonthlyStatements(
+                    $validated['month'],
+                    (float) (
+                        $validated[
+                            'commission_percent'
+                        ] ?? 0
+                    )
+                );
+        } catch (\RuntimeException $exception) {
+            return back()->withErrors([
+                'generate' => str_contains($exception->getMessage(), 'cutover')
+                    ? 'Months before July 2026 are already included in the opening balances from the old system, so statements cannot be generated for '.$validated['month'].'. Choose July 2026 or later.'
+                    : 'Statements could not be generated: '.$exception->getMessage(),
+            ]);
+        }
+
+        \App\Services\V2\FinanceAudit::log(
+            'finance.statements_generated',
+            'Statements generated for '.$validated['month'].'.',
+            ['month' => $validated['month'], 'created' => $result['created'] ?? null, 'updated' => $result['updated'] ?? null, 'failed' => $result['failed_count'] ?? null]
+        );
 
         return back()->with(
             'success',
@@ -357,9 +372,32 @@ class FinanceController extends Controller
             403
         );
 
-        $royalties->approve(
+        /* MIXXTUNE_FINANCE_SAFETY_V1: e-mailed code + audit before money moves to a wallet. */
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            $request->user(),
+            'statement.approve:'.$statement->id,
+            'approve royalty statement #'.$statement->id.' ('.number_format((float) $statement->net_payable, 2).' '.$statement->currency.')'
+        );
+
+        $before = \App\Services\V2\FinanceAudit::pick($statement, ['id', 'status', 'net_payable', 'currency', 'statement_month', 'artist_id', 'label_id']);
+
+        try {
+            $royalties->approve(
+                $statement,
+                $request->user()
+            );
+        } catch (\RuntimeException $exception) {
+            return back()->withErrors([
+                'approve' => $exception->getMessage(),
+            ]);
+        }
+
+        \App\Services\V2\FinanceAudit::log(
+            'finance.statement_approved',
+            'Royalty statement #'.$statement->id.' approved (pending wallet balance).',
+            \App\Services\V2\FinanceAudit::pick($statement->fresh(), ['id', 'status', 'net_payable', 'approved_at', 'approved_by']),
             $statement,
-            $request->user()
+            $before
         );
 
         return back()->with(
@@ -388,6 +426,13 @@ class FinanceController extends Controller
             403
         );
 
+        /* MIXXTUNE_FINANCE_SAFETY_V1 */
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            $request->user(),
+            'hold.release:'.$hold,
+            'release held revenue #'.$hold.' to the owner wallet'
+        );
+
         try {
             $result = $releaser->release(
                 $hold,
@@ -399,6 +444,12 @@ class FinanceController extends Controller
                 'release' => $e->getMessage(),
             ]);
         }
+
+        \App\Services\V2\FinanceAudit::log(
+            'finance.hold_released',
+            'Held revenue #'.$hold.' of '.number_format((float) ($result['amount'] ?? 0), 2).' released to the owner wallet.',
+            is_array($result) ? array_filter($result, fn ($v) => is_scalar($v) || $v === null) : [],
+        );
 
         return back()->with(
             'success',
@@ -419,9 +470,32 @@ class FinanceController extends Controller
             403
         );
 
-        $royalties->makeAvailable(
+        /* MIXXTUNE_FINANCE_SAFETY_V1 */
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            $request->user(),
+            'statement.available:'.$statement->id,
+            'make royalty statement #'.$statement->id.' available for withdrawal ('.number_format((float) $statement->net_payable, 2).' '.$statement->currency.')'
+        );
+
+        $before = \App\Services\V2\FinanceAudit::pick($statement, ['id', 'status', 'net_payable', 'currency']);
+
+        try {
+            $royalties->makeAvailable(
+                $statement,
+                $request->user()
+            );
+        } catch (\RuntimeException $exception) {
+            return back()->withErrors([
+                'available' => $exception->getMessage(),
+            ]);
+        }
+
+        \App\Services\V2\FinanceAudit::log(
+            'finance.statement_made_available',
+            'Royalty statement #'.$statement->id.' moved to available wallet balance.',
+            \App\Services\V2\FinanceAudit::pick($statement->fresh(), ['id', 'status', 'net_payable', 'available_at']),
             $statement,
-            $request->user()
+            $before
         );
 
         return back()->with(

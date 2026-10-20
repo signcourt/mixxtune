@@ -1455,6 +1455,23 @@ class ReportImportController extends Controller
             }
         );
 
+        /* MIXXTUNE_FINANCE_SAFETY_V1 */
+        \App\Services\V2\FinanceAudit::log(
+            'finance.report_approved',
+            'Revenue report #'.$reportImport->id.' approved; publication scheduled for '.$validated['publish_at'].'.',
+            [
+                'report_import_id' => $reportImport->id,
+                'publish_at' => $validated['publish_at'],
+                'rows' => $rowCount,
+                'mapped_rows' => $mappedRows,
+                'unmapped_rows' => $unmappedRows,
+                'collected_revenue' => $collectedRevenue,
+                'earnings' => $earnings,
+                'review_note' => $validated['review_note'] ?? null,
+            ],
+            $reportImport
+        );
+
         return back()->with(
             'success',
             'Financial review approved. Revenue is scheduled for publication on the selected date.'
@@ -1611,6 +1628,15 @@ class ReportImportController extends Controller
 
         $storedPath = $reportImport->stored_path;
         $errorPath = $reportImport->error_file_path;
+
+        /* MIXXTUNE_FINANCE_SAFETY_V1 */
+        \App\Services\V2\FinanceAudit::log(
+            'finance.report_deleted',
+            'Revenue report #'.$reportImport->id.' deleted.',
+            [],
+            $reportImport,
+            \App\Services\V2\FinanceAudit::pick($reportImport, ['id', 'original_filename', 'reporting_month', 'financial_status', 'status', 'row_count'])
+        );
 
         DB::transaction(
             function () use ($reportImport): void {

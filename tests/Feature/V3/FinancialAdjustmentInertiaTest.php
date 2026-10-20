@@ -6,11 +6,13 @@ use App\Models\Finance\FinancialAdjustment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\ConfirmsActionOtp;
 use Tests\TestCase;
 
 class FinancialAdjustmentInertiaTest extends TestCase
 {
     use RefreshDatabase;
+    use ConfirmsActionOtp;
 
     protected function setUp(): void
     {
@@ -133,6 +135,8 @@ class FinancialAdjustmentInertiaTest extends TestCase
 
         $artist =
             $this->user('artist');
+
+        $this->unlockActionOtp($superAdmin, 'adjustment.post:'.$artist->id.':credit:500.00');
 
         $this->actingAs($superAdmin)
             ->post(

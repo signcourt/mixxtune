@@ -6,11 +6,13 @@ use App\Models\Finance\FinancialAdjustment;
 use App\Models\Finance\WalletAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ConfirmsActionOtp;
 use Tests\TestCase;
 
 class FinancialAdjustmentHttpSecurityTest extends TestCase
 {
     use RefreshDatabase;
+    use ConfirmsActionOtp;
 
     protected function setUp(): void
     {
@@ -194,7 +196,8 @@ class FinancialAdjustmentHttpSecurityTest extends TestCase
             'artist'
         );
 
-        $response = $this
+        /* MIXXTUNE_FINANCE_SAFETY_V1: the e-mailed code is entered first */
+        $response = $this->viaActionOtp($admin, fn () => $this
             ->actingAs($admin)
             ->from(
                 '/super-admin/finance/recoupment'
@@ -204,7 +207,7 @@ class FinancialAdjustmentHttpSecurityTest extends TestCase
                 $this->payload(
                     $beneficiary
                 )
-            );
+            ));
 
         $response->assertRedirect(
             '/super-admin/finance/recoupment'
@@ -251,6 +254,8 @@ class FinancialAdjustmentHttpSecurityTest extends TestCase
             'artist'
         );
 
+        $this->unlockActionOtp($admin, 'adjustment.post:'.$beneficiary->id.':credit:1000.00');
+
         $this->actingAs($admin)
             ->post(
                 '/super-admin/finance/adjustments',
@@ -265,6 +270,8 @@ class FinancialAdjustmentHttpSecurityTest extends TestCase
                     'reversal_of_id'
                 )
                 ->firstOrFail();
+
+        $this->unlockActionOtp($admin, 'adjustment.reverse:'.$adjustment->id);
 
         $response = $this
             ->actingAs($admin)
@@ -341,6 +348,8 @@ class FinancialAdjustmentHttpSecurityTest extends TestCase
         $beneficiary = $this->user(
             'artist'
         );
+
+        $this->unlockActionOtp($superAdmin, 'adjustment.post:'.$beneficiary->id.':credit:1000.00');
 
         $this->actingAs($superAdmin)
             ->post(
