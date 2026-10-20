@@ -13,7 +13,7 @@ const statusLabels = {
     submitted: 'In Review',
     approved: 'Approved',
     rejected: 'Rejected',
-    changes_requested: 'Need Changes',
+    changes_requested: 'Changes Requested',
     processing: 'Processing',
 };
 
@@ -71,10 +71,10 @@ export default function Index({
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                     {[
                         ['submitted', 'In Review'],
+                        ['changes_requested', 'Changes Requested'],
                         ['approved', 'Approved'],
-                        ['changes_requested', 'Need Changes'],
-                        ['rejected', 'Rejected'],
                         ['processing', 'Processing'],
+                        ['rejected', 'Rejected'],
                     ].map(([status, label]) => (
                         <button
                             key={status}

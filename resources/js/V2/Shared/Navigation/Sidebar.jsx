@@ -1095,6 +1095,15 @@ function isChildActive(
         return currentStatus === "";
     }
 
+    /* MIXXTUNE_NAV_RELEASES_CATALOGUE: two menu items share the ownership page */
+    if (child.id === "catalogue-transfer-history") {
+        return currentQuery?.get("section") === "history";
+    }
+
+    if (child.id === "catalogue-ownership") {
+        return currentQuery?.get("section") !== "history";
+    }
+
     if (child.id?.startsWith("legal-")) {
         const childQuery = getQueryParams(
             child.href,

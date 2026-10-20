@@ -58,6 +58,12 @@ const icons = {
     permissions: ShieldCheck,
 };
 
+/*
+ * MIXXTUNE_NAV_RELEASES_CATALOGUE
+ * Releases = the work flow (drafts -> review -> approved -> processing).
+ * Catalogue = finished releases (approved / delivered / live) + tools.
+ * Every release status now has exactly one place in the menu.
+ */
 const releaseChildren = (
     routes,
     role
@@ -73,16 +79,34 @@ const releaseChildren = (
                 href: routes.releasesAll,
             },
             {
+                id: 'releases-draft',
+                label: 'My Drafts',
+                href: routes.releasesDraft,
+                queryStatus: 'draft',
+            },
+            {
                 id: 'releases-review',
                 label: 'In Review',
                 href: routes.releasesReview,
                 queryStatus: 'submitted',
             },
             {
+                id: 'releases-changes',
+                label: 'Changes Requested',
+                href: routes.releasesChanges,
+                queryStatus: 'changes_requested',
+            },
+            {
                 id: 'releases-approved',
                 label: 'Approved',
                 href: routes.releasesApproved,
                 queryStatus: 'approved',
+            },
+            {
+                id: 'releases-processing',
+                label: 'Processing',
+                href: routes.releasesProcessing,
+                queryStatus: 'processing',
             },
             {
                 id: 'releases-rejected',
@@ -100,16 +124,28 @@ const releaseChildren = (
             href: routes.releasesAll,
         },
         {
+            id: 'releases-draft',
+            label: 'Drafts',
+            href: routes.releasesDraft,
+            queryStatus: 'draft',
+        },
+        {
             id: 'releases-review',
             label: 'In Review',
             href: routes.releasesReview,
             queryStatus: 'submitted',
         },
         {
-            id: 'releases-draft',
-            label: 'Drafts',
-            href: routes.releasesDraft,
-            queryStatus: 'draft',
+            id: 'releases-changes',
+            label: 'Changes Requested',
+            href: routes.releasesChanges,
+            queryStatus: 'changes_requested',
+        },
+        {
+            id: 'releases-live',
+            label: 'Live',
+            href: routes.releasesLive,
+            queryStatus: 'live',
         },
         {
             id: 'releases-rejected',
@@ -417,7 +453,7 @@ const adminNavigation = (
                           {
                               id: 'catalogue-transfer-history',
                               label: 'Transfer History',
-                              href: '/v2/admin/ownership',
+                              href: '/v2/admin/ownership?section=history',
                               permission: 'catalogue.view',
                           },
                           {

@@ -12,6 +12,7 @@ export const PANEL_ROUTES = {
         releasesReview: "/artist/releases?status=submitted",
         releasesDraft: "/artist/releases?status=draft",
         releasesRejected: "/artist/releases?status=rejected",
+        releasesChanges: "/artist/releases?status=changes_requested",
 
         createRelease: "/artist/releases/create",
 
@@ -54,6 +55,7 @@ export const PANEL_ROUTES = {
         releasesReview: "/v2/releases?status=submitted",
         releasesDraft: "/v2/releases?status=draft",
         releasesRejected: "/v2/releases?status=rejected",
+        releasesChanges: "/v2/releases?status=changes_requested",
 
         createRelease: "/v2/releases/create",
 
@@ -94,6 +96,12 @@ export const PANEL_ROUTES = {
         releasesApproved: "/v2/admin/release-reviews?status=approved",
 
         releasesRejected: "/v2/admin/release-reviews?status=rejected",
+
+        releasesChanges: "/v2/admin/release-reviews?status=changes_requested",
+
+        releasesProcessing: "/v2/admin/release-reviews?status=processing",
+
+        releasesDraft: "/v2/releases?status=draft",
 
         createRelease: "/v2/releases/create",
 
@@ -138,13 +146,20 @@ export const PANEL_ROUTES = {
 
         releases: "/v2/admin/release-reviews",
 
-        releasesAll: "/v2/admin/release-reviews?status=",
+        /* MIXXTUNE_NAV_RELEASES_CATALOGUE: "All Releases" = every stage (was the review queue, which only showed In Review) */
+        releasesAll: "/v2/releases",
 
         releasesReview: "/v2/admin/release-reviews?status=submitted",
 
         releasesApproved: "/v2/admin/release-reviews?status=approved",
 
         releasesRejected: "/v2/admin/release-reviews?status=rejected",
+
+        releasesChanges: "/v2/admin/release-reviews?status=changes_requested",
+
+        releasesProcessing: "/v2/admin/release-reviews?status=processing",
+
+        releasesDraft: "/v2/releases?status=draft",
 
         createRelease: "/v2/releases/create",
 

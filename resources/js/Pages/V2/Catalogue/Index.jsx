@@ -244,7 +244,7 @@ export default function Index({
         <PanelLayout
             role={role}
             title={title}
-            subtitle="Every release with its artwork, label and store status"
+            subtitle="Finished releases (approved, delivered, live) with artwork, label and store status"
         >
             <Head title={title} />
 
@@ -252,7 +252,7 @@ export default function Index({
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex flex-wrap items-baseline gap-3">
                         <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-[28px]">
-                            All Releases
+                            All Catalogue
                         </h1>
 
                         <span className="text-sm text-slate-500">

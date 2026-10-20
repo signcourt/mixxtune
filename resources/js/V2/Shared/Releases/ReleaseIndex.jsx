@@ -176,7 +176,7 @@ export default function ReleaseIndex({
         <PanelLayout
             role={role}
             title={pageTitle}
-            subtitle="Every release with its artwork, label and status"
+            subtitle="Every release in every stage: drafts, review, approved and live"
         >
             <Head title={pageTitle} />
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Head, router } from '@inertiajs/react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 
@@ -23,6 +23,20 @@ export default function OwnershipIndex({
     history = [],
 }) {
     const [search, setSearch] = useState('');
+
+    /* MIXXTUNE_NAV_RELEASES_CATALOGUE: menu "Transfer History" opens this page at the history table */
+    useEffect(() => {
+        if (
+            typeof window !== 'undefined'
+            && new URLSearchParams(window.location.search).get('section') === 'history'
+        ) {
+            window.setTimeout(() => {
+                document
+                    .getElementById('transfer-history')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 50);
+        }
+    }, []);
 
     const filteredReleases = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -107,7 +121,7 @@ export default function OwnershipIndex({
                     />
                 </div>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div id="transfer-history" className="scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200 bg-white">
                     <div className="border-b border-slate-200 p-4">
                         <h2 className="font-bold text-slate-900">
                             Transfer History
