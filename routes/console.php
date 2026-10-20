@@ -25,3 +25,12 @@ Schedule::command(
 )
     ->everyMinute()
     ->withoutOverlapping(10);
+
+/*
+| MIXXTUNE_INVITATION_REMINDERS_V1
+| 10:05 India time every day: remind people who have not accepted their invitation.
+*/
+Schedule::command('invitations:send-reminders')
+    ->dailyAt('04:35')
+    ->timezone('UTC')
+    ->withoutOverlapping(30);

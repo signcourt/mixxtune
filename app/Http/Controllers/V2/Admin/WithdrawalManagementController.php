@@ -190,13 +190,23 @@ class WithdrawalManagementController extends Controller
                 ],
 
                 'withdrawals' =>
-                    $query
-                        ->orderByDesc(
-                            $dateColumns[$status]
-                        )
-                        ->orderByDesc('id')
-                        ->paginate(30)
-                        ->withQueryString(),
+                    $this->withDeductions(
+                        $query
+                            ->with('invoice:id,withdrawal_id,invoice_number,gst_amount,tds_percentage,tds_amount,net_payable')
+                            ->orderByDesc(
+                                $dateColumns[$status]
+                            )
+                            ->orderByDesc('id')
+                            ->paginate(30)
+                            ->withQueryString()
+                    ),
+
+                /* MIXXTUNE_PAYOUT_FILES_V1 */
+                'payoutTools' => [
+                    'can_download' => $role === 'super_admin',
+                    'financial_year' => \App\Services\V2\PayoutDeductionService::financialYear()['label'],
+                    'tds' => app(\App\Services\V2\PayoutDeductionService::class)->settings(),
+                ],
             ]
         );
     }
@@ -294,6 +304,7 @@ class WithdrawalManagementController extends Controller
         }
 
         $rows = $query
+            ->with('invoice:id,withdrawal_id,tds_amount,net_payable')
             ->orderByDesc(
                 $dateColumns[$status]
             )
@@ -331,7 +342,6 @@ class WithdrawalManagementController extends Controller
             'Bank Account Number',
             'IFSC Code',
             'Branch Name',
-            'UPI ID',
             'PAN Number',
             'GST Number',
             'Address Line 1',
@@ -343,6 +353,8 @@ class WithdrawalManagementController extends Controller
             'KYC Status',
             'Request Note',
             'Admin / Rejection Note',
+            'TDS Amount',
+            'Net To Transfer',
         ];
 
         $sheet->fromArray(
@@ -437,9 +449,6 @@ class WithdrawalManagementController extends Controller
                         ?->branch_name,
 
                     $profile
-                        ?->upi_id,
-
-                    $profile
                         ?->pan_number,
 
                     $profile
@@ -476,6 +485,10 @@ class WithdrawalManagementController extends Controller
                             'rejection_reason'
                         ]
                         ?? null,
+
+                    ...$this->exportDeduction(
+                        $withdrawal
+                    ),
                 ],
                 null,
                 'A' . $rowNumber
@@ -492,8 +505,7 @@ class WithdrawalManagementController extends Controller
                     'R',
                     'T',
                     'U',
-                    'V',
-                    'AA',
+                    'Z',
                 ]
                 as $column
             ) {
@@ -541,6 +553,7 @@ class WithdrawalManagementController extends Controller
                 'AC',
                 'AD',
                 'AE',
+                'AF',
             ]
             as $column
         ) {
@@ -981,6 +994,62 @@ class WithdrawalManagementController extends Controller
             'success',
             'KYC status updated.'
         );
+    }
+
+    /*
+     * MIXXTUNE_TDS_V1: show GST / TDS / net to transfer on each request.
+     * Paid requests show the saved payout document; open ones show a live preview.
+     */
+    private function withDeductions($paginator)
+    {
+        $service = app(\App\Services\V2\PayoutDeductionService::class);
+
+        $paginator->getCollection()->transform(function ($withdrawal) use ($service) {
+            $invoice = $withdrawal->invoice;
+
+            if ($invoice) {
+                $withdrawal->setAttribute('deduction', [
+                    'source' => 'document',
+                    'gross' => round((float) $withdrawal->amount, 2),
+                    'gst_amount' => round((float) $invoice->gst_amount, 2),
+                    'tds_percent' => (float) $invoice->tds_percentage,
+                    'tds_amount' => round((float) $invoice->tds_amount, 2),
+                    'net' => round((float) $invoice->net_payable, 2),
+                    'note' => 'From payout document '.$invoice->invoice_number,
+                ]);
+            } elseif ($withdrawal->user && in_array($withdrawal->status, ['pending', 'approved', 'processing'], true)) {
+                $calc = $service->preview($withdrawal->user, (float) $withdrawal->amount, (int) $withdrawal->id, $withdrawal->payoutProfile);
+                $withdrawal->setAttribute('deduction', [
+                    'source' => 'preview',
+                    'gross' => $calc['gross'],
+                    'gst_amount' => $calc['gst_amount'],
+                    'tds_percent' => $calc['tds_percent'],
+                    'tds_amount' => $calc['tds_amount'],
+                    'net' => $calc['net'],
+                    'note' => \App\Services\V2\PayoutDeductionService::reasonText($calc['tds_reason']),
+                ]);
+            }
+
+            return $withdrawal;
+        });
+
+        return $paginator;
+    }
+
+    private function exportDeduction($withdrawal): array
+    {
+        if ($withdrawal->invoice) {
+            return [round((float) $withdrawal->invoice->tds_amount, 2), round((float) $withdrawal->invoice->net_payable, 2)];
+        }
+
+        if ($withdrawal->user && in_array($withdrawal->status, ['pending', 'approved', 'processing'], true)) {
+            $calc = app(\App\Services\V2\PayoutDeductionService::class)
+                ->preview($withdrawal->user, (float) $withdrawal->amount, (int) $withdrawal->id, $withdrawal->payoutProfile);
+
+            return [$calc['tds_amount'], $calc['net']];
+        }
+
+        return [null, null];
     }
 
     private function authorizeAdmin(

@@ -120,62 +120,25 @@ class InvoiceGenerationService
             );
 
             /*
-             * GST registration and TDS are independent.
-             *
-             * GST:
-             * Applied only when the payee has GSTIN.
-             *
-             * TDS:
-             * Applied according to configured payout
-             * deduction policy independently of GST.
+             * MIXXTUNE_TDS_V1: GST and TDS come from one shared calculator
+             * (rate, no-PAN rate and yearly limit from Master Settings), so this
+             * document matches the admin screen and the bank payout file.
              */
-
-            $gstPercentage =
-                $policy['gst_registered']
-                    ? max(
-                        0,
-                        min(
-                            100,
-                            (float) $policy[
-                                'configured_gst_percent'
-                            ]
-                        )
-                    )
-                    : 0.0;
-
-            $tdsPercentage = max(
-                0,
-                min(
-                    100,
-                    (float) $policy[
-                        'configured_tds_percent'
-                    ]
-                )
+            $deduction = app(
+                \App\Services\V2\PayoutDeductionService::class
+            )->preview(
+                $payee,
+                $subtotal,
+                (int) $withdrawal->id,
+                $profile
             );
 
-            $gstAmount = round(
-                $subtotal
-                * $gstPercentage
-                / 100,
-                8
-            );
-
-            $tdsAmount = round(
-                $subtotal
-                * $tdsPercentage
-                / 100,
-                8
-            );
-
-            $totalAmount = round(
-                $subtotal + $gstAmount,
-                8
-            );
-
-            $netPayable = round(
-                $totalAmount - $tdsAmount,
-                8
-            );
+            $gstPercentage = $deduction['gst_percent'];
+            $tdsPercentage = $deduction['tds_percent'];
+            $gstAmount = $deduction['gst_amount'];
+            $tdsAmount = $deduction['tds_amount'];
+            $totalAmount = $deduction['total'];
+            $netPayable = $deduction['net'];
 
             $sequence = DB::table('invoices')
                 ->whereYear(
@@ -225,6 +188,14 @@ class InvoiceGenerationService
 
                 'tds_percentage' =>
                     $tdsPercentage,
+
+                'tds' => [
+                    'reason' => $deduction['tds_reason'],
+                    'pan' => $deduction['pan'],
+                    'financial_year' => $deduction['financial_year'],
+                    'paid_this_year_before' => $deduction['paid_this_year_before'],
+                    'threshold' => $deduction['threshold'],
+                ],
 
                 'payee' =>
                     $policy['payee'],
@@ -312,7 +283,7 @@ class InvoiceGenerationService
                         $gstin,
 
                     'pan' =>
-                        null,
+                        $deduction['pan'],
 
                     'billing_details' =>
                         json_encode(

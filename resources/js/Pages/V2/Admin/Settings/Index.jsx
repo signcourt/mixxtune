@@ -86,6 +86,28 @@ export default function Index({
             prefix: getValue("invoice", "prefix", "INV"),
             gst_percent: Number(getValue("invoice", "gst_percent", 0)),
             tds_percent: Number(getValue("invoice", "tds_percent", 0)),
+            tds_no_pan_percent: Number(
+                getValue("invoice", "tds_no_pan_percent", 0),
+            ),
+            tds_threshold: Number(getValue("invoice", "tds_threshold", 0)),
+        },
+
+        payout: {
+            debit_account_number: getValue(
+                "payout",
+                "debit_account_number",
+                "",
+            ),
+        },
+
+        invitation: {
+            reminders_enabled: Boolean(
+                getValue("invitation", "reminders_enabled", true),
+            ),
+            reminder_every_days: Number(
+                getValue("invitation", "reminder_every_days", 3),
+            ),
+            reminder_max: Number(getValue("invitation", "reminder_max", 3)),
         },
     });
 
@@ -694,6 +716,94 @@ export default function Index({
                             value={data.invoice.tds_percent}
                             onChange={(value) =>
                                 update("invoice", "tds_percent", Number(value))
+                            }
+                        />
+
+                        <Field
+                            label="TDS % when payee has no PAN (0 = same as TDS %)"
+                            type="number"
+                            value={data.invoice.tds_no_pan_percent}
+                            onChange={(value) =>
+                                update(
+                                    "invoice",
+                                    "tds_no_pan_percent",
+                                    Number(value),
+                                )
+                            }
+                        />
+
+                        <Field
+                            label="TDS yearly limit per payee, ₹ (0 = deduct on every payout)"
+                            type="number"
+                            value={data.invoice.tds_threshold}
+                            onChange={(value) =>
+                                update(
+                                    "invoice",
+                                    "tds_threshold",
+                                    Number(value),
+                                )
+                            }
+                        />
+                    </Grid>
+
+                    <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                        TDS is cut from each payout at Mark Paid and shown on the
+                        payout document. While TDS % is 0 nothing is cut. Confirm
+                        the rate and the yearly limit (April–March) with your CA.
+                    </p>
+                </Section>
+
+                {/* MIXXTUNE_PAYOUT_FILES_V1 */}
+                <Section title="Payout / Bank file (Axis)">
+                    <Grid>
+                        <Field
+                            label="Company Axis account number (money is sent from this account)"
+                            value={data.payout.debit_account_number}
+                            onChange={(value) =>
+                                update(
+                                    "payout",
+                                    "debit_account_number",
+                                    value.replace(/[^0-9 ]/g, ""),
+                                )
+                            }
+                        />
+                    </Grid>
+                </Section>
+
+                {/* MIXXTUNE_INVITATION_REMINDERS_V1 */}
+                <Section title="Invitation Reminders">
+                    <Grid>
+                        <Toggle
+                            label="Send reminder e-mails automatically (daily, 10 AM India time)"
+                            checked={data.invitation.reminders_enabled}
+                            onChange={(value) =>
+                                update("invitation", "reminders_enabled", value)
+                            }
+                        />
+
+                        <Field
+                            label="Remind every (days)"
+                            type="number"
+                            value={data.invitation.reminder_every_days}
+                            onChange={(value) =>
+                                update(
+                                    "invitation",
+                                    "reminder_every_days",
+                                    Number(value),
+                                )
+                            }
+                        />
+
+                        <Field
+                            label="Reminders per person (max)"
+                            type="number"
+                            value={data.invitation.reminder_max}
+                            onChange={(value) =>
+                                update(
+                                    "invitation",
+                                    "reminder_max",
+                                    Number(value),
+                                )
                             }
                         />
                     </Grid>

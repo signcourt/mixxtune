@@ -14,6 +14,7 @@ export default function Index({
     withdrawals = {},
     counts = {},
     filters = {},
+    payoutTools = {},
 }) {
     const [note, setNote] =
         useState('');
@@ -243,13 +244,55 @@ export default function Index({
                         </div>
                     </div>
 
-                    <a
-                        href={exportUrl}
-                        className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white"
-                    >
-                        Download Finance Excel
-                    </a>
+                    <div className="flex flex-wrap gap-2">
+                        <a
+                            href={exportUrl}
+                            className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white"
+                        >
+                            Download Finance Excel
+                        </a>
+
+                        {payoutTools.can_download && (
+                            <>
+                                <a
+                                    href="/v2/admin/payouts/axis-file"
+                                    className="rounded-xl bg-rose-700 px-5 py-3 text-sm font-semibold text-white"
+                                    title="All APPROVED requests, net amount after TDS"
+                                >
+                                    Axis Bank Payout File
+                                </a>
+
+                                <a
+                                    href="/v2/admin/payouts/axis-file?format=csv"
+                                    className="rounded-xl border border-rose-300 px-4 py-3 text-sm font-semibold text-rose-700"
+                                >
+                                    Axis CSV
+                                </a>
+
+                                <a
+                                    href={`/v2/admin/payouts/tds-report?fy=${encodeURIComponent(payoutTools.financial_year ?? '')}`}
+                                    className="rounded-xl bg-slate-800 px-5 py-3 text-sm font-semibold text-white"
+                                >
+                                    TDS Report FY {payoutTools.financial_year}
+                                </a>
+                            </>
+                        )}
+                    </div>
                 </div>
+
+                {payoutTools.can_download && (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                        TDS now: {payoutTools.tds?.rate ?? 0}%
+                        {Number(payoutTools.tds?.no_pan_rate ?? 0) > 0 &&
+                            ` (no PAN: ${payoutTools.tds.no_pan_rate}%)`}
+                        {Number(payoutTools.tds?.threshold ?? 0) > 0
+                            ? ` · only after ₹${payoutTools.tds.threshold} per payee in a year`
+                            : ' · on every payout'}
+                        {' '}— change in Master Settings. Axis file has only
+                        Approved requests that are ready (KYC verified, no
+                        bank-change hold); see its "Check List" sheet.
+                    </div>
+                )}
 
                 <div className="space-y-4">
                     {rows.length === 0 && (
@@ -324,6 +367,33 @@ export default function Index({
                                             }
                                         />
                                     </div>
+
+                                    {item.deduction && (
+                                        <div className="mt-3 grid gap-3 sm:grid-cols-4">
+                                            <Info
+                                                label="GST added"
+                                                value={`₹${item.deduction.gst_amount}`}
+                                            />
+
+                                            <Info
+                                                label={`TDS ${item.deduction.tds_percent}%`}
+                                                value={`₹${item.deduction.tds_amount}`}
+                                            />
+
+                                            <Info
+                                                label={
+                                                    item.status === 'paid'
+                                                        ? 'Net paid'
+                                                        : 'Net to transfer'
+                                                }
+                                                value={`₹${item.deduction.net}`}
+                                            />
+
+                                            <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+                                                {item.deduction.note}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div>

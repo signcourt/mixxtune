@@ -2092,6 +2092,37 @@ export default function Index({
                     />
                 </div>
 
+                {/* MIXXTUNE_INVITATION_REMINDERS_V1 */}
+                {Number(summary.pending_invitations ?? 0) > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <span>
+                            {summary.pending_invitations} invitation(s) not
+                            accepted yet. Reminders go out automatically
+                            (settings: Master Settings → Invitation Reminders).
+                        </span>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (
+                                    window.confirm(
+                                        'Send the reminders that are due now?\n\nEach reminder has a fresh 7-day link; older links stop working.'
+                                    )
+                                ) {
+                                    router.post(
+                                        '/v2/admin/users/invitation-reminders',
+                                        {},
+                                        { preserveScroll: true }
+                                    );
+                                }
+                            }}
+                            className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white"
+                        >
+                            Send due reminders now
+                        </button>
+                    </div>
+                )}
+
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                         <div className="grid flex-1 gap-3 md:grid-cols-[1fr_180px_180px]">

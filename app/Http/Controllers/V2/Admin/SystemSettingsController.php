@@ -252,20 +252,35 @@ class SystemSettingsController extends Controller
                 'min:0',
                 'max:100',
             ],
+
+            /* MIXXTUNE_TDS_V1 / MIXXTUNE_PAYOUT_FILES_V1 / MIXXTUNE_INVITATION_REMINDERS_V1 */
+            'invoice.tds_no_pan_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
+            'invoice.tds_threshold' => ['sometimes', 'numeric', 'min:0', 'max:100000000'],
+            'payout.debit_account_number' => ['sometimes', 'nullable', 'string', 'max:30', 'regex:/^[0-9 ]*$/'],
+            'invitation.reminders_enabled' => ['sometimes', 'boolean'],
+            'invitation.reminder_every_days' => ['sometimes', 'integer', 'min:1', 'max:30'],
+            'invitation.reminder_max' => ['sometimes', 'integer', 'min:0', 'max:10'],
         ]);
 
         $oldValues = $settings->grouped();
+        $defaults = $this->defaults();
 
         foreach (
             $this->schema()
             as $group => $fields
         ) {
             foreach ($fields as $key => $type) {
+                // a field the form did not send keeps its saved value (or the default)
+                $current = $oldValues[$group]["{$group}.{$key}"]
+                    ?? $defaults[$group]["{$group}.{$key}"]
+                    ?? null;
+
                 $settings->set(
                     "{$group}.{$key}",
                     data_get(
                         $validated,
-                        "{$group}.{$key}"
+                        "{$group}.{$key}",
+                        $current
                     ),
                     $group,
                     $type,
@@ -458,6 +473,18 @@ class SystemSettingsController extends Controller
                 'invoice.prefix' => 'INV',
                 'invoice.gst_percent' => 0,
                 'invoice.tds_percent' => 0,
+                'invoice.tds_no_pan_percent' => 0,
+                'invoice.tds_threshold' => 0,
+            ],
+
+            'payout' => [
+                'payout.debit_account_number' => '',
+            ],
+
+            'invitation' => [
+                'invitation.reminders_enabled' => true,
+                'invitation.reminder_every_days' => 3,
+                'invitation.reminder_max' => 3,
             ],
         ];
     }
@@ -516,6 +543,18 @@ class SystemSettingsController extends Controller
                 'prefix' => 'string',
                 'gst_percent' => 'decimal',
                 'tds_percent' => 'decimal',
+                'tds_no_pan_percent' => 'decimal',
+                'tds_threshold' => 'decimal',
+            ],
+
+            'payout' => [
+                'debit_account_number' => 'string',
+            ],
+
+            'invitation' => [
+                'reminders_enabled' => 'boolean',
+                'reminder_every_days' => 'integer',
+                'reminder_max' => 'integer',
             ],
         ];
     }

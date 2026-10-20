@@ -69,16 +69,17 @@ class UserInvitationService
     /**
      * Generate a new invitation and send it immediately.
      */
-    public function send(User $user): string
+    public function send(User $user, bool $reminder = false): string
     {
-        return DB::transaction(function () use ($user) {
+        return DB::transaction(function () use ($user, $reminder) {
             $plainToken = $this->issue($user);
 
             try {
                 $user->notify(
                     new UserInvitationNotification(
                         $plainToken,
-                        (string) $user->role
+                        (string) $user->role,
+                        $reminder
                     )
                 );
 

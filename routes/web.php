@@ -2037,6 +2037,30 @@ Route::middleware(['auth', 'verified'])
     ->name('v2.admin.withdrawals.export');
 
 
+/* MIXXTUNE_PAYOUT_FILES_V1: Axis payout file + TDS report (super admin) */
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/admin/payouts/axis-file',
+        [\App\Http\Controllers\V2\Admin\PayoutFilesController::class, 'bankFile']
+    )
+    ->name('v2.admin.payouts.axis-file');
+
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/admin/payouts/tds-report',
+        [\App\Http\Controllers\V2\Admin\PayoutFilesController::class, 'tdsReport']
+    )
+    ->name('v2.admin.payouts.tds-report');
+
+/* MIXXTUNE_INVITATION_REMINDERS_V1: send due reminders now (super admin) */
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/v2/admin/users/invitation-reminders',
+        [\App\Http\Controllers\V2\Admin\InvitationReminderController::class, 'store']
+    )
+    ->name('v2.admin.users.invitation-reminders');
+
+
 Route::middleware(['auth', 'verified'])
     ->delete(
         '/v2/admin/withdrawals/{withdrawal}',

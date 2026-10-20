@@ -12,7 +12,8 @@ class UserInvitationNotification extends Notification
 
     public function __construct(
         public string $plainToken,
-        public string $role
+        public string $role,
+        public bool $reminder = false
     ) {
     }
 
@@ -35,10 +36,16 @@ class UserInvitationNotification extends Notification
             default => ucfirst($this->role),
         };
 
+        /* MIXXTUNE_INVITATION_REMINDERS_V1 */
+        $subject = $this->reminder
+            ? 'Reminder: your Mixx Tune invitation is waiting'
+            : "You're invited to Mixx Tune";
+
         return (new MailMessage)
-            ->subject("You're invited to Mixx Tune")
+            ->subject($subject)
             ->view('emails.invitation', [
-                'subject' => "You're invited to Mixx Tune",
+                'subject' => $subject,
+                'reminder' => $this->reminder,
                 'name' => $notifiable->name,
                 'roleName' => $roleName,
                 'username' => $notifiable->username,

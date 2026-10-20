@@ -256,6 +256,26 @@ export default function Index({
                                                     item.amount
                                                 )}
                                             </span>
+
+                                            {/* MIXXTUNE_TDS_V1 */}
+                                            {item.invoice &&
+                                                Number(
+                                                    item.invoice
+                                                        .tds_amount ?? 0
+                                                ) > 0 && (
+                                                    <span className="mt-1 block text-xs text-slate-500">
+                                                        TDS{' '}
+                                                        {money(
+                                                            item.invoice
+                                                                .tds_amount
+                                                        )}{' '}
+                                                        · Received{' '}
+                                                        {money(
+                                                            item.invoice
+                                                                .net_payable
+                                                        )}
+                                                    </span>
+                                                )}
                                         </Cell>
 
                                         <Cell>

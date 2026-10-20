@@ -33,8 +33,15 @@
                     <td style="padding:35px 32px;">
 
                         <h1 style="margin:0 0 18px;font-size:24px;line-height:1.3;color:#111827;">
-                            You're invited
+                            {{ !empty($reminder) ? 'Your invitation is waiting' : "You're invited" }}
                         </h1>
+
+                        @if(!empty($reminder))
+                        <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;">
+                            This is a friendly reminder. Your royalty payments can be released only after you accept the invitation and complete your profile.
+                            Please use the button in this e-mail &mdash; links in older invitation e-mails no longer work.
+                        </p>
+                        @endif
 
                         <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#4b5563;">
                             Hello {{ $name }},
