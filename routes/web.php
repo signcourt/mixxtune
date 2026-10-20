@@ -2944,3 +2944,13 @@ Route::middleware(['auth', 'verified'])
 Route::middleware(['auth', 'verified'])
     ->get('/v2/admin/labels/rate-history', [\App\Http\Controllers\V2\Admin\LabelRateHistoryController::class, 'show'])
     ->name('v2.admin.labels.rate-history');
+
+/* MIXXTUNE_OWNER_STATEMENT_V1 */
+Route::middleware(['auth', 'verified'])
+    ->prefix('v2/admin/statement-emails')
+    ->name('v2.admin.statement-emails.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\V2\Admin\StatementEmailController::class, 'index'])->name('index');
+        Route::post('send', [\App\Http\Controllers\V2\Admin\StatementEmailController::class, 'send'])->middleware('throttle:60,1')->name('send');
+        Route::get('preview', [\App\Http\Controllers\V2\Admin\StatementEmailController::class, 'preview'])->middleware('throttle:30,1')->name('preview');
+    });

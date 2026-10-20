@@ -17,6 +17,7 @@ import {
 } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import StatementEmailPanel from '@/V2/Admin/StatementEmailPanel';
 
 const statusStyles = {
     pending:
@@ -242,6 +243,9 @@ export default function Index({
             <Head title={title} />
 
             <div className="space-y-6">
+                {/* MIXXTUNE_OWNER_STATEMENT_V1 */}
+                {role === 'super_admin' && <StatementEmailPanel />}
+
                 <header className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                     <div className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
                         <div>

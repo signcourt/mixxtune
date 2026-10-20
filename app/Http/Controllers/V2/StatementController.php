@@ -74,24 +74,13 @@ class StatementController extends Controller
             403
         );
 
-        $statement->load(
-            'allocations'
-        );
+        /* MIXXTUNE_OWNER_STATEMENT_V1: readable owner statement PDF. */
+        $service = app(\App\Services\V2\OwnerStatementService::class);
 
-        return Pdf::loadView(
-            'pdf.royalty-statement',
-            [
-                'statement' =>
-                    $statement,
-
-                'user' =>
-                    $request->user(),
-            ]
-        )->download(
-            'statement-'
-            . $statement->statement_month
-            . '.pdf'
-        );
+        return response($service->pdf($statement), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$service->fileName($statement).'"',
+        ]);
     }
 
     private function applyScope(

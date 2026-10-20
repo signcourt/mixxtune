@@ -485,6 +485,12 @@ const adminNavigation = (
                 },
                 ...(role === 'super_admin'
                     ? [
+                          // MIXXTUNE_OWNER_STATEMENT_V1: statements + e-mail to owners
+                          {
+                              id: 'financial-statements',
+                              label: 'Statements',
+                              href: '/v2/admin/statements',
+                          },
                           {
                               id: 'financial-recoupment-advances',
                               label: 'Recoupment & Advances',
