@@ -96,10 +96,38 @@ class ReleaseAccessService
         );
 
         abort_unless(
-            $this->isEditable($release),
+            $this->isEditable($release)
+                || $this->isAdminOverride($user, $release),
             403,
             'This release is locked for editing.'
         );
+    }
+
+    /*
+     * MIXXTUNE_SUPER_ADMIN_FULL_EDIT
+     *
+     * A Super Admin may edit any non-draft release (submitted,
+     * approved, delivered, live, legacy imports ...): details,
+     * poster, tracks, audio, stores. Status is never changed by
+     * this path. Drafts stay creator-private (canAccess).
+     */
+    public function isAdminOverride(
+        ?User $user,
+        Release $release
+    ): bool {
+        if (!$user || $this->isEditable($release)) {
+            return false;
+        }
+
+        if ((string) $release->status === 'draft') {
+            return false;
+        }
+
+        if (app(LabelTeamAccessService::class)->membership($user)) {
+            return false;
+        }
+
+        return $this->role($user) === 'super_admin';
     }
 
     public function authorizeSubmit(

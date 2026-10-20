@@ -10,6 +10,7 @@ use App\Models\Distribution\Track;
 use App\Services\V2\AdminAssignmentService;
 use App\Services\V2\PermissionService;
 use App\Services\V2\ReleaseAccessService;
+use App\Services\V2\ReleaseAdminEditService;
 use App\Services\V2\LabelAccess\LabelTeamAccessService;
 use App\Services\V2\AudioValidationService;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +23,15 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ReleaseTrackController extends Controller
 {
+    /* MIXXTUNE_SUPER_ADMIN_FULL_EDIT: fields written to the audit log */
+    private const AUDIT_FIELDS = [
+        'disc_number', 'track_number', 'title', 'version', 'subtitle',
+        'primary_artist_name', 'featuring_artist_name', 'isrc', 'language',
+        'genre', 'sub_genre', 'is_explicit', 'is_instrumental',
+        'contains_ai_generated_content', 'duration_seconds',
+        'preview_start_seconds', 'audio_path', 'audio_original_name',
+    ];
+
     public function store(
         Request $request,
         Release $release,
@@ -134,6 +144,18 @@ class ReleaseTrackController extends Controller
             $request->user()
         );
 
+        $adminEditService = app(ReleaseAdminEditService::class);
+
+        if ($adminEditService->active($request, $release)) {
+            $adminEditService->record(
+                $release,
+                'tracks (added track #'.$track->id.')',
+                [],
+                $track->fresh()->only(self::AUDIT_FIELDS),
+                $request
+            );
+        }
+
         return back()->with([
             'success' =>
                 'Track added successfully.',
@@ -169,8 +191,13 @@ class ReleaseTrackController extends Controller
             false
         );
 
+        $adminEditService = app(ReleaseAdminEditService::class);
+        $adminEdit = $adminEditService->active($request, $track->release);
+        $before = $adminEdit ? $track->only(self::AUDIT_FIELDS) : [];
+
         if ($request->hasFile('audio')) {
-            if ($track->audio_path) {
+            /* Super Admin edit keeps the old audio file on disk (recoverable). */
+            if ($track->audio_path && !$adminEdit) {
                 Storage::disk('public')->delete(
                     $track->audio_path
                 );
@@ -221,6 +248,16 @@ class ReleaseTrackController extends Controller
             );
         }
 
+        if ($adminEdit) {
+            $adminEditService->record(
+                $track->release,
+                'track #'.$track->id.($audioWasReplaced ? ' (audio replaced)' : ''),
+                $before,
+                $track->fresh()->only(self::AUDIT_FIELDS),
+                $request
+            );
+        }
+
         return back()->with(
             'success',
             'Track updated successfully.'
@@ -246,7 +283,24 @@ class ReleaseTrackController extends Controller
             $track->release
         );
 
-        if ($track->audio_path) {
+        $adminEditService = app(ReleaseAdminEditService::class);
+        $adminEdit = $adminEditService->active($request, $track->release);
+
+        if ($adminEdit) {
+            /*
+             * A track that already has revenue rows must stay, or old
+             * statements would lose their track. Edit or replace it instead.
+             */
+            abort_if(
+                $adminEditService->trackHasRevenue((int) $track->id),
+                422,
+                'This track already has revenue in reports, so it cannot be deleted. Edit it or replace its audio instead.'
+            );
+
+            $before = $track->only(self::AUDIT_FIELDS);
+        }
+
+        if ($track->audio_path && !$adminEdit) {
             Storage::disk('public')->delete(
                 $track->audio_path
             );
@@ -257,6 +311,16 @@ class ReleaseTrackController extends Controller
         ]);
 
         $track->delete();
+
+        if ($adminEdit) {
+            $adminEditService->record(
+                $track->release,
+                'tracks (deleted track #'.$track->id.')',
+                $before,
+                [],
+                $request
+            );
+        }
 
         return back()->with(
             'success',

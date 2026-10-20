@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 const RELEASES_BASE_PATH =
@@ -25,6 +25,7 @@ const formatDate = (value) => {
 
 export default function ReviewStep({
     release,
+    adminEdit = false,
     artist = null,
     label = null,
     distributionStores = [],
@@ -550,6 +551,14 @@ export default function ReviewStep({
                             : 'Complete all missing information.'}
                     </p>
 
+                    {adminEdit ? (
+                        <Link
+                            href={`/v2/releases/${release.id}`}
+                            className="mt-5 block w-full rounded-xl bg-emerald-600 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-700"
+                        >
+                            Done · changes are already saved
+                        </Link>
+                    ) : (
                     <button
                         type="button"
                         onClick={
@@ -565,6 +574,7 @@ export default function ReviewStep({
                             ? 'Submitting...'
                             : 'Submit for Review'}
                     </button>
+                    )}
                 </div>
             </aside>
         </div>

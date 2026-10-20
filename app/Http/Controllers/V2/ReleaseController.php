@@ -15,6 +15,7 @@ use App\Services\V2\PermissionService;
 use App\Services\V2\ReleaseWorkflowService;
 use App\Services\V2\ReleaseValidationService;
 use App\Services\V2\ReleaseAccessService;
+use App\Services\V2\ReleaseAdminEditService;
 use App\Services\V2\LabelAccess\LabelTeamAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -993,6 +994,10 @@ class ReleaseController extends Controller
             true
         );
 
+        /* MIXXTUNE_SUPER_ADMIN_FULL_EDIT */
+        $adminEdit = app(ReleaseAccessService::class)
+            ->isAdminOverride($request->user(), $release);
+
         /*
          * For selected-scope Team Users, expose only Tracks
          * that their catalogue scope permits.
@@ -1112,6 +1117,8 @@ class ReleaseController extends Controller
                         $release->rejection_reason,
                     'editable' =>
                         $editable,
+                    'admin_edit' =>
+                        $adminEdit,
 
                     'tracks' =>
                         $visibleTracks
@@ -1204,6 +1211,10 @@ class ReleaseController extends Controller
                 ...$context,
                 'release' => $release,
                 'title' => 'Edit Release',
+
+                /* MIXXTUNE_SUPER_ADMIN_FULL_EDIT */
+                'adminEdit' => app(ReleaseAdminEditService::class)
+                    ->active($request, $release),
             ]
         );
     }
@@ -1266,7 +1277,50 @@ class ReleaseController extends Controller
             $release
         );
 
-        $validated = $this->validateDraft($request);
+        /*
+         * MIXXTUNE_SUPER_ADMIN_FULL_EDIT
+         * Super Admin editing a locked release: keep old files,
+         * allow a corrected UPC and a past release date (live
+         * releases are already out), keep status / wizard progress,
+         * audit every change and refresh the catalogue record.
+         */
+        $adminEditService = app(ReleaseAdminEditService::class);
+        $adminEdit = $adminEditService->active($request, $release);
+
+        $validated = $this->validateDraft($request, $adminEdit);
+        $auditFields = [
+            'title', 'version', 'release_type', 'catalog_number', 'upc',
+            'artist_id', 'label_id', 'primary_artist_name',
+            'featuring_artist_name', 'language', 'primary_genre',
+            'sub_genre', 'original_release_date', 'digital_release_date',
+            'copyright_owner', 'copyright_year', 'phonographic_owner',
+            'phonographic_year', 'artwork_path',
+        ];
+        $before = $adminEdit ? $release->only($auditFields) : [];
+        $upc = $release->upc;
+
+        if ($adminEdit) {
+            $newUpc = trim((string) $request->input('upc', ''));
+
+            if (
+                $newUpc !== ''
+                && $newUpc !== (string) $release->upc
+                && !$request->boolean('generate_upc')
+            ) {
+                $request->validate([
+                    'upc' => [
+                        'regex:/^\d{12,14}$/',
+                        \Illuminate\Validation\Rule::unique('releases', 'upc')
+                            ->ignore($release->id),
+                    ],
+                ], [
+                    'upc.regex' => 'UPC must be 12 to 14 digits.',
+                    'upc.unique' => 'This UPC is already used by another release.',
+                ]);
+
+                $upc = $newUpc;
+            }
+        }
 
         [$artist, $label] = $this->resolveOwnership(
             $request,
@@ -1276,7 +1330,7 @@ class ReleaseController extends Controller
         );
 
         if ($request->hasFile('artwork')) {
-            if ($release->artwork_path) {
+            if ($release->artwork_path && !$adminEdit) {
                 Storage::disk('public')->delete(
                     $release->artwork_path
                 );
@@ -1362,8 +1416,9 @@ class ReleaseController extends Controller
             /*
              * UPC is immutable once assigned.
              * Prevent Step 1 edits from clearing or replacing it.
+             * (Super Admin edit may correct it: see above.)
              */
-            'upc' => $release->upc,
+            'upc' => $upc,
 
             'original_release_date' =>
                 $validated[
@@ -1402,7 +1457,9 @@ class ReleaseController extends Controller
             'status' =>
                 $release->status,
 
-            'wizard_step' => max(
+            'wizard_step' => $adminEdit
+                ? $release->wizard_step
+                : max(
                 1,
                 min(
                     4,
@@ -1414,7 +1471,9 @@ class ReleaseController extends Controller
                 )
             ),
 
-            'completion_percentage' => max(
+            'completion_percentage' => $adminEdit
+                ? $release->completion_percentage
+                : max(
                 20,
                 min(
                     100,
@@ -1432,6 +1491,20 @@ class ReleaseController extends Controller
             'updated_by' =>
                 $request->user()->id,
         ]);
+
+        if ($adminEdit) {
+            $adminEditService->record(
+                $release,
+                'release details',
+                $before,
+                $release->fresh()->only($auditFields),
+                $request
+            );
+
+            return redirect()
+                ->route('v2.releases.edit', $release)
+                ->with('success', 'Release updated (Super Admin edit).');
+        }
 
         return redirect()
             ->route(
@@ -1537,6 +1610,12 @@ class ReleaseController extends Controller
             ]);
         }
 
+        /* MIXXTUNE_SUPER_ADMIN_FULL_EDIT */
+        $adminEditService = app(ReleaseAdminEditService::class);
+        $adminEdit = $adminEditService->active($request, $release);
+        $distFields = ['stores', 'worldwide', 'territories', 'release_timezone', 'pre_order'];
+        $before = $adminEdit ? $release->only($distFields) : [];
+
         $release->update([
             'stores' =>
                 $activeStoreIds,
@@ -1586,6 +1665,16 @@ class ReleaseController extends Controller
             'updated_by' =>
                 $request->user()->id,
         ]);
+
+        if ($adminEdit) {
+            $adminEditService->record(
+                $release,
+                'stores / territories',
+                $before,
+                $release->fresh()->only($distFields),
+                $request
+            );
+        }
 
         return back()->with(
             'success',
@@ -1694,7 +1783,8 @@ class ReleaseController extends Controller
     }
 
     private function validateDraft(
-        Request $request
+        Request $request,
+        bool $adminEdit = false
     ): array {
         return $request->validate([
             'title' => [
@@ -1815,7 +1905,9 @@ class ReleaseController extends Controller
                 'date',
             ],
 
-            'digital_release_date' => [
+            'digital_release_date' => $adminEdit
+                ? ['required', 'date']
+                : [
                 'required',
                 'date',
                 'after:today',

@@ -299,6 +299,15 @@ export default function Show({
                                 Edit Release
                             </Link>
                         )}
+
+                        {!release.editable && release.admin_edit && (
+                            <Link
+                                href={`/v2/releases/${release.id}/edit`}
+                                className="inline-flex rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-600"
+                            >
+                                Edit (Super Admin)
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -310,6 +319,9 @@ export default function Show({
 
                         <div className="mt-1 text-sm text-blue-700">
                             It has been submitted for review or is already being processed.
+                            {release.admin_edit
+                                ? ' As Super Admin you can still edit it with "Edit (Super Admin)".'
+                                : ''}
                         </div>
                     </div>
                 )}

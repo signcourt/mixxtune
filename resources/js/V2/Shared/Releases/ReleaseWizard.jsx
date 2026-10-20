@@ -77,6 +77,7 @@ export default function ReleaseWizard({
     availableArtists = [],
     availableLabels = [],
     distributionStores = [],
+    adminEdit = false,
 }) {
     const wizardStorageKey =
         typeof window !== 'undefined'
@@ -365,7 +366,13 @@ export default function ReleaseWizard({
     });
 
     useEffect(() => {
+        /*
+         * MIXXTUNE_SUPER_ADMIN_FULL_EDIT
+         * No autosave while a Super Admin edits a locked release:
+         * every save is deliberate and audit-logged.
+         */
         if (
+            adminEdit ||
             !release?.id ||
             currentStep !== 1
         ) {
@@ -740,6 +747,8 @@ saveState === 'saving'
                         <div className="overflow-x-auto pb-1 xl:pb-0">
                             <WizardTopActions
                                 currentStep={currentStep}
+                                adminEdit={adminEdit}
+                                releaseId={release?.id}
                                 processing={processing}
                                 onBack={previousStep}
                                 onSaveDraft={saveDraft}
@@ -749,6 +758,22 @@ saveState === 'saving'
                         </div>
                     </div>
                 </div>
+
+                {adminEdit && (
+                    <div className="rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4">
+                        <div className="font-bold text-amber-900">
+                            Super Admin edit · this release is{' '}
+                            <span className="capitalize">
+                                {String(release?.status ?? '').replace(/_/g, ' ')}
+                            </span>
+                        </div>
+                        <p className="mt-1 text-sm leading-6 text-amber-800">
+                            You can change details, poster, UPC, tracks, ISRC, audio files and stores.
+                            Each save is written to the audit log and shows in All Catalogue at once.
+                            The status does not change, and nothing is re-sent to the stores automatically.
+                        </p>
+                    </div>
+                )}
 
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 <div className="min-h-[420px] p-6">
@@ -846,6 +871,7 @@ saveState === 'saving'
                             release?.id ? (
                                 <ReviewStep
                                     release={release}
+                                    adminEdit={adminEdit}
                                     artist={artist}
                                     label={label}
                                     distributionStores={
@@ -920,6 +946,8 @@ function StepPlaceholder({
 
 function WizardTopActions({
     currentStep,
+    adminEdit = false,
+    releaseId = null,
     processing = false,
     onBack,
     onSaveDraft,
@@ -950,10 +978,19 @@ function WizardTopActions({
             >
                 {processing
                     ? 'Saving...'
-                    : 'Save Draft'}
+                    : adminEdit
+                      ? 'Save Changes'
+                      : 'Save Draft'}
             </button>
 
-            {isLastStep ? (
+            {isLastStep && adminEdit ? (
+                <Link
+                    href={`/v2/releases/${releaseId}`}
+                    className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                >
+                    Done
+                </Link>
+            ) : isLastStep ? (
                 <button
                     type="button"
                     onClick={onSubmit}

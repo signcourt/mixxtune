@@ -462,6 +462,7 @@ export default function Index({
                     ) : (
                         <CatalogueTable
                             rows={rows}
+                            canEdit={role === 'super_admin'}
                         />
                     )}
 
@@ -488,6 +489,7 @@ export default function Index({
 
 function CatalogueTable({
     rows,
+    canEdit = false,
 }) {
     return (
         <div className="overflow-x-auto">
@@ -511,6 +513,7 @@ function CatalogueTable({
                         <CatalogueRow
                             key={item.id}
                             item={item}
+                            canEdit={canEdit}
                         />
                     ))}
                 </tbody>
@@ -551,6 +554,7 @@ function StatusPill({
 
 function CatalogueRow({
     item,
+    canEdit = false,
 }) {
     const artwork = artworkUrl(
         item.artwork_path
@@ -668,7 +672,21 @@ function CatalogueRow({
             </td>
 
             <td className="px-5 py-3">
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                    {/* MIXXTUNE_SUPER_ADMIN_FULL_EDIT */}
+                    {canEdit && item.release_id && (
+                        <Link
+                            href={`/v2/releases/${item.release_id}/edit`}
+                            title="Edit release (Super Admin): poster, details, tracks, audio"
+                            aria-label="Edit release"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 transition hover:border-amber-300 hover:bg-amber-100"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                                <path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3Z" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="m14 8 2 2" strokeLinecap="round" />
+                            </svg>
+                        </Link>
+                    )}
                     <Link
                         href={viewPath}
                         title="View release"
