@@ -4,8 +4,10 @@ export default function ReleaseCoverArtCard({
     data,
     setData,
     error = null,
+    adminEdit = false,
 }) {
     const [localError, setLocalError] = useState('');
+    const [localNote, setLocalNote] = useState('');
     const fileInputRef = useRef(null);
 
     const openFilePicker = () => {
@@ -14,6 +16,7 @@ export default function ReleaseCoverArtCard({
 
     const validateArtwork = (file, input) => {
         setLocalError('');
+        setLocalNote('');
 
         if (!file) {
             return;
@@ -40,9 +43,25 @@ export default function ReleaseCoverArtCard({
         const objectUrl = URL.createObjectURL(file);
 
         image.onload = () => {
-            const valid =
+            /*
+             * MIXXTUNE_SUPER_ADMIN_FULL_EDIT
+             * Super Admin fixing an old / live release may use any
+             * poster of at least 500 x 500 px (store delivery still
+             * needs exactly 3000 x 3000, so a note is shown).
+             */
+            const exact =
                 image.naturalWidth === 3000 &&
                 image.naturalHeight === 3000;
+
+            const valid = adminEdit
+                ? image.naturalWidth >= 500 && image.naturalHeight >= 500
+                : exact;
+
+            if (adminEdit && valid && !exact) {
+                setLocalNote(
+                    `Poster is ${image.naturalWidth} × ${image.naturalHeight} px. It will show in the catalogue; for sending to stores use 3000 × 3000 px.`
+                );
+            }
 
             if (!valid) {
                 URL.revokeObjectURL(objectUrl);
@@ -51,7 +70,9 @@ export default function ReleaseCoverArtCard({
                 setData('artwork_preview', null);
 
                 setLocalError(
-                    `Artwork must be exactly 3000 × 3000 px. Selected image is ${image.naturalWidth} × ${image.naturalHeight} px.`
+                    adminEdit
+                        ? `Poster must be at least 500 × 500 px. Selected image is ${image.naturalWidth} × ${image.naturalHeight} px.`
+                        : `Artwork must be exactly 3000 × 3000 px. Selected image is ${image.naturalWidth} × ${image.naturalHeight} px.`
                 );
 
                 input.value = '';
@@ -188,6 +209,18 @@ export default function ReleaseCoverArtCard({
             {(localError || error) && (
                 <div className="mixx-v4-cover-error">
                     {localError || error}
+                </div>
+            )}
+
+            {!localError && localNote && (
+                <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800 ring-1 ring-amber-200">
+                    {localNote}
+                </div>
+            )}
+
+            {adminEdit && data.artwork && (
+                <div className="mt-3 rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold leading-5 text-violet-800 ring-1 ring-violet-200">
+                    New poster selected. Press "Save Changes" at the top to save it.
                 </div>
             )}
         </aside>

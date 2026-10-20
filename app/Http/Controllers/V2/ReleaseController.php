@@ -1348,13 +1348,15 @@ class ReleaseController extends Controller
 
         $release->update([
             'catalog_number' =>
-                $validated['catalog_number'],
+                ($validated['catalog_number'] ?? null)
+                ?: $release->catalog_number,
 
             'artist_id' => $artist?->id,
             'label_id' => $label?->id,
 
             'release_type' =>
-                $validated['release_type'],
+                ($validated['release_type'] ?? null)
+                ?: $release->release_type,
 
             'title' => $validated['title'],
 
@@ -1786,7 +1788,7 @@ class ReleaseController extends Controller
         Request $request,
         bool $adminEdit = false
     ): array {
-        return $request->validate([
+        $rules = [
             'title' => [
                 'required',
                 'string',
@@ -1959,7 +1961,35 @@ class ReleaseController extends Controller
                 'min:0',
                 'max:100',
             ],
-        ]);
+        ];
+
+        /*
+         * MIXXTUNE_SUPER_ADMIN_FULL_EDIT
+         * Old / imported releases often miss fields that the new
+         * wizard requires (sub genre, (c)/(p) lines, catalogue no.).
+         * A Super Admin fixing a live release must be able to save
+         * just the poster or one field, so only the title stays
+         * required and the existing release type is accepted.
+         */
+        if ($adminEdit) {
+            foreach ($rules as $field => $list) {
+                if ($field === 'title') {
+                    continue;
+                }
+
+                $rules[$field] = array_values(array_map(
+                    fn ($rule) => is_string($rule) && (
+                        $rule === 'required' || str_starts_with($rule, 'required_if')
+                    ) ? 'nullable' : $rule,
+                    $list
+                ));
+            }
+
+            $rules['release_type'] = ['nullable', 'string', 'max:40'];
+            $rules['primary_artists'] = ['nullable', 'array', 'max:3'];
+        }
+
+        return $request->validate($rules);
     }
 
     private function resolveOwnership(

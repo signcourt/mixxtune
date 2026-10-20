@@ -137,6 +137,28 @@ class SuperAdminFullEditTest extends TestCase
         $this->assertStringContainsString('222222222222', (string) $audit->new_values);
     }
 
+    public function test_super_admin_can_save_only_a_poster_on_an_old_release_with_missing_fields(): void
+    {
+        Storage::fake('public');
+        [$super, , $label, $artist, $release] = $this->context('live');
+        $release->update(['sub_genre' => null, 'copyright_owner' => null, 'phonographic_owner' => null, 'language' => null, 'release_type' => 'compilation']);
+
+        $this->actingAs($super)->post(route('v2.releases.update', $release), [
+            '_method' => 'patch', 'title' => 'Old Gen Title', 'artist_id' => $artist->id, 'label_id' => $label->id,
+            'catalog_number' => '', 'release_type' => 'compilation', 'primary_artists' => [['name' => 'Gen Singer']],
+            'generate_upc' => false, 'upc' => '111111111111', 'sub_genre' => '', 'copyright_owner' => '',
+            'phonographic_owner' => '', 'language' => '', 'digital_release_date' => '2019-05-01',
+            'artwork' => UploadedFile::fake()->image('cover.jpg', 3000, 3000),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $release->refresh();
+        $this->assertNotSame('releases/artwork/old-gen.jpg', $release->artwork_path);
+        $this->assertStringStartsWith('releases/artwork/', $release->artwork_path);
+        $this->assertSame('compilation', $release->release_type);
+        $this->assertNotEmpty($release->catalog_number);
+        $this->assertSame($release->artwork_path, DB::table('catalogue_items')->where('release_id', $release->id)->value('artwork_path'));
+    }
+
     public function test_duplicate_upc_is_refused(): void
     {
         [$super, , $label, $artist, $release] = $this->context('approved');

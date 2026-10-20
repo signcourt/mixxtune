@@ -3,6 +3,7 @@ import {
     Link,
     router,
     useForm,
+    usePage,
 } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -79,6 +80,8 @@ export default function ReleaseWizard({
     distributionStores = [],
     adminEdit = false,
 }) {
+    const pageErrors = usePage().props?.errors ?? {};
+
     const wizardStorageKey =
         typeof window !== 'undefined'
             ? `mixxtune-release-wizard-step-${
@@ -772,6 +775,15 @@ saveState === 'saving'
                             Each save is written to the audit log and shows in All Catalogue at once.
                             The status does not change, and nothing is re-sent to the stores automatically.
                         </p>
+                        {Object.keys(pageErrors).length > 0 && (
+                            <ul className="mt-3 list-disc space-y-1 rounded-xl bg-rose-50 px-8 py-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
+                                {Object.entries(pageErrors).map(([field, message]) => (
+                                    <li key={field}>
+                                        Not saved: {String(message)}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
                 )}
 
@@ -898,7 +910,8 @@ saveState === 'saving'
                                 <ReleaseCoverArtCard
                                     data={data}
                                     setData={setData}
-                                    error={errors.artwork}
+                                    error={errors.artwork ?? pageErrors.artwork}
+                                    adminEdit={adminEdit}
                                 />
                             ) : (
                                 currentStep < 5 && (
