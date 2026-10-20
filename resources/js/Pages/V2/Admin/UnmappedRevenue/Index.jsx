@@ -783,7 +783,10 @@ export default function Index({
     const applyAllRules = () => {
         if (
             !window.confirm(
-                'Apply all saved persistent mapping rules to currently unmapped report rows?'
+                /* MIXXTUNE_UNMAPPED_APPLY_SCOPED_V1 */
+                reportImportId
+                    ? `Apply saved ISRC rules to the unmapped rows of report #${reportImportId} only?`
+                    : 'Apply saved ISRC rules to the unmapped rows of ALL reports that are still under review?'
             )
         ) {
             return;

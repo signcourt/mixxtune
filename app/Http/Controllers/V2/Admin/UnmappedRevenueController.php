@@ -3070,6 +3070,46 @@ class UnmappedRevenueController extends Controller
 
     public function applyAll(Request $request)
     {
+        /*
+         * MIXXTUNE_UNMAPPED_APPLY_SCOPED_V1
+         *
+         * - When a report is selected on the page, saved rules are applied
+         *   to that report only (the page always sent report_import_id,
+         *   but it was ignored before and every report was touched).
+         * - Only rules whose ISRC is actually present in the unmapped rows
+         *   are run, so the transaction stays small.
+         * - Only review_pending reports can change (unchanged rule).
+         */
+        $validated = $request->validate([
+            'report_import_id' => ['nullable', 'integer', 'exists:report_imports,id'],
+        ]);
+
+        $importId = !empty($validated['report_import_id'])
+            ? (int) $validated['report_import_id']
+            : null;
+
+        if (
+            $importId !== null
+            && DB::table('report_imports')->where('id', $importId)->value('financial_status') !== 'review_pending'
+        ) {
+            return back()->withErrors([
+                'apply' => 'Report #'.$importId.' is already approved, so its rows can no longer be changed.',
+            ]);
+        }
+
+        $pendingIsrcs = DB::table('report_rows as rr')
+            ->join('report_imports as ri', 'ri.id', '=', 'rr.report_import_id')
+            ->where('rr.mapping_status', 'unmapped')
+            ->where('ri.financial_status', 'review_pending')
+            ->when($importId !== null, fn ($query) => $query->where('rr.report_import_id', $importId))
+            ->whereNotNull('rr.isrc')
+            ->distinct()
+            ->pluck('rr.isrc')
+            ->map(fn ($isrc) => preg_replace('/[^A-Z0-9]/', '', strtoupper(trim((string) $isrc))))
+            ->filter()
+            ->unique()
+            ->flip();
+
         $rules =
             DB::table(
                 'revenue_mapping_rules'
@@ -3079,13 +3119,18 @@ class UnmappedRevenueController extends Controller
                     'isrc'
                 )
                 ->orderBy('id')
-                ->get();
+                ->get()
+                ->filter(
+                    fn ($rule) => isset($pendingIsrcs[(string) $rule->identifier_value])
+                )
+                ->values();
 
         $updated = 0;
 
         DB::transaction(
             function () use (
                 $rules,
+                $importId,
                 &$updated
             ) {
                 foreach ($rules as $rule) {
@@ -3114,16 +3159,26 @@ class UnmappedRevenueController extends Controller
                                 ? (int)
                                     $rule
                                         ->artist_id
-                                : null
+                                : null,
+
+                            $importId
                         );
                 }
             }
         );
 
+        \App\Services\V2\FinanceAudit::log(
+            'finance.unmapped_rules_applied',
+            'Saved ISRC rules applied'.($importId !== null ? ' to report #'.$importId : ' to all reports under review').': '.$updated.' rows mapped.',
+            ['report_import_id' => $importId, 'rules_run' => $rules->count(), 'rows_mapped' => $updated]
+        );
+
         return back()->with(
             'success',
             $updated.
-            ' report rows mapped from saved ISRC rules.'
+            ' report rows mapped from saved ISRC rules'
+            .($importId !== null ? ' in report #'.$importId : ' in all reports under review')
+            .'.'
         );
     }
 
