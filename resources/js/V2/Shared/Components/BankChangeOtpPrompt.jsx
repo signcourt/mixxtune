@@ -8,9 +8,28 @@ import { useEffect, useState } from 'react';
  * changed. The code from the e-mail unlocks the change for 10 minutes;
  * the person then presses Save again on the same form.
  */
+/* MIXXTUNE_TWO_STEP_ACTIONS_V1: the same box also confirms report approval, % change and Mark Paid. */
+const KINDS = {
+    bank_change_otp: {
+        title: 'Confirm bank details change',
+        endpoint: '/v2/admin/bank-change',
+        after: 'After saving: the owner gets an e-mail, payout KYC must be verified again, and payouts to this owner stay on hold for 48 hours.',
+        okText: 'OK, I will press Save again',
+    },
+    action_otp: {
+        title: 'Confirm this action',
+        endpoint: '/v2/admin/action-otp',
+        after: null,
+        okText: 'OK, I will press the button again',
+    },
+};
+
 export default function BankChangeOtpPrompt() {
     const page = usePage();
-    const message = page.props?.errors?.bank_change_otp ?? null;
+    const errors = page.props?.errors ?? {};
+    const kindKey = errors.bank_change_otp ? 'bank_change_otp' : (errors.action_otp ? 'action_otp' : null);
+    const message = kindKey ? errors[kindKey] : null;
+    const [kind, setKind] = useState(KINDS.bank_change_otp);
 
     const [open, setOpen] = useState(false);
     const [otp, setOtp] = useState('');
@@ -21,6 +40,7 @@ export default function BankChangeOtpPrompt() {
 
     useEffect(() => {
         if (message) {
+            setKind(KINDS[kindKey]);
             setOpen(true);
             setOtp('');
             setError('');
@@ -51,7 +71,7 @@ export default function BankChangeOtpPrompt() {
         setError('');
 
         try {
-            const response = await axios.post('/v2/admin/bank-change/unlock', { otp: otp.trim() });
+            const response = await axios.post(`${kind.endpoint}/unlock`, { otp: otp.trim() });
             setDone(response.data?.message ?? 'Confirmed. Now press Save again.');
         } catch (exception) {
             setError(firstError(exception, 'Could not check the code.'));
@@ -70,7 +90,7 @@ export default function BankChangeOtpPrompt() {
         setInfo('');
 
         try {
-            const response = await axios.post('/v2/admin/bank-change/resend');
+            const response = await axios.post(`${kind.endpoint}/resend`);
             setInfo(response.data?.message ?? 'A new code was sent.');
         } catch (exception) {
             setError(firstError(exception, 'Could not send a new code.'));
@@ -83,7 +103,7 @@ export default function BankChangeOtpPrompt() {
         <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4">
             <div className="mt-24 w-full max-w-md rounded-2xl bg-white p-6 text-left shadow-2xl">
                 <div className="flex items-start justify-between gap-4">
-                    <div className="text-lg font-semibold text-slate-900">Confirm bank details change</div>
+                    <div className="text-lg font-semibold text-slate-900">{kind.title}</div>
                     <button
                         type="button"
                         onClick={() => setOpen(false)}
@@ -96,15 +116,13 @@ export default function BankChangeOtpPrompt() {
                 {done ? (
                     <>
                         <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{done}</div>
-                        <p className="mt-3 text-xs text-slate-500">
-                            After saving: the owner gets an e-mail, payout KYC must be verified again, and payouts to this owner stay on hold for 48 hours.
-                        </p>
+                        {kind.after && <p className="mt-3 text-xs text-slate-500">{kind.after}</p>}
                         <button
                             type="button"
                             onClick={() => setOpen(false)}
                             className="mt-5 w-full rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
                         >
-                            OK, I will press Save again
+                            {kind.okText}
                         </button>
                     </>
                 ) : (

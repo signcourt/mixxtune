@@ -221,6 +221,10 @@ export default function Index({
                 },
 
                 onError: (errors) => {
+                    if (errors?.action_otp) {
+                        return; // MIXXTUNE_TWO_STEP_ACTIONS_V1: code box handles it
+                    }
+
                     const message =
                         Object.values(
                             errors ?? {}
@@ -1031,6 +1035,10 @@ function LabelRateEditor({ label }) {
                 preserveScroll: true,
                 onFinish: () => setSaving(false),
                 onError: (errors) => {
+                    if (errors?.action_otp) {
+                        return; // MIXXTUNE_TWO_STEP_ACTIONS_V1: code box handles it
+                    }
+
                     const message =
                         errors?.revenue_share_percentage ??
                         'Unable to update Label Rate.';

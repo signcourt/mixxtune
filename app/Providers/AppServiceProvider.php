@@ -26,5 +26,7 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\Core\Label::observe(\App\Observers\LabelRateObserver::class);
         /* MIXXTUNE_BANK_CHANGE_PROTECTION_V1 */
         \App\Models\Finance\PayoutProfile::observe(\App\Observers\PayoutProfileBankObserver::class);
+        /* MIXXTUNE_TWO_STEP_ACTIONS_V1 */
+        \App\Models\Core\Label::observe(\App\Observers\LabelRateConfirmObserver::class);
     }
 }

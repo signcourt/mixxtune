@@ -1376,6 +1376,13 @@ class ReportImportController extends Controller
             8
         );
 
+        /* MIXXTUNE_TWO_STEP_ACTIONS_V1: e-mailed code before a report is approved for payout. */
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            $request->user(),
+            'report.approve:'.$reportImport->id,
+            'approve revenue report #'.$reportImport->id.' for payout'
+        );
+
         DB::transaction(
             function () use (
                 $reportImport,

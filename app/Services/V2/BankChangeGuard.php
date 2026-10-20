@@ -45,9 +45,15 @@ class BankChangeGuard
      * Always the file store: the code is created inside the (rolled back)
      * user-save transaction, so a database cache would lose it.
      */
+    public static function store(): \Illuminate\Contracts\Cache\Repository
+    {
+        /* tests: per-test in-memory store, so tests never touch the server's cache folder */
+        return Cache::store(app()->runningUnitTests() ? 'array' : 'file');
+    }
+
     private function cache(): \Illuminate\Contracts\Cache\Repository
     {
-        return Cache::store('file');
+        return static::store();
     }
 
     private function pendingKey(User $actor): string

@@ -2963,3 +2963,12 @@ Route::middleware(['auth', 'verified'])
         Route::post('unlock', [\App\Http\Controllers\V2\Admin\BankChangeController::class, 'unlock'])->middleware('throttle:20,1')->name('unlock');
         Route::post('resend', [\App\Http\Controllers\V2\Admin\BankChangeController::class, 'resend'])->middleware('throttle:10,1')->name('resend');
     });
+
+/* MIXXTUNE_TWO_STEP_ACTIONS_V1 */
+Route::middleware(['auth', 'verified'])
+    ->prefix('v2/admin/action-otp')
+    ->name('v2.admin.action-otp.')
+    ->group(function () {
+        Route::post('unlock', [\App\Http\Controllers\V2\Admin\ActionOtpController::class, 'unlock'])->middleware('throttle:20,1')->name('unlock');
+        Route::post('resend', [\App\Http\Controllers\V2\Admin\ActionOtpController::class, 'resend'])->middleware('throttle:10,1')->name('resend');
+    });

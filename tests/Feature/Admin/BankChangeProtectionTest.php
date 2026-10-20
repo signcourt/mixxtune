@@ -31,7 +31,6 @@ class BankChangeProtectionTest extends TestCase
     {
         parent::setUp();
         Storage::fake('local');
-        Cache::store('file')->flush();
 
         if (!Schema::hasTable('audit_logs')) {
             Schema::create('audit_logs', function ($table) {

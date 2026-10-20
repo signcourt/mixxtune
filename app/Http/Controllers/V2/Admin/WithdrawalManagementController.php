@@ -768,6 +768,14 @@ class WithdrawalManagementController extends Controller
             ],
         ]);
 
+        /* MIXXTUNE_TWO_STEP_ACTIONS_V1: e-mailed code before money is marked as sent. */
+        app(\App\Services\V2\BankChangeGuard::class)->assertPayoutAllowed((int) $withdrawal->user_id);
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            $request->user(),
+            'withdrawal.paid:'.$withdrawal->id,
+            'mark withdrawal #'.$withdrawal->id.' as paid'
+        );
+
         $service->markPaid(
             $withdrawal,
             $request->user(),

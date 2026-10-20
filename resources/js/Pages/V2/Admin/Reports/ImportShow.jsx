@@ -236,6 +236,10 @@ export default function ImportShow({
                 preserveScroll: true,
 
                 onError: (errors) => {
+                    if (errors.action_otp) {
+                        return; // MIXXTUNE_TWO_STEP_ACTIONS_V1: code box handles it
+                    }
+
                     setApprovalError(
                         errors.approval ||
                         errors.publish_at ||

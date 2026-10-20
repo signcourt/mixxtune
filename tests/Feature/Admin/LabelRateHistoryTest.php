@@ -89,6 +89,23 @@ class LabelRateHistoryTest extends TestCase
         return (int) DB::table('labels')->insertGetId($row);
     }
 
+    /* MIXXTUNE_TWO_STEP_ACTIONS_V1: changing an existing % first asks for the e-mailed code. */
+    private function withConfirmationCode(User $actor, callable $send): void
+    {
+        Mail::fake();
+        $send()->assertSessionHasErrors('action_otp');
+
+        $code = null;
+        Mail::assertSent(\App\Mail\ActionOtpMail::class, function ($mail) use (&$code) {
+            $code = $mail->otp;
+
+            return true;
+        });
+
+        $this->actingAs($actor)->postJson('/v2/admin/action-otp/unlock', ['otp' => $code])->assertOk();
+        $send()->assertRedirect()->assertSessionHasNoErrors();
+    }
+
     private function entries(int $labelId)
     {
         return DB::table('audit_logs')->where('action', 'label.rate_changed')->where('auditable_id', $labelId)->orderBy('id')->get();
@@ -99,7 +116,7 @@ class LabelRateHistoryTest extends TestCase
         $super = $this->makeUser('super_admin');
         $label = $this->makeLabel('History Label A', 80);
 
-        $this->actingAs($super)->patch("/v2/admin/labels/{$label}/revenue-rate", ['revenue_share_percentage' => 85])->assertRedirect();
+        $this->withConfirmationCode($super, fn () => $this->actingAs($super)->patch("/v2/admin/labels/{$label}/revenue-rate", ['revenue_share_percentage' => 85]));
         $this->actingAs($super)->patch("/v2/admin/labels/{$label}/revenue-rate", ['revenue_share_percentage' => 85])->assertRedirect();
 
         $entries = $this->entries($label);
@@ -140,9 +157,9 @@ class LabelRateHistoryTest extends TestCase
         $a = $this->makeLabel('History Label C', 70);
         $b = $this->makeLabel('History Label D', 75);
 
-        $this->actingAs($super)->post('/v2/admin/labels/bulk-action', [
+        $this->withConfirmationCode($super, fn () => $this->actingAs($super)->post('/v2/admin/labels/bulk-action', [
             'label_ids' => [$a, $b], 'action' => 'set_rate', 'revenue_share_percentage' => 88,
-        ])->assertRedirect();
+        ]));
 
         $this->assertCount(1, $this->entries($a));
         $this->assertCount(1, $this->entries($b));
