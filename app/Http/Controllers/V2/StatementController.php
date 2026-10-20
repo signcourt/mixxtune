@@ -24,6 +24,12 @@ class StatementController extends Controller
             $request->user()
         );
 
+        /* MIXXTUNE_FINANCE_CLEANUP_V1: only known roles; any other role sees nothing */
+        abort_unless(
+            in_array($role, ['artist', 'label', 'admin', 'super_admin'], true),
+            403
+        );
+
         $query =
             RoyaltyStatement::query();
 
@@ -33,17 +39,51 @@ class StatementController extends Controller
             $role
         );
 
+        /*
+         * Search and status now run on the server over every statement
+         * (before: only inside the 25 rows of the current page).
+         */
+        $filters = [
+            'search' => mb_substr(trim((string) $request->input('search', '')), 0, 100),
+            'status' => in_array($request->input('status'), ['pending', 'generated', 'approved', 'available', 'paid', 'cancelled'], true)
+                ? (string) $request->input('status')
+                : '',
+        ];
+
+        if ($filters['status'] !== '') {
+            $query->where('status', $filters['status']);
+        }
+
+        if ($filters['search'] !== '') {
+            $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $filters['search']).'%';
+
+            $query->where(function ($builder) use ($term) {
+                $builder
+                    ->where('statement_month', 'like', $term)
+                    ->orWhere('public_id', 'like', $term)
+                    ->orWhere('currency', 'like', $term)
+                    ->orWhereIn('label_id', DB::table('labels')->where('name', 'like', $term)->select('id'))
+                    ->orWhereIn('artist_id', DB::table('artists')->where(function ($artists) use ($term) {
+                        $artists->where('stage_name', 'like', $term)->orWhere('legal_name', 'like', $term);
+                    })->select('id'));
+            });
+        }
+
         return Inertia::render(
             'V2/Statements/Index',
             [
                 'role' => $role,
+
+                'filters' => $filters,
 
                 'statements' =>
                     $query
                         ->orderByDesc(
                             'statement_month'
                         )
-                        ->paginate(25),
+                        ->orderByDesc('id')
+                        ->paginate(25)
+                        ->withQueryString(),
             ]
         );
     }

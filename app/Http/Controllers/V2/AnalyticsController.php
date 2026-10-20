@@ -1084,9 +1084,14 @@ class AnalyticsController extends Controller
                  * Never reapply the account's current rate.
                  */
 
-fputcsv(
-                    $handle,
-                    [
+                /*
+                 * MIXXTUNE_FINANCE_CLEANUP_V1: owners (label / artist) get
+                 * their own earning only, like their Analytics cards; the
+                 * store's gross amount and the applied rate stay internal.
+                 */
+                $ownerView = in_array($role, ['label', 'artist'], true);
+
+                $header = [
                         'Sale Month',
                         'Sale Date',
                         'Track',
@@ -1106,7 +1111,15 @@ fputcsv(
                         'Collected Revenue',
                         'Applied Rate',
                         'Earning',
-                    ]
+                ];
+
+                if ($ownerView) {
+                    $header = array_values(array_diff($header, ['Collected Revenue', 'Applied Rate']));
+                }
+
+                fputcsv(
+                    $handle,
+                    $header
                 );
 
                 $query
@@ -1114,7 +1127,8 @@ fputcsv(
                     ->chunkById(
                         1000,
                         function ($rows) use (
-                            $handle
+                            $handle,
+                            $ownerView
                         ) {
                             foreach ($rows as $row) {
                                 $collected =
@@ -1144,9 +1158,7 @@ fputcsv(
                                         8
                                     );
 
-                                fputcsv(
-                                    $handle,
-                                    [
+                                $line = [
                                         $row->sale_month,
                                         optional(
                                             $row->sale_date
@@ -1168,7 +1180,16 @@ fputcsv(
                                         $collected,
                                         $appliedRate,
                                         $earning,
-                                    ]
+                                ];
+
+                                if ($ownerView) {
+                                    /* drop Collected Revenue + Applied Rate (2nd and 3rd from the end) */
+                                    array_splice($line, -3, 2);
+                                }
+
+                                fputcsv(
+                                    $handle,
+                                    $line
                                 );
                             }
                         }

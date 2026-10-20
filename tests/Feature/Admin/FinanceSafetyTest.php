@@ -5,12 +5,15 @@ namespace Tests\Feature\Admin;
 use App\Models\Core\Artist;
 use App\Models\Core\Label;
 use App\Models\Finance\FinancialAdjustment;
+use App\Models\Finance\RecoupmentPlan;
 use App\Models\Finance\RoyaltyStatement;
+use App\Models\Finance\WalletAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\ConfirmsActionOtp;
 use Tests\TestCase;
 
@@ -120,6 +123,81 @@ class FinanceSafetyTest extends TestCase
         $this->viaActionOtp($super, fn () => $this->actingAs($super)->post('/v2/admin/finance/statements/'.$statement->id.'/available'))
             ->assertSessionHasNoErrors();
         $this->assertSame(1, $this->audits('finance.statement_made_available'));
+    }
+
+    /* MIXXTUNE_FINANCE_CLEANUP_V1 */
+    public function test_recoupment_plan_cancel_needs_code_reason_and_is_audited(): void
+    {
+        $super = $this->user('super_admin');
+        $owner = $this->user('artist');
+        $plan = RecoupmentPlan::create([
+            'user_id' => $owner->id, 'plan_number' => 'REC-GEN-001', 'title' => 'Gen advance',
+            'base_percentage' => 20, 'recovery_uplift_percentage' => 10, 'total_recoverable_amount' => 5000,
+            'total_recovered_amount' => 0, 'outstanding_amount' => 5000, 'recovery_method' => 'percentage', 'status' => 'active',
+        ]);
+
+        $this->actingAs($super)->post('/super-admin/finance/recoupment/'.$plan->id.'/cancel', [])
+            ->assertSessionHasErrors('reason');
+
+        $this->viaActionOtp($super, fn () => $this->actingAs($super)->post('/super-admin/finance/recoupment/'.$plan->id.'/cancel', ['reason' => 'Gen settled outside']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('cancelled', $plan->fresh()->status);
+        $this->assertSame(1, $this->audits('finance.recoupment_plan_cancelled'));
+
+        $this->actingAs($this->user('admin'))->post('/super-admin/finance/recoupment/'.$plan->id.'/cancel', ['reason' => 'x x x'])
+            ->assertForbidden();
+    }
+
+    public function test_statements_search_runs_on_the_server_over_all_pages(): void
+    {
+        $super = $this->user('super_admin');
+        $owner = $this->user('artist');
+        $label = Label::factory()->create(['created_by' => $owner->id, 'name' => 'Zeta Gen Music']);
+        $artist = Artist::factory()->create(['user_id' => $owner->id, 'label_id' => $label->id, 'created_by' => $owner->id]);
+
+        foreach (range(1, 30) as $i) {
+            RoyaltyStatement::query()->create([
+                'public_id' => (string) Str::ulid(), 'artist_id' => $artist->id, 'label_id' => $i === 30 ? $label->id : null,
+                'statement_month' => '2026-07', 'currency' => 'INR', 'gross_earnings' => $i, 'commission_amount' => 0,
+                'tax_amount' => 0, 'other_deductions' => 0, 'net_payable' => $i, 'status' => $i % 2 ? 'pending' : 'paid',
+            ]);
+        }
+
+        $this->actingAs($super)->get('/v2/admin/statements?search=Zeta')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('statements.data', 1)->where('filters.search', 'Zeta'));
+
+        $this->actingAs($super)->get('/v2/admin/statements?status=paid')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('statements.total', 15));
+
+        $other = User::factory()->create(['role' => 'guest_viewer', 'account_status' => 'active', 'email_verified_at' => now()]);
+        $this->actingAs($other)->get('/v2/statements')->assertForbidden();
+    }
+
+    public function test_admin_wallet_lists_each_owner_and_searches(): void
+    {
+        $super = $this->user('super_admin');
+        $a = User::factory()->create(['role' => 'label', 'name' => 'Gen Alpha Owner', 'account_status' => 'active', 'email_verified_at' => now()]);
+        $b = User::factory()->create(['role' => 'artist', 'name' => 'Gen Beta Owner', 'account_status' => 'active', 'email_verified_at' => now()]);
+
+        foreach ([[$a, 700], [$b, 300]] as [$user, $amount]) {
+            WalletAccount::query()->create([
+                'public_id' => (string) Str::ulid(), 'user_id' => $user->id, 'currency' => 'INR',
+                'available_balance' => $amount, 'pending_balance' => 0, 'lifetime_credits' => $amount, 'lifetime_debits' => 0,
+            ]);
+        }
+
+        $this->actingAs($super)->get('/v2/admin/wallet')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('owners.data', 2)
+                ->where('owners.data.0.owner_name', 'Gen Alpha Owner'));
+
+        $this->actingAs($super)->get('/v2/admin/wallet?owner_search=Beta')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('owners.data', 1)->where('owners.data.0.owner_name', 'Gen Beta Owner'));
     }
 
     public function test_generate_for_a_blocked_month_shows_a_message_not_an_error_page(): void

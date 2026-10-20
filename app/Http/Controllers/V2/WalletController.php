@@ -161,6 +161,43 @@ class WalletController extends Controller
                     ->orderByDesc('id')
                     ->paginate(30);
 
+            /*
+             * MIXXTUNE_FINANCE_CLEANUP_V1: one row per owner wallet
+             * (same scope as the totals above), searchable by name / e-mail.
+             */
+            $ownerSearch = mb_substr(trim((string) $request->input('owner_search', '')), 0, 100);
+
+            $ownersQuery = WalletAccount::query()
+                ->whereIn('wallets.id', $walletIds)
+                ->leftJoin('users', 'users.id', '=', 'wallets.user_id')
+                ->select([
+                    'wallets.id',
+                    'wallets.user_id',
+                    'wallets.currency',
+                    'wallets.available_balance',
+                    'wallets.pending_balance',
+                    'wallets.lifetime_credits',
+                    'wallets.lifetime_debits',
+                    'wallets.updated_at',
+                    'users.name as owner_name',
+                    'users.email as owner_email',
+                    'users.role as owner_role',
+                ]);
+
+            if ($ownerSearch !== '') {
+                $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $ownerSearch).'%';
+
+                $ownersQuery->where(function ($builder) use ($term) {
+                    $builder->where('users.name', 'like', $term)->orWhere('users.email', 'like', $term);
+                });
+            }
+
+            $owners = $ownersQuery
+                ->orderByDesc('wallets.available_balance')
+                ->orderBy('wallets.id')
+                ->paginate(25, ['*'], 'owners_page')
+                ->withQueryString();
+
             return Inertia::render(
                 'V2/Wallet/Index',
                 [
@@ -183,6 +220,12 @@ class WalletController extends Controller
 
                     'transactions' =>
                         $transactions,
+
+                    'owners' =>
+                        $owners,
+
+                    'ownerSearch' =>
+                        $ownerSearch,
                 ]
             );
         }

@@ -2921,6 +2921,15 @@ Route::middleware([
             ]
         )->name('documents.store');
 
+        /* MIXXTUNE_FINANCE_CLEANUP_V1: stop recovering an advance (code + audit) */
+        Route::post(
+            '/{plan}/cancel',
+            [
+                \App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class,
+                'cancel',
+            ]
+        )->name('cancel');
+
         Route::get(
             '/{plan}/documents/{document}/download',
             [

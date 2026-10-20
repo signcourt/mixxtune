@@ -445,6 +445,16 @@ export default function Index({
 
                     )}
 
+                    {/* MIXXTUNE_FINANCE_CLEANUP_V1: CSV of the rows behind this view (same filters, same access) */}
+                    <div className="flex justify-end">
+                        <a
+                            href={`/v2/analytics/export${typeof window !== 'undefined' ? window.location.search : ''}`}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                        >
+                            Export CSV
+                        </a>
+                    </div>
+
                     {/* REPORTING RANGE */}
                     <div className="flex">
                         <div className="inline-flex w-full flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:w-auto sm:flex-row sm:items-end">

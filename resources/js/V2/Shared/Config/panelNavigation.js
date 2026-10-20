@@ -483,12 +483,18 @@ const adminNavigation = (
                     label: 'Finance & Royalties',
                     href: '/v2/admin/finance',
                 },
-                {
-                    id: 'financial-royalties',
-                    label: 'Royalties',
-                    href: routes.royalties,
-                    permission: 'royalties.view',
-                },
+                /* MIXXTUNE_FINANCE_CLEANUP_V1: statement lists are in Finance & Royalties / Statements;
+                   this page is only the IPRS / PRS rights royalty upload (super admin) */
+                ...(role === 'super_admin'
+                    ? [
+                          {
+                              id: 'financial-royalties',
+                              label: 'Rights Royalties',
+                              href: routes.royalties,
+                              permission: 'royalties.view',
+                          },
+                      ]
+                    : []),
                 {
                     id: 'financial-reports',
                     label: 'Reports',
@@ -507,12 +513,17 @@ const adminNavigation = (
                     href: '/v2/admin/reports/imports',
                     permission: 'reports.view',
                 },
-                {
-                    id: 'financial-unmapped-revenue',
-                    label: 'Unmapped Revenue',
-                    href: routes.unmappedRevenue,
-                    permission: 'reports.view',
-                },
+                /* MIXXTUNE_FINANCE_CLEANUP_V1: the page itself is super admin only */
+                ...(role === 'super_admin'
+                    ? [
+                          {
+                              id: 'financial-unmapped-revenue',
+                              label: 'Unmapped Revenue',
+                              href: routes.unmappedRevenue,
+                              permission: 'reports.view',
+                          },
+                      ]
+                    : []),
                 {
                     id: 'financial-wallet',
                     label: 'Wallet',
@@ -526,6 +537,11 @@ const adminNavigation = (
                               id: 'financial-statements',
                               label: 'Statements',
                               href: '/v2/admin/statements',
+                          },
+                          {
+                              id: 'financial-invoices',
+                              label: 'Invoices',
+                              href: '/v2/admin/invoices',
                           },
                           {
                               id: 'financial-recoupment-advances',

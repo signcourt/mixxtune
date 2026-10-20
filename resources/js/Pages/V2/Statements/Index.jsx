@@ -1,6 +1,7 @@
 import {
     Head,
     Link,
+    router,
 } from '@inertiajs/react';
 
 import {
@@ -12,7 +13,9 @@ import {
 } from 'lucide-react';
 
 import {
+    useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 
@@ -113,67 +116,46 @@ const formatDate = (value) => {
 export default function Index({
     role = 'artist',
     statements = {},
+    filters = {},
 }) {
     const rows =
         statements.data ?? [];
 
+    /* MIXXTUNE_FINANCE_CLEANUP_V1: search + status run on the server over all statements */
     const [search, setSearch] =
-        useState('');
+        useState(filters.search ?? '');
 
     const [status, setStatus] =
-        useState('');
+        useState(filters.status ?? '');
 
-    const filteredRows =
-        useMemo(() => {
-            const searchValue =
-                search
-                    .trim()
-                    .toLowerCase();
+    const firstRun = useRef(true);
 
-            return rows.filter(
-                (item) => {
-                    const matchesStatus =
-                        !status ||
-                        item.status === status;
+    useEffect(() => {
+        if (firstRun.current) {
+            firstRun.current = false;
+            return undefined;
+        }
 
-                    const matchesSearch =
-                        !searchValue ||
-                        String(
-                            item.statement_month ??
-                                ''
-                        )
-                            .toLowerCase()
-                            .includes(
-                                searchValue
-                            ) ||
-                        String(
-                            item.public_id ??
-                                ''
-                        )
-                            .toLowerCase()
-                            .includes(
-                                searchValue
-                            ) ||
-                        String(
-                            item.currency ??
-                                ''
-                        )
-                            .toLowerCase()
-                            .includes(
-                                searchValue
-                            );
-
-                    return (
-                        matchesStatus &&
-                        matchesSearch
-                    );
+        const timer = window.setTimeout(() => {
+            router.get(
+                window.location.pathname,
+                {
+                    search: search.trim() || undefined,
+                    status: status || undefined,
+                },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
                 }
             );
-        }, [
-            rows,
-            search,
-            status,
-        ]);
+        }, 400);
+
+        return () => window.clearTimeout(timer);
+    }, [search, status]);
+
+    const filteredRows = rows;
+
 
     const totals =
         useMemo(() => {
@@ -357,7 +339,7 @@ export default function Index({
                                     event.target.value
                                 )
                             }
-                            placeholder="Search month, currency or statement ID..."
+                            placeholder="Search month, label, artist, currency or statement ID..."
                             className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
                         />
 
@@ -415,8 +397,8 @@ export default function Index({
                         </h2>
 
                         <p className="mt-1 text-sm text-slate-500">
-                            {filteredRows.length}{' '}
-                            statements displayed
+                            {Number(statements.total ?? filteredRows.length).toLocaleString('en-IN')}{' '}
+                            statements found
                         </p>
                     </div>
 

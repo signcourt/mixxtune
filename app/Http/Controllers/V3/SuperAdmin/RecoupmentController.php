@@ -249,6 +249,46 @@ class RecoupmentController extends Controller
         );
     }
 
+    /*
+     * MIXXTUNE_FINANCE_CLEANUP_V1
+     * Cancel an active plan: no more amounts are recovered from the
+     * owner's future royalties. Amounts already recovered stay recovered.
+     */
+    public function cancel(
+        \Illuminate\Http\Request $request,
+        RecoupmentPlan $plan
+    ) {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:1000'],
+        ]);
+
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            Auth::user(),
+            'recoupment.cancel:'.$plan->id,
+            'cancel recoupment plan '.($plan->plan_number ?: '#'.$plan->id)
+        );
+
+        $before = \App\Services\V2\FinanceAudit::pick($plan, ['id', 'plan_number', 'user_id', 'status', 'total_recoverable_amount', 'total_recovered_amount', 'outstanding_amount']);
+
+        $this->management->cancelPlan(
+            $plan,
+            Auth::user()
+        );
+
+        \App\Services\V2\FinanceAudit::log(
+            'finance.recoupment_plan_cancelled',
+            'Recoupment plan '.($plan->plan_number ?: '#'.$plan->id).' cancelled: '.$validated['reason'],
+            \App\Services\V2\FinanceAudit::pick($plan->fresh(), ['id', 'status', 'completed_on', 'completed_by']) + ['reason' => $validated['reason']],
+            $plan,
+            $before
+        );
+
+        return back()->with(
+            'success',
+            'Recoupment plan cancelled. Nothing more will be recovered from this owner.'
+        );
+    }
+
     public function details(
         RecoupmentPlan $plan
     ): JsonResponse {

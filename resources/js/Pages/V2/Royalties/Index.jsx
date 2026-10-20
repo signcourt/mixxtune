@@ -316,6 +316,32 @@ export default function Index({
 
             <Head title={title} />
 
+            {/* MIXXTUNE_FINANCE_CLEANUP_V1: admins already have the statement list on
+                Finance & Royalties (actions) and Statements (PDF + e-mail); no third copy here */}
+            {['admin', 'super_admin'].includes(role) ? (
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h2 className="text-lg font-bold text-slate-900">
+                        Where are the royalty statements?
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                        This page is for rights royalty files (IPRS / PRS / TPL). Monthly statements are in one place each:
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                        <Link
+                            href="/v2/admin/finance"
+                            className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+                        >
+                            Finance &amp; Royalties · approve and release
+                        </Link>
+                        <Link
+                            href="/v2/admin/statements"
+                            className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Statements · PDF and e-mail to owners
+                        </Link>
+                    </div>
+                </div>
+            ) : (
             <div className="space-y-6">
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                     {summaryCards.map(
@@ -536,6 +562,7 @@ export default function Index({
                     }
                 />
             </div>
+            )}
         </PanelLayout>
     );
 }

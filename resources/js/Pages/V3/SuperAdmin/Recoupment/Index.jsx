@@ -545,6 +545,31 @@ export default function Index({
                                                                 {plan.recoveries_count ??
                                                                     0}
                                                             </button>
+
+                                                            {/* MIXXTUNE_FINANCE_CLEANUP_V1 */}
+                                                            {plan.status === 'active' && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const reason = window.prompt(
+                                                                            `Cancel recoupment plan ${plan.plan_number}? Nothing more will be recovered from this owner (amounts already recovered stay). Write the reason:`
+                                                                        );
+
+                                                                        if (reason && reason.trim().length >= 3) {
+                                                                            router.post(
+                                                                                `/super-admin/finance/recoupment/${plan.id}/cancel`,
+                                                                                { reason: reason.trim() },
+                                                                                { preserveScroll: true }
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                    title="Cancel plan"
+                                                                    className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                                                                >
+                                                                    <X className="h-3.5 w-3.5" />
+                                                                    Cancel
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
