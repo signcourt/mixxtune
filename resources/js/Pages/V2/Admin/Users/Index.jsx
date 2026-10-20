@@ -295,9 +295,6 @@ export default function Index({
             branch_name:
                 user.branch_name ?? '',
 
-            upi_id:
-                user.upi_id ?? '',
-
             // MIXXTUNE_QUICK_EDIT_ASSIGNMENT_STATE_V1
             artist_ids:
                 (
@@ -1570,7 +1567,6 @@ export default function Index({
     "bank_name",
     "ifsc_code",
     "branch_name",
-    "upi_id",
 ].some((field) =>
     quickFieldEnabled(field)
 ) && (
@@ -1596,10 +1592,6 @@ export default function Index({
                 [
                     "branch_name",
                     "Branch Name",
-                ],
-                [
-                    "upi_id",
-                    "UPI ID",
                 ],
             ].map(([field, label]) =>
                 quickFieldEnabled(field) ? (

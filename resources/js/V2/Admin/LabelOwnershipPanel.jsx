@@ -50,7 +50,7 @@ const emptyNewUser = {
     name: '', username: '', email: '', phone: '',
     country: 'India', country_code: 'IN', address_line_1: '', address_line_2: '', state_code: '', state: '', city: '', postal_code: '',
     revenue_share_percentage: '',
-    account_holder_name: '', bank_account_number: '', bank_name: '', ifsc_code: '', branch_name: '', upi_id: '',
+    account_holder_name: '', bank_account_number: '', bank_name: '', ifsc_code: '', branch_name: '',
     pan_number: '', gst_number: '',
 };
 
@@ -449,7 +449,6 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
                                                 {field('bank_name', 'Bank name')}
                                                 {field('ifsc_code', 'IFSC code')}
                                                 {field('branch_name', 'Branch name')}
-                                                {field('upi_id', 'UPI ID')}
                                             </div>
                                         </div>
 

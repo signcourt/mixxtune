@@ -511,18 +511,11 @@ function KycCard({ profile }) {
                                 'Not added',
                         ],
                         [
-                            'UPI',
-                            profile.upi_id ??
-                                'Not added',
-                        ],
-                        [
                             'Payout Method',
                             profile.masked_bank_account &&
                             profile.ifsc_code
                                 ? 'Bank Transfer'
-                                : profile.upi_id
-                                  ? 'UPI'
-                                  : 'Not configured',
+                                : 'Not configured',
                         ],
                     ]}
                 />

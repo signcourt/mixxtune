@@ -311,27 +311,22 @@ class WithdrawalWorkflowTest extends TestCase
         );
     }
 
-    public function test_upi_withdrawal_can_be_created(): void
+    /* MIXXTUNE_BANK_ONLY_PAYOUTS_V1: royalties are paid only to a bank account. */
+    public function test_upi_withdrawal_is_rejected(): void
     {
-        [
-            ,
-            ,
-            ,
-            $withdrawal,
-        ] = $this->createWithdrawal(
-            1500,
-            'upi'
-        );
+        $user = $this->createUser();
+        $this->createWallet($user, 5000);
+        $this->createVerifiedProfile($user);
 
-        $this->assertSame(
-            'upi',
-            $withdrawal->payment_method
-        );
-
-        $this->assertSame(
-            'pending',
-            $withdrawal->status
-        );
+        try {
+            $this->service()->create($user, 1500, 'upi');
+            $this->fail('UPI withdrawal must be rejected.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString(
+                'bank account',
+                implode(' ', $exception->errors()['payment_method'] ?? [])
+            );
+        }
     }
 
     public function test_minimum_withdrawal_amount_is_enforced(): void

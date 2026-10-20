@@ -199,11 +199,6 @@ export default function Edit({ role, profile }) {
                                     label="Branch"
                                     value={profile.branch_name}
                                 />
-
-                                <DisplayField
-                                    label="UPI ID"
-                                    value={profile.upi_id}
-                                />
                             </Section>
 
                             <Section

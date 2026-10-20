@@ -120,8 +120,7 @@ class WithdrawalService
         }
 
         if (
-            $paymentMethod === 'bank'
-            && (
+            (
                 !$profile->bank_account_number
                 || !$profile->ifsc_code
             )
@@ -132,13 +131,11 @@ class WithdrawalService
             ]);
         }
 
-        if (
-            $paymentMethod === 'upi'
-            && !$profile->upi_id
-        ) {
+        /* MIXXTUNE_BANK_ONLY_PAYOUTS_V1: royalties are paid only to a bank account. */
+        if ($paymentMethod !== 'bank') {
             throw ValidationException::withMessages([
                 'payment_method' =>
-                    'UPI ID is required.',
+                    'Payouts are made only to a bank account.',
             ]);
         }
 

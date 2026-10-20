@@ -35,7 +35,6 @@ class ProfileController extends Controller
                 'bank_name' => $payoutProfile->bank_name,
                 'ifsc_code' => $payoutProfile->ifsc_code,
                 'branch_name' => $payoutProfile->branch_name,
-                'upi_id' => $payoutProfile->upi_id,
                 'pan_number' => $payoutProfile->pan_number,
                 'gst_number' => $payoutProfile->gst_number,
                 'address_line_1' => $payoutProfile->address_line_1,

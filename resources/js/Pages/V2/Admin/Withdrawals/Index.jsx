@@ -320,8 +320,6 @@ export default function Index({
                                             value={
                                                 item.payout_profile
                                                     ?.masked_bank_account ??
-                                                item.payout_profile
-                                                    ?.upi_id ??
                                                 '—'
                                             }
                                         />

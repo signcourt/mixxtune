@@ -29,7 +29,6 @@ class UserFieldRequirementService
         'bank_name' => 'Bank Name',
         'ifsc_code' => 'IFSC Code',
         'branch_name' => 'Branch Name',
-        'upi_id' => 'UPI ID',
     ];
 
     private const PAYEE_DEFAULTS = [
@@ -47,7 +46,6 @@ class UserFieldRequirementService
         'bank_name' => true,
         'ifsc_code' => true,
         'branch_name' => false,
-        'upi_id' => false,
     ];
 
     private const LOCKED = [

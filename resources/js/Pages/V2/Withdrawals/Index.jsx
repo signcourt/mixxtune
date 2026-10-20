@@ -67,12 +67,8 @@ export default function Index({
         Boolean(profile?.masked_bank_account) &&
         Boolean(profile?.ifsc_code);
 
-    const hasUpi = Boolean(profile?.upi_id);
-
-    const selectedMethodReady =
-        data.payment_method === 'bank'
-            ? hasBank
-            : hasUpi;
+    /* MIXXTUNE_BANK_ONLY_PAYOUTS_V1: payouts only to a bank account */
+    const selectedMethodReady = hasBank;
 
     const balanceReady =
         availableBalance >= minimum;
@@ -121,7 +117,7 @@ export default function Index({
         blockers.push({
             title: 'Payout profile missing',
             detail:
-                'Add bank, UPI, PAN and address details.',
+                'Add bank, PAN and address details.',
             action: 'Add payout details',
         });
     } else if (!isVerified) {

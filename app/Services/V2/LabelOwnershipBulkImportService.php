@@ -33,14 +33,14 @@ class LabelOwnershipBulkImportService
         'label_id', 'label_name', 'current_owner_email', 'owner_email', 'owner_name', 'username', 'phone',
         'address_line_1', 'address_line_2', 'city', 'state_code', 'postal_code',
         'revenue_share_percentage', 'account_holder_name', 'bank_account_number', 'bank_name',
-        'ifsc_code', 'branch_name', 'upi_id', 'pan_number', 'gst_number',
+        'ifsc_code', 'branch_name', 'pan_number', 'gst_number',
     ];
 
     /* Columns that describe a NEW owner account (first filled row of an e-mail wins). */
     private const DETAIL_COLUMNS = [
         'owner_name', 'username', 'phone', 'address_line_1', 'address_line_2', 'city', 'state_code',
         'postal_code', 'revenue_share_percentage', 'account_holder_name', 'bank_account_number',
-        'bank_name', 'ifsc_code', 'branch_name', 'upi_id', 'pan_number', 'gst_number',
+        'bank_name', 'ifsc_code', 'branch_name', 'pan_number', 'gst_number',
     ];
 
     public const INDIA_STATES = [
@@ -175,7 +175,6 @@ class LabelOwnershipBulkImportService
             'bank_name' => [$req('bank_name'), 'nullable', 'string', 'max:190'],
             'ifsc_code' => [$req('ifsc_code'), 'nullable', 'string', 'max:30'],
             'branch_name' => [$req('branch_name'), 'nullable', 'string', 'max:190'],
-            'upi_id' => [$req('upi_id'), 'nullable', 'string', 'max:190'],
             'pan_number' => [$req('pan_number'), 'nullable', 'string', 'max:30'],
             'gst_number' => [$req('gst_number'), 'nullable', 'string', 'max:40'],
         ];
@@ -204,7 +203,6 @@ class LabelOwnershipBulkImportService
             'bank_name' => $details['bank_name'] ?? null,
             'ifsc_code' => $details['ifsc_code'] ?? null,
             'branch_name' => $details['branch_name'] ?? null,
-            'upi_id' => $details['upi_id'] ?? null,
             'pan_number' => $details['pan_number'] ?? null,
             'gst_number' => $details['gst_number'] ?? null,
         ]);

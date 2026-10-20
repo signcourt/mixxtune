@@ -254,11 +254,6 @@ export default function Edit({ payoutProfile = null }) {
                             label="Branch Name"
                             value={payoutProfile?.branch_name}
                         />
-
-                        <InfoField
-                            label="UPI ID"
-                            value={payoutProfile?.upi_id}
-                        />
                     </div>
                 </section>
             </div>

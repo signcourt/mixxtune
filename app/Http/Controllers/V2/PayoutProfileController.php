@@ -59,9 +59,6 @@ class PayoutProfileController extends Controller
                         'branch_name' =>
                             $profile->branch_name,
 
-                        'upi_id' =>
-                            $profile->upi_id,
-
                         'masked_pan' =>
                             $profile->masked_pan,
 
@@ -174,10 +171,9 @@ class PayoutProfileController extends Controller
             && filled($profile->bank_account_number)
             && filled($profile->ifsc_code);
 
-        $hasUpi = filled($profile->upi_id);
-
-        if (! $hasBank && ! $hasUpi) {
-            $missing[] = 'Bank account + IFSC or UPI ID';
+        /* MIXXTUNE_BANK_ONLY_PAYOUTS_V1 */
+        if (! $hasBank) {
+            $missing[] = 'Bank account + IFSC';
         }
 
         if ($missing !== []) {

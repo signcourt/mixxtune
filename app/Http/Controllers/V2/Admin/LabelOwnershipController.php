@@ -34,7 +34,6 @@ class LabelOwnershipController extends Controller
         'new_user.bank_name' => 'bank name',
         'new_user.ifsc_code' => 'IFSC code',
         'new_user.branch_name' => 'branch name',
-        'new_user.upi_id' => 'UPI ID',
         'new_user.pan_number' => 'PAN',
         'new_user.gst_number' => 'GST',
     ];
@@ -124,7 +123,6 @@ class LabelOwnershipController extends Controller
             'new_user.bank_name' => $req('max:190'),
             'new_user.ifsc_code' => $req('max:30'),
             'new_user.branch_name' => $opt('max:190'),
-            'new_user.upi_id' => $opt('max:190'),
             'new_user.pan_number' => $req('max:30'),
             'new_user.gst_number' => $opt('max:40'),
         ];

@@ -32,7 +32,7 @@ class LabelOwnershipService
     public const NEW_USER_FIELDS = [
         'name', 'username', 'email', 'phone', 'address_line_1', 'address_line_2', 'country', 'country_code', 'state_code', 'state', 'city', 'postal_code',
         'revenue_share_percentage', 'account_holder_name', 'bank_account_number', 'bank_name', 'ifsc_code',
-        'branch_name', 'upi_id', 'pan_number', 'gst_number',
+        'branch_name', 'pan_number', 'gst_number',
     ];
 
     public function normalizeNewUser(?array $newUser): ?array

@@ -95,7 +95,7 @@ class WithdrawalController extends Controller
             'payment_method' => [
                 'required',
                 'string',
-                'in:bank,upi',
+                'in:bank', // MIXXTUNE_BANK_ONLY_PAYOUTS_V1: payouts only to a bank account
             ],
 
             'request_note' => [

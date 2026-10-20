@@ -90,9 +90,6 @@ export default function Edit({
         branch_name:
             payoutProfile?.branch_name ?? "",
 
-        upi_id:
-            payoutProfile?.upi_id ?? "",
-
         pan_number: "",
 
         gst_number:
@@ -255,7 +252,6 @@ export default function Edit({
         "Bank Name": "bank_name",
         "IFSC Code": "ifsc_code",
         "Branch Name": "branch_name",
-        "UPI ID": "upi_id",
     };
 
     // MIXXTUNE_FF429_D3R_SWITCH_V1
@@ -879,17 +875,6 @@ export default function Edit({
                             error={errors.branch_name}
                             onChange={(value) =>
                                 setData("branch_name", value)
-                            }
-                        />
-
-                        <Field
-                            quickEditFieldMap={quickEditFieldMap}
-                            QuickEditToggle={QuickEditToggle}
-                            label="UPI ID"
-                            value={data.upi_id}
-                            error={errors.upi_id}
-                            onChange={(value) =>
-                                setData("upi_id", value)
                             }
                         />
                     </div>

@@ -138,7 +138,6 @@ export default function Create({
         bank_name: "",
         ifsc_code: "",
         branch_name: "",
-        upi_id: "",
 
         pan_number: "",
         gst_number: "",
@@ -729,16 +728,6 @@ export default function Create({
                                 error={errors.branch_name}
                                 onChange={(value) =>
                                     setData("branch_name", value)
-                                }
-                            />
-
-                            <Field
-                                label="UPI ID"
-                                required={req("upi_id")}
-                                value={data.upi_id}
-                                error={errors.upi_id}
-                                onChange={(value) =>
-                                    setData("upi_id", value)
                                 }
                             />
                         </div>
