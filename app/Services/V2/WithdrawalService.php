@@ -902,6 +902,9 @@ class WithdrawalService
             'Withdrawal must be approved first.'
         );
 
+        /* MIXXTUNE_BANK_CHANGE_PROTECTION_V1: 48h hold after a bank change + KYC must be verified. */
+        app(\App\Services\V2\BankChangeGuard::class)->assertPayoutAllowed((int) $withdrawal->user_id);
+
         return DB::transaction(function () use (
             $withdrawal,
             $admin,

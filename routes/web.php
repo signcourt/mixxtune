@@ -2954,3 +2954,12 @@ Route::middleware(['auth', 'verified'])
         Route::post('send', [\App\Http\Controllers\V2\Admin\StatementEmailController::class, 'send'])->middleware('throttle:60,1')->name('send');
         Route::get('preview', [\App\Http\Controllers\V2\Admin\StatementEmailController::class, 'preview'])->middleware('throttle:30,1')->name('preview');
     });
+
+/* MIXXTUNE_BANK_CHANGE_PROTECTION_V1 */
+Route::middleware(['auth', 'verified'])
+    ->prefix('v2/admin/bank-change')
+    ->name('v2.admin.bank-change.')
+    ->group(function () {
+        Route::post('unlock', [\App\Http\Controllers\V2\Admin\BankChangeController::class, 'unlock'])->middleware('throttle:20,1')->name('unlock');
+        Route::post('resend', [\App\Http\Controllers\V2\Admin\BankChangeController::class, 'resend'])->middleware('throttle:10,1')->name('resend');
+    });

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Sidebar from "@/V2/Shared/Navigation/Sidebar";
 import ImpersonationBanner from "@/V2/Shared/Components/ImpersonationBanner";
 import MaintenanceExperience from "@/V2/Shared/Maintenance/MaintenanceExperience";
+import BankChangeOtpPrompt from "@/V2/Shared/Components/BankChangeOtpPrompt";
 
 export default function PanelLayout({
     role = null,
@@ -474,6 +475,8 @@ export default function PanelLayout({
                     </header>
 
                     <main className="p-5 lg:p-7">
+                        {/* MIXXTUNE_BANK_CHANGE_PROTECTION_V1 */}
+                        <BankChangeOtpPrompt />
                         <MaintenanceExperience
                             maintenance={props.maintenance}
                             children={children}
