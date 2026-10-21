@@ -170,7 +170,8 @@ export default function ReleaseIndex({
             : 'All Releases';
 
     const selectClass =
-        'h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-500';
+        /* MIXXTUNE_MOBILE_LIST_V1: on phones two filters per row, full text visible */
+        'h-11 min-w-[9.5rem] flex-1 rounded-xl border border-slate-200 bg-white pl-3 pr-8 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-500 sm:flex-none';
 
     return (
         <PanelLayout
@@ -457,7 +458,20 @@ export default function ReleaseIndex({
                         ))}
                     </section>
                 ) : (
-                    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <>
+                    {/* MIXXTUNE_MOBILE_LIST_V1: phones get stacked cards instead of a wide table */}
+                    <section className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:hidden">
+                        {rows.map((release) => (
+                            <ReleaseRow
+                                key={release.id}
+                                release={release}
+                                basePath={basePath}
+                                variant="card"
+                            />
+                        ))}
+                    </section>
+
+                    <section className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-slate-200">
                                 <thead className="bg-slate-50">
@@ -496,6 +510,7 @@ export default function ReleaseIndex({
                             </table>
                         </div>
                     </section>
+                    </>
                 )}
 
                 <Pagination
@@ -677,6 +692,7 @@ function ReleaseCard({
 function ReleaseRow({
     release,
     basePath,
+    variant = 'row',
 }) {
     const status =
         normaliseStatus(release.status);
@@ -756,6 +772,66 @@ function ReleaseRow({
         ),
         storesTotal
     );
+
+    if (variant === 'card') {
+        return (
+            <div className="flex gap-3 p-3.5">
+                <Link
+                    href={viewPath}
+                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 shadow-sm ring-1 ring-slate-200"
+                >
+                    {artworkSrc ? (
+                        <img src={artworkSrc} alt={release.title || 'Release artwork'} className="h-full w-full object-cover" loading="lazy" />
+                    ) : (
+                        <span className="text-2xl text-violet-600" aria-hidden="true">♫</span>
+                    )}
+                </Link>
+
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                        <Link href={viewPath} className="min-w-0 truncate text-[15px] font-bold text-slate-900">
+                            {release.title || 'Untitled Release'}
+                        </Link>
+                        <StatusPill status={status} />
+                    </div>
+
+                    <p className="mt-0.5 truncate text-[13px] text-slate-500">
+                        {release.primary_artist_name || 'Artist'} · <span className="capitalize">{release.release_type || 'single'}</span> · {trackCount} {trackCount === 1 ? 'track' : 'tracks'}
+                    </p>
+
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                        {release.label_name || '—'} · {displayReleaseDate ? formatDate(displayReleaseDate) : 'Not scheduled'}
+                    </p>
+
+                    <div className="mt-2 flex items-end justify-between gap-2">
+                        <div className="min-w-0">
+                            <p className="truncate font-mono text-xs text-slate-600">
+                                {release.upc ? `UPC ${release.upc}` : 'UPC pending'}
+                            </p>
+                            {storesTotal > 0 && (
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    {storesLive} / {storesTotal} stores live
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-1.5">
+                            {editable && (
+                                <Link href={editPath} aria-label="Edit release" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700">
+                                    <PencilIcon />
+                                </Link>
+                            )}
+                            {isDraft && (
+                                <button type="button" onClick={deleteDraft} aria-label="Delete draft" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600">
+                                    <TrashIcon />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <tr className="transition hover:bg-slate-50">

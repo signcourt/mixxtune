@@ -238,7 +238,8 @@ export default function Index({
     );
 
     const selectClass =
-        'h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-500';
+        /* MIXXTUNE_MOBILE_LIST_V1: on phones two filters per row, full text visible */
+        'h-11 min-w-[9.5rem] flex-1 rounded-xl border border-slate-200 bg-white pl-3 pr-8 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-500 sm:flex-none';
 
     return (
         <PanelLayout
@@ -492,7 +493,20 @@ function CatalogueTable({
     canEdit = false,
 }) {
     return (
-        <div className="overflow-x-auto">
+        <>
+        {/* MIXXTUNE_MOBILE_LIST_V1: phones get stacked cards instead of a wide table */}
+        <div className="divide-y divide-slate-100 md:hidden">
+            {rows.map((item) => (
+                <CatalogueRow
+                    key={item.id}
+                    item={item}
+                    canEdit={canEdit}
+                    variant="card"
+                />
+            ))}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[1100px] border-collapse">
                 <thead>
                     <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -519,6 +533,7 @@ function CatalogueTable({
                 </tbody>
             </table>
         </div>
+        </>
     );
 }
 
@@ -555,6 +570,7 @@ function StatusPill({
 function CatalogueRow({
     item,
     canEdit = false,
+    variant = 'row',
 }) {
     const artwork = artworkUrl(
         item.artwork_path
@@ -577,6 +593,63 @@ function CatalogueRow({
     );
 
     const viewPath = `/v2/catalogue/${item.id}`;
+
+    if (variant === 'card') {
+        return (
+            <div className="flex gap-3 p-3.5">
+                <Link
+                    href={viewPath}
+                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 shadow-sm ring-1 ring-slate-200"
+                >
+                    {artwork ? (
+                        <img src={artwork} alt={item.title ?? 'Release artwork'} className="h-full w-full object-cover" loading="lazy" />
+                    ) : (
+                        <span className="text-2xl font-semibold text-violet-600" aria-hidden="true">♪</span>
+                    )}
+                </Link>
+
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                        <Link href={viewPath} className="min-w-0 truncate text-[15px] font-bold text-slate-900">
+                            {item.title ?? 'Untitled Release'}
+                        </Link>
+                        <StatusPill status={item.release_status} />
+                    </div>
+
+                    <p className="mt-0.5 truncate text-[13px] text-slate-500">
+                        {item.primary_artist_name || 'Unknown Artist'} · <span className="capitalize">{item.release_type || 'single'}</span> · {trackCount} {trackCount === 1 ? 'track' : 'tracks'}
+                    </p>
+
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                        {item.label_name || '—'} · {formatDate(item.digital_release_date || item.original_release_date)}
+                    </p>
+
+                    <div className="mt-2 flex items-end justify-between gap-2">
+                        <div className="min-w-0">
+                            <p className="truncate font-mono text-xs text-slate-600">
+                                {item.upc ? `UPC ${item.upc}` : 'UPC pending'}
+                            </p>
+                            {storesTotal > 0 && (
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    {storesLive} / {storesTotal} stores live
+                                </p>
+                            )}
+                        </div>
+
+                        {canEdit && item.release_id && (
+                            <Link
+                                href={`/v2/releases/${item.release_id}/edit`}
+                                aria-label="Edit release"
+                                className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-xs font-semibold text-amber-700"
+                            >
+                                Edit
+                            </Link>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <tr className="border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50/70">
