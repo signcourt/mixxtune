@@ -256,8 +256,11 @@ class BankChangeGuard
     {
         $profile = PayoutProfile::query()->where('user_id', $ownerUserId)->first();
 
+        /* MIXXTUNE_WITHDRAWALS_V2: no payout profile = nowhere to pay (was allowed before) */
         if (!$profile) {
-            return;
+            throw ValidationException::withMessages([
+                'payment_reference' => 'This owner has no payout / KYC profile. Add bank + PAN on the user page and verify the KYC first.',
+            ]);
         }
 
         $until = $this->holdUntil($profile);

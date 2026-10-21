@@ -23,192 +23,158 @@ class WithdrawalManagementController extends Controller
         PermissionService $permissions,
         AdminFinancialAccessService $financialAccess
     ): Response {
-        $role = $permissions->role(
-            $request->user()
-        );
+        $role = $permissions->role($request->user());
 
-        abort_unless(
-            in_array(
-                $role,
-                [
-                    'admin',
-                    'super_admin',
-                ],
-                true
-            ),
-            403,
-            'Admin access required.'
-        );
+        abort_unless(in_array($role, ['admin', 'super_admin'], true), 403, 'Admin access required.');
 
-        $status = trim(
-            (string) $request->input(
-                'status',
-                'pending'
-            )
-        );
-
-        $allowedStatuses = [
-            'pending',
-            'approved',
-            'paid',
-            'rejected',
-        ];
-
-        if (
-            !in_array(
-                $status,
-                $allowedStatuses,
-                true
-            )
-        ) {
+        /* MIXXTUNE_WITHDRAWALS_V2: tabs incl. All, search, totals, readiness, pages */
+        $status = trim((string) $request->input('status', 'pending'));
+        if (!in_array($status, ['pending', 'approved', 'paid', 'rejected', 'all'], true)) {
             $status = 'pending';
         }
 
-        $month = trim(
-            (string) $request->input(
-                'month',
-                ''
-            )
-        );
-
-        if (
-            $month !== '' &&
-            !preg_match(
-                '/^\d{4}-\d{2}$/',
-                $month
-            )
-        ) {
+        $month = trim((string) $request->input('month', ''));
+        if ($month !== '' && !preg_match('/^\d{4}-\d{2}$/', $month)) {
             $month = '';
         }
 
+        $search = trim((string) $request->input('search', ''));
+
         $dateColumns = [
-            'pending' =>
-                'requested_at',
-
-            'approved' =>
-                'approved_at',
-
-            'paid' =>
-                'paid_at',
-
-            'rejected' =>
-                'rejected_at',
+            'pending' => 'requested_at',
+            'approved' => 'approved_at',
+            'paid' => 'paid_at',
+            'rejected' => 'rejected_at',
+            'all' => 'requested_at',
         ];
 
-        $query = WithdrawalRequest::query()
-            ->with([
-                'user:id,name,email',
-                'payoutProfile',
-            ]);
+        $filtered = function (string $forStatus) use ($request, $financialAccess, $month, $search, $dateColumns) {
+            $builder = WithdrawalRequest::query();
+            $financialAccess->applyFinancialOwnerScope($builder, $request->user());
 
-        $financialAccess
-            ->applyFinancialOwnerScope(
-                $query,
-                $request->user()
-            );
-
-        $query->where(
-            'status',
-            $status
-        );
-
-        if ($month !== '') {
-            $query->where(
-                $dateColumns[$status],
-                'like',
-                $month . '%'
-            );
-        }
-
-        $countForStatus = function (
-            string $countStatus
-        ) use (
-            $request,
-            $financialAccess,
-            $month,
-            $dateColumns
-        ): int {
-            $builder =
-                WithdrawalRequest::query();
-
-            $financialAccess
-                ->applyFinancialOwnerScope(
-                    $builder,
-                    $request->user()
-                );
-
-            $builder->where(
-                'status',
-                $countStatus
-            );
-
-            if ($month !== '') {
-                $builder->where(
-                    $dateColumns[$countStatus],
-                    'like',
-                    $month . '%'
-                );
+            if ($forStatus !== 'all') {
+                $builder->where('status', $forStatus);
             }
 
-            return $builder->count();
+            if ($month !== '') {
+                $builder->where($dateColumns[$forStatus], 'like', $month.'%');
+            }
+
+            if ($search !== '') {
+                $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
+                $builder->where(fn ($w) => $w->where('withdrawal_number', 'like', $like)
+                    ->orWhere('payment_reference', 'like', $like)
+                    ->orWhereHas('user', fn ($u) => $u->where('name', 'like', $like)->orWhere('email', 'like', $like)->orWhere('client_id', 'like', $like)));
+            }
+
+            return $builder;
         };
 
-        return Inertia::render(
-            'V2/Admin/Withdrawals/Index',
-            [
-                'role' =>
-                    $role,
+        $counts = [];
+        $totals = [];
+        foreach (['pending', 'approved', 'paid', 'rejected', 'all'] as $s) {
+            $counts[$s] = $filtered($s)->count();
+            $totals[$s] = round((float) $filtered($s)->sum('amount'), 2);
+        }
 
-                'filters' => [
-                    'status' =>
-                        $status,
-
-                    'month' =>
-                        $month,
-                ],
-
-                'counts' => [
-                    'pending' =>
-                        $countForStatus(
-                            'pending'
-                        ),
-
-                    'approved' =>
-                        $countForStatus(
-                            'approved'
-                        ),
-
-                    'paid' =>
-                        $countForStatus(
-                            'paid'
-                        ),
-
-                    'rejected' =>
-                        $countForStatus(
-                            'rejected'
-                        ),
-                ],
-
-                'withdrawals' =>
-                    $this->withDeductions(
-                        $query
-                            ->with('invoice:id,withdrawal_id,invoice_number,gst_amount,tds_percentage,tds_amount,net_payable')
-                            ->orderByDesc(
-                                $dateColumns[$status]
-                            )
-                            ->orderByDesc('id')
-                            ->paginate(30)
-                            ->withQueryString()
-                    ),
-
-                /* MIXXTUNE_PAYOUT_FILES_V1 */
-                'payoutTools' => [
-                    'can_download' => $role === 'super_admin',
-                    'financial_year' => \App\Services\V2\PayoutDeductionService::financialYear()['label'],
-                    'tds' => app(\App\Services\V2\PayoutDeductionService::class)->settings(),
-                ],
-            ]
+        $page = $this->withDeductions(
+            $filtered($status)
+                ->with([
+                    'user:id,name,email,client_id',
+                    'payoutProfile',
+                    'invoice:id,withdrawal_id,invoice_number,gst_amount,tds_percentage,tds_amount,net_payable',
+                ])
+                ->orderByDesc($dateColumns[$status])
+                ->orderByDesc('id')
+                ->paginate(30)
+                ->withQueryString()
         );
+
+        $guard = app(\App\Services\V2\BankChangeGuard::class);
+        $service = app(WithdrawalService::class);
+        $userIds = $page->getCollection()->pluck('user_id')->unique();
+        $available = DB::table('wallets')->whereIn('user_id', $userIds)->groupBy('user_id')
+            ->select('user_id', DB::raw('SUM(available_balance) as total'))->pluck('total', 'user_id');
+        $people = \App\Models\User::query()->whereIn('id', $page->getCollection()->flatMap(fn ($w) => [$w->approved_by, $w->updated_by])->filter()->unique())->pluck('name', 'id');
+
+        $page->getCollection()->transform(function (WithdrawalRequest $w) use ($guard, $service, $available, $people) {
+            $profile = PayoutProfile::query()->where('user_id', $w->user_id)->first();
+            $problems = [];
+
+            if (in_array($w->status, ['pending', 'approved', 'processing'], true)) {
+                if (!$profile) {
+                    $problems[] = 'No payout profile';
+                } else {
+                    if ($profile->kyc_status !== 'verified') {
+                        $problems[] = 'KYC '.($profile->kyc_status ?: 'pending');
+                    }
+                    if (!$profile->bank_account_number || !$profile->ifsc_code) {
+                        $problems[] = 'No bank account / IFSC';
+                    }
+                    try {
+                        if ($until = $guard->holdUntil($profile)) {
+                            $problems[] = 'Bank changed — hold until '.$until->copy()->timezone('Asia/Kolkata')->format('d M, h:i A');
+                        }
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
+                }
+                if ($w->user && !$service->withdrawalEnabledFor($w->user)) {
+                    $problems[] = 'Withdrawals suspended for this owner';
+                }
+            }
+
+            $w->setAttribute('problems', $problems);
+            $w->setAttribute('ready', $problems === []);
+            $w->setAttribute('owner_available', round((float) ($available[$w->user_id] ?? 0), 2));
+            $w->setAttribute('kyc_status', $profile?->kyc_status ?: ($profile ? 'pending' : 'missing'));
+            $w->setAttribute('holder', $profile?->account_holder_name);
+            $w->setAttribute('ifsc', $profile?->ifsc_code);
+            $w->setAttribute('bank_name', $profile?->bank_name);
+            $w->setAttribute('approved_by_name', $w->approved_by ? ($people[$w->approved_by] ?? null) : null);
+            $w->setAttribute('dates', [
+                'requested' => $w->requested_at?->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A'),
+                'approved' => $w->approved_at?->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A'),
+                'paid' => $w->paid_at?->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A'),
+                'rejected' => $w->rejected_at?->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A'),
+            ]);
+            $w->setAttribute('waiting_days', $w->status === 'pending' && $w->requested_at ? (int) $w->requested_at->diffInDays(now()) : null);
+
+            return $w;
+        });
+
+        return Inertia::render('V2/Admin/Withdrawals/Index', [
+            'role' => $role,
+            'filters' => ['status' => $status, 'month' => $month, 'search' => $search],
+            'counts' => $counts,
+            'totals' => $totals,
+            'withdrawals' => $page,
+
+            /* MIXXTUNE_PAYOUT_FILES_V1 */
+            'payoutTools' => [
+                'can_download' => $role === 'super_admin',
+                'financial_year' => \App\Services\V2\PayoutDeductionService::financialYear()['label'],
+                'tds' => app(\App\Services\V2\PayoutDeductionService::class)->settings(),
+            ],
+        ]);
+    }
+
+    /* MIXXTUNE_WITHDRAWALS_V2: tell the owner what happened to their request */
+    private function tellOwner(WithdrawalRequest $withdrawal, string $type, string $title, string $message): void
+    {
+        try {
+            $owner = $withdrawal->user ?? \App\Models\User::query()->find($withdrawal->user_id);
+            if ($owner) {
+                app(\App\Services\V2\PanelNotificationService::class)->send($owner, $type, $title, $message, '/v2/withdrawals');
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    private static function inr($amount): string
+    {
+        return '₹'.number_format((float) $amount, 2);
     }
 
     public function export(
@@ -646,6 +612,9 @@ class WithdrawalManagementController extends Controller
             $before
         );
 
+        $this->tellOwner($withdrawal, 'withdrawal.deleted', 'Withdrawal request removed',
+            'Your withdrawal request '.($withdrawal->withdrawal_number ?: '').' of '.self::inr($withdrawal->amount).' was removed by our team. The amount is back in your wallet.');
+
         return back()->with(
             'success',
             'Withdrawal deleted and reserved balance restored.'
@@ -704,6 +673,9 @@ class WithdrawalManagementController extends Controller
             $withdrawal,
             $before
         );
+
+        $this->tellOwner($withdrawal, 'withdrawal.approved', 'Withdrawal approved',
+            'Your withdrawal '.($withdrawal->withdrawal_number ?: '').' of '.self::inr($withdrawal->amount).' is approved. The money will be sent to your bank account soon.');
 
         return back()->with(
             'success',
@@ -766,9 +738,12 @@ class WithdrawalManagementController extends Controller
             $before
         );
 
+        $this->tellOwner($withdrawal, 'withdrawal.rejected', 'Withdrawal not approved',
+            'Your withdrawal '.($withdrawal->withdrawal_number ?: '').' of '.self::inr($withdrawal->amount).' was rejected: '.$validated['rejection_reason'].' The amount is back in your wallet.');
+
         return back()->with(
             'success',
-            'Withdrawal rejected.'
+            'Withdrawal rejected. The amount is back in the owner\'s wallet.'
         );
     }
 
@@ -842,6 +817,9 @@ class WithdrawalManagementController extends Controller
             $withdrawal,
             $before
         );
+
+        $this->tellOwner($withdrawal, 'withdrawal.paid', 'Payout sent',
+            'Your withdrawal '.($withdrawal->withdrawal_number ?: '').' of '.self::inr($withdrawal->amount).' has been sent to your bank account. Bank reference (UTR): '.$validated['payment_reference'].'.');
 
         return back()->with(
             'success',

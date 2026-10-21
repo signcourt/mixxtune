@@ -206,6 +206,13 @@ class WithdrawalService
                 $sequence
             );
 
+            /* MIXXTUNE_WITHDRAWALS_V2: a deleted request lowers the count, so the
+             * next number could repeat an existing one (unique index -> error). */
+            while (WithdrawalRequest::query()->where('withdrawal_number', $number)->exists()) {
+                $sequence++;
+                $number = sprintf('WD-%s-%06d', now()->format('Ym'), $sequence);
+            }
+
             $availableBefore = round(
                 (float) $lockedWallet
                     ->available_balance,
@@ -384,6 +391,43 @@ class WithdrawalService
             'Only pending requests can be approved.'
         );
 
+        /* MIXXTUNE_WITHDRAWALS_V2: approve only what can really be paid */
+        $profile = PayoutProfile::query()->where('user_id', $withdrawal->user_id)->first();
+
+        if (!$profile || $profile->kyc_status !== 'verified') {
+            throw ValidationException::withMessages([
+                'withdrawal' => 'KYC of this owner is "'.($profile?->kyc_status ?: 'missing').'". Verify it in KYC Reviews first (or reject this request).',
+            ]);
+        }
+
+        if (!$profile->bank_account_number || !$profile->ifsc_code) {
+            throw ValidationException::withMessages([
+                'withdrawal' => 'This owner has no bank account / IFSC. Add them on the user page first.',
+            ]);
+        }
+
+        if ($withdrawal->user && !$this->withdrawalEnabledFor($withdrawal->user)) {
+            throw ValidationException::withMessages([
+                'withdrawal' => 'Withdrawals are suspended for this owner (label / artist setting).',
+            ]);
+        }
+
+        return DB::transaction(function () use ($withdrawal, $admin, $note) {
+            $locked = WithdrawalRequest::query()->whereKey($withdrawal->id)->lockForUpdate()->first();
+
+            abort_unless($locked && $locked->status === 'pending', 422, 'This request was changed by someone else. Reload the page.');
+
+            $withdrawal->setRawAttributes($locked->getAttributes(), true);
+
+            return $this->approveLocked($withdrawal, $admin, $note);
+        });
+    }
+
+    private function approveLocked(
+        WithdrawalRequest $withdrawal,
+        User $admin,
+        ?string $note
+    ): WithdrawalRequest {
         $metadata = $withdrawal->metadata
             ?? [];
 
@@ -435,7 +479,15 @@ class WithdrawalService
             $admin,
             $reason
         ) {
+            /* MIXXTUNE_WITHDRAWALS_V2: lock the request and check again (two people / double click) */
+            WithdrawalRequest::query()->whereKey($withdrawal->id)->lockForUpdate()->first();
             $withdrawal->refresh();
+
+            abort_unless(
+                in_array($withdrawal->status, ['pending', 'approved', 'processing'], true),
+                422,
+                'This request was changed by someone else (now '.$withdrawal->status.'). Reload the page.'
+            );
 
             $wallet = DB::table('wallets')
                 ->where(
@@ -908,7 +960,15 @@ class WithdrawalService
             $paymentReference,
             $note
         ) {
+            /* MIXXTUNE_WITHDRAWALS_V2: lock the request and check again (never pay twice) */
+            WithdrawalRequest::query()->whereKey($withdrawal->id)->lockForUpdate()->first();
             $withdrawal->refresh();
+
+            abort_unless(
+                in_array($withdrawal->status, ['approved', 'processing'], true),
+                422,
+                'This request was changed by someone else (now '.$withdrawal->status.'). Reload the page.'
+            );
 
             $wallet = DB::table('wallets')
                 ->where(
