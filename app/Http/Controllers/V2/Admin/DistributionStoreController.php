@@ -28,6 +28,33 @@ class DistributionStoreController extends Controller
         );
     }
 
+    /* W58: adding / changing / switching off / deleting a store is super admin only */
+    private function authorizeChange(Request $request): void
+    {
+        abort_unless($request->user()?->role === 'super_admin', 403, 'Only the super admin can change stores.');
+    }
+
+    private function audit(string $action, string $description, array $old = [], array $new = [], $store = null): void
+    {
+        try {
+            app(\App\Services\V2\AuditLogService::class)->record($action, 'delivery', $description, $old, $new, $store, request());
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /* W58: a slug made from the name must also be unique ("Spotify " next to "spotify") */
+    private function uniqueSlug(string $wanted, ?int $exceptId = null): string
+    {
+        $taken = DistributionStore::query()->where('slug', $wanted)->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))->exists();
+
+        if ($taken) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['name' => 'A store with almost the same name already exists ('.$wanted.').']);
+        }
+
+        return $wanted;
+    }
+
     public function index(
         Request $request
     ): Response {
@@ -83,6 +110,7 @@ class DistributionStoreController extends Controller
         Request $request
     ): RedirectResponse {
         $this->authorizeAdmin($request);
+        $this->authorizeChange($request);
 
         $validated =
             $this->validateStore($request);
@@ -112,9 +140,9 @@ class DistributionStoreController extends Controller
 
             'slug' =>
                 $validated['slug']
-                ?: Str::slug(
+                ?: $this->uniqueSlug(Str::slug(
                     $validated['name']
-                ),
+                )),
 
             'logo_path' =>
                 $logoPath,
@@ -132,6 +160,8 @@ class DistributionStoreController extends Controller
                 ?? $nextOrder,
         ]);
 
+        $this->audit('delivery.store_added', 'Store "'.$validated['name'].'" added.', [], ['name' => $validated['name'], 'active' => (bool) $validated['is_active']]);
+
         return back()->with(
             'success',
             'DSP added successfully.'
@@ -143,6 +173,9 @@ class DistributionStoreController extends Controller
         DistributionStore $distributionStore
     ): RedirectResponse {
         $this->authorizeAdmin($request);
+        $this->authorizeChange($request);
+
+        $before = $distributionStore->only(['name', 'slug', 'is_active', 'default_selected', 'sort_order']);
 
         $validated =
             $this->validateStore(
@@ -174,13 +207,15 @@ class DistributionStoreController extends Controller
 
         $validated['slug'] =
             $validated['slug']
-            ?: Str::slug(
+            ?: $this->uniqueSlug(Str::slug(
                 $validated['name']
-            );
+            ), (int) $distributionStore->id);
 
         $distributionStore->update(
             $validated
         );
+
+        $this->audit('delivery.store_updated', 'Store "'.$distributionStore->name.'" changed.', $before, $distributionStore->only(['name', 'slug', 'is_active', 'default_selected', 'sort_order']), $distributionStore);
 
         return back()->with(
             'success',
@@ -193,12 +228,21 @@ class DistributionStoreController extends Controller
         DistributionStore $distributionStore
     ): RedirectResponse {
         $this->authorizeAdmin($request);
+        $this->authorizeChange($request);
 
         $distributionStore->update([
             'is_active' =>
                 !$distributionStore
                     ->is_active,
         ]);
+
+        $waiting = \App\Models\ReleaseStoreDelivery::query()->where('distribution_store_id', $distributionStore->id)->whereIn('status', ['pending', 'processing'])->count();
+
+        $this->audit('delivery.store_toggled', 'Store "'.$distributionStore->name.'" '.($distributionStore->is_active ? 'switched on' : 'switched off').'.', [], ['active' => (bool) $distributionStore->is_active, 'waiting_deliveries' => $waiting], $distributionStore);
+
+        if (!$distributionStore->is_active && $waiting > 0) {
+            return back()->with('success', 'DSP deactivated. New releases will not be sent to it. '.$waiting.' delivery(ies) already waiting for this store were left as they are - finish or mark them failed on the Distribution page.');
+        }
 
         return back()->with(
             'success',
@@ -213,6 +257,21 @@ class DistributionStoreController extends Controller
         DistributionStore $distributionStore
     ): RedirectResponse {
         $this->authorizeAdmin($request);
+        $this->authorizeChange($request);
+
+        /*
+         * W58: deleting a store used to delete its whole delivery history
+         * (cascade). A store that was ever used can only be switched off.
+         */
+        $used = \App\Models\ReleaseStoreDelivery::query()->where('distribution_store_id', $distributionStore->id)->count();
+
+        if ($used > 0) {
+            return back()->withErrors([
+                'store' => '"'.$distributionStore->name.'" has '.$used.' delivery record(s), so it cannot be deleted (that would erase the history). Switch it off instead.',
+            ]);
+        }
+
+        $this->audit('delivery.store_deleted', 'Store "'.$distributionStore->name.'" deleted (never used).', $distributionStore->only(['name', 'slug']), []);
 
         if (
             $distributionStore->logo_path
@@ -263,8 +322,7 @@ class DistributionStoreController extends Controller
 
             'logo' => [
                 'nullable',
-                'image',
-                'mimes:jpg,jpeg,png,webp,svg',
+                'mimes:jpg,jpeg,png,webp',
                 'max:5120',
             ],
 

@@ -49,6 +49,12 @@ class DeliveryManagementController extends Controller
             )
         );
 
+        /* W58: "all", plus releases with a failed / takedown store */
+        $storeFilter = in_array($status, ['store_failed', 'store_takedown'], true) ? $status : null;
+        if ($status === 'all' || $storeFilter) {
+            $status = $storeFilter ?? 'all';
+        }
+
         $search = trim(
             (string) $request->input(
                 'search',
@@ -57,6 +63,7 @@ class DeliveryManagementController extends Controller
         );
 
         $query = Release::query()
+            ->select(['releases.id', 'releases.public_id', 'releases.title', 'releases.primary_artist_name', 'releases.upc', 'releases.catalog_number', 'releases.status', 'releases.artwork_path', 'releases.artist_id', 'releases.label_id', 'releases.updated_at'])
             ->whereNull('deleted_at')
             ->whereIn(
                 'status',
@@ -120,12 +127,22 @@ class DeliveryManagementController extends Controller
             }
         }
 
-        if ($status !== '') {
+        if ($status === 'store_failed') {
+            $query->whereHas('storeDeliveries', fn ($d) => $d->where('status', 'failed'));
+        } elseif ($status === 'store_takedown') {
+            $query->whereHas('storeDeliveries', fn ($d) => $d->whereIn('status', ['takedown_requested']));
+        } elseif ($status !== '' && $status !== 'all') {
             $query->where(
                 'status',
                 $status
             );
         }
+
+        $query->withCount([
+            'storeDeliveries as stores_total',
+            'storeDeliveries as stores_live' => fn ($d) => $d->where('status', 'live'),
+            'storeDeliveries as stores_failed' => fn ($d) => $d->where('status', 'failed'),
+        ]);
 
         if ($search !== '') {
             $query->where(
@@ -206,6 +223,19 @@ class DeliveryManagementController extends Controller
                 ],
 
                 'counts' => [
+                    /* W58 */
+                    'approved' =>
+                        (clone $countQuery)
+                            ->where('status', 'approved')
+                            ->count(),
+                    'store_failed' =>
+                        (clone $countQuery)
+                            ->whereHas('storeDeliveries', fn ($d) => $d->where('status', 'failed'))
+                            ->count(),
+                    'store_takedown' =>
+                        (clone $countQuery)
+                            ->whereHas('storeDeliveries', fn ($d) => $d->where('status', 'takedown_requested'))
+                            ->count(),
                     'processing' =>
                         (clone $countQuery)
                             ->where(
@@ -315,6 +345,34 @@ class DeliveryManagementController extends Controller
 
                 'deliveries' =>
                     $deliveries,
+
+                /* W58 */
+                'readiness' => $deliveries->isEmpty() ? $delivery->readiness($release) : null,
+
+                'history' => !\Illuminate\Support\Facades\Schema::hasTable('audit_logs') ? [] : \App\Models\System\AuditLog::query()
+                    ->where('module', 'delivery')
+                    ->where('action', 'delivery.status_changed')
+                    ->where('auditable_type', \App\Models\ReleaseStoreDelivery::class)
+                    ->whereIn('auditable_id', $deliveries->pluck('id'))
+                    ->orderByDesc('id')
+                    ->limit(100)
+                    ->get(['id', 'user_id', 'auditable_id', 'old_values', 'new_values', 'created_at'])
+                    ->map(function ($log) use ($deliveries) {
+                        $d = $deliveries->firstWhere('id', $log->auditable_id);
+
+                        return [
+                            'id' => $log->id,
+                            'store' => $d?->store?->name ?? '#'.$log->auditable_id,
+                            'from' => $log->old_values['status'] ?? null,
+                            'to' => $log->new_values['status'] ?? null,
+                            'note' => $log->new_values['note'] ?? ($log->new_values['error'] ?? null),
+                            'by' => \App\Models\User::query()->whereKey($log->user_id)->value('name') ?? '—',
+                            'at' => optional($log->created_at)->timezone('Asia/Kolkata')?->format('d M Y, h:i A'),
+                        ];
+                    })
+                    ->values(),
+
+                'canStart' => in_array($release->status, ['approved', 'processing', 'delivered', 'live'], true),
             ]
         );
     }
@@ -428,6 +486,17 @@ class DeliveryManagementController extends Controller
             ],
         ]);
 
+        $this->authorizeStatus($request, $permissions, $validated['status']);
+
+        /* W58: live / takedown need the e-mailed code */
+        if (in_array($validated['status'], self::CONFIRM_STATUSES, true)) {
+            app(\App\Services\V2\ActionOtpGuard::class)->require(
+                $request->user(),
+                'delivery.'.$validated['status'].':'.$deliveryRecord->id,
+                'mark store delivery #'.$deliveryRecord->id.' of "'.$deliveryRecord->release->title.'" as '.str_replace('_', ' ', $validated['status'])
+            );
+        }
+
         $delivery->transition(
             $deliveryRecord,
             $validated['status'],
@@ -497,6 +566,17 @@ class DeliveryManagementController extends Controller
             ],
         ]);
 
+        $this->authorizeStatus($request, $permissions, $validated['status']);
+
+        if (in_array($validated['status'], self::CONFIRM_STATUSES, true)) {
+            $ids = collect($validated['delivery_ids'])->map(fn ($v) => (int) $v)->sort()->values()->implode(',');
+            app(\App\Services\V2\ActionOtpGuard::class)->require(
+                $request->user(),
+                'delivery.bulk.'.$validated['status'].':'.$release->id.':'.sha1($ids),
+                'mark '.count($validated['delivery_ids']).' store(s) of "'.$release->title.'" as '.str_replace('_', ' ', $validated['status'])
+            );
+        }
+
         $delivery->bulkTransition(
             $release,
             $validated['delivery_ids'],
@@ -509,6 +589,26 @@ class DeliveryManagementController extends Controller
             'success',
             'Selected DSP deliveries updated.'
         );
+    }
+
+    private const CONFIRM_STATUSES = ['live', 'takedown_requested', 'taken_down'];
+
+    /* W58: delivery permissions really apply (an admin without "takedown" cannot take down) */
+    private function authorizeStatus(Request $request, PermissionService $permissions, string $status): void
+    {
+        $permissions->authorize($request->user(), 'delivery.manage');
+
+        $specific = match ($status) {
+            'delivered' => 'delivery.mark_delivered',
+            'live' => 'delivery.mark_live',
+            'failed' => 'delivery.mark_failed',
+            'takedown_requested', 'taken_down' => 'delivery.takedown',
+            default => null,
+        };
+
+        if ($specific) {
+            $permissions->authorize($request->user(), $specific);
+        }
     }
 
     private function authorizeAdmin(

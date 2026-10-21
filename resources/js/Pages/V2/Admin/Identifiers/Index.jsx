@@ -38,7 +38,13 @@ export default function Index({
     role = 'super_admin',
     pendingIsrc = {},
     pendingUpc = {},
+    scope = 'new',
+    q = '',
 }) {
+    /* W58: new releases vs old catalogue (codes only typed in), search */
+    const isOld = scope === 'old';
+    const [search, setSearch] = useState(q);
+    const go = (extra) => router.get('/v2/admin/identifiers/pending', { scope, q: search, ...extra }, { preserveState: true, replace: true });
     const [selectedTracks, setSelectedTracks] =
         useState([]);
 
@@ -229,6 +235,26 @@ export default function Index({
                     </p>
                 </div>
 
+                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex gap-2">
+                        {[['new', 'New releases'], ['old', 'Old catalogue']].map(([k, t]) => (
+                            <button key={k} type="button" onClick={() => go({ scope: k, isrc_page: 1, upc_page: 1 })} className={`rounded-xl px-4 py-2 text-sm font-semibold ${scope === k ? 'bg-violet-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                {t}
+                            </button>
+                        ))}
+                    </div>
+                    <form onSubmit={(e) => { e.preventDefault(); go({ isrc_page: 1, upc_page: 1 }); }} className="flex gap-2">
+                        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search title, artist or catalogue no." className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm sm:w-72" />
+                        <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Search</button>
+                    </form>
+                </div>
+
+                {isOld && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        Old catalogue already has its real UPC / ISRC from the previous distributor. Codes are <b>never generated</b> here - use <b>Edit</b> and type the existing code.
+                    </div>
+                )}
+
                 {notice && (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
                         {notice}
@@ -248,11 +274,15 @@ export default function Index({
                         <button
                             type="button"
                             disabled={
+                                isOld ||
+                                
                                 busy ||
                                 selectedTracks.length ===
                                     0
                             }
                             onClick={() =>
+                                window.confirm(`Generate ISRC for ${selectedTracks.length} selected item(s)? A code is permanent once given.`) &&
+                                
                                 runAction(
                                     '/v2/admin/identifiers/isrc/bulk-generate',
                                     {
@@ -386,9 +416,7 @@ export default function Index({
                                                     <div className="flex flex-wrap gap-2">
                                                         <button
                                                             type="button"
-                                                            disabled={
-                                                                busy
-                                                            }
+                                                            disabled={busy || isOld}
                                                             onClick={() =>
                                                                 runAction(
                                                                     `/v2/admin/tracks/${track.id}/isrc/generate`
@@ -439,11 +467,15 @@ export default function Index({
                         <button
                             type="button"
                             disabled={
+                                isOld ||
+                                
                                 busy ||
                                 selectedReleases.length ===
                                     0
                             }
                             onClick={() =>
+                                window.confirm(`Generate UPC for ${selectedReleases.length} selected item(s)? A code is permanent once given.`) &&
+                                
                                 runAction(
                                     '/v2/admin/identifiers/upc/bulk-generate',
                                     {
@@ -587,9 +619,7 @@ export default function Index({
                                                     <div className="flex flex-wrap gap-2">
                                                         <button
                                                             type="button"
-                                                            disabled={
-                                                                busy
-                                                            }
+                                                            disabled={busy || isOld}
                                                             onClick={() =>
                                                                 runAction(
                                                                     `/v2/admin/releases/${release.id}/upc/generate`

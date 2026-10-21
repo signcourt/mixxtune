@@ -49,6 +49,19 @@ class UpcService
         return $code;
     }
 
+    /* GS1: from the right, digits next to the check digit are weighted 3, then 1, 3, 1 ... */
+    public function gs1Valid(string $code): bool
+    {
+        $digits = array_map('intval', str_split($code));
+        $check = array_pop($digits);
+        $sum = 0;
+        foreach (array_reverse($digits) as $i => $d) {
+            $sum += $d * ($i % 2 === 0 ? 3 : 1);
+        }
+
+        return ((10 - ($sum % 10)) % 10) === $check;
+    }
+
     public function assignManual(
         Release $release,
         string $code,
@@ -61,6 +74,13 @@ class UpcService
             ->where('upc', $code)
             ->where('id', '!=', $release->id)
             ->exists();
+
+        /* W58: replacing an existing UPC needs the e-mailed code and keeps the old one in the log */
+        $old = (string) ($release->upc ?? '');
+        if (!$duplicate && $old !== '' && $this->normalise($old) !== $code) {
+            app(ActionOtpGuard::class)->require($user, 'identifier.upc:'.$release->id.':'.$code, 'change UPC '.$old.' of release #'.$release->id.' to '.$code);
+            $notes = trim('Replaced '.$old.'. '.(string) $notes);
+        }
 
         if ($duplicate) {
             throw ValidationException::withMessages([
@@ -156,6 +176,13 @@ class UpcService
             ]);
         }
 
+        /* W58: never invent codes for old catalogue */
+        if (\App\Support\LegacyRelease::is($release)) {
+            throw ValidationException::withMessages([
+                'upc' => \App\Support\LegacyRelease::message('UPC'),
+            ]);
+        }
+
         $prefix = $this->normalise(
             $prefix
         );
@@ -217,6 +244,18 @@ class UpcService
                 . $this->calculateCheckDigit(
                     $body
                 );
+
+            /* W58: skip numbers already on a release (e.g. typed in by hand) */
+            while (Release::query()->where('upc', $code)->exists()) {
+                $sequence++;
+                if (strlen((string) $sequence) > $sequenceLength) {
+                    throw ValidationException::withMessages([
+                        'upc' => 'No free UPC left for prefix '.$prefix.'.',
+                    ]);
+                }
+                $body = $prefix.str_pad((string) $sequence, $sequenceLength, '0', STR_PAD_LEFT);
+                $code = $body.$this->calculateCheckDigit($body);
+            }
 
             $record = UpcCode::query()->create([
                 'public_id' =>

@@ -86,6 +86,16 @@ class ReleaseDeliveryWorkflowTest extends TestCase
 
             'created_by' => $artistUser->id,
             'updated_by' => $artistUser->id,
+
+            /* W58: a deliverable release has a poster and a track with audio */
+            'artwork_path' => 'releases/artwork/test.jpg',
+        ]);
+
+        \App\Models\Distribution\Track::factory()->withAudio()->create([
+            'release_id' => $release->id,
+            'track_number' => 1,
+            'created_by' => $artistUser->id,
+            'updated_by' => $artistUser->id,
         ]);
 
         $admin = User::factory()->create([

@@ -58,8 +58,13 @@ export default function Index({
             <Head title="DSP Distribution" />
 
             <div className="space-y-5">
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {[
+                        /* W58 */
+                        [
+                            'approved',
+                            'Approved - not started',
+                        ],
                         [
                             'processing',
                             'Processing',
@@ -73,12 +78,16 @@ export default function Index({
                             'Live',
                         ],
                         [
-                            'failed',
-                            'Failed',
+                            'store_failed',
+                            'A store failed',
                         ],
                         [
-                            'takedown_requested',
-                            'Takedown',
+                            'store_takedown',
+                            'Takedown asked',
+                        ],
+                        [
+                            'all',
+                            'All',
                         ],
                     ].map(
                         ([status, label]) => (
@@ -168,6 +177,7 @@ export default function Index({
                                         'Artist',
                                         'UPC',
                                         'Tracks',
+                                        'Stores',
                                         'Status',
                                         'Action',
                                     ].map(
@@ -228,6 +238,16 @@ export default function Index({
                                                     {release.tracks_count ??
                                                         0}
                                                 </td>
+                                                <td className="px-5 py-4 text-sm text-slate-600">
+                                                    {release.stores_total ? (
+                                                        <span>
+                                                            {release.stores_live}/{release.stores_total} live
+                                                            {release.stores_failed > 0 && <span className="ml-1 font-semibold text-rose-600">· {release.stores_failed} failed</span>}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-400">not started</span>
+                                                    )}
+                                                </td>
 
                                                 <td className="px-5 py-4">
                                                     <span
@@ -263,7 +283,7 @@ export default function Index({
                                 ) : (
                                     <tr>
                                         <td
-                                            colSpan="6"
+                                            colSpan="7"
                                             className="px-5 py-16 text-center text-sm text-slate-500"
                                         >
                                             No distribution
@@ -274,6 +294,17 @@ export default function Index({
                             </tbody>
                         </table>
                     </div>
+                    {/* W58: pages */}
+                    {(releases.links || []).length > 3 && (
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
+                            <p className="text-sm text-slate-500">{releases.from ?? 0}–{releases.to ?? 0} of {releases.total ?? 0}</p>
+                            <div className="flex flex-wrap gap-2">
+                                {releases.links.map((link, i) => (
+                                    <Link key={`${link.label}-${i}`} href={link.url || '#'} preserveScroll className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${link.active ? 'border-violet-600 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-600'} ${!link.url ? 'pointer-events-none opacity-40' : ''}`} dangerouslySetInnerHTML={{ __html: link.label }} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </section>
             </div>
         </PanelLayout>

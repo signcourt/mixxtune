@@ -42,6 +42,14 @@ class BackfillIdentifiers extends Command
 
                 foreach ($releases as $release) {
 
+                    /* W58: never generate codes for old catalogue or unfinished drafts */
+                    if (
+                        \App\Support\LegacyRelease::is($release)
+                        || in_array((string) $release->status, ['draft', 'rejected'], true)
+                    ) {
+                        continue;
+                    }
+
                     if (blank($release->upc)) {
                         $upc->generate($release, $admin);
                         $upcCount++;

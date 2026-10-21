@@ -2,6 +2,7 @@ import {
     Head,
     router,
     useForm,
+    usePage,
 } from '@inertiajs/react';
 import {
     useMemo,
@@ -125,12 +126,21 @@ export default function Index({
         });
     };
 
+    /* W58: messages from the server + one action at a time */
+    const { flash = {}, errors: pageErrors = {} } = usePage().props;
+    const [busyId, setBusyId] = useState(null);
+
     const toggleStore = (store) => {
+        if (store.is_active && !window.confirm(`Switch off "${store.name}"? New releases will not be sent to it.`)) {
+            return;
+        }
+        setBusyId(store.id);
         router.post(
             `/v2/admin/stores/${store.id}/toggle`,
             {},
             {
                 preserveScroll: true,
+                onFinish: () => setBusyId(null),
             }
         );
     };
@@ -144,10 +154,12 @@ export default function Index({
             return;
         }
 
+        setBusyId(store.id);
         router.delete(
             `/v2/admin/stores/${store.id}`,
             {
                 preserveScroll: true,
+                onFinish: () => setBusyId(null),
             }
         );
     };
@@ -161,6 +173,8 @@ export default function Index({
             <Head title="DSP Stores" />
 
             <div className="space-y-6">
+                {flash.success && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-800">{flash.success}</div>}
+                {pageErrors.store && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-800">{pageErrors.store}</div>}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900">
@@ -298,7 +312,7 @@ export default function Index({
                             >
                                 <input
                                     type="file"
-                                    accept="image/*,.svg"
+                                    accept="image/png,image/jpeg,image/webp"
                                     className={
                                         inputClass
                                     }
@@ -517,7 +531,8 @@ export default function Index({
                                                         store
                                                     )
                                                 }
-                                                className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white"
+                                                disabled={busyId === store.id}
+                                                className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
                                             >
                                                 {store.is_active
                                                     ? 'Deactivate'
@@ -531,7 +546,8 @@ export default function Index({
                                                         store
                                                     )
                                                 }
-                                                className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white"
+                                                disabled={busyId === store.id}
+                                                className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
                                             >
                                                 Delete
                                             </button>

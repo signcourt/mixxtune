@@ -86,6 +86,19 @@ class DeliveryWorkflowService
         );
 
         /*
+         * W58 MIXXTUNE_DELIVERY_SAFE_V1: everything a store needs must be
+         * there before delivery starts, and nothing is generated when the
+         * start would fail anyway (no stores, no tracks, no poster ...).
+         */
+        $ready = $this->readiness($release);
+
+        if ($ready['blocking'] !== []) {
+            throw ValidationException::withMessages([
+                'delivery' => 'Delivery not started: '.implode(' ', $ready['blocking']),
+            ]);
+        }
+
+        /*
          * Identifiers must exist before a release enters DSP delivery.
          * Existing UPC/ISRC values are preserved.
          */
@@ -188,6 +201,60 @@ class DeliveryWorkflowService
         );
     }
 
+    /*
+     * W58: what is missing before a release can go to stores.
+     * "blocking" stops the start; "notes" are shown only.
+     */
+    public function readiness(Release $release): array
+    {
+        $release->loadMissing('tracks');
+        $blocking = [];
+        $notes = [];
+        $tracks = $release->tracks;
+        $legacy = \App\Support\LegacyRelease::is($release);
+
+        if ($tracks->isEmpty()) {
+            $blocking[] = 'The release has no tracks.';
+        }
+
+        if (blank($release->artwork_path)) {
+            $blocking[] = 'The poster (artwork) is missing.';
+        }
+
+        $noAudio = $tracks->filter(fn ($t) => blank($t->audio_path))->count();
+        if ($noAudio > 0) {
+            $blocking[] = $noAudio.' track(s) have no audio file.';
+        }
+
+        if ($legacy && blank($release->upc)) {
+            $blocking[] = 'Old (WordPress) release without UPC - enter its existing UPC first; codes are never made automatically for old releases.';
+        }
+
+        $noIsrc = $tracks->filter(fn ($t) => blank($t->isrc))->count();
+        if ($legacy && $noIsrc > 0) {
+            $blocking[] = $noIsrc.' old track(s) without ISRC - enter the existing ISRC first.';
+        }
+
+        if (!$legacy && blank($release->upc)) {
+            $notes[] = 'A new UPC will be assigned when delivery starts.';
+        }
+
+        if (!$legacy && $noIsrc > 0) {
+            $notes[] = $noIsrc.' track(s) will get a new ISRC when delivery starts.';
+        }
+
+        $storeIds = $this->resolveStoreIds($release);
+        if ($storeIds === []) {
+            $blocking[] = 'No active store to deliver to.';
+        } elseif (!is_array($release->stores) || $release->stores === []) {
+            $notes[] = 'No stores were chosen on the release, so all '.count($storeIds).' active stores will be used.';
+        } else {
+            $notes[] = count($storeIds).' store(s) chosen on the release.';
+        }
+
+        return ['blocking' => $blocking, 'notes' => $notes, 'stores' => count($storeIds)];
+    }
+
     public function transition(
         ReleaseStoreDelivery $delivery,
         string $newStatus,
@@ -210,17 +277,12 @@ class DeliveryWorkflowService
 
         $oldStatus = (string) $delivery->status;
 
-        abort_unless(
-            in_array(
-                $newStatus,
-                self::TRANSITIONS[
-                    $oldStatus
-                ] ?? [],
-                true
-            ),
-            422,
-            "Store delivery cannot move from {$oldStatus} to {$newStatus}."
-        );
+        if (!in_array($newStatus, self::TRANSITIONS[$oldStatus] ?? [], true)) {
+            /* W58: a readable message on the page instead of an error screen */
+            throw ValidationException::withMessages([
+                'status' => 'This store is '.str_replace('_', ' ', $oldStatus).' and cannot be marked '.str_replace('_', ' ', $newStatus).'.',
+            ]);
+        }
 
         if (
             $newStatus === 'failed'
@@ -241,7 +303,8 @@ class DeliveryWorkflowService
             $delivery,
             $newStatus,
             $user,
-            $data
+            $data,
+            $oldStatus
         ) {
             $updates = [
                 'status' =>
@@ -299,6 +362,26 @@ class DeliveryWorkflowService
             }
 
             $delivery->update($updates);
+
+            /* W58: every store status change is kept (who, when, from -> to, note) */
+            try {
+                app(AuditLogService::class)->record(
+                    'delivery.status_changed',
+                    'delivery',
+                    'Store delivery #'.$delivery->id.': '.$oldStatus.' -> '.$newStatus.'.',
+                    ['status' => $oldStatus],
+                    array_filter([
+                        'status' => $newStatus,
+                        'note' => $data['delivery_note'] ?? null,
+                        'error' => $data['error_message'] ?? null,
+                        'external_reference' => $data['external_reference'] ?? null,
+                        'release_id' => $delivery->release_id,
+                    ], fn ($v) => $v !== null && $v !== ''),
+                    $delivery
+                );
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
         });
 
         $this->syncReleaseStatus(
@@ -340,14 +423,27 @@ class DeliveryWorkflowService
             'Select at least one store delivery.'
         );
 
-        foreach ($deliveries as $delivery) {
-            $this->transition(
-                $delivery,
-                $newStatus,
-                $user,
-                $data
-            );
+        /* W58: check every store first - all change or none (no half-done bulk) */
+        $blocked = $deliveries->filter(
+            fn ($d) => !in_array($newStatus, self::TRANSITIONS[(string) $d->status] ?? [], true)
+        );
+
+        if ($blocked->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'status' => $blocked->count().' of the selected stores cannot move to '.str_replace('_', ' ', $newStatus).' from their current state. Nothing was changed.',
+            ]);
         }
+
+        DB::transaction(function () use ($deliveries, $newStatus, $user, $data) {
+            foreach ($deliveries as $delivery) {
+                $this->transition(
+                    $delivery,
+                    $newStatus,
+                    $user,
+                    $data
+                );
+            }
+        });
 
         return $this->deliveries(
             $release

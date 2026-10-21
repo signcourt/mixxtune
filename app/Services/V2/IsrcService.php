@@ -78,10 +78,15 @@ class IsrcService
     ): Track {
         $formatted = $this->validate($code);
 
-        $duplicate = Track::query()
-            ->where('isrc', $formatted)
-            ->where('id', '!=', $track->id)
-            ->exists();
+        /* W58: "INMXT2600001" and "IN-MXT-26-00001" are the same ISRC */
+        $duplicate = $this->usedElsewhere($formatted, (int) $track->id);
+
+        /* W58: replacing an existing code needs the e-mailed code and keeps the old one in the log */
+        $old = (string) ($track->isrc ?? '');
+        if ($old !== '' && $this->normalise($old) !== $this->normalise($formatted)) {
+            app(ActionOtpGuard::class)->require($user, 'identifier.isrc:'.$track->id.':'.$this->normalise($formatted), 'change ISRC '.$old.' of track #'.$track->id.' to '.$formatted);
+            $notes = trim('Replaced '.$old.'. '.(string) $notes);
+        }
 
         if ($duplicate) {
             throw ValidationException::withMessages([
@@ -212,6 +217,13 @@ class IsrcService
             ]);
         }
 
+        /* W58: never invent codes for old catalogue */
+        if (\App\Support\LegacyRelease::is($track->release()->first())) {
+            throw ValidationException::withMessages([
+                'isrc' => \App\Support\LegacyRelease::message('ISRC'),
+            ]);
+        }
+
         $countryCode = strtoupper(
             trim($countryCode)
         );
@@ -275,6 +287,14 @@ class IsrcService
 
             $designation =
                 ((int) $lastDesignation) + 1;
+
+            /* W58: skip numbers already used by a track (e.g. imported without dashes) */
+            while (
+                $designation <= 99999
+                && $this->usedElsewhere(sprintf('%s%s%s%05d', $countryCode, $registrantCode, substr((string) $year, -2), $designation), 0)
+            ) {
+                $designation++;
+            }
 
             if ($designation > 99999) {
                 throw ValidationException::withMessages([
@@ -373,6 +393,15 @@ class IsrcService
 
             return $freshTrack;
         });
+    }
+
+    /* W58: same ISRC in any spelling (with / without dashes, any case) on another track */
+    public function usedElsewhere(string $code, int $exceptTrackId): bool
+    {
+        return Track::query()
+            ->whereRaw("REPLACE(UPPER(isrc), '-', '') = ?", [$this->normalise($code)])
+            ->when($exceptTrackId > 0, fn ($q) => $q->where('id', '!=', $exceptTrackId))
+            ->exists();
     }
 
     private function log(

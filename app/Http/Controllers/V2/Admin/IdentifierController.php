@@ -25,12 +25,38 @@ class IdentifierController extends Controller
             'identifiers.view'
         );
 
+        /*
+         * W58: "new" = releases made in this panel (codes may be generated);
+         * "old" = old catalogue (WordPress / Legacy Import) - its real codes
+         * must be typed in, never generated. Plus a search box.
+         */
+        $scope = $request->query('scope') === 'old' ? 'old' : 'new';
+        $q = trim((string) $request->query('q', ''));
+        $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $q).'%';
+        $legacy = function ($w) {
+            $w->where('releases.catalog_number', 'like', 'WP-%')
+                ->orWhereExists(function ($e) {
+                    $e->selectRaw('1')->from('legacy_catalogue_import_rows as lcr')->whereColumn('lcr.release_id', 'releases.id');
+                });
+        };
+        $notLegacy = function ($w) {
+            $w->where(function ($x) {
+                $x->whereNull('releases.catalog_number')->orWhere('releases.catalog_number', 'not like', 'WP-%');
+            })->whereNotExists(function ($e) {
+                $e->selectRaw('1')->from('legacy_catalogue_import_rows as lcr')->whereColumn('lcr.release_id', 'releases.id');
+            });
+        };
+
         $trackQuery = Track::query()
             ->with([
-                'release:id,title,status,artist_id,label_id',
+                'release:id,title,status,artist_id,label_id,catalog_number',
             ])
             ->whereNull('isrc')
-            ->whereNull('deleted_at');
+            ->whereNull('deleted_at')
+            ->whereHas('release', fn ($r) => $r->where($scope === 'old' ? $legacy : $notLegacy))
+            ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x
+                ->whereRaw("tracks.title LIKE ? ESCAPE '!'", [$like])
+                ->orWhereHas('release', fn ($r) => $r->whereRaw("releases.title LIKE ? ESCAPE '!'", [$like]))));
 
         $releaseQuery = Release::query()
             ->with([
@@ -38,7 +64,12 @@ class IdentifierController extends Controller
                 'label:id,name',
             ])
             ->whereNull('upc')
-            ->whereNull('deleted_at');
+            ->whereNull('deleted_at')
+            ->where($scope === 'old' ? $legacy : $notLegacy)
+            ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x
+                ->whereRaw("releases.title LIKE ? ESCAPE '!'", [$like])
+                ->orWhereRaw("releases.catalog_number LIKE ? ESCAPE '!'", [$like])
+                ->orWhereRaw("releases.primary_artist_name LIKE ? ESCAPE '!'", [$like])));
 
         $pendingIsrc = $trackQuery
             ->orderByDesc('id')
@@ -71,6 +102,9 @@ class IdentifierController extends Controller
 
                 'pendingUpc' =>
                     $pendingUpc,
+
+                'scope' => $scope,
+                'q' => $q,
             ]
         );
     }
@@ -339,8 +373,16 @@ class IdentifierController extends Controller
             ->get();
 
         $assigned = [];
+        $skipped = 0;
 
         foreach ($tracks as $track) {
+            /* W58: old catalogue never gets generated codes */
+            if (\App\Support\LegacyRelease::is($track->release()->first())) {
+                $skipped++;
+
+                continue;
+            }
+
             $assigned[] = $isrc->generate(
                 $track,
                 $request->user(),
@@ -356,7 +398,8 @@ class IdentifierController extends Controller
         return response()->json([
             'message' =>
                 count($assigned)
-                . ' ISRC codes generated.',
+                . ' ISRC codes generated.'
+                . ($skipped ? ' '.$skipped.' old catalogue track(s) skipped - enter their existing ISRC.' : ''),
 
             'tracks' => $assigned,
         ]);
@@ -404,8 +447,15 @@ class IdentifierController extends Controller
             ->get();
 
         $assigned = [];
+        $skipped = 0;
 
         foreach ($releases as $release) {
+            if (\App\Support\LegacyRelease::is($release)) {
+                $skipped++;
+
+                continue;
+            }
+
             $assigned[] = $upc->generate(
                 $release,
                 $request->user(),
@@ -417,7 +467,8 @@ class IdentifierController extends Controller
         return response()->json([
             'message' =>
                 count($assigned)
-                . ' UPC codes generated.',
+                . ' UPC codes generated.'
+                . ($skipped ? ' '.$skipped.' old catalogue release(s) skipped - enter their existing UPC.' : ''),
 
             'releases' => $assigned,
         ]);
