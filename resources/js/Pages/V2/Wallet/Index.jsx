@@ -1,5 +1,5 @@
 import { Head, Link, router } from "@inertiajs/react";
-import { Download, History, ReceiptText, Search, WalletCards, X } from "lucide-react";
+import { ChevronDown, Download, History, ReceiptText, Search, WalletCards, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
@@ -111,14 +111,39 @@ function HistorySection({ transactions, money, staff, historyWallet, historyOwne
     const rows = transactions.data ?? [];
     const clear = () => router.get(window.location.pathname, { wallet: undefined, owner_search: new URLSearchParams(window.location.search).get("owner_search") || undefined }, { preserveScroll: true, preserveState: true });
 
+    /* W71: one clickable title "Transaction history & Invoices"; it opens the list below and scrolls to it */
+    const startOpen = () => {
+        if (historyWallet) return true;
+        try {
+            return new URLSearchParams(window.location.search).has("tx_page") || window.location.hash === "#history";
+        } catch {
+            return false;
+        }
+    };
+    const [open, setOpen] = useState(startOpen);
+    const bodyRef = useRef(null);
+    useEffect(() => {
+        if (historyWallet) setOpen(true);
+    }, [historyWallet]);
+    const toggle = () => {
+        setOpen((was) => {
+            if (!was) setTimeout(() => bodyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+            return !was;
+        });
+    };
+    const total = transactions.total ?? rows.length;
+    const title = staff ? (historyWallet ? `History · ${historyOwner ?? "owner"}` : "Wallet history & Invoices") : "Transaction history & Invoices";
+
     return (
         <section id="history" className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
-                <div className="flex items-center gap-2">
-                    <History className="h-4 w-4 text-slate-500" />
-                    <h2 className="text-base font-semibold text-slate-900">
-                        {staff ? (historyWallet ? `History · ${historyOwner ?? "owner"}` : "Latest wallet entries (all owners)") : "Transaction history"}
-                    </h2>
+            <div className={`flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5 ${open ? "border-b border-slate-100" : ""}`}>
+                <div className="flex min-w-0 items-center gap-2">
+                    <button type="button" onClick={toggle} aria-expanded={open} aria-controls="history-body" className="group flex min-w-0 items-center gap-2 rounded-lg py-1 pr-2 text-left">
+                        <History className="h-4 w-4 shrink-0 text-slate-500" />
+                        <h2 className="truncate text-base font-semibold text-slate-900 group-hover:text-violet-700">{title}</h2>
+                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{total} {total === 1 ? "entry" : "entries"}</span>
+                        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? "rotate-180" : ""}`} />
+                    </button>
                     {historyWallet && (
                         <button type="button" onClick={clear} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                             <X className="h-3 w-3" /> show all
@@ -130,6 +155,8 @@ function HistorySection({ transactions, money, staff, historyWallet, historyOwne
                 </Link>
             </div>
 
+            {!open ? null : (
+            <div id="history-body" ref={bodyRef} className="scroll-mt-4">
             {rows.length === 0 ? (
                 <div className="px-5 py-12 text-center">
                     <ReceiptText className="mx-auto h-9 w-9 text-slate-300" />
@@ -161,6 +188,8 @@ function HistorySection({ transactions, money, staff, historyWallet, historyOwne
                 </ul>
             )}
             <Pager page={transactions} name="History" />
+            </div>
+            )}
         </section>
     );
 }
