@@ -144,103 +144,98 @@ class RoyaltyController extends Controller
         };
 
 
+        /*
+         * W72 MIXXTUNE_ROYALTIES_V3: totals ignore cancelled statements,
+         * the monthly chart and the status counts come from ALL statements
+         * (not only the 25 on the page), and the status filter / month
+         * search run on the server so they cover every page.
+         */
+        $live = fn () => (clone $query)->where('royalty_statements.status', '!=', 'cancelled');
+        $notImport = fn ($q) => $q->whereNotExists($importJournal);
+
         $summary = [
-            'gross' =>
-                (float) (
-                    (clone $query)
-                        ->sum(
-                            'gross_earnings'
-                        )
-                ),
-
-            'pending' =>
-                (float) (
-                    (clone $query)
-                        ->where(
-                            'status',
-                            'pending'
-                        )
-                        ->whereNotExists($importJournal)
-                        ->sum(
-                            'net_payable'
-                        )
-                ),
-
-            'approved' =>
-                (float) (
-                    (clone $query)
-                        ->where(
-                            'status',
-                            'approved'
-                        )
-                        ->whereNotExists($importJournal)
-                        ->sum(
-                            'net_payable'
-                        )
-                ),
-
-            'available' =>
-                (float) (
-                    (clone $query)
-                        ->where(
-                            'status',
-                            'available'
-                        )
-                        ->sum(
-                            'net_payable'
-                        )
-                ),
-
-            'paid' =>
-                (float) (
-                    (clone $query)
-                        ->where(
-                            'status',
-                            'paid'
-                        )
-                        ->sum(
-                            'net_payable'
-                        )
-                ),
+            'gross' => (float) $live()->sum('gross_earnings'),
+            'deductions' => (float) $live()->sum(DB::raw('COALESCE(commission_amount, 0) + COALESCE(tax_amount, 0) + COALESCE(other_deductions, 0)')),
+            'net' => (float) $live()->sum('net_payable'),
+            'pending' => (float) $notImport((clone $query)->where('status', 'pending'))->sum('net_payable'),
+            'approved' => (float) $notImport((clone $query)->where('status', 'approved'))->sum('net_payable'),
+            'available' => (float) (clone $query)->where('status', 'available')->sum('net_payable'),
+            'paid' => (float) (clone $query)->where('status', 'paid')->sum('net_payable'),
+            'paid_via_import' => (float) (clone $query)->whereExists($importCredited)->sum('net_payable'),
+            'held_via_import' => (float) (clone $query)->whereExists($importHeld)->sum('net_payable'),
         ];
-        $summary['paid_via_import'] = (float) (
-            (clone $query)
-                ->whereExists($importCredited)
-                ->sum('net_payable')
-        );
 
-        $summary['held_via_import'] = (float) (
-            (clone $query)
-                ->whereExists($importHeld)
-                ->sum('net_payable')
-        );
+        $statusFilters = [
+            'pending' => fn ($q) => $notImport($q->where('royalty_statements.status', 'pending')),
+            'approved' => fn ($q) => $notImport($q->where('royalty_statements.status', 'approved')),
+            'available' => fn ($q) => $q->where('royalty_statements.status', 'available'),
+            'paid' => fn ($q) => $q->where('royalty_statements.status', 'paid'),
+            'import_paid' => fn ($q) => $q->whereExists($importCredited),
+            'import_held' => fn ($q) => $q->whereExists($importHeld),
+            'cancelled' => fn ($q) => $q->where('royalty_statements.status', 'cancelled'),
+        ];
 
+        $counts = ['all' => (clone $query)->count()];
+        foreach ($statusFilters as $key => $apply) {
+            $counts[$key] = $apply(clone $query)->count();
+        }
+
+        $monthly = $live()
+            ->whereNotNull('statement_month')
+            ->where('statement_month', '!=', '')
+            ->toBase()
+            ->reorder()
+            /* statement_month may be "2026-07" or "2026-07-01": group by the month part */
+            ->selectRaw('SUBSTR(statement_month, 1, 7) as ym')
+            ->selectRaw('COALESCE(SUM(net_payable), 0) as net')
+            ->selectRaw('COALESCE(SUM(gross_earnings), 0) as gross')
+            ->groupByRaw('SUBSTR(statement_month, 1, 7)')
+            ->orderByDesc('ym')
+            ->limit(12)
+            ->get()
+            ->reverse()
+            ->values()
+            ->map(fn ($r) => ['month' => (string) $r->ym, 'net' => round((float) $r->net, 2), 'gross' => round((float) $r->gross, 2)])
+            ->all();
+
+        $status = (string) $request->query('status', '');
+        if (!array_key_exists($status, $statusFilters)) {
+            $status = '';
+        }
+        $search = trim((string) $request->query('search', ''));
+
+        $list = clone $query;
+        if ($status !== '') {
+            $statusFilters[$status]($list);
+        }
+        if ($search !== '') {
+            $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
+            $list->where(function ($w) use ($like) {
+                $w->whereRaw("royalty_statements.statement_month LIKE ? ESCAPE '!'", [$like])
+                    ->orWhereRaw("royalty_statements.public_id LIKE ? ESCAPE '!'", [$like]);
+            });
+        }
 
         return Inertia::render(
             'V2/Royalties/Index',
             [
-                'role' =>
-                    $role,
-
-                'summary' =>
-                    $summary,
-
-                'statements' =>
-                    $query
-                        ->select('royalty_statements.*')
-                        ->addSelect([
-                            'import_posting_status' => DB::table('report_import_postings as rip')
-                                ->select('rip.status')
-                                ->whereColumn(
-                                    'rip.royalty_statement_id',
-                                    'royalty_statements.id'
-                                )
-                                ->limit(1),
-                        ])
-                        ->orderByDesc(
-                            'statement_month'
-                        )
-                        ->paginate(25),
+                'role' => $role,
+                'summary' => $summary,
+                'counts' => $counts,
+                'monthly' => $monthly,
+                'filters' => ['status' => $status, 'search' => $search],
+                'statements' => $list
+                    ->select('royalty_statements.*')
+                    ->addSelect([
+                        'import_posting_status' => DB::table('report_import_postings as rip')
+                            ->select('rip.status')
+                            ->whereColumn('rip.royalty_statement_id', 'royalty_statements.id')
+                            ->limit(1),
+                    ])
+                    ->orderByDesc('statement_month')
+                    ->orderByDesc('royalty_statements.id')
+                    ->paginate(25)
+                    ->withQueryString(),
             ]
         );
     }
