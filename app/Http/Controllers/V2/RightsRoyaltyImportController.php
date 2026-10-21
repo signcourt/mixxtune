@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Finance\RightsRoyaltyImport;
 use App\Services\Royalties\RightsRoyaltyImportService;
 use App\Services\Royalties\RightsRoyaltyPublishingService;
+use App\Services\V2\ActionOtpGuard;
+use App\Services\V2\FinanceAudit;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -202,13 +204,38 @@ class RightsRoyaltyImportController extends Controller
      */
 
     public function approve(
+        Request $request,
         RightsRoyaltyImport $import,
         RightsRoyaltyPublishingService $publishing
     ) {
+        /* W54: plain words before any code is e-mailed */
+        if ($import->status !== 'review_required') {
+            return response()->json([
+                'ok' => false,
+                'message' => $import->status === 'approved' || $import->status === 'published'
+                    ? 'This report is already '.$import->status.'.'
+                    : 'This report cannot be approved in its current state ('.$import->status.').',
+            ], 422);
+        }
+
+        /* W54: e-mailed code, same as revenue report approval */
+        app(ActionOtpGuard::class)->require(
+            $request->user(),
+            'rights.approve:'.$import->public_id,
+            'approve rights royalty report '.$import->source.' '.$import->statement_month
+        );
+
         try {
             $approved = $publishing->approve(
                 $import,
                 auth()->id()
+            );
+
+            FinanceAudit::log(
+                'finance.rights_import_approved',
+                'Rights royalty report approved: '.$approved->source.' '.$approved->statement_month.' ('.$approved->original_filename.').',
+                FinanceAudit::pick($approved, ['public_id', 'source', 'statement_month', 'currency', 'status', 'mapped_amount', 'unmapped_amount']),
+                $approved
             );
 
             return response()->json([
@@ -227,13 +254,37 @@ class RightsRoyaltyImportController extends Controller
     }
 
     public function publish(
+        Request $request,
         RightsRoyaltyImport $import,
         RightsRoyaltyPublishingService $publishing
     ) {
+        if (!in_array($import->status, ['approved', 'published'], true)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Approve the report first, then publish it.',
+            ], 422);
+        }
+
+        /* published again = nothing new is created (idempotent), so no code needed */
+        if ($import->status === 'approved') {
+            app(ActionOtpGuard::class)->require(
+                $request->user(),
+                'rights.publish:'.$import->public_id,
+                'publish rights royalty report '.$import->source.' '.$import->statement_month
+            );
+        }
+
         try {
             $result = $publishing->publish(
                 $import,
                 auth()->id()
+            );
+
+            if ((int) $result['created'] > 0) FinanceAudit::log(
+                'finance.rights_import_published',
+                'Rights royalty report published: '.$import->source.' '.$import->statement_month.' - '.(int) $result['created'].' ledger line(s) created.',
+                ['public_id' => $import->public_id, 'created_ledgers' => (int) $result['created'], 'skipped_ledgers' => (int) $result['skipped']],
+                $result['import']
             );
 
             return response()->json([

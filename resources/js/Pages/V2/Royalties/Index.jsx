@@ -168,6 +168,7 @@ export default function Index({
     role = 'artist',
     summary = {},
     statements = {},
+    rightsImports = [],
 }) {
     const rows =
         statements.data ?? [];
@@ -301,17 +302,21 @@ export default function Index({
             ? 'My Royalties'
             : role === 'label'
               ? 'Label Royalties'
-              : 'Royalties';
+              : ['admin', 'super_admin'].includes(role)
+                ? 'Rights Royalties'
+                : 'Royalties';
 
     return (
         <PanelLayout
             role={role}
             title={title}
-            subtitle="Monthly royalty statements, earnings and payment status"
+            subtitle={['admin', 'super_admin'].includes(role)
+                ? 'IPRS / PRS / TPL rights statements - upload, match, approve, publish'
+                : 'Monthly royalty statements, earnings and payment status'}
         >
             {/* MIXXTUNE_RIGHTS_ROYALTY_PANEL_V1 */}
             {role === 'super_admin' && (
-                <RightsRoyaltyUploadPanel role={role} />
+                <RightsRoyaltyUploadPanel role={role} imports={rightsImports} />
             )}
 
             <Head title={title} />

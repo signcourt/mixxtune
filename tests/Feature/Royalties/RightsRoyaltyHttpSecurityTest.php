@@ -6,11 +6,13 @@ use App\Models\User;
 use App\Models\Finance\RightsRoyaltyImport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Concerns\ConfirmsActionOtp;
 use Tests\TestCase;
 
 class RightsRoyaltyHttpSecurityTest extends TestCase
 {
     use RefreshDatabase;
+    use ConfirmsActionOtp;
 
     private function user(string $role): User
     {
@@ -355,6 +357,10 @@ class RightsRoyaltyHttpSecurityTest extends TestCase
         $walletBefore = \DB::table(
             'wallet_transactions'
         )->count();
+
+        /* W54: approve / publish need the e-mailed code */
+        $this->unlockActionOtp($super, 'rights.approve:'.$import->public_id);
+        $this->unlockActionOtp($super, 'rights.publish:'.$import->public_id);
 
         /*
          * APPROVE

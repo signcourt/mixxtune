@@ -3,6 +3,16 @@ import React, {
     useRef,
     useState,
 } from "react";
+import { router } from "@inertiajs/react";
+
+/* W54: status words + colours used by the list and the review */
+const STATUS = {
+    review_required: ["Waiting for review", "bg-amber-100 text-amber-700"],
+    approved: ["Approved - publish next", "bg-blue-100 text-blue-700"],
+    published: ["Published to ledger", "bg-emerald-100 text-emerald-700"],
+};
+const statusInfo = (s) =>
+    STATUS[s] || [String(s || "unknown").replaceAll("_", " "), "bg-slate-100 text-slate-600"];
 
 const csrfToken = () =>
     document
@@ -50,7 +60,7 @@ const apiErrors = async (response) => {
     );
 };
 
-export default function RightsRoyaltyUploadPanel({ role = "label" }) {
+export default function RightsRoyaltyUploadPanel({ role = "label", imports = [] }) {
     const isSuperAdmin = role === "super_admin";
 
     /*
@@ -107,6 +117,12 @@ export default function RightsRoyaltyUploadPanel({ role = "label" }) {
     const [error, setError] =
         useState("");
 
+    /* W54: e-mailed code box for approve / publish */
+    const [otpFor, setOtpFor] = useState(null);
+    const [otpMessage, setOtpMessage] = useState("");
+    const [otpCode, setOtpCode] = useState("");
+    const [otpInfo, setOtpInfo] = useState("");
+
     const headers = useMemo(
         () => inspection?.headers || [],
         [inspection]
@@ -132,6 +148,10 @@ export default function RightsRoyaltyUploadPanel({ role = "label" }) {
         setRows([]);
         setPagination(null);
         setError("");
+        setOtpFor(null);
+        setOtpMessage("");
+        setOtpCode("");
+        setOtpInfo("");
 
         if (fileRef.current) {
             fileRef.current.value = "";
@@ -143,6 +163,25 @@ export default function RightsRoyaltyUploadPanel({ role = "label" }) {
 
         setOpen(false);
         reset();
+
+        /* W54: list shows the new / changed report at once */
+        router.reload({ only: ["rightsImports"], preserveScroll: true });
+    };
+
+    /* W54: open an earlier upload straight at its review */
+    const openImport = async (publicId) => {
+        reset();
+        setOpen(true);
+        setStep(3);
+        setBusy(true);
+
+        try {
+            await loadReview(publicId);
+        } catch (e) {
+            setError(e?.message || "Unable to open this report.");
+        } finally {
+            setBusy(false);
+        }
     };
 
     const inspectFile = async () => {
@@ -379,6 +418,24 @@ export default function RightsRoyaltyUploadPanel({ role = "label" }) {
             );
 
             if (!response.ok) {
+                /* W54: a code was e-mailed - show the code box */
+                if (response.status === 422) {
+                    let payload = {};
+                    try {
+                        payload = await response.clone().json();
+                    } catch {
+                        payload = {};
+                    }
+                    const otpError = payload?.errors?.action_otp;
+                    if (otpError) {
+                        setOtpFor(action);
+                        setOtpMessage(Array.isArray(otpError) ? otpError[0] : String(otpError));
+                        setOtpCode("");
+                        setOtpInfo("");
+                        return;
+                    }
+                }
+
                 throw new Error(
                     await apiErrors(response)
                 );
@@ -386,6 +443,8 @@ export default function RightsRoyaltyUploadPanel({ role = "label" }) {
 
             const data =
                 await response.json();
+
+            setOtpFor(null);
 
             if (data?.import) {
                 setResult(data.import);
@@ -406,6 +465,57 @@ export default function RightsRoyaltyUploadPanel({ role = "label" }) {
             );
         } finally {
             setBusy(false);
+        }
+    };
+
+    /* W54: enter the code, then the same action runs again by itself */
+    const confirmOtp = async () => {
+        if (!otpFor || busy) return;
+        setError("");
+        setOtpInfo("");
+        setBusy(true);
+        let ok = false;
+        try {
+            const response = await fetch("/v2/admin/action-otp/unlock", {
+                method: "POST",
+                headers: {
+                    "X-CSRF-TOKEN": csrfToken(),
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({ otp: otpCode.trim() }),
+            });
+            if (!response.ok) {
+                setOtpInfo(await apiErrors(response));
+            } else {
+                ok = true;
+            }
+        } catch (e) {
+            setOtpInfo(e?.message || "Could not check the code.");
+        } finally {
+            setBusy(false);
+        }
+        if (ok) {
+            const action = otpFor;
+            setOtpFor(null);
+            await runLifecycleAction(action);
+        }
+    };
+
+    const resendOtp = async () => {
+        if (busy) return;
+        setOtpInfo("");
+        try {
+            const response = await fetch("/v2/admin/action-otp/resend", {
+                method: "POST",
+                headers: { "X-CSRF-TOKEN": csrfToken(), Accept: "application/json" },
+                credentials: "same-origin",
+            });
+            const data = response.ok ? await response.json() : null;
+            setOtpInfo(data?.message || (await apiErrors(response)));
+        } catch (e) {
+            setOtpInfo(e?.message || "Could not send a new code.");
         }
     };
 
@@ -460,13 +570,102 @@ export default function RightsRoyaltyUploadPanel({ role = "label" }) {
             </div>
             )}
 
+            {/* W54: every uploaded rights report, so an earlier one can be opened, approved and published */}
+            {isSuperAdmin && (
+                <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
+                        <div>
+                            <h3 className="text-base font-bold text-slate-900">Uploaded rights reports</h3>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                                Open a report to check its matching, approve it and publish it to the royalty ledger.
+                            </p>
+                        </div>
+                        <div className="text-xs font-semibold text-slate-500">
+                            {imports.length} report(s)
+                        </div>
+                    </div>
+
+                    {imports.length === 0 ? (
+                        <div className="px-5 py-10 text-center text-sm text-slate-500">
+                            No rights report uploaded yet. Press <b>+ Upload Royalty Report</b> to add an IPRS / PRS / TPL file.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    <tr>
+                                        <th className="px-5 py-3">Report</th>
+                                        <th className="px-5 py-3">Month</th>
+                                        <th className="px-5 py-3 text-right">Rows matched</th>
+                                        <th className="px-5 py-3 text-right">Amount</th>
+                                        <th className="px-5 py-3">Status</th>
+                                        <th className="px-5 py-3 text-right"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {imports.map((item) => {
+                                        const [label, tone] = statusInfo(item.status);
+                                        return (
+                                            <tr key={item.public_id} className="hover:bg-slate-50">
+                                                <td className="px-5 py-3">
+                                                    <div className="font-semibold text-slate-900">{item.source}</div>
+                                                    <div className="max-w-[260px] truncate text-xs text-slate-500" title={item.file}>
+                                                        {item.file} · {item.uploaded}
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-3 font-medium text-slate-700">{item.statement_month}</td>
+                                                <td className="px-5 py-3 text-right text-slate-700">
+                                                    {Number(item.mapped_rows).toLocaleString("en-IN")} / {Number(item.total_rows).toLocaleString("en-IN")}
+                                                    {item.unmapped_rows > 0 && (
+                                                        <div className="text-xs text-amber-700">
+                                                            {Number(item.unmapped_rows).toLocaleString("en-IN")} not matched
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-5 py-3 text-right">
+                                                    <div className="font-semibold text-slate-900">{money(item.gross_amount, item.currency)}</div>
+                                                    {item.unmapped_amount > 0 && (
+                                                        <div className="text-xs text-amber-700">
+                                                            {money(item.unmapped_amount, item.currency)} not matched
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-5 py-3">
+                                                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${tone}`}>{label}</span>
+                                                    {(item.published || item.approved) && (
+                                                        <div className="mt-1 text-xs text-slate-400">
+                                                            {item.published ? `published ${item.published}` : `approved ${item.approved}`}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-5 py-3 text-right">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openImport(item.public_id)}
+                                                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                    >
+                                                        {item.status === "review_required" ? "Review" : item.status === "approved" ? "Publish" : "Open"}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {open && isSuperAdmin && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
                     <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-2xl">
                         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
                             <div>
                                 <h3 className="text-xl font-bold text-slate-900">
-                                    Upload Royalty Report
+                                    {step === 3 && result
+                                        ? `${result.source} rights report · ${result.statement_month}`
+                                        : "Upload Royalty Report"}
                                 </h3>
 
                                 <p className="mt-1 text-sm text-slate-500">
@@ -1157,6 +1356,41 @@ export default function RightsRoyaltyUploadPanel({ role = "label" }) {
                                                 </div>
                                             )}
 
+                                        {otpFor && (
+                                            <div className="mt-6 rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                                                <div className="text-sm font-bold text-violet-900">
+                                                    Confirm: {otpFor === "approve" ? "approve this report" : "publish this report to the ledger"}
+                                                </div>
+                                                <p className="mt-1 text-xs text-violet-800">{otpMessage}</p>
+                                                <p className="mt-1 text-xs font-semibold text-violet-900">After "Confirm code" the action runs by itself.</p>
+                                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                    <input
+                                                        value={otpCode}
+                                                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                                        onKeyDown={(e) => { if (e.key === "Enter" && otpCode.length === 6) confirmOtp(); }}
+                                                        inputMode="numeric"
+                                                        placeholder="6-digit code"
+                                                        className={`w-40 rounded-xl border border-violet-300 bg-white px-3 py-2 text-center ${otpCode ? "text-lg font-bold tracking-[0.3em]" : "text-sm"}`}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        disabled={busy || otpCode.length !== 6}
+                                                        onClick={confirmOtp}
+                                                        className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+                                                    >
+                                                        {busy ? "Working..." : "Confirm code"}
+                                                    </button>
+                                                    <button type="button" disabled={busy} onClick={resendOtp} className="rounded-xl border border-violet-300 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700">
+                                                        Send a new code
+                                                    </button>
+                                                    <button type="button" disabled={busy} onClick={() => setOtpFor(null)} className="px-2 text-sm font-semibold text-slate-500">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                                {otpInfo && <div className="mt-2 text-xs font-semibold text-violet-900">{otpInfo}</div>}
+                                            </div>
+                                        )}
+
                                         <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                                                 <div>
@@ -1179,13 +1413,7 @@ export default function RightsRoyaltyUploadPanel({ role = "label" }) {
                                                                 " "
                                                             )}
                                                         >
-                                                            {String(
-                                                                result.status ||
-                                                                    "review_required"
-                                                            ).replaceAll(
-                                                                "_",
-                                                                " "
-                                                            )}
+                                                            {statusInfo(result.status || "review_required")[0]}
                                                         </span>
 
                                                         {Number(

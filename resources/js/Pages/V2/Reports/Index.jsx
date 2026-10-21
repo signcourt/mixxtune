@@ -1278,8 +1278,13 @@ export default function ReportsIndex({
                                                     );
                                                 }
                                             }}
-                                            className="w-full rounded-xl border-slate-300 bg-white"
+                                            disabled={!reportingPeriods.length}
+                                            className="w-full rounded-xl border-slate-300 bg-white disabled:bg-slate-50 disabled:text-slate-400"
                                         >
+                                            {/* W54: say why it is empty instead of a blank box */}
+                                            {!reportingPeriods.length && (
+                                                <option value="">No published month yet</option>
+                                            )}
                                             {reportingPeriods.map(
                                                 (item) => (
                                                     <option
@@ -1305,8 +1310,12 @@ export default function ReportsIndex({
                                                     e.target.value
                                                 )
                                             }
-                                            className="w-full rounded-xl border-slate-300 bg-white"
+                                            disabled={!availableToPeriods.length}
+                                            className="w-full rounded-xl border-slate-300 bg-white disabled:bg-slate-50 disabled:text-slate-400"
                                         >
+                                            {!availableToPeriods.length && (
+                                                <option value="">No published month yet</option>
+                                            )}
                                             {availableToPeriods.map(
                                                 (item) => (
                                                     <option
@@ -1856,12 +1865,14 @@ export default function ReportsIndex({
                         {step < 4 && (
                             <button
                                 type="button"
+                                disabled={!reportingPeriods.length}
+                                title={reportingPeriods.length ? undefined : 'A report can be built once a month is published'}
                                 onClick={() =>
                                     setStep((current) =>
                                         Math.min(4, current + 1)
                                     )
                                 }
-                                className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white"
+                                className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 Next
                                 <ChevronRight size={16} />

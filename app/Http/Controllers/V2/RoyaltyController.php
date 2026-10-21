@@ -28,6 +28,20 @@ class RoyaltyController extends Controller
             $request->user()
         );
 
+        /*
+         * W54: admins / super admin see only the rights royalty tools here
+         * (statements live on Finance & Royalties and Statements), so the
+         * statement totals + list are not queried for them at all.
+         */
+        if (in_array($role, ['admin', 'super_admin'], true)) {
+            return Inertia::render('V2/Royalties/Index', [
+                'role' => $role,
+                'summary' => [],
+                'statements' => ['data' => []],
+                'rightsImports' => $role === 'super_admin' ? $this->rightsImports() : [],
+            ]);
+        }
+
         $query =
             RoyaltyStatement::query();
 
@@ -229,5 +243,37 @@ class RoyaltyController extends Controller
                         ->paginate(25),
             ]
         );
+    }
+
+    /* W54: list of uploaded rights royalty reports (newest first) */
+    private function rightsImports(): array
+    {
+        return \App\Models\Finance\RightsRoyaltyImport::query()
+            ->select([
+                'public_id', 'source', 'statement_month', 'currency', 'original_filename', 'status',
+                'total_rows', 'mapped_rows', 'unmapped_rows', 'gross_amount', 'mapped_amount',
+                'unmapped_amount', 'processed_at', 'approved_at', 'published_at', 'created_at',
+            ])
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get()
+            ->map(fn ($i) => [
+                'public_id' => $i->public_id,
+                'source' => $i->source,
+                'statement_month' => $i->statement_month,
+                'currency' => $i->currency,
+                'file' => $i->original_filename,
+                'status' => $i->status,
+                'total_rows' => (int) $i->total_rows,
+                'mapped_rows' => (int) $i->mapped_rows,
+                'unmapped_rows' => (int) $i->unmapped_rows,
+                'gross_amount' => round((float) $i->gross_amount, 2),
+                'mapped_amount' => round((float) $i->mapped_amount, 2),
+                'unmapped_amount' => round((float) $i->unmapped_amount, 2),
+                'uploaded' => optional($i->created_at)?->timezone('Asia/Kolkata')->format('d M Y, h:i A'),
+                'approved' => $i->approved_at ? \Illuminate\Support\Carbon::parse($i->approved_at)->timezone('Asia/Kolkata')->format('d M Y') : null,
+                'published' => $i->published_at ? \Illuminate\Support\Carbon::parse($i->published_at)->timezone('Asia/Kolkata')->format('d M Y') : null,
+            ])
+            ->all();
     }
 }
