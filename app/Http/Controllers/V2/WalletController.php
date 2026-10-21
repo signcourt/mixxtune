@@ -149,17 +149,34 @@ class WalletController extends Controller
                     'lifetime_credits'
                 ];
 
-            $wallet['hold_balance'] =
-                0.0;
+            /*
+             * MIXXTUNE_WALLET_V2 (W44): "On hold" was always 0. Money in
+             * withdrawal requests (asked / approved, not yet paid) is now
+             * shown on its own; "pending" = royalties approved but not yet
+             * released (pending balance minus the withdrawal holds).
+             */
+            $inWithdrawal = (float) \Illuminate\Support\Facades\DB::table('withdrawals')
+                ->whereIn('wallet_id', $walletIds)
+                ->whereIn('status', ['pending', 'approved'])
+                ->sum('amount');
 
-            $transactions =
+            $wallet['hold_balance'] = round($inWithdrawal, 2);
+            $wallet['in_withdrawal'] = round($inWithdrawal, 2);
+            $wallet['royalty_pending'] = round(max(0, $wallet['pending_balance'] - $inWithdrawal), 2);
+            $wallet['owners_with_money'] = (clone $walletQuery)->where('available_balance', '>', 0)->count();
+            $wallet['wallet_count'] = $walletIds->count();
+
+            /* history: one owner (wallet=ID, inside scope) or everybody */
+            $onlyWallet = (int) $request->input('wallet', 0);
+            if ($onlyWallet && ! $walletIds->contains($onlyWallet)) {
+                $onlyWallet = 0;
+            }
+
+            $transactions = $this->history(
                 \App\Models\Finance\WalletTransaction::query()
-                    ->whereIn(
-                        'wallet_id',
-                        $walletIds
-                    )
-                    ->orderByDesc('id')
-                    ->paginate(30);
+                    ->whereIn('wallet_id', $onlyWallet ? [$onlyWallet] : $walletIds),
+                true
+            );
 
             /*
              * MIXXTUNE_FINANCE_CLEANUP_V1: one row per owner wallet
@@ -167,9 +184,15 @@ class WalletController extends Controller
              */
             $ownerSearch = mb_substr(trim((string) $request->input('owner_search', '')), 0, 100);
 
+            $holds = \Illuminate\Support\Facades\DB::table('withdrawals')
+                ->select('wallet_id', \Illuminate\Support\Facades\DB::raw('SUM(amount) as held'))
+                ->whereIn('status', ['pending', 'approved'])
+                ->groupBy('wallet_id');
+
             $ownersQuery = WalletAccount::query()
                 ->whereIn('wallets.id', $walletIds)
                 ->leftJoin('users', 'users.id', '=', 'wallets.user_id')
+                ->leftJoinSub($holds, 'h', 'h.wallet_id', '=', 'wallets.id')
                 ->select([
                     'wallets.id',
                     'wallets.user_id',
@@ -182,21 +205,43 @@ class WalletController extends Controller
                     'users.name as owner_name',
                     'users.email as owner_email',
                     'users.role as owner_role',
+                    'users.client_id as owner_client_id',
+                    \Illuminate\Support\Facades\DB::raw('COALESCE(h.held, 0) as in_withdrawal'),
                 ]);
 
             if ($ownerSearch !== '') {
                 $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $ownerSearch).'%';
 
                 $ownersQuery->where(function ($builder) use ($term) {
-                    $builder->where('users.name', 'like', $term)->orWhere('users.email', 'like', $term);
+                    $builder->where('users.name', 'like', $term)->orWhere('users.email', 'like', $term)->orWhere('users.client_id', 'like', $term);
                 });
             }
 
+            $sort = in_array($request->input('sort'), ['available', 'pending', 'earned', 'recent'], true) ? $request->input('sort') : 'available';
+            $ownersQuery->orderByDesc(match ($sort) {
+                'pending' => 'wallets.pending_balance',
+                'earned' => 'wallets.lifetime_credits',
+                'recent' => 'wallets.updated_at',
+                default => 'wallets.available_balance',
+            })->orderBy('wallets.id');
+
             $owners = $ownersQuery
-                ->orderByDesc('wallets.available_balance')
-                ->orderBy('wallets.id')
                 ->paginate(25, ['*'], 'owners_page')
-                ->withQueryString();
+                ->withQueryString()
+                ->through(fn ($w) => [
+                    'id' => $w->id,
+                    'user_id' => $w->user_id,
+                    'owner_name' => $w->owner_name,
+                    'owner_email' => $w->owner_email,
+                    'owner_role' => $w->owner_role,
+                    'client_id' => $w->owner_client_id,
+                    'available_balance' => round((float) $w->available_balance, 2),
+                    'in_withdrawal' => round((float) $w->in_withdrawal, 2),
+                    'royalty_pending' => round(max(0, (float) $w->pending_balance - (float) $w->in_withdrawal), 2),
+                    'lifetime_credits' => round((float) $w->lifetime_credits, 2),
+                    'lifetime_debits' => round((float) $w->lifetime_debits, 2),
+                    'updated' => $w->updated_at ? \Illuminate\Support\Carbon::parse($w->updated_at)->timezone('Asia/Kolkata')->format('d M Y') : null,
+                ]);
 
             return Inertia::render(
                 'V2/Wallet/Index',
@@ -226,6 +271,10 @@ class WalletController extends Controller
 
                     'ownerSearch' =>
                         $ownerSearch,
+
+                    'historyWallet' => $onlyWallet ?: null,
+                    'historyOwner' => $onlyWallet ? WalletAccount::query()->leftJoin('users', 'users.id', '=', 'wallets.user_id')->where('wallets.id', $onlyWallet)->value('users.name') : null,
+                    'sort' => $sort,
                 ]
             );
         }
@@ -269,10 +318,13 @@ class WalletController extends Controller
                     $wallet,
 
                 'transactions' =>
-                    $wallet
-                        ->transactions()
-                        ->orderByDesc('id')
-                        ->paginate(30),
+                    $this->history($wallet->transactions()->getQuery(), false),
+
+                /* MIXXTUNE_WALLET_V2: money in withdrawal requests (was "on hold" 0) */
+                'inWithdrawal' => round((float) \Illuminate\Support\Facades\DB::table('withdrawals')
+                    ->where('wallet_id', $wallet->id)
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->sum('amount'), 2),
 
                 /* MIXXTUNE_RECOUPMENT_V2: advance still being repaid */
                 'advances' =>
@@ -301,5 +353,92 @@ class WalletController extends Controller
                         ->values(),
             ]
         );
+    }
+    /*
+     * MIXXTUNE_WALLET_V2 (W44): history rows with readable date (IST), type
+     * name, owner (staff view), paging ("tx_page"). Before: raw ISO dates,
+     * raw type codes, no paging links, no owner on the staff page.
+     */
+    private function history($query, bool $staff)
+    {
+        $labels = [
+            'royalty_credit' => 'Royalty (pending)',
+            'royalty_import' => 'Royalty',
+            'available_credit' => 'Royalty released',
+            'withdrawal_hold' => 'Withdrawal requested',
+            'withdrawal_release' => 'Withdrawal returned',
+            'withdrawal_paid' => 'Withdrawal paid',
+            'manual_adjustment' => 'Manual adjustment',
+            'adjustment_reversal' => 'Adjustment reversed',
+            'recoupment' => 'Advance recovery',
+        ];
+
+        $page = $query
+            ->orderByDesc('id')
+            ->paginate(30, ['*'], 'tx_page')
+            ->withQueryString();
+
+        $names = $staff
+            ? \Illuminate\Support\Facades\DB::table('users')->whereIn('id', $page->getCollection()->pluck('user_id')->filter())->pluck('name', 'id')
+            : collect();
+
+        return $page->through(function ($t) use ($labels, $names, $staff) {
+            $type = (string) ($t->transaction_type ?? '');
+            $when = $t->posted_at ?? $t->created_at;
+
+            return [
+                'id' => $t->id,
+                'date' => $when ? \Illuminate\Support\Carbon::parse($when)->timezone('Asia/Kolkata')->format('d M Y, h:i A') : '—',
+                'type' => $labels[$type] ?? ucfirst(str_replace('_', ' ', $type ?: 'entry')),
+                'direction' => $t->direction,
+                'amount' => round((float) $t->amount, 2),
+                'balance_after' => $t->balance_after !== null ? round((float) $t->balance_after, 2) : null,
+                'description' => $t->description,
+                'month' => $t->financial_month ? \Illuminate\Support\Carbon::parse($t->financial_month)->format('M Y') : null,
+                'owner' => $staff ? ($names[$t->user_id] ?? null) : null,
+                'wallet_id' => $t->wallet_id,
+            ];
+        });
+    }
+
+    /* MIXXTUNE_WALLET_V2: owner balances as CSV (same scope as the page) */
+    public function export(
+        Request $request,
+        PermissionService $permissions,
+        AdminFinancialAccessService $adminFinancialAccess
+    ): \Symfony\Component\HttpFoundation\StreamedResponse {
+        abort_unless(in_array($permissions->role($request->user()), ['admin', 'super_admin'], true), 403);
+
+        $walletQuery = WalletAccount::query();
+        $adminFinancialAccess->applyFinancialOwnerScope($walletQuery, $request->user());
+        $ids = $walletQuery->pluck('id');
+
+        $holds = \Illuminate\Support\Facades\DB::table('withdrawals')->whereIn('wallet_id', $ids)->whereIn('status', ['pending', 'approved'])
+            ->groupBy('wallet_id')->select('wallet_id', \Illuminate\Support\Facades\DB::raw('SUM(amount) as held'))->pluck('held', 'wallet_id');
+
+        $rows = WalletAccount::query()->whereIn('wallets.id', $ids)->leftJoin('users', 'users.id', '=', 'wallets.user_id')
+            ->orderByDesc('wallets.available_balance')
+            ->get(['wallets.*', 'users.name as owner_name', 'users.email as owner_email', 'users.role as owner_role', 'users.client_id as owner_client_id']);
+
+        \App\Services\V2\FinanceAudit::log('finance.wallets_exported', 'Owner wallet balances exported (CSV).', ['wallets' => $rows->count()]);
+
+        return response()->streamDownload(function () use ($rows, $holds) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['Owner', 'E-mail', 'Role', 'Client ID', 'Currency', 'Available', 'Royalty pending', 'In withdrawal', 'Lifetime credits', 'Lifetime debits', 'Last change']);
+            foreach ($rows as $w) {
+                $held = (float) ($holds[$w->id] ?? 0);
+                fputcsv($out, [
+                    $w->owner_name, $w->owner_email, $w->owner_role, $w->owner_client_id, $w->currency,
+                    number_format((float) $w->available_balance, 2, '.', ''),
+                    number_format(max(0, (float) $w->pending_balance - $held), 2, '.', ''),
+                    number_format($held, 2, '.', ''),
+                    number_format((float) $w->lifetime_credits, 2, '.', ''),
+                    number_format((float) $w->lifetime_debits, 2, '.', ''),
+                    optional($w->updated_at)->format('Y-m-d H:i'),
+                ]);
+            }
+            fclose($out);
+        }, 'owner-wallets-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }

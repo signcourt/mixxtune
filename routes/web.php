@@ -1958,6 +1958,14 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.admin.wallet.index');
 
+/* MIXXTUNE_WALLET_V2: owner balances CSV */
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/v2/admin/wallet/export',
+        [\App\Http\Controllers\V2\WalletController::class, 'export']
+    )
+    ->name('v2.admin.wallet.export');
+
 
 
 /*
