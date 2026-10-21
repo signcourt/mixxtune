@@ -193,19 +193,24 @@ class SystemSettingsController extends Controller
                 'boolean',
             ],
 
+            /* MIXXTUNE_SETTINGS_WIRED_V1: a switched-on window needs a date and both times */
             'maintenance.date' => [
                 'nullable',
+                'required_if_accepted:maintenance.enabled',
                 'date_format:Y-m-d',
             ],
 
             'maintenance.start_time' => [
                 'nullable',
+                'required_if_accepted:maintenance.enabled',
                 'date_format:H:i',
             ],
 
             'maintenance.end_time' => [
                 'nullable',
+                'required_if_accepted:maintenance.enabled',
                 'date_format:H:i',
+                'different:maintenance.start_time',
             ],
 
             'maintenance.message' => [
@@ -236,7 +241,8 @@ class SystemSettingsController extends Controller
             'invoice.prefix' => [
                 'required',
                 'string',
-                'max:20',
+                'max:12',
+                'regex:/^[A-Za-z0-9]+$/',
             ],
 
             'invoice.gst_percent' => [
@@ -260,6 +266,26 @@ class SystemSettingsController extends Controller
             'invitation.reminders_enabled' => ['sometimes', 'boolean'],
             'invitation.reminder_every_days' => ['sometimes', 'integer', 'min:1', 'max:30'],
             'invitation.reminder_max' => ['sometimes', 'integer', 'min:0', 'max:10'],
+        ], [
+            'maintenance.date.required_if_accepted' => 'Choose the maintenance date (maintenance is switched on).',
+            'maintenance.start_time.required_if_accepted' => 'Choose the start time (maintenance is switched on).',
+            'maintenance.end_time.required_if_accepted' => 'Choose the end time (maintenance is switched on).',
+            'maintenance.end_time.different' => 'End time must be different from the start time.',
+            'invoice.prefix.regex' => 'Invoice prefix: letters and numbers only (for example INV or MXT).',
+        ], [
+            'branding.name' => 'Brand name', 'branding.logo_url' => 'Panel logo', 'branding.login_logo_url' => 'Login logo',
+            'company.name' => 'Company name', 'company.email' => 'Company e-mail', 'company.phone' => 'Phone',
+            'company.gst_number' => 'GST number', 'company.pan_number' => 'PAN number',
+            'release.minimum_days_ahead' => 'Minimum days before release',
+            'upload.audio_max_mb' => 'Audio maximum MB', 'upload.artwork_max_mb' => 'Artwork maximum MB',
+            'upload.report_max_mb' => 'Report maximum MB',
+            'maintenance.date' => 'Maintenance date', 'maintenance.start_time' => 'Start time', 'maintenance.end_time' => 'End time',
+            'finance.default_currency' => 'Default currency', 'finance.minimum_withdrawal' => 'Minimum withdrawal',
+            'finance.default_commission_percent' => 'Default commission %',
+            'invoice.prefix' => 'Invoice prefix', 'invoice.gst_percent' => 'GST %', 'invoice.tds_percent' => 'TDS %',
+            'invoice.tds_no_pan_percent' => 'TDS % without PAN', 'invoice.tds_threshold' => 'TDS yearly limit',
+            'payout.debit_account_number' => 'Company Axis account number',
+            'invitation.reminder_every_days' => 'Remind every (days)', 'invitation.reminder_max' => 'Reminders per person',
         ]);
 
         $oldValues = $settings->grouped();
@@ -442,7 +468,8 @@ class SystemSettingsController extends Controller
             ],
 
             'release' => [
-                'release.minimum_days_ahead' => 7,
+                /* MIXXTUNE_SETTINGS_WIRED_V1: 1 = the old "after today" rule */
+                'release.minimum_days_ahead' => 1,
                 'release.allow_explicit' => true,
                 'release.require_artwork' => true,
                 'release.require_wav' => true,

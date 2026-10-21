@@ -526,6 +526,12 @@ class ReleaseTrackController extends Controller
             'is_explicit' => [
                 'nullable',
                 'boolean',
+                /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Release Rules > Allow Explicit Content */
+                function ($attribute, $value, $fail) {
+                    if (filter_var($value, FILTER_VALIDATE_BOOLEAN) && !\App\Services\V2\PlatformRules::allowExplicit() && (request()->user()?->role ?? null) !== 'super_admin') {
+                        $fail('Explicit content is switched off in Master Settings. Untick "Explicit" for this track.');
+                    }
+                },
             ],
 
             'is_instrumental' => [
@@ -562,7 +568,8 @@ class ReleaseTrackController extends Controller
 
                 'file',
                 'mimes:wav,wave',
-                'max:307200',
+                /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Upload Rules > Audio Maximum MB */
+                'max:'.(\App\Services\V2\PlatformRules::audioMaxMb() * 1024),
             ],
 
             'status' => [

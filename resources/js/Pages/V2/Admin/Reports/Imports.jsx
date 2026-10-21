@@ -2,6 +2,7 @@ import {
     Head,
     router,
     useForm,
+    usePage,
 } from '@inertiajs/react';
 
 import {
@@ -85,6 +86,9 @@ export default function Imports({
     imports = {},
     errors: pageErrors = {},
 }) {
+    /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Report Maximum MB */
+    const reportMaxMb = Number(usePage().props?.platformRules?.report_max_mb) || 500;
+
     const [editing, setEditing] = useState(null);
     const [editMonth, setEditMonth] = useState('');
     const [actionBusy, setActionBusy] = useState(false);
@@ -274,7 +278,7 @@ export default function Imports({
                     </h2>
 
                     <p className="mt-1 text-sm text-slate-500">
-                        Maximum file size: 500 MB.
+                        Maximum file size: {reportMaxMb} MB.
                     </p>
 
                     <div className="mt-5">

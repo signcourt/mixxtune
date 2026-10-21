@@ -148,7 +148,8 @@ class InvoiceGenerationService
                 ->lockForUpdate()
                 ->count() + 1;
 
-            $prefix = 'INV';
+            /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Invoice Prefix */
+            $prefix = \App\Services\V2\PlatformRules::invoicePrefix();
 
             $invoiceNumber = sprintf(
                 '%s-%s-%06d',

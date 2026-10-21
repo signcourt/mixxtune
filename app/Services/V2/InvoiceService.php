@@ -172,8 +172,10 @@ class InvoiceService
             )
             ->max('id') ?? 0;
 
+        /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Invoice Prefix */
         return sprintf(
-            'INV-%s-%06d',
+            '%s-%s-%06d',
+            PlatformRules::invoicePrefix(),
             $year,
             $lastId + 1
         );

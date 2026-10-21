@@ -1,6 +1,7 @@
 import {
     router,
     useForm,
+    usePage,
 } from '@inertiajs/react';
 
 import {
@@ -275,6 +276,9 @@ export default function TrackManager({
     onSaved = () => {},
     onMascotEvent = () => {},
 }) {
+    /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Audio Maximum MB */
+    const audioMaxMb = Number(usePage().props?.platformRules?.audio_max_mb) || 300;
+
     const tracks = Array.isArray(release?.tracks)
         ? release.tracks
         : [];
@@ -534,12 +538,13 @@ export default function TrackManager({
             return;
         }
 
+        const maxMb = audioMaxMb;
         const maxSize =
-            300 * 1024 * 1024;
+            maxMb * 1024 * 1024;
 
         if (file.size > maxSize) {
             window.alert(
-                'WAV file must be 300 MB or smaller.'
+                `WAV file must be ${maxMb} MB or smaller.`
             );
 
             return;
@@ -963,7 +968,7 @@ export default function TrackManager({
                                     </p>
 
                                     <span>
-                                        WAV only · Maximum 300 MB
+                                        WAV only · Maximum {audioMaxMb} MB
                                     </span>
                                 </label>
 

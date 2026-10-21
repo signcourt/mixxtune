@@ -74,6 +74,11 @@ class EnforceMaintenanceMode
                     $timezone
                 );
 
+                /* MIXXTUNE_SETTINGS_WIRED_V1: a window like 23:00-02:00 ends the next day */
+                if ($endsAt->lte($startsAt)) {
+                    $endsAt->addDay();
+                }
+
                 $scheduled = $now->lt($startsAt);
                 $active = $now->gte($startsAt)
                     && $now->lt($endsAt);

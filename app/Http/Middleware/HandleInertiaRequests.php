@@ -137,6 +137,9 @@ class HandleInertiaRequests extends Middleware
 
             'maintenance' => \App\Http\Middleware\EnforceMaintenanceMode::state($request),
 
+            /* MIXXTUNE_SETTINGS_WIRED_V1: limits from Master Settings for upload screens */
+            'platformRules' => fn () => $request->user() ? \App\Services\V2\PlatformRules::shared() : null,
+
             'auth' => [
                 'user' =>
                     $request->user(),

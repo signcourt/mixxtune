@@ -108,13 +108,15 @@ class ReleaseValidationService
                 $release->digital_release_date
             )->startOfDay();
 
-            if ($releaseDate->lte(now()->startOfDay())) {
+            /* MIXXTUNE_SETTINGS_WIRED_V1: Minimum Days Before Release */
+            if ($releaseDate->lt(PlatformRules::earliestReleaseDate())) {
                 $errors['release.digital_release_date'] =
-                    'Digital release date must be after today.';
+                    PlatformRules::releaseDateMessage();
             }
         }
 
-        if (!$release->artwork_path) {
+        /* MIXXTUNE_SETTINGS_WIRED_V1: Artwork Required */
+        if (!$release->artwork_path && PlatformRules::requireArtwork()) {
             $errors['release.artwork'] =
                 'Cover artwork is required.';
         }

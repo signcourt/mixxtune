@@ -93,7 +93,8 @@ class ReportImportController extends Controller
                     'required',
                     'file',
                     'mimes:csv,txt',
-                    'max:512000',
+                    /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Upload Rules > Report Maximum MB */
+                    'max:'.(\App\Services\V2\PlatformRules::reportMaxMb() * 1024),
                 ],
             ]
         )->validate();

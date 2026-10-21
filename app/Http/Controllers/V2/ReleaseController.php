@@ -1907,12 +1907,13 @@ class ReleaseController extends Controller
                 'date',
             ],
 
+            /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Release Rules > Minimum Days Before Release */
             'digital_release_date' => $adminEdit
                 ? ['required', 'date']
                 : [
                 'required',
                 'date',
-                'after:today',
+                'after_or_equal:'.\App\Services\V2\PlatformRules::earliestReleaseDate()->toDateString(),
             ],
 
             'copyright_owner' => [
@@ -1945,7 +1946,8 @@ class ReleaseController extends Controller
                 'nullable',
                 'image',
                 'mimes:jpg,jpeg,png',
-                'max:20480',
+                /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Upload Rules > Artwork Maximum MB */
+                'max:'.(\App\Services\V2\PlatformRules::artworkMaxMb() * 1024),
             ],
 
             'wizard_step' => [
@@ -1989,7 +1991,10 @@ class ReleaseController extends Controller
             $rules['primary_artists'] = ['nullable', 'array', 'max:3'];
         }
 
-        return $request->validate($rules);
+        return $request->validate($rules, [
+            'digital_release_date.after_or_equal' => \App\Services\V2\PlatformRules::releaseDateMessage(),
+            'artwork.max' => 'Artwork must be '.\App\Services\V2\PlatformRules::artworkMaxMb().' MB or smaller.',
+        ]);
     }
 
     private function resolveOwnership(
