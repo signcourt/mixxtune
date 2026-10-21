@@ -276,6 +276,16 @@ export default function Edit({ role, profile }) {
                                         Please review the details before resubmitting.
                                     </p>
                                 )}
+
+                                {/* MIXXTUNE_KYC_REVIEW_V1 */}
+                                {profile?.kyc_notes && (
+                                    <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+                                        <b>Note from Mixx Tune:</b> {profile.kyc_notes}
+                                        <span className="mt-1 block text-xs text-red-700">
+                                            To change bank / PAN details, open a support ticket (KYC topic).
+                                        </span>
+                                    </p>
+                                )}
                             </div>
 
                             <button

@@ -2135,7 +2135,7 @@ Route::middleware(['auth', 'verified'])
 Route::middleware(['auth', 'verified'])
     ->get(
         '/v2/admin/kyc',
-        [\App\Http\Controllers\V2\Admin\WithdrawalManagementController::class, 'kycIndex']
+        [\App\Http\Controllers\V2\Admin\KycReviewController::class, 'index']
     )
     ->name('v2.admin.kyc.index');
 
@@ -2143,9 +2143,16 @@ Route::middleware(['auth', 'verified'])
 Route::middleware(['auth', 'verified'])
     ->post(
         '/v2/admin/kyc/{profile}/verify',
-        [\App\Http\Controllers\V2\Admin\WithdrawalManagementController::class, 'verifyKyc']
+        [\App\Http\Controllers\V2\Admin\KycReviewController::class, 'decide']
     )
     ->name('v2.admin.kyc.verify');
+
+/* MIXXTUNE_KYC_REVIEW_V1 */
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/v2/admin/kyc/{profile}/history', [\App\Http\Controllers\V2\Admin\KycReviewController::class, 'history'])->whereNumber('profile')->name('v2.admin.kyc.history');
+    Route::post('/v2/admin/kyc/{profile}/reveal', [\App\Http\Controllers\V2\Admin\KycReviewController::class, 'reveal'])->whereNumber('profile')->middleware('throttle:30,1')->name('v2.admin.kyc.reveal');
+    Route::post('/v2/admin/kyc/remind', [\App\Http\Controllers\V2\Admin\KycReviewController::class, 'remind'])->name('v2.admin.kyc.remind');
+});
 
 
 Route::middleware(['auth', 'verified'])

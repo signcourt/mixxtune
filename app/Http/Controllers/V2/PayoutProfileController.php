@@ -86,6 +86,12 @@ class PayoutProfileController extends Controller
                         'kyc_status' =>
                             $profile->kyc_status,
 
+                        /* MIXXTUNE_KYC_REVIEW_V1: the reviewer's note (why it was rejected / sent back) */
+                        'kyc_notes' =>
+                            in_array($profile->kyc_status, ['rejected', 'pending'], true)
+                                ? $profile->kyc_notes
+                                : null,
+
                         'verified_at' =>
                             optional(
                                 $profile->verified_at
