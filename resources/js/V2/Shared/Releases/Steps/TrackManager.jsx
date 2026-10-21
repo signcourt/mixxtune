@@ -351,6 +351,7 @@ export default function TrackManager({
         processing,
         errors,
         clearErrors,
+        transform,
     } = useForm(
         makeEmptyTrack(
             release,
@@ -358,8 +359,95 @@ export default function TrackManager({
         )
     );
 
+    /* W65: local checks before saving, credits copy, same-language switch */
+    const [localErrors, setLocalErrors] = useState({});
+    const [sameLanguage, setSameLanguage] = useState(true);
+
+    const err = (key) => errors[key] || localErrors[key] || null;
+
+    const setField = (key, value) => {
+        setData(key, value);
+        if (localErrors[key]) {
+            setLocalErrors((current) => {
+                const next = { ...current };
+                delete next[key];
+                return next;
+            });
+        }
+    };
+
+    const previousTrack = useMemo(() => {
+        const others = tracks.filter((t) => !editingTrack || t.id !== editingTrack.id);
+        return others.length ? others[others.length - 1] : null;
+    }, [tracks, editingTrack]);
+
+    const CREDIT_KEYS = ['author_name', 'composer_name', 'arranger_name', 'producer_name', 'music_director_name', 'publisher_name', 'p_line'];
+
+    const copyCredits = () => {
+        if (!previousTrack) return;
+        setData((d) => {
+            const next = { ...d };
+            CREDIT_KEYS.forEach((k) => {
+                next[k] = previousTrack[k] ?? '';
+            });
+            return next;
+        });
+        setLocalErrors({});
+    };
+
+    const moreCreditsFilled = ['arranger_name', 'producer_name', 'music_director_name', 'publisher_name', 'p_line']
+        .filter((k) => String(data[k] ?? '').trim() !== '').length;
+
+    const LABELS = {
+        title: 'Track title',
+        primary_artist_name: 'Primary artist',
+        author_name: 'Lyricist',
+        composer_name: 'Composer',
+        genre: 'Genre',
+        sub_genre: 'Sub genre',
+        language: 'Language',
+        title_language: 'Title language',
+        lyrics_language: 'Lyrics language',
+        track_number: 'Track number',
+        release_year: 'Recording year',
+        isrc: 'ISRC',
+    };
+
+    const missingList = Object.keys({ ...localErrors, ...errors })
+        .map((k) => LABELS[k] || k.replaceAll('_', ' '))
+        .filter((v, i, a) => a.indexOf(v) === i);
+
+    const checkForm = () => {
+        const out = {};
+        const need = (k, msg) => {
+            if (String(data[k] ?? '').trim() === '') out[k] = msg;
+        };
+        need('title', 'Enter the track title.');
+        need('primary_artist_name', 'Enter the primary artist.');
+        if (!data.is_instrumental) need('author_name', 'Enter the lyricist (or mark the track as instrumental).');
+        need('composer_name', 'Enter the composer.');
+        need('genre', 'Pick a genre.');
+        need('sub_genre', 'Pick a sub genre.');
+        need('language', 'Pick a language.');
+        if (!sameLanguage) {
+            need('title_language', 'Pick the title language.');
+            need('lyrics_language', 'Pick the lyrics language.');
+        }
+        if (!(Number(data.track_number) >= 1)) out.track_number = 'Track number must be 1 or more.';
+        const year = Number(data.release_year);
+        if (!(year >= 1900 && year <= new Date().getFullYear() + 1)) out.release_year = 'Enter a year between 1900 and next year.';
+        if (!data.isrc_is_auto_generated) {
+            const code = String(data.isrc ?? '').replace(/-/g, '').toUpperCase();
+            if (!/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(code)) out.isrc = 'ISRC must be 12 characters: 2 letters, 3 letters/digits, 7 digits.';
+        }
+        setLocalErrors(out);
+        return Object.keys(out).length === 0;
+    };
+
     const addTrack = () => {
         clearErrors();
+        setLocalErrors({});
+        setSameLanguage(true);
 
         setEditingTrack(null);
 
@@ -423,8 +511,10 @@ export default function TrackManager({
             isrc:
                 track.isrc ?? '',
 
+            /* W65: "already has an ISRC" only when a code was typed by hand */
             isrc_is_auto_generated:
-                Boolean(
+                !track.isrc
+                || Boolean(
                     track.isrc_is_auto_generated
                 ),
 
@@ -498,6 +588,14 @@ export default function TrackManager({
             track.audio_original_name ?? ''
         );
 
+        setLocalErrors({});
+        {
+            const lang = track.language ?? release?.language ?? '';
+            const tl = track.title_language ?? lang;
+            const ll = track.lyrics_language ?? lang;
+            setSameLanguage(tl === lang && ll === lang);
+        }
+
         setModalStage('details');
         setFormVisible(true);
     };
@@ -550,7 +648,14 @@ export default function TrackManager({
             return;
         }
 
-        setData('audio', file);
+        setData((d) => ({
+            ...d,
+            audio: file,
+            /* W65: title from the file name when it is still empty */
+            title: d.title
+                ? d.title
+                : file.name.replace(/\.wav$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim(),
+        }));
         setUploadFileName(file.name);
     };
 
@@ -585,6 +690,12 @@ export default function TrackManager({
             return;
         }
 
+        if (!checkForm()) {
+            const box = event.currentTarget?.closest?.('.mixx-v6-track-modal');
+            if (box) box.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
         setData(
             'is_explicit',
             data.parental_advisory === 'yes'
@@ -604,6 +715,11 @@ export default function TrackManager({
 
             is_explicit:
                 data.parental_advisory === 'yes',
+
+            title_language: sameLanguage ? data.language : data.title_language,
+            lyrics_language: sameLanguage ? data.language : data.lyrics_language,
+            author_name: data.is_instrumental ? '' : data.author_name,
+            isrc: data.isrc_is_auto_generated ? (editingTrack?.isrc_is_auto_generated ? editingTrack.isrc ?? '' : '') : String(data.isrc ?? '').replace(/-/g, '').toUpperCase(),
         };
 
         const requestOptions = {
@@ -663,21 +779,21 @@ export default function TrackManager({
             },
         };
 
-        if (editingTrack) {
-            router.post(
-                `${TRACKS_BASE_PATH}/${editingTrack.id}`,
-                {
-                    ...payload,
-                    _method: 'patch',
-                },
-                requestOptions
-            );
-
-            return;
-        }
+        /*
+         * W65: both new and edited tracks go through the form, so the
+         * server's field errors show under the fields (edits showed none)
+         * and the cleaned values below are what is sent.
+         */
+        transform(() => (
+            editingTrack
+                ? { ...payload, _method: 'patch' }
+                : payload
+        ));
 
         post(
-            `${RELEASES_BASE_PATH}/${release.id}/tracks`,
+            editingTrack
+                ? `${TRACKS_BASE_PATH}/${editingTrack.id}`
+                : `${RELEASES_BASE_PATH}/${release.id}/tracks`,
             requestOptions
         );
     };
@@ -1018,555 +1134,236 @@ export default function TrackManager({
                             <form
                                 onSubmit={submitTrack}
                                 className="mixx-v6-details-form"
+                                noValidate
                             >
+                                {/* W65 MIXXTUNE_TRACK_FORM_V2: song first, then credits, genre, codes, lyrics */}
                                 <SectionTitle
                                     number="01"
-                                    title="Track Information"
-                                    subtitle="Basic information about this recording."
+                                    title="Song"
+                                    subtitle="Name and artists exactly as they should appear in stores."
                                 />
 
                                 <div className="mixx-v6-form-grid">
-                                    <Field
-                                        label="Track Type"
-                                        required
-                                    >
-                                        <select
-                                            className={inputClass}
-                                            value={data.track_type}
-                                            onChange={(event) =>
-                                                setData(
-                                                    'track_type',
-                                                    event.target.value
-                                                )
-                                            }
-                                        >
-                                            {trackTypes.map(
-                                                ([value, label]) => (
-                                                    <option
-                                                        key={value}
-                                                        value={value}
-                                                    >
-                                                        {label}
-                                                    </option>
-                                                )
-                                            )}
-                                        </select>
+                                    <Field label="Track title" required error={err('title')}>
+                                        <input className={inputClass} value={data.title} onChange={(e) => setField('title', e.target.value)} placeholder="Song name, no “feat.” or “Official”" />
                                     </Field>
 
-                                    <Field
-                                        label="Instrumental"
-                                        required
-                                    >
-                                        <select
-                                            className={inputClass}
-                                            value={
-                                                data.is_instrumental
-                                                    ? 'yes'
-                                                    : 'no'
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'is_instrumental',
-                                                    event.target.value
-                                                        === 'yes'
-                                                )
-                                            }
-                                        >
-                                            <option value="no">
-                                                No
-                                            </option>
-
-                                            <option value="yes">
-                                                Yes
-                                            </option>
-                                        </select>
+                                    <Field label="Version" hint="Only if it is not the original">
+                                        <input className={inputClass} value={data.version} onChange={(e) => setField('version', e.target.value)} placeholder="Remix, Lofi, Acoustic…" />
                                     </Field>
 
-                                    <Field
-                                        label="Track Title"
-                                        required
-                                        error={errors.title}
-                                    >
-                                        <input
-                                            className={inputClass}
-                                            value={data.title}
-                                            onChange={(event) =>
-                                                setData(
-                                                    'title',
-                                                    event.target.value
-                                                )
-                                            }
-                                        />
+                                    <Field label="Primary artist / singer" required error={err('primary_artist_name')}>
+                                        <input className={inputClass} value={data.primary_artist_name} onChange={(e) => setField('primary_artist_name', e.target.value)} />
                                     </Field>
 
-                                    <Field label="Version">
-                                        <input
-                                            className={inputClass}
-                                            value={data.version}
-                                            onChange={(event) =>
-                                                setData(
-                                                    'version',
-                                                    event.target.value
-                                                )
-                                            }
-                                            placeholder="Original, Remix, Acoustic..."
-                                        />
+                                    <Field label="Featuring artist" error={err('featuring_artist_name')}>
+                                        <input className={inputClass} value={data.featuring_artist_name} onChange={(e) => setField('featuring_artist_name', e.target.value)} placeholder="Leave empty if none" />
                                     </Field>
                                 </div>
 
-                                <SectionTitle
-                                    number="02"
-                                    title="Artists & Credits"
-                                    subtitle="Enter the performers and creative contributors."
-                                />
+                                <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                                    <Field label="Track type">
+                                        <select className={inputClass} value={data.track_type} onChange={(e) => setField('track_type', e.target.value)}>
+                                            {trackTypes.map(([value, label]) => (
+                                                <option key={value} value={value}>{label}</option>
+                                            ))}
+                                        </select>
+                                    </Field>
+
+                                    <Field label="Explicit lyrics">
+                                        <select className={inputClass} value={data.parental_advisory} onChange={(e) => setField('parental_advisory', e.target.value)}>
+                                            {parentalOptions.map(([value, label]) => (
+                                                <option key={value} value={value}>{label}</option>
+                                            ))}
+                                        </select>
+                                    </Field>
+
+                                    <Toggle label="Instrumental" hint="No vocals" checked={Boolean(data.is_instrumental)} onChange={(v) => setField('is_instrumental', v)} />
+                                    <Toggle label="Made with AI" hint="Any AI voice or music" checked={Boolean(data.contains_ai_generated_content)} onChange={(v) => setField('contains_ai_generated_content', v)} />
+                                </div>
+
+                                <div className="mixx-v6-section-title">
+                                    <span>02</span>
+                                    <div className="flex-1">
+                                        <h3>Credits</h3>
+                                        <p>Writers and makers of the song. Stores in India require both.</p>
+                                    </div>
+                                    {previousTrack && (
+                                        <button type="button" onClick={copyCredits} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100">
+                                            Copy from track {previousTrack.track_number || ''}
+                                        </button>
+                                    )}
+                                </div>
 
                                 <div className="mixx-v6-form-grid">
-                                    <Field
-                                        label="Primary Artist / Singer"
-                                        required
-                                    >
-                                        <input
-                                            className={inputClass}
-                                            value={
-                                                data.primary_artist_name
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'primary_artist_name',
-                                                    event.target.value
-                                                )
-                                            }
-                                        />
+                                    <Field label="Lyricist / writer" required={!data.is_instrumental} error={err('author_name')} hint={data.is_instrumental ? 'Not needed for an instrumental' : null}>
+                                        <input className={inputClass} value={data.author_name} onChange={(e) => setField('author_name', e.target.value)} disabled={Boolean(data.is_instrumental)} />
                                     </Field>
 
-                                    <Field label="Featuring Artist">
-                                        <input
-                                            className={inputClass}
-                                            value={
-                                                data.featuring_artist_name
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'featuring_artist_name',
-                                                    event.target.value
-                                                )
-                                            }
-                                        />
-                                    </Field>
-
-                                    <Field
-                                        label="Author / Lyricist / Writer"
-                                        required={
-                                            !data.is_instrumental
-                                        }
-                                    >
-                                        <input
-                                            className={inputClass}
-                                            value={data.author_name}
-                                            onChange={(event) =>
-                                                setData(
-                                                    'author_name',
-                                                    event.target.value
-                                                )
-                                            }
-                                        />
-                                    </Field>
-
-                                    <Field
-                                        label="Composer"
-                                        required
-                                    >
-                                        <input
-                                            className={inputClass}
-                                            value={
-                                                data.composer_name
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'composer_name',
-                                                    event.target.value
-                                                )
-                                            }
-                                        />
-                                    </Field>
-
-                                    <Field label="Arranger">
-                                        <input
-                                            className={inputClass}
-                                            value={
-                                                data.arranger_name
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'arranger_name',
-                                                    event.target.value
-                                                )
-                                            }
-                                        />
-                                    </Field>
-
-                                    <Field label="Producer">
-                                        <input
-                                            className={inputClass}
-                                            value={
-                                                data.producer_name
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'producer_name',
-                                                    event.target.value
-                                                )
-                                            }
-                                        />
-                                    </Field>
-
-                                    <Field label="Music Director">
-                                        <input
-                                            className={inputClass}
-                                            value={
-                                                data.music_director_name
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'music_director_name',
-                                                    event.target.value
-                                                )
-                                            }
-                                        />
-                                    </Field>
-
-                                    <Field label="Publisher">
-                                        <input
-                                            className={inputClass}
-                                            value={
-                                                data.publisher_name
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'publisher_name',
-                                                    event.target.value
-                                                )
-                                            }
-                                        />
+                                    <Field label="Composer" required error={err('composer_name')}>
+                                        <input className={inputClass} value={data.composer_name} onChange={(e) => setField('composer_name', e.target.value)} />
                                     </Field>
                                 </div>
+
+                                <details className="mb-6 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3" open={moreCreditsFilled > 0}>
+                                    <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+                                        More credits (optional){moreCreditsFilled > 0 ? ` · ${moreCreditsFilled} filled` : ''}
+                                    </summary>
+                                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                                        {[
+                                            ['producer_name', 'Producer'],
+                                            ['music_director_name', 'Music director'],
+                                            ['arranger_name', 'Arranger'],
+                                            ['publisher_name', 'Publisher'],
+                                        ].map(([key, label]) => (
+                                            <Field key={key} label={label} error={err(key)}>
+                                                <input className={inputClass} value={data[key] ?? ''} onChange={(e) => setField(key, e.target.value)} />
+                                            </Field>
+                                        ))}
+                                        <Field label="℗ line" hint="e.g. 2026 Mixx Tune Entertainment" error={err('p_line')}>
+                                            <input className={inputClass} value={data.p_line ?? ''} onChange={(e) => setField('p_line', e.target.value)} />
+                                        </Field>
+                                    </div>
+                                </details>
 
                                 <SectionTitle
                                     number="03"
-                                    title="Rights & Identification"
-                                    subtitle="Copyright, ISRC and release information."
+                                    title="Genre & language"
+                                    subtitle="Filled from the release - change only if this track is different."
                                 />
 
                                 <div className="mixx-v6-form-grid">
-                                    <Field
-                                        label="Releasing Year"
-                                        required
-                                        error={errors.release_year}
-                                    >
-                                        <input
-                                            type="number"
-                                            min="1900"
-                                            max={
-                                                new Date()
-                                                    .getFullYear()
-                                                + 1
-                                            }
-                                            className={inputClass}
-                                            value={
-                                                data.release_year
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'release_year',
-                                                    event.target.value
-                                                )
-                                            }
-                                        />
+                                    <Field label="Genre" required error={err('genre')}>
+                                        <SearchableTrackSelect value={data.genre} options={TRACK_GENRES} placeholder="Search genre..." onChange={(value) => setField('genre', value)} />
                                     </Field>
 
-                                    <Field
-                                        label="Generate ISRC"
-                                        required
-                                        error={errors.isrc_is_auto_generated}
-                                    >
-                                        <select
-                                            className={inputClass}
-                                            value={
-                                                data
-                                                    .isrc_is_auto_generated
-                                                    ? 'yes'
-                                                    : 'no'
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'isrc_is_auto_generated',
-                                                    event.target.value
-                                                        === 'yes'
-                                                )
-                                            }
-                                        >
-                                            <option value="yes">
-                                                Yes
-                                            </option>
-
-                                            <option value="no">
-                                                No
-                                            </option>
-                                        </select>
+                                    <Field label="Sub genre" required error={err('sub_genre')}>
+                                        <SearchableTrackSelect value={data.sub_genre} options={TRACK_SUB_GENRES} placeholder="Search sub genre..." onChange={(value) => setField('sub_genre', value)} />
                                     </Field>
 
-                                    {!data.isrc_is_auto_generated && (
-                                        <Field
-                                            label="ISRC"
-                                            required
-                                            error={errors.isrc}
-                                        >
-                                            <input
-                                                className={inputClass}
-                                                value={data.isrc}
-                                                onChange={(event) =>
-                                                    setData(
-                                                        'isrc',
-                                                        event.target.value
-                                                    )
-                                                }
-                                                placeholder="Enter existing ISRC"
-                                            />
-                                        </Field>
-                                    )}
-
-                                    <Field
-                                        label="Track Number"
-                                        required
-                                        error={errors.track_number}
-                                    >
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            className={inputClass}
-                                            value={
-                                                data.track_number
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'track_number',
-                                                    Number(
-                                                        event.target.value
-                                                    )
-                                                )
-                                            }
-                                        />
-                                    </Field>
-                                </div>
-
-                                <SectionTitle
-                                    number="04"
-                                    title="Genre & Language"
-                                    subtitle="Classification and language metadata."
-                                />
-
-                                <div className="mixx-v6-form-grid">
-                                    <Field
-                                        label="Genre"
-                                        required
-                                        error={errors.genre}
-                                    >
-                                        <SearchableTrackSelect
-                                            value={data.genre}
-                                            options={TRACK_GENRES}
-                                            placeholder="Search genre..."
-                                            onChange={(value) =>
-                                                setData(
-                                                    'genre',
-                                                    value
-                                                )
-                                            }
-                                        />
-                                    </Field>
-
-                                    <Field
-                                        label="Sub Genre"
-                                        required
-                                        error={errors.sub_genre}
-                                    >
-                                        <SearchableTrackSelect
-                                            value={data.sub_genre}
-                                            options={TRACK_SUB_GENRES}
-                                            placeholder="Search sub genre..."
-                                            onChange={(value) =>
-                                                setData(
-                                                    'sub_genre',
-                                                    value
-                                                )
-                                            }
-                                        />
-                                    </Field>
-
-                                    <Field
-                                        label="Language"
-                                        required
-                                        error={errors.language}
-                                    >
+                                    <Field label="Language" required error={err('language')}>
                                         <SearchableTrackSelect
                                             value={data.language}
                                             options={TRACK_LANGUAGES}
                                             placeholder="Search language..."
-                                            onChange={(value) =>
-                                                setData(
-                                                    'language',
-                                                    value
-                                                )
-                                            }
+                                            onChange={(value) => {
+                                                setField('language', value);
+                                                if (sameLanguage) {
+                                                    setData((d) => ({ ...d, language: value, title_language: value, lyrics_language: value }));
+                                                }
+                                            }}
                                         />
                                     </Field>
 
-                                    <Field
-                                        label="Track Title Language"
-                                        required
-                                        error={errors.title_language}
-                                    >
-                                        <SearchableTrackSelect
-                                            value={data.title_language}
-                                            options={TRACK_LANGUAGES}
-                                            placeholder="Search title language..."
-                                            onChange={(value) =>
-                                                setData(
-                                                    'title_language',
-                                                    value
-                                                )
-                                            }
-                                        />
-                                    </Field>
+                                    <div className="flex items-end">
+                                        <label className="flex min-h-[46px] w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-4 text-sm text-slate-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={sameLanguage}
+                                                onChange={(e) => {
+                                                    setSameLanguage(e.target.checked);
+                                                    if (e.target.checked) {
+                                                        setData((d) => ({ ...d, title_language: d.language, lyrics_language: d.language }));
+                                                    }
+                                                }}
+                                                className="h-4 w-4 rounded border-slate-300 text-violet-600"
+                                            />
+                                            Title and lyrics are in this language too
+                                        </label>
+                                    </div>
 
-                                    <Field
-                                        label="Lyrics Language"
-                                        required
-                                        error={errors.lyrics_language}
-                                    >
-                                        <SearchableTrackSelect
-                                            value={data.lyrics_language}
-                                            options={TRACK_LANGUAGES}
-                                            placeholder="Search lyrics language..."
-                                            onChange={(value) =>
-                                                setData(
-                                                    'lyrics_language',
-                                                    value
-                                                )
-                                            }
-                                        />
-                                    </Field>
-
-                                    <Field
-                                        label="Parental Advisory"
-                                        required
-                                        error={errors.parental_advisory}
-                                    >
-                                        <select
-                                            className={inputClass}
-                                            value={
-                                                data.parental_advisory
-                                            }
-                                            onChange={(event) =>
-                                                setData(
-                                                    'parental_advisory',
-                                                    event.target.value
-                                                )
-                                            }
-                                        >
-                                            {parentalOptions.map(
-                                                ([value, label]) => (
-                                                    <option
-                                                        key={value}
-                                                        value={value}
-                                                    >
-                                                        {label}
-                                                    </option>
-                                                )
-                                            )}
-                                        </select>
-                                    </Field>
-
+                                    {!sameLanguage && (
+                                        <>
+                                            <Field label="Title language" required error={err('title_language')}>
+                                                <SearchableTrackSelect value={data.title_language} options={TRACK_LANGUAGES} placeholder="Search..." onChange={(value) => setField('title_language', value)} />
+                                            </Field>
+                                            <Field label="Lyrics language" required error={err('lyrics_language')}>
+                                                <SearchableTrackSelect value={data.lyrics_language} options={TRACK_LANGUAGES} placeholder="Search..." onChange={(value) => setField('lyrics_language', value)} />
+                                            </Field>
+                                        </>
+                                    )}
                                 </div>
+
+                                <SectionTitle
+                                    number="04"
+                                    title="Numbering & ISRC"
+                                    subtitle="Position on the release and the recording code."
+                                />
+
+                                <div className="mb-6 grid gap-4 sm:grid-cols-3">
+                                    <Field label="Track number" required error={err('track_number')}>
+                                        <input type="number" min="1" className={inputClass} value={data.track_number ?? ''} onChange={(e) => setField('track_number', e.target.value === '' ? '' : Number(e.target.value))} />
+                                    </Field>
+
+                                    <Field label="Recording year" required error={err('release_year')}>
+                                        <input type="number" min="1900" max={new Date().getFullYear() + 1} className={inputClass} value={data.release_year ?? ''} onChange={(e) => setField('release_year', e.target.value === '' ? '' : Number(e.target.value))} />
+                                    </Field>
+
+                                    <Field label="Disc" hint="For multi-disc albums">
+                                        <input type="number" min="1" className={inputClass} value={data.disc_number ?? 1} onChange={(e) => setField('disc_number', e.target.value === '' ? 1 : Number(e.target.value))} />
+                                    </Field>
+                                </div>
+
+                                <fieldset className="mb-6">
+                                    <legend className="mb-2 text-sm font-semibold text-slate-700">ISRC</legend>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${data.isrc_is_auto_generated ? 'border-violet-400 bg-violet-50' : 'border-slate-200'}`}>
+                                            <input type="radio" name="isrc_mode" checked={Boolean(data.isrc_is_auto_generated)} onChange={() => setData((d) => ({ ...d, isrc_is_auto_generated: true, isrc: editingTrack?.isrc && !editingTrack?.isrc_is_auto_generated ? '' : d.isrc }))} className="mt-0.5" />
+                                            <span>
+                                                <span className="block text-sm font-semibold text-slate-900">New song - give an ISRC</span>
+                                                <span className="block text-xs text-slate-500">Mixx Tune assigns it when the release is approved</span>
+                                            </span>
+                                        </label>
+                                        <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${!data.isrc_is_auto_generated ? 'border-violet-400 bg-violet-50' : 'border-slate-200'}`}>
+                                            <input type="radio" name="isrc_mode" checked={!data.isrc_is_auto_generated} onChange={() => setField('isrc_is_auto_generated', false)} className="mt-0.5" />
+                                            <span>
+                                                <span className="block text-sm font-semibold text-slate-900">It already has an ISRC</span>
+                                                <span className="block text-xs text-slate-500">Old song released before - type its code</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    {!data.isrc_is_auto_generated && (
+                                        <div className="mt-3 max-w-sm">
+                                            <Field label="Existing ISRC" required error={err('isrc')} hint="12 characters, e.g. INA1C2600001">
+                                                <input className={`${inputClass} font-mono uppercase`} value={data.isrc ?? ''} onChange={(e) => setField('isrc', e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))} placeholder="INXXX2600001" />
+                                            </Field>
+                                        </div>
+                                    )}
+                                </fieldset>
 
                                 {!data.is_instrumental && (
-                                    <>
-                                        <SectionTitle
-                                            number="05"
-                                            title="Lyrics"
-                                            subtitle="Enter the complete lyrics for this track."
+                                    <details className="mb-6 rounded-xl border border-slate-200 px-4 py-3" open={Boolean(data.lyrics)}>
+                                        <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+                                            Lyrics (optional){data.lyrics ? ` · ${String(data.lyrics).split('\n').filter(Boolean).length} lines` : ''}
+                                        </summary>
+                                        <textarea
+                                            className={`${inputClass} mt-3 min-h-52 resize-y`}
+                                            value={data.lyrics}
+                                            onChange={(e) => setField('lyrics', e.target.value)}
+                                            placeholder="Full lyrics, one line per line. Used by Apple Music, Spotify and Instagram."
                                         />
-
-                                        <Field label="Lyrics">
-                                            <textarea
-                                                className={`${inputClass} min-h-52 resize-y`}
-                                                value={data.lyrics}
-                                                onChange={(event) =>
-                                                    setData(
-                                                        'lyrics',
-                                                        event.target.value
-                                                    )
-                                                }
-                                                placeholder="Enter full song lyrics..."
-                                            />
-                                        </Field>
-                                    </>
+                                    </details>
                                 )}
 
-                                <div className="mixx-v6-ai-option">
-                                    <CheckBox
-                                        label="Contains AI Generated Content"
-                                        checked={
-                                            data
-                                                .contains_ai_generated_content
-                                        }
-                                        onChange={(value) =>
-                                            setData(
-                                                'contains_ai_generated_content',
-                                                value
-                                            )
-                                        }
-                                    />
-                                </div>
-
-                                {Object.keys(errors).length > 0 && (
+                                {missingList.length > 0 && (
                                     <div className="mixx-v6-error-summary">
-                                        Please review the highlighted fields before saving.
+                                        Please fill: {missingList.join(', ')}.
                                     </div>
                                 )}
 
                                 <div className="mixx-v6-modal-footer">
                                     {!editingTrack && (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setModalStage(
-                                                    'upload'
-                                                )
-                                            }
-                                            className="mixx-v6-secondary-button"
-                                        >
+                                        <button type="button" onClick={() => setModalStage('upload')} className="mixx-v6-secondary-button">
                                             ← Back to WAV
                                         </button>
                                     )}
 
-                                    <button
-                                        type="button"
-                                        onClick={closeForm}
-                                        className="mixx-v6-secondary-button"
-                                    >
+                                    <button type="button" onClick={closeForm} className="mixx-v6-secondary-button">
                                         Cancel
                                     </button>
 
-                                    <button
-                                        type="submit"
-                                        disabled={processing}
-                                        className="mixx-v6-primary-button"
-                                    >
-                                        {processing
-                                            ? 'Saving Track...'
-                                            : editingTrack
-                                                ? 'Update Track'
-                                                : 'Save Track'}
+                                    <button type="submit" disabled={processing} className="mixx-v6-primary-button">
+                                        {processing ? 'Saving Track...' : editingTrack ? 'Update Track' : 'Save Track'}
                                     </button>
                                 </div>
                             </form>
@@ -1599,10 +1396,11 @@ function Field({
     label,
     required = false,
     error = null,
+    hint = null,
     children,
 }) {
     return (
-        <div>
+        <div className="min-w-0">
             <label className="mb-2 block text-sm font-semibold text-slate-700">
                 {label}
 
@@ -1615,11 +1413,36 @@ function Field({
 
             {children}
 
-            {error && (
-                <p className="mt-1 text-sm text-red-600">
+            {error ? (
+                <p className="mt-1 text-xs font-medium text-red-600">
                     {error}
                 </p>
-            )}
+            ) : hint ? (
+                <p className="mt-1 text-xs text-slate-500">
+                    {hint}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
+function Toggle({ label, hint, checked, onChange }) {
+    return (
+        <div className="min-w-0">
+            <span className="mb-2 block text-sm font-semibold text-slate-700">{label}</span>
+            <button
+                type="button"
+                role="switch"
+                aria-checked={checked}
+                aria-label={label}
+                onClick={() => onChange(!checked)}
+                className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl border px-4 text-sm transition ${checked ? 'border-violet-400 bg-violet-50 text-violet-800' : 'border-slate-300 bg-white text-slate-600'}`}
+            >
+                <span className="truncate">{checked ? 'Yes' : 'No'} <span className="text-xs text-slate-400">· {hint}</span></span>
+                <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition ${checked ? 'bg-violet-600' : 'bg-slate-300'}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${checked ? 'left-[18px]' : 'left-0.5'}`} />
+                </span>
+            </button>
         </div>
     );
 }

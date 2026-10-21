@@ -30,6 +30,9 @@ class ReleaseTrackController extends Controller
         'genre', 'sub_genre', 'is_explicit', 'is_instrumental',
         'contains_ai_generated_content', 'duration_seconds',
         'preview_start_seconds', 'audio_path', 'audio_original_name',
+        'track_type', 'author_name', 'composer_name', 'arranger_name', 'producer_name',
+        'music_director_name', 'publisher_name', 'p_line', 'release_year',
+        'title_language', 'lyrics_language', 'parental_advisory',
     ];
 
     public function store(
@@ -93,7 +96,7 @@ class ReleaseTrackController extends Controller
                 $trackNumber,
 
             'isrc' =>
-                $validated['isrc'] ?: null,
+                ($validated['isrc'] ?? null) ?: null,
 
             'isrc_is_auto_generated' =>
                 false,
@@ -488,6 +491,24 @@ class ReleaseTrackController extends Controller
                 'string',
                 'max:255',
             ],
+
+            /*
+             * W65 MIXXTUNE_TRACK_CREDITS_SAVED: the form sent these but they
+             * were not in this list, so they were silently dropped
+             * (lyricist, composer, producer ... were never saved).
+             */
+            'track_type' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['original', 'karaoke', 'medley', 'cover', 'cover_by_cover_band'])],
+            'author_name' => ['nullable', 'string', 'max:255'],
+            'composer_name' => ['nullable', 'string', 'max:255'],
+            'arranger_name' => ['nullable', 'string', 'max:255'],
+            'producer_name' => ['nullable', 'string', 'max:255'],
+            'music_director_name' => ['nullable', 'string', 'max:255'],
+            'publisher_name' => ['nullable', 'string', 'max:255'],
+            'p_line' => ['nullable', 'string', 'max:255'],
+            'release_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
+            'title_language' => ['nullable', 'string', 'max:100'],
+            'lyrics_language' => ['nullable', 'string', 'max:100'],
+            'parental_advisory' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['yes', 'no', 'cleaned'])],
 
             'isrc' => [
                 'nullable',
