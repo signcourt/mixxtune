@@ -1,10 +1,10 @@
 import { Head, Link, router } from "@inertiajs/react";
-import { ArrowDownLeft, ArrowUpRight, Clock3, Download, History, ReceiptText, Search, WalletCards, X } from "lucide-react";
+import { Download, History, ReceiptText, Search, WalletCards, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 
-/* MIXXTUNE_WALLET_V2 (W44) */
+/* MIXXTUNE_WALLET_V2 (W44) - W70: the 4 small cards (on the way / in withdrawal / lifetime / paid out) removed */
 
 export default function Index({
     role = "artist",
@@ -15,7 +15,6 @@ export default function Index({
     owners = null,
     ownerSearch = "",
     advances = [],
-    inWithdrawal = 0,
     historyWallet = null,
     historyOwner = null,
     sort = "available",
@@ -31,14 +30,12 @@ export default function Index({
     };
 
     const available = Number(wallet.available_balance ?? 0);
-    const withdrawing = staff ? Number(wallet.in_withdrawal ?? 0) : Number(inWithdrawal ?? 0);
-    const royaltyPending = staff ? Number(wallet.royalty_pending ?? 0) : Math.max(0, Number(wallet.pending_balance ?? 0) - withdrawing);
     const minimum = Number(minimumWithdrawal ?? 0);
     const canRequest = withdrawalEnabled && minimum > 0 && available >= minimum;
     const today = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "long", year: "numeric" }).format(new Date());
 
     return (
-        <PanelLayout role={role} title="Wallet" subtitle={staff ? "Every owner's balance, money on the way and wallet history" : "Balance, payments and transaction history"}>
+        <PanelLayout role={role} title="Wallet" subtitle={staff ? "Every owner's balance and wallet history" : "Balance, payments and transaction history"}>
             <Head title="Wallet" />
 
             <div className="mx-auto w-full max-w-[1500px] space-y-5">
@@ -86,18 +83,6 @@ export default function Index({
                             </div>
                         )}
                     </div>
-
-                    <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                        <Mini label="Royalty on the way" value={money(royaltyPending)} hint="approved, not yet released" icon={Clock3} />
-                        <Mini
-                            label="In withdrawal requests"
-                            value={money(withdrawing)}
-                            hint={<Link href={staff ? "/v2/admin/withdrawals" : "/v2/withdrawals"} className="font-semibold text-violet-700">Open withdrawals →</Link>}
-                            icon={ArrowUpRight}
-                        />
-                        <Mini label={staff ? "Lifetime credits" : "Lifetime earnings"} value={money(wallet.lifetime_earnings ?? wallet.lifetime_credits)} icon={ArrowDownLeft} tone="text-emerald-700" />
-                        <Mini label={staff ? "Lifetime debits" : "Paid out / used"} value={money(wallet.lifetime_debits ?? wallet.withdrawn_balance)} icon={ArrowUpRight} />
-                    </div>
                 </section>
 
                 {!staff && advances.length > 0 && <AdvanceCard advances={advances} />}
@@ -110,15 +95,6 @@ export default function Index({
     );
 }
 
-function Mini({ label, value, hint, icon: Icon, tone = "text-slate-900" }) {
-    return (
-        <div className="rounded-xl bg-slate-50 px-3 py-3">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">{Icon && <Icon className="h-3.5 w-3.5" />} {label}</div>
-            <div className={`mt-0.5 text-lg font-black ${tone}`}>{value}</div>
-            {hint && <div className="text-xs text-slate-500">{hint}</div>}
-        </div>
-    );
-}
 
 function Pager({ page, name }) {
     if (!page || !(page.last_page > 1)) return null;
