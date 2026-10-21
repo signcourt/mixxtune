@@ -457,6 +457,13 @@ const adminNavigation = (
                               permission: 'catalogue.view',
                           },
                           {
+                              /* MIXXTUNE_CATALOGUE_HEALTH_V1 */
+                              id: 'catalogue-health',
+                              label: 'Missing Details',
+                              href: '/super-admin/catalogue-health',
+                              permission: 'catalogue.view',
+                          },
+                          {
                               /* MIXXTUNE_BULK_POSTERS_V1 */
                               id: 'catalogue-bulk-posters',
                               label: 'Bulk Posters',

@@ -1002,6 +1002,20 @@ Route::middleware([
             )->middleware('throttle:240,1')->name('posters.upload');
 
             /*
+             * MIXXTUNE_CATALOGUE_HEALTH_V1
+             * Super Admin, read only: what is missing in the catalogue.
+             */
+            Route::get(
+                '/catalogue-health',
+                [\App\Http\Controllers\V2\Admin\CatalogueHealthController::class, 'index']
+            )->name('catalogue-health.index');
+
+            Route::get(
+                '/catalogue-health/export',
+                [\App\Http\Controllers\V2\Admin\CatalogueHealthController::class, 'export']
+            )->name('catalogue-health.export');
+
+            /*
              * Legacy Catalogue Bulk Import
              *
              * Super Admin only.
