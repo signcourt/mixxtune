@@ -13,11 +13,11 @@ import {
 } from 'lucide-react';
 
 import {
-    Area,
-    AreaChart,
+    Bar,
     CartesianGrid,
+    ComposedChart,
+    Legend,
     Cell,
-    Line,
     Pie,
     PieChart,
     ResponsiveContainer,
@@ -462,18 +462,8 @@ export default function Index({
 
                     )}
 
-                    {/* MIXXTUNE_FINANCE_CLEANUP_V1: CSV of the rows behind this view (same filters, same access) */}
-                    <div className="flex justify-end">
-                        <a
-                            href={`/v2/analytics/export?${(() => { const q = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : ''); if (preview) q.set('preview', '1'); return q.toString(); })()}`}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                        >
-                            Export CSV
-                        </a>
-                    </div>
-
-                    {/* REPORTING RANGE */}
-                    <div className="flex">
+                    {/* REPORTING RANGE + EXPORT (W53: one row, no empty gap) */}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div className="inline-flex w-full flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:w-auto sm:flex-row sm:items-end">
                             <div className="w-full sm:w-[190px]">
                                 <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -526,6 +516,15 @@ export default function Index({
                             <div className="hidden h-9 items-center border-l border-slate-100 pl-3 text-xs font-medium text-slate-400 lg:flex">
                                 Reporting period
                             </div>
+                        </div>
+                        {/* MIXXTUNE_FINANCE_CLEANUP_V1: CSV of the rows behind this view (same filters, same access) */}
+                        <div className="flex shrink-0 justify-end">
+                            <a
+                                href={`/v2/analytics/export?${(() => { const q = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : ''); if (preview) q.set('preview', '1'); return q.toString(); })()}`}
+                                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            >
+                                Export CSV
+                            </a>
                         </div>
                     </div>
 
@@ -860,8 +859,10 @@ export default function Index({
                                             width="100%"
                                             height="100%"
                                         >
-                                            <AreaChart
+                                            <ComposedChart
                                                 data={financialMonthly}
+                                                barGap={4}
+                                                maxBarSize={56}
                                                 margin={{
                                                     top: 10,
                                                     right: 20,
@@ -916,22 +917,28 @@ export default function Index({
                                                     }
                                                 />
 
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="gross_earnings"
-                                                    stroke="#7c3aed"
-                                                    fill="#ede9fe"
-                                                    strokeWidth={2}
+                                                <Legend
+                                                    verticalAlign="top"
+                                                    height={28}
+                                                    iconType="circle"
+                                                    wrapperStyle={{ fontSize: 12 }}
                                                 />
 
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="net_payable"
-                                                    stroke="#0f172a"
-                                                    strokeWidth={2}
-                                                    dot={false}
+                                                {/* W53: bars - a single month is a clear bar, not a lone dot */}
+                                                <Bar
+                                                    dataKey="gross_earnings"
+                                                    name="Gross revenue"
+                                                    fill="#c4b5fd"
+                                                    radius={[6, 6, 0, 0]}
                                                 />
-                                            </AreaChart>
+
+                                                <Bar
+                                                    dataKey="net_payable"
+                                                    name="Label earnings"
+                                                    fill="#7c3aed"
+                                                    radius={[6, 6, 0, 0]}
+                                                />
+                                            </ComposedChart>
                                         </ResponsiveContainer>
                                     </div>
                                 ) : (
@@ -1004,7 +1011,7 @@ export default function Index({
                                                         colSpan="3"
                                                         className="px-5 py-14 text-center text-sm text-slate-400"
                                                     >
-                                                        No financial currency allocation data available.
+                                                        Fills in after a report is published and split to owners.
                                                     </td>
                                                 </tr>
                                             )}
@@ -1013,10 +1020,10 @@ export default function Index({
                                 </div>
                             </div>
                             )}
-                        </div>
 
+                        {/* W53: CMS sits beside Currency (no half-empty row) */}
                         {role === 'super_admin' && (
-                        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                             <div className="border-b border-slate-100 p-5">
                                 <SectionHeader
                                     icon={BarChart3}
@@ -1075,7 +1082,7 @@ export default function Index({
                                                     colSpan="3"
                                                     className="px-5 py-14 text-center text-sm text-slate-400"
                                                 >
-                                                    No financial CMS allocation data available.
+                                                    Fills in after a report is published and split to owners.
                                                 </td>
                                             </tr>
                                         )}
@@ -1084,6 +1091,7 @@ export default function Index({
                             </div>
                         </div>
                         )}
+                        </div>
                     {/* RANKINGS */}
                     <div
                         className={`grid gap-4 ${
