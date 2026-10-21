@@ -1,589 +1,267 @@
-import {
-    Head,
-    router,
-    useForm,
-    usePage,
-} from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
+import { CheckCircle2, Download, Eye, Loader2, Pencil, RefreshCw, Trash2, Upload, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import {
-    Download,
-    Eye,
-    Pencil,
-    RefreshCw,
-    Trash2,
-    X,
-} from 'lucide-react';
+import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 
-import {
-    useEffect,
-    useState,
-} from 'react';
+/* MIXXTUNE_REPORT_IMPORTS_V2 (W47) */
 
-import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+const monthName = (v) => {
+    const m = String(v || "").match(/^(\d{4})-(\d{2})/);
+    return m ? new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(new Date(Number(m[1]), Number(m[2]) - 1, 1)) : "—";
+};
+const num = (v) => new Intl.NumberFormat("en-IN").format(Number(v ?? 0));
+const inr = (v) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(v || 0));
+const when = (v) => {
+    if (!v) return "—";
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? String(v) : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).format(d) + " IST";
+};
+const mb = (bytes) => (bytes / 1048576).toLocaleString("en-IN", { maximumFractionDigits: 1 });
 
-const formatReportingMonth = (value) => {
-    if (!value) return '—';
-
-    const [year, month] = value.split('-');
-
-    if (!year || !month) {
-        return value;
+/* import status + money status -> one plain step */
+const stepOf = (i) => {
+    if (["queued", "pending", "processing"].includes(i.status)) return ["Reading the file…", "bg-slate-100 text-slate-700", false];
+    if (i.status === "failed") return ["Import failed", "bg-red-50 text-red-700", false];
+    if (i.financial_status === "published" || i.published_at) return ["Published · in wallets", "bg-emerald-50 text-emerald-700", true];
+    if (i.financial_status === "approved_scheduled") {
+        const late = i.publish_at && new Date(i.publish_at).getTime() < Date.now() - 15 * 60 * 1000;
+        return [late ? "Publish overdue" : `Approved · publishes ${when(i.publish_at)}`, late ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700", true];
     }
-
-    const date = new Date(
-        Number(year),
-        Number(month) - 1,
-        1
-    );
-
-    return new Intl.DateTimeFormat('en-IN', {
-        month: 'short',
-        year: 'numeric',
-    }).format(date);
+    return ["Waiting for review", "bg-amber-50 text-amber-800", false];
 };
 
-const formatNumber = (value) =>
-    new Intl.NumberFormat('en-IN').format(
-        Number(value ?? 0)
-    );
-
-const formatUploadedAt = (value) => {
-    if (!value) {
-        return {
-            date: '—',
-            time: '',
-        };
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return {
-            date: value,
-            time: '',
-        };
-    }
-
-    return {
-        date: new Intl.DateTimeFormat('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            timeZone: 'Asia/Kolkata',
-        }).format(date),
-
-        time: new Intl.DateTimeFormat('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-            timeZone: 'Asia/Kolkata',
-        }).format(date),
-    };
-};
-
-export default function Imports({
-    role = 'admin',
-    imports = {},
-    errors: pageErrors = {},
-}) {
-    /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Report Maximum MB */
-    const reportMaxMb = Number(usePage().props?.platformRules?.report_max_mb) || 500;
+export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 0, settingLimitMb = 0 }) {
+    const page = usePage().props;
+    const flash = page.flash ?? {};
+    const pageErrors = page.errors ?? {};
+    const limitMb = Number(uploadLimitMb) || Number(page.platformRules?.report_max_mb) || 100;
+    const rows = imports.data ?? [];
 
     const [editing, setEditing] = useState(null);
-    const [editMonth, setEditMonth] = useState('');
-    const [actionBusy, setActionBusy] = useState(false);
+    const [editMonth, setEditMonth] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [fileError, setFileError] = useState("");
 
-    /*
-     * Revenue reports are processed by a background worker.
-     * Poll only while this page contains active imports.
-     */
+    /* reports are read by a background worker: refresh while one is running */
     useEffect(() => {
-        const hasActiveImport =
-            (imports.data ?? []).some(
-                (item) =>
-                    item.status === 'queued' ||
-                    item.status === 'processing'
-            );
-
-        if (!hasActiveImport) {
-            return undefined;
-        }
-
-        const timer = window.setInterval(
-            () => {
-                router.reload({
-                    only: ['imports'],
-                    preserveScroll: true,
-                    preserveState: true,
-                });
-            },
-            5000
-        );
-
-        return () =>
-            window.clearInterval(timer);
+        if (!rows.some((i) => ["queued", "pending", "processing"].includes(i.status))) return undefined;
+        const t = window.setInterval(() => router.reload({ only: ["imports"], preserveScroll: true, preserveState: true }), 5000);
+        return () => window.clearInterval(t);
     }, [imports.data]);
 
-    const {
-        data,
-        setData,
-        post,
-        processing,
-        errors,
-        reset,
-    } = useForm({
-        reporting_month: '',
-        report_file: null,
-    });
+    const { data, setData, post, processing, errors, reset, progress } = useForm({ reporting_month: "", report_file: null });
 
-    const submit = (event) => {
-        event.preventDefault();
+    const sameMonth = data.reporting_month ? rows.filter((i) => String(i.reporting_month || "").startsWith(data.reporting_month)) : [];
 
-        post('/v2/admin/reports/imports', {
-            forceFormData: true,
+    const pickFile = (file) => {
+        setFileError("");
+        if (file && file.size > limitMb * 1048576) {
+            setFileError(`This file is ${mb(file.size)} MB - the server accepts up to ${limitMb} MB. Split it into smaller CSV files (same reporting month) and upload each.`);
+            setData("report_file", null);
+            return;
+        }
+        if (file && !/\.(csv|txt)$/i.test(file.name)) {
+            setFileError("Choose the report as a .csv file.");
+            setData("report_file", null);
+            return;
+        }
+        setData("report_file", file ?? null);
+    };
 
-            onSuccess: () => {
-                reset();
-            },
+    const submit = (e) => {
+        e.preventDefault();
+        if (sameMonth.length && !window.confirm(`${monthName(data.reporting_month)} already has ${sameMonth.length} report(s). Upload this one too?\n(Exact duplicate rows are skipped automatically.)`)) return;
+        post("/v2/admin/reports/imports", { forceFormData: true, preserveScroll: true, onSuccess: () => { reset(); const f = document.getElementById("report-file"); if (f) f.value = ""; } });
+    };
+
+    const saveEdit = (e) => {
+        e.preventDefault();
+        if (!editing || !editMonth || busy) return;
+        setBusy(true);
+        router.patch(`/v2/admin/reports/imports/${editing.id}`, { reporting_month: editMonth }, {
+            preserveScroll: true,
+            onSuccess: () => { setEditing(null); setEditMonth(""); },
+            onFinish: () => setBusy(false),
         });
     };
 
-    const openEdit = (item) => {
-        setEditing(item);
-        setEditMonth(item.reporting_month || '');
+    const remove = (i) => {
+        if (busy || !window.confirm(`Delete "${i.original_filename}" and its ${num(i.imported_rows)} rows?\n\nOnly possible while nothing from it is in wallets.`)) return;
+        setBusy(true);
+        router.delete(`/v2/admin/reports/imports/${i.id}`, { preserveScroll: true, onFinish: () => setBusy(false) });
     };
 
-    const closeEdit = () => {
-        if (actionBusy) {
-            return;
-        }
-
-        setEditing(null);
-        setEditMonth('');
+    const redetect = (i) => {
+        if (busy || !window.confirm(`Check the ${num(i.unmapped_rows_count)} unmapped row(s) of ${i.original_filename} against the latest catalogue again?\n\nMapped rows are not changed. Nothing is credited or published.`)) return;
+        setBusy(true);
+        router.post(`/v2/admin/reports/imports/${i.id}/re-detect-unmapped`, {}, { preserveScroll: true, preserveState: true, onFinish: () => setBusy(false) });
     };
 
-    const saveEdit = (event) => {
-        event.preventDefault();
-
-        if (!editing || !editMonth || actionBusy) {
-            return;
-        }
-
-        setActionBusy(true);
-
-        router.patch(
-            `/v2/admin/reports/imports/${editing.id}`,
-            {
-                reporting_month: editMonth,
-            },
-            {
-                preserveScroll: true,
-
-                onSuccess: () => {
-                    setEditing(null);
-                    setEditMonth('');
-                },
-
-                onFinish: () => {
-                    setActionBusy(false);
-                },
-            }
-        );
-    };
-
-    const deleteImport = (item) => {
-        if (actionBusy) {
-            return;
-        }
-
-        const confirmed = window.confirm(
-            `Delete "${item.original_filename}"?\n\n` +
-            `This action is allowed only when the report has no royalty allocations.`
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        setActionBusy(true);
-
-        router.delete(
-            `/v2/admin/reports/imports/${item.id}`,
-            {
-                preserveScroll: true,
-
-                onFinish: () => {
-                    setActionBusy(false);
-                },
-            }
-        );
-    };
-
-    const reDetectUnmapped = (item) => {
-        const count =
-            Number(item.unmapped_rows_count || 0);
-
-        if (actionBusy) {
-            return;
-        }
-
-        const confirmed = window.confirm(
-            `Re-detect ${count.toLocaleString()} currently unmapped row(s) in ${item.original_filename}?\n\n` +
-            'Latest catalogue ISRC ownership will be checked again.\n' +
-            'Already mapped rows will NOT be changed.\n' +
-            'Wallets will NOT be credited and the report will NOT be published.'
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        setActionBusy(true);
-
-        router.post(
-            `/v2/admin/reports/imports/${item.id}/re-detect-unmapped`,
-            {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-
-                onFinish: () => {
-                    setActionBusy(false);
-                },
-            }
-        );
-    };
+    const errorList = Object.entries(pageErrors).filter(([k]) => !["reporting_month", "report_file"].includes(k));
 
     return (
-        <PanelLayout
-            role={role}
-            title="Report Imports"
-            subtitle="Upload DSP CSV reports"
-        >
-            <Head title="Report Imports" />
+        <PanelLayout role={role} title="Revenue Imports" subtitle="Upload the monthly store report, review it, approve it - then statements and wallets are filled">
+            <Head title="Revenue Imports" />
 
-            <div className="space-y-6">
-                {pageErrors?.delete && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                        {pageErrors.delete}
+            <div className="space-y-5">
+                {flash.success && (
+                    <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                        <CheckCircle2 className="h-4 w-4" /> {flash.success}
+                    </div>
+                )}
+                {errorList.length > 0 && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {errorList.map(([k, v]) => <div key={k}>{v}</div>)}
                     </div>
                 )}
 
-                <form
-                    onSubmit={submit}
-                    className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-                >
-                    <h2 className="text-lg font-semibold text-slate-900">
-                        Upload Report CSV
-                    </h2>
+                <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <h2 className="text-base font-semibold text-slate-900">Upload a report (CSV)</h2>
+                        <span className="text-xs text-slate-500">
+                            Up to <b>{limitMb} MB</b> per file{Number(settingLimitMb) > limitMb ? ` (Master Settings says ${settingLimitMb} MB, the server allows ${limitMb} MB)` : ""}
+                        </span>
+                    </div>
 
-                    <p className="mt-1 text-sm text-slate-500">
-                        Maximum file size: {reportMaxMb} MB.
-                    </p>
-
-                    <div className="mt-5">
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">
-                            Reporting Month
+                    <div className="mt-4 grid gap-4 md:grid-cols-[240px_minmax(0,1fr)]">
+                        <label className="block">
+                            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Reporting month</span>
+                            <input type="month" required value={data.reporting_month} onChange={(e) => setData("reporting_month", e.target.value)} className="h-11 w-full rounded-xl border border-slate-300 px-3 text-sm" />
+                            {errors.reporting_month && <span className="mt-1 block text-xs text-red-600">{errors.reporting_month}</span>}
                         </label>
+                        <label className="block min-w-0">
+                            <span className="mb-1.5 block text-sm font-semibold text-slate-700">Report file</span>
+                            <input id="report-file" type="file" accept=".csv,.txt" onChange={(e) => pickFile(e.target.files?.[0])} className="block w-full rounded-xl border border-slate-300 p-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold" />
+                            {data.report_file && <span className="mt-1 block text-xs text-slate-500">{data.report_file.name} · {mb(data.report_file.size)} MB</span>}
+                            {(fileError || errors.report_file) && <span className="mt-1 block text-xs text-red-600">{fileError || errors.report_file}</span>}
+                        </label>
+                    </div>
 
-                        <input
-                            type="month"
-                            value={data.reporting_month}
-                            onChange={(event) =>
-                                setData(
-                                    'reporting_month',
-                                    event.target.value
-                                )
-                            }
-                            required
-                            className="block w-full rounded-xl border border-slate-300 p-3 text-sm"
-                        />
-
-                        <p className="mt-2 text-xs text-slate-500">
-                            Revenue from this CSV will appear in dashboards,
-                            analytics and royalties under this reporting month.
-                            Sales Month inside the CSV remains unchanged.
+                    <p className="mt-3 text-xs text-slate-500">
+                        Money from this file is counted under the reporting month you choose (the sale month inside the CSV stays as it is).
+                    </p>
+                    {sameMonth.length > 0 && (
+                        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                            {monthName(data.reporting_month)} already has {sameMonth.length} report(s): {sameMonth.map((i) => i.original_filename).join(", ")}. Exact duplicate rows are skipped, but a different file for the same sales would be counted again.
                         </p>
+                    )}
 
-                        {errors.reporting_month && (
-                            <div className="mt-2 text-sm text-red-600">
-                                {errors.reporting_month}
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <button type="submit" disabled={processing || !data.reporting_month || !data.report_file} className="inline-flex h-11 items-center gap-2 rounded-xl bg-violet-600 px-6 text-sm font-semibold text-white disabled:opacity-40">
+                            {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                            {processing ? `Uploading${progress ? ` ${progress.percentage}%` : "…"}` : "Upload & import"}
+                        </button>
+                        {processing && progress && (
+                            <div className="h-2 w-48 overflow-hidden rounded-full bg-slate-100">
+                                <div className="h-full bg-violet-600" style={{ width: `${progress.percentage}%` }} />
                             </div>
                         )}
                     </div>
-
-                    <input
-                        type="file"
-                        accept=".csv,.txt"
-                        onChange={(event) =>
-                            setData(
-                                'report_file',
-                                event.target.files?.[0] ?? null
-                            )
-                        }
-                        className="mt-5 block w-full rounded-xl border border-slate-300 p-3 text-sm"
-                    />
-
-                    {errors.report_file && (
-                        <div className="mt-2 text-sm text-red-600">
-                            {errors.report_file}
-                        </div>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={
-                            processing ||
-                            !data.reporting_month ||
-                            !data.report_file
-                        }
-                        className="mt-5 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
-                    >
-                        {processing
-                            ? 'Uploading...'
-                            : 'Upload & Import'}
-                    </button>
                 </form>
 
-                <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <table className="min-w-full">
-                        <thead className="bg-slate-50">
-                            <tr>
-                                {[
-                                    'File',
-                                    'Reporting Month',
-                                    'Status',
-                                    'Total',
-                                    'Imported',
-                                    'Duplicate',
-                                    'Failed',
-                                    'Uploaded',
-                                    'Actions',
-                                ].map((heading) => (
-                                    <th
-                                        key={heading}
-                                        className="whitespace-nowrap px-5 py-4 text-left text-xs font-semibold uppercase text-slate-500"
-                                    >
-                                        {heading}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
+                <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
+                        <h2 className="text-base font-semibold text-slate-900">Uploaded reports</h2>
+                        <p className="text-xs text-slate-500">Steps: read the file → review (map unmapped rows) → open the report and "Approve & schedule" → published to statements and wallets.</p>
+                    </div>
 
-                        <tbody className="divide-y divide-slate-100">
-                            {(imports.data ?? []).map((item) => (
-                                <tr
-                                    key={item.id}
-                                    className="hover:bg-slate-50/70"
-                                >
-                                    <Cell>
-                                        {item.original_filename}
-                                    </Cell>
-
-                                    <Cell>
-                                        {formatReportingMonth(item.reporting_month)}
-                                    </Cell>
-
-                                    <Cell>
-                                        {item.status}
-                                    </Cell>
-
-                                    <Cell>
-                                        {formatNumber(item.total_rows)}
-                                    </Cell>
-
-                                    <Cell>
-                                        {formatNumber(item.imported_rows)}
-                                    </Cell>
-
-                                    <Cell>
-                                        {formatNumber(item.duplicate_rows)}
-                                    </Cell>
-
-                                    <Cell>
-                                        {formatNumber(item.failed_rows)}
-                                    </Cell>
-
-                                    <Cell>
-                                        {(() => {
-                                            const uploaded =
-                                                formatUploadedAt(
-                                                    item.created_at
-                                                );
-
-                                            return (
-                                                <div className="leading-tight">
-                                                    <div className="font-medium text-slate-700">
-                                                        {uploaded.date}
-                                                    </div>
-
-                                                    {uploaded.time && (
-                                                        <div className="mt-1 text-xs text-slate-500">
-                                                            {uploaded.time} IST
-                                                        </div>
-                                                    )}
+                    {rows.length === 0 ? (
+                        <p className="px-5 py-12 text-center text-sm text-slate-500">No report uploaded yet.</p>
+                    ) : (
+                        <ul className="divide-y divide-slate-100">
+                            {rows.map((i) => {
+                                const [label, tone, locked] = stepOf(i);
+                                const unmapped = Number(i.unmapped_rows_count || 0);
+                                const running = ["queued", "pending", "processing"].includes(i.status);
+                                const done = Number(i.imported_rows || 0) + Number(i.duplicate_rows || 0) + Number(i.failed_rows || 0);
+                                return (
+                                    <li key={i.id} className="flex flex-col gap-3 px-4 py-4 sm:px-5 lg:flex-row lg:items-center">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="text-sm font-bold text-slate-900">{monthName(i.reporting_month)}</span>
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{label}</span>
+                                                {unmapped > 0 && !running && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">{num(unmapped)} unmapped</span>}
+                                            </div>
+                                            <div className="mt-0.5 truncate text-sm text-slate-700">{i.original_filename}</div>
+                                            <div className="text-xs text-slate-500">
+                                                {num(i.total_rows)} rows · {num(i.imported_rows)} imported
+                                                {Number(i.duplicate_rows) > 0 && <span title="Rows identical to rows already imported - skipped so nothing is counted twice"> · {num(i.duplicate_rows)} duplicate (skipped)</span>}
+                                                {Number(i.failed_rows) > 0 && <span className="text-red-600"> · {num(i.failed_rows)} failed</span>}
+                                                {i.review_earnings !== undefined && i.review_earnings !== null && Number(i.review_earnings) > 0 ? ` · earnings ${inr(i.review_earnings)}` : ""}
+                                            </div>
+                                            <div className="text-[11px] text-slate-400">uploaded {when(i.created_at)}</div>
+                                            {running && Number(i.total_rows) > 0 && (
+                                                <div className="mt-1 h-1.5 w-56 overflow-hidden rounded-full bg-slate-100">
+                                                    <div className="h-full bg-violet-500" style={{ width: `${Math.min(100, (done / Number(i.total_rows)) * 100)}%` }} />
                                                 </div>
-                                            );
-                                        })()}
-                                    </Cell>
+                                            )}
+                                            {i.status === "failed" && i.error_short && <div className="mt-1 break-words text-xs text-red-600">{i.error_short}</div>}
+                                        </div>
 
-                                    <Cell>
-                                        <div className="flex items-center gap-2">
-                                            <a
-                                                href={`/v2/admin/reports/imports/${item.id}/view`}
-                                                title="View report data"
-                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
-                                            >
-                                                <Eye size={16} />
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <a href={`/v2/admin/reports/imports/${i.id}/view`} className="inline-flex h-9 items-center gap-1 rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white">
+                                                <Eye className="h-3.5 w-3.5" /> {locked || i.status === "failed" || running ? "Open" : "Open & review"}
                                             </a>
-
-                                            {Number(item.unmapped_rows_count || 0) > 0 && (
-                                                <a
-                                                    href={`/super-admin/unmapped-revenue?report_import_id=${item.id}`}
-                                                    title={`${Number(item.unmapped_rows_count || 0).toLocaleString()} unmapped ISRC rows`}
-                                                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-amber-100"
-                                                >
-                                                    <span>Unmapped</span>
-                                                    <span className="rounded-full bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                                                        {Number(item.unmapped_rows_count || 0).toLocaleString()}
-                                                    </span>
+                                            {unmapped > 0 && !running && (
+                                                <a href={`/super-admin/unmapped-revenue?report_import_id=${i.id}`} className="inline-flex h-9 items-center rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-800">
+                                                    Map {num(unmapped)}
                                                 </a>
                                             )}
-
-                                            {Number(item.unmapped_rows_count || 0) > 0 &&
-                                                item.financial_status === 'review_pending' && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            reDetectUnmapped(item)
-                                                        }
-                                                        disabled={actionBusy}
-                                                        title="Refresh / Re-detect unmapped ISRCs"
-                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 transition hover:border-cyan-300 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                                    >
-                                                        <RefreshCw size={16} />
-                                                    </button>
-                                                )}
-
-                                            <a
-                                                href={`/v2/admin/reports/imports/${item.id}/download`}
-                                                title="Download original report"
-                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
-                                            >
-                                                <Download size={16} />
+                                            {unmapped > 0 && i.financial_status === "review_pending" && !running && (
+                                                <button type="button" onClick={() => redetect(i)} disabled={busy} title="Check unmapped rows again" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 disabled:opacity-50">
+                                                    <RefreshCw className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                            <a href={`/v2/admin/reports/imports/${i.id}/download`} title="Download the original file" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600">
+                                                <Download className="h-4 w-4" />
                                             </a>
-
-                                            <button
-                                                type="button"
-                                                title="Edit reporting month"
-                                                onClick={() => openEdit(item)}
-                                                disabled={actionBusy}
-                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50"
-                                            >
-                                                <Pencil size={16} />
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                title="Delete report"
-                                                onClick={() =>
-                                                    deleteImport(item)
-                                                }
-                                                disabled={actionBusy}
-                                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                            {!locked && !running && (
+                                                <>
+                                                    <button type="button" title="Change reporting month" onClick={() => { setEditing(i); setEditMonth(String(i.reporting_month || "").slice(0, 7)); }} disabled={busy} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 disabled:opacity-50">
+                                                        <Pencil className="h-4 w-4" />
+                                                    </button>
+                                                    <button type="button" title="Delete report" onClick={() => remove(i)} disabled={busy} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 disabled:opacity-50">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
-                                    </Cell>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+
+                    {imports.last_page > 1 && (
+                        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm">
+                            {imports.prev_page_url ? <Link href={imports.prev_page_url} preserveScroll className="font-semibold text-violet-700">← Previous</Link> : <span />}
+                            <span className="text-xs text-slate-500">Page {imports.current_page} of {imports.last_page}</span>
+                            {imports.next_page_url ? <Link href={imports.next_page_url} preserveScroll className="font-semibold text-violet-700">Next →</Link> : <span />}
+                        </div>
+                    )}
                 </section>
             </div>
 
             {editing && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-                    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-                        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 sm:items-center sm:p-4" onClick={() => !busy && setEditing(null)}>
+                    <form onClick={(e) => e.stopPropagation()} onSubmit={saveEdit} className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-2xl">
+                        <div className="flex items-start justify-between gap-3">
                             <div>
-                                <h3 className="font-semibold text-slate-900">
-                                    Edit Report
-                                </h3>
-
-                                <p className="mt-1 text-xs text-slate-500">
-                                    {editing.original_filename}
-                                </p>
+                                <h3 className="font-semibold text-slate-900">Change reporting month</h3>
+                                <p className="mt-0.5 text-xs text-slate-500">{editing.original_filename}</p>
                             </div>
-
-                            <button
-                                type="button"
-                                onClick={closeEdit}
-                                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                            >
-                                <X size={18} />
-                            </button>
+                            <button type="button" onClick={() => setEditing(null)} disabled={busy} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" aria-label="Close"><X className="h-4 w-4" /></button>
                         </div>
-
-                        <form
-                            onSubmit={saveEdit}
-                            className="p-6"
-                        >
-                            <label className="mb-2 block text-sm font-semibold text-slate-700">
-                                Reporting Month
-                            </label>
-
-                            <input
-                                type="month"
-                                value={editMonth}
-                                onChange={(event) =>
-                                    setEditMonth(event.target.value)
-                                }
-                                required
-                                className="block w-full rounded-xl border border-slate-300 p-3 text-sm"
-                            />
-
-                            <p className="mt-2 text-xs text-slate-500">
-                                This updates the reporting month for this
-                                import and its report rows.
-                            </p>
-
-                            <div className="mt-6 flex justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={closeEdit}
-                                    disabled={actionBusy}
-                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
-                                >
-                                    Cancel
-                                </button>
-
-                                <button
-                                    type="submit"
-                                    disabled={
-                                        actionBusy ||
-                                        !editMonth
-                                    }
-                                    className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                                >
-                                    {actionBusy
-                                        ? 'Saving...'
-                                        : 'Save Changes'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                        <input type="month" required value={editMonth} onChange={(e) => setEditMonth(e.target.value)} className="mt-4 h-11 w-full rounded-xl border border-slate-300 px-3 text-sm" />
+                        <p className="mt-2 text-xs text-slate-500">Moves this report and all its rows to the new month. Only possible before approval.</p>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <button type="button" onClick={() => setEditing(null)} disabled={busy} className="h-10 rounded-xl border border-slate-300 px-4 text-sm font-semibold">Cancel</button>
+                            <button type="submit" disabled={busy || !editMonth} className="h-10 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white disabled:opacity-40">{busy ? "Saving…" : "Save"}</button>
+                        </div>
+                    </form>
                 </div>
             )}
         </PanelLayout>
-    );
-}
-
-function Cell({ children }) {
-    return (
-        <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
-            {children}
-        </td>
     );
 }

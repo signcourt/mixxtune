@@ -43,8 +43,25 @@ class ReportImportController extends Controller
             [
                 'role' => $role,
 
+                /*
+                 * MIXXTUNE_REPORT_IMPORTS_V2 (W47): only the columns the list
+                 * needs (was every column incl. the big column map / error
+                 * text), the review -> publish step, and the REAL upload
+                 * limit (Master Settings value capped by the server's PHP
+                 * upload_max_filesize / post_max_size - a bigger file was
+                 * cut off by PHP with a blank "413" page).
+                 */
                 'imports' =>
                     ReportImport::query()
+                        ->select(array_values(array_filter([
+                            'id', 'original_filename', 'reporting_month', 'status', 'total_rows', 'imported_rows',
+                            'duplicate_rows', 'failed_rows', 'created_at', 'completed_at', 'uploaded_by',
+                            \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'financial_status') ? 'financial_status' : null,
+                            \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'publish_at') ? 'publish_at' : null,
+                            \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'published_at') ? 'published_at' : null,
+                            \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'review_earnings') ? 'review_earnings' : null,
+                        ])))
+                        ->selectRaw('SUBSTR(error_message, 1, 300) as error_short')
                         ->withCount([
                             'rows as unmapped_rows_count' => function ($query) {
                                 $query
@@ -55,8 +72,38 @@ class ReportImportController extends Controller
                         ])
                         ->orderByDesc('id')
                         ->paginate(25),
+
+                'uploadLimitMb' => $this->uploadLimitMb(),
+                'settingLimitMb' => \App\Services\V2\PlatformRules::reportMaxMb(),
             ]
         );
+    }
+
+
+    /* MIXXTUNE_REPORT_IMPORTS_V2: the biggest file that can really be uploaded */
+    private function uploadLimitMb(): int
+    {
+        $toMb = function ($v) {
+            $v = trim((string) $v);
+            if ($v === '' || $v === '0' || $v === '-1') {
+                return PHP_INT_MAX;
+            }
+            $n = (float) $v;
+            $u = strtolower(substr($v, -1));
+
+            return (int) floor(match ($u) {
+                'g' => $n * 1024,
+                'm' => $n,
+                'k' => $n / 1024,
+                default => $n / 1048576,
+            });
+        };
+
+        return max(1, min(
+            \App\Services\V2\PlatformRules::reportMaxMb(),
+            $toMb(ini_get('upload_max_filesize')),
+            $toMb(ini_get('post_max_size'))
+        ));
     }
 
     public function store(
@@ -94,8 +141,12 @@ class ReportImportController extends Controller
                     'file',
                     'mimes:csv,txt',
                     /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Upload Rules > Report Maximum MB */
-                    'max:'.(\App\Services\V2\PlatformRules::reportMaxMb() * 1024),
+                    'max:'.($this->uploadLimitMb() * 1024),
                 ],
+            ],
+            [
+                'report_file.max' => 'The file is bigger than '.$this->uploadLimitMb().' MB, the most this server accepts. Split the report into smaller CSV files (same reporting month) and upload each.',
+                'report_file.mimes' => 'Upload the report as a .csv file.',
             ]
         )->validate();
 
