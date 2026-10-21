@@ -228,7 +228,22 @@ export default function Index({
     currencySummary = [],
     financialAnalytics = {},
     importedRevenueAnalytics = {},
+    preview = false,
+    unpublished = [],
 }) {
+    /* MIXXTUNE_ANALYTICS_V2 (W48): keep every current filter, put From before To */
+    const goRange = (from, to) => {
+        const params = Object.fromEntries(new URLSearchParams(window.location.search));
+        delete params.month;
+        if (from && to && from > to) [from, to] = [to, from];
+        router.get(window.location.pathname, { ...params, from_month: from || undefined, to_month: to || undefined }, { preserveScroll: true, preserveState: true, replace: true });
+    };
+    const setPreview = (on) => {
+        const params = Object.fromEntries(new URLSearchParams(window.location.search));
+        delete params.month; delete params.from_month; delete params.to_month;
+        router.get(window.location.pathname, { ...params, preview: on ? 1 : undefined }, { preserveScroll: true, replace: true });
+    };
+
     const primaryCurrency =
         currencySummary?.[0]?.currency || 'INR';
 
@@ -401,7 +416,8 @@ export default function Index({
                 title="Financial Analytics"
                 subtitle="Performance intelligence from imported royalty reports"
             >
-                <div className="space-y-6 p-5 lg:p-7">
+                <div className="space-y-6">
+                    <PublishBanner role={role} preview={preview} unpublished={unpublished} hasMonths={(filterOptions?.months || []).length > 0} onPreview={setPreview} />
 
                     {/* RAW REPORT KPI CARDS */}
                     {!['label', 'artist'].includes(role) && (
@@ -466,25 +482,12 @@ export default function Index({
                                 <select
                                     value={filters.from_month || filters.month || ''}
                                     onChange={(event) =>
-                                        router.get(
-                                            window.location.pathname,
-                                            {
-                                                from_month:
-                                                    event.target.value,
-                                                to_month:
-                                                    filters.to_month ||
-                                                    filters.month ||
-                                                    event.target.value,
-                                            },
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                                replace: true,
-                                            }
-                                        )
+                                        goRange(event.target.value, filters.to_month || filters.month || event.target.value)
                                     }
+                                    disabled={!months.length}
                                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                                 >
+                                    {!months.length && <option value="">No months yet</option>}
                                     {months.map((month) => (
                                         <option key={month} value={month}>
                                             {monthFormat(month)}
@@ -505,25 +508,12 @@ export default function Index({
                                 <select
                                     value={filters.to_month || filters.month || ''}
                                     onChange={(event) =>
-                                        router.get(
-                                            window.location.pathname,
-                                            {
-                                                from_month:
-                                                    filters.from_month ||
-                                                    filters.month ||
-                                                    event.target.value,
-                                                to_month:
-                                                    event.target.value,
-                                            },
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                                replace: true,
-                                            }
-                                        )
+                                        goRange(filters.from_month || filters.month || event.target.value, event.target.value)
                                     }
+                                    disabled={!months.length}
                                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                                 >
+                                    {!months.length && <option value="">No months yet</option>}
                                     {months.map((month) => (
                                         <option key={month} value={month}>
                                             {monthFormat(month)}
@@ -1258,4 +1248,59 @@ export default function Index({
             </PanelLayout>
         </>
     );
+}
+
+/* MIXXTUNE_ANALYTICS_V2 (W48): why the numbers can be 0, and a staff preview */
+function PublishBanner({ role, preview, unpublished = [], hasMonths, onPreview }) {
+    const staff = role === 'admin' || role === 'super_admin';
+
+    if (staff && preview) {
+        return (
+            <div className="flex flex-col gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                    <b>Preview</b> - these numbers include {unpublished.length} report(s) that are not published yet. They can still change, and owners do not see them.
+                </span>
+                <button type="button" onClick={() => onPreview(false)} className="h-9 shrink-0 rounded-lg border border-amber-300 bg-white px-3 text-xs font-semibold">
+                    Show published only
+                </button>
+            </div>
+        );
+    }
+
+    if (staff && unpublished.length > 0) {
+        return (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span>Analytics counts only <b>published</b> reports. {unpublished.length} report(s) are not published yet:</span>
+                    <div className="flex shrink-0 gap-2">
+                        <button type="button" onClick={() => onPreview(true)} className="h-9 rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white">
+                            Preview them here
+                        </button>
+                        <a href="/v2/admin/reports/imports" className="inline-flex h-9 items-center rounded-lg border border-violet-200 bg-white px-3 text-xs font-semibold">
+                            Open Revenue Imports
+                        </a>
+                    </div>
+                </div>
+                <ul className="mt-2 space-y-0.5 text-xs text-violet-800">
+                    {unpublished.map((u) => (
+                        <li key={u.id}>
+                            {monthFormat(u.month)} · {u.file} · {numberFormat(u.rows)} rows · <b>{u.step}</b>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        );
+    }
+
+    if (!hasMonths) {
+        return (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+                {staff
+                    ? 'No published report yet. Upload a report in Revenue Imports, review it and approve it - analytics fill in when it is published.'
+                    : 'Your analytics appear here after the first monthly store report is published.'}
+            </div>
+        );
+    }
+
+    return null;
 }

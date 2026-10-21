@@ -458,9 +458,13 @@ class AnalyticsController extends Controller
 
         $filters = $this->filters($request);
 
+        /* MIXXTUNE_ANALYTICS_V2 (W48): staff preview of reports not yet published */
+        $preview = in_array($role, ['admin', 'super_admin'], true) && $request->boolean('preview');
+
         $base = $analytics->scopedQuery(
             $user,
-            $permissions
+            $permissions,
+            $preview
         );
 
         $months = (clone $base)
@@ -909,6 +913,10 @@ class AnalyticsController extends Controller
 
                 'filters' => $filters,
 
+                'preview' => $preview,
+
+                'unpublished' => in_array($role, ['admin', 'super_admin'], true) ? $this->unpublishedImports() : [],
+
                 'financialAnalytics' =>
                     $financialData,
 
@@ -1014,6 +1022,31 @@ class AnalyticsController extends Controller
         );
     }
 
+
+    /* MIXXTUNE_ANALYTICS_V2: reports that are read but not yet published */
+    private function unpublishedImports(): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'financial_status')) {
+            return [];
+        }
+
+        return DB::table('report_imports')
+            ->whereIn('status', ['completed', 'completed_with_errors'])
+            ->whereIn('financial_status', ['review_pending', 'approved_scheduled'])
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get(['id', 'original_filename', 'reporting_month', 'financial_status', 'imported_rows'])
+            ->map(fn ($r) => [
+                'id' => (int) $r->id,
+                'file' => $r->original_filename,
+                'month' => $r->reporting_month ? substr((string) $r->reporting_month, 0, 7) : null,
+                'step' => $r->financial_status === 'approved_scheduled' ? 'Approved, not published yet' : 'Waiting for review',
+                'rows' => (int) $r->imported_rows,
+            ])
+            ->values()
+            ->all();
+    }
+
     public function export(
         Request $request,
         PermissionService $permissions,
@@ -1033,7 +1066,8 @@ class AnalyticsController extends Controller
          */
         $query = $analytics->scopedQuery(
             $user,
-            $permissions
+            $permissions,
+            in_array($permissions->role($user), ['admin', 'super_admin'], true) && $request->boolean('preview')
         );
 
         $query = $analytics->applyFilters(

@@ -19,7 +19,8 @@ class ReportAnalyticsService
 
     public function scopedQuery(
         User $user,
-        PermissionService $permissions
+        PermissionService $permissions,
+        bool $preview = false
     ): Builder {
         $role = $permissions->role(
             $user
@@ -46,7 +47,7 @@ class ReportAnalyticsService
         $query =
             ReportRow::query()
                 ->whereExists(
-                    function ($publishedImport) {
+                    function ($publishedImport) use ($preview, $role) {
                         $publishedImport
                             ->selectRaw('1')
                             ->from('report_imports as financial_import')
@@ -54,9 +55,17 @@ class ReportAnalyticsService
                                 'financial_import.id',
                                 'report_rows.report_import_id'
                             )
-                            ->where(
+                            /*
+                             * MIXXTUNE_ANALYTICS_V2 (W48): staff "preview"
+                             * also reads reports still under review /
+                             * approved, so a report can be checked before
+                             * it is published. Owners never get preview.
+                             */
+                            ->whereIn(
                                 'financial_import.financial_status',
-                                'published'
+                                $preview && in_array($role, ['admin', 'super_admin'], true)
+                                    ? ['published', 'review_pending', 'approved_scheduled']
+                                    : ['published']
                             );
                     }
                 );
