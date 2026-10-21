@@ -145,6 +145,8 @@ const LEGAL_CONFIG = {
 export default function Create({
     role = 'artist',
     legalSection = null,
+    categories = {},
+    presetCategory = null,
 }) {
     const config = LEGAL_CONFIG[legalSection] || {
         title: 'New Support Ticket',
@@ -164,7 +166,8 @@ export default function Create({
         errors,
     } = useForm({
         subject: config.subject,
-        category: config.category,
+        /* MIXXTUNE_SUPPORT_DESK_V1: topic chosen by the user (was always "general") */
+        category: legalSection ? config.category : presetCategory || config.category,
         priority: 'normal',
         message: '',
         attachments: [],
@@ -319,6 +322,28 @@ export default function Create({
                                 />
                             </label>
                         ))}
+
+                    {!legalSection && Object.keys(categories).length > 0 && (
+                        <label>
+                            <span className="text-sm font-semibold text-slate-700">
+                                Topic
+                            </span>
+
+                            <select
+                                value={data.category}
+                                onChange={(e) =>
+                                    setData('category', e.target.value)
+                                }
+                                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500"
+                            >
+                                {Object.entries(categories).map(([key, label]) => (
+                                    <option key={key} value={key}>
+                                        {label}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    )}
 
                     <label>
                         <span className="text-sm font-semibold text-slate-700">

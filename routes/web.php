@@ -2254,6 +2254,16 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.support.reply');
 
+/* MIXXTUNE_SUPPORT_DESK_V1 */
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('/v2/support/{ticket}/close', [\App\Http\Controllers\V2\SupportTicketController::class, 'close'])->name('v2.support.close');
+    Route::post('/v2/support/{ticket}/reopen', [\App\Http\Controllers\V2\SupportTicketController::class, 'reopen'])->name('v2.support.reopen');
+    Route::get('/v2/support/{ticket}/files/{message}/{index}', [\App\Http\Controllers\V2\SupportTicketController::class, 'file'])
+        ->whereNumber('index')->name('v2.support.file');
+    Route::get('/v2/admin/support/search-users', [\App\Http\Controllers\V2\Admin\SupportManagementController::class, 'searchUsers'])->name('v2.admin.support.search-users');
+    Route::post('/v2/admin/support', [\App\Http\Controllers\V2\Admin\SupportManagementController::class, 'store'])->name('v2.admin.support.store');
+});
+
 
 Route::middleware(['auth', 'verified'])
     ->get(
