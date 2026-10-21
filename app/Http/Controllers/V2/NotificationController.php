@@ -122,7 +122,8 @@ class NotificationController extends Controller
             ]);
         }
 
-        if ($notification->action_url) {
+        /* MIXXTUNE_NOTIFY_TARGETED_V1: "Hide" on a highlighted notice only marks it read */
+        if ($notification->action_url && !$request->boolean('stay')) {
             return redirect(
                 $notification->action_url
             );

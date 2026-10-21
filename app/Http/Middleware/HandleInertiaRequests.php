@@ -137,6 +137,20 @@ class HandleInertiaRequests extends Middleware
 
             'maintenance' => \App\Http\Middleware\EnforceMaintenanceMode::state($request),
 
+            /* MIXXTUNE_NOTIFY_TARGETED_V1: newest unread highlighted notice -> banner at the top of the panel */
+            'highlightNotice' => fn () => $request->user()
+                ? \App\Models\Support\PanelNotification::query()
+                    ->where('user_id', $request->user()->id)
+                    ->where('type', 'broadcast.manual')
+                    ->whereNull('read_at')
+                    ->whereNull('dismissed_at')
+                    ->orderByDesc('id')
+                    ->limit(20)
+                    ->get(['id', 'title', 'message', 'action_url', 'severity', 'data'])
+                    ->first(fn ($n) => (bool) data_get($n->data, 'highlight'))
+                    ?->only(['id', 'title', 'message', 'action_url', 'severity'])
+                : null,
+
             /* MIXXTUNE_SETTINGS_WIRED_V1: limits from Master Settings for upload screens */
             'platformRules' => fn () => $request->user() ? \App\Services\V2\PlatformRules::shared() : null,
 

@@ -114,6 +114,21 @@ export default function Index({
         >
             <Head title="Notifications" />
 
+            {/* MIXXTUNE_NOTIFY_TARGETED_V1 */}
+            {role === "super_admin" && (
+                <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-sm text-violet-900">
+                        This is your own inbox. To send a notice to labels, artists, managers or chosen people:
+                    </span>
+                    <a
+                        href="/v2/admin/notification-management"
+                        className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700"
+                    >
+                        Send Notification
+                    </a>
+                </div>
+            )}
+
             <div className="w-full">
                 <div className="overflow-x-auto border-b border-slate-200 bg-white">
                     <div className="flex min-w-[580px]">

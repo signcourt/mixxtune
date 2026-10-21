@@ -600,6 +600,14 @@ const adminNavigation = (
                     href: routes.notifications,
                     badgeKey: 'notifications',
                 },
+                /* MIXXTUNE_NOTIFY_TARGETED_V1 */
+                ...(role === 'super_admin'
+                    ? [{
+                          id: 'administration-send-notification',
+                          label: 'Send Notification',
+                          href: '/v2/admin/notification-management',
+                      }]
+                    : []),
                 {
                     id: 'administration-settings',
                     label: 'Settings',

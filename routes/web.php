@@ -2771,6 +2771,27 @@ Route::middleware('auth')->group(function () {
         '/v2/admin/notification-management',
         [NotificationManagementController::class, 'store']
     )->name('v2.admin.notification-management.store');
+
+    /* MIXXTUNE_NOTIFY_TARGETED_V1 */
+    Route::post(
+        '/v2/admin/notification-management/preview',
+        [NotificationManagementController::class, 'preview']
+    )->name('v2.admin.notification-management.preview');
+
+    Route::get(
+        '/v2/admin/notification-management/search-users',
+        [NotificationManagementController::class, 'searchUsers']
+    )->name('v2.admin.notification-management.search-users');
+
+    Route::get(
+        '/v2/admin/notification-management/search-labels',
+        [NotificationManagementController::class, 'searchLabels']
+    )->name('v2.admin.notification-management.search-labels');
+
+    Route::get(
+        '/v2/admin/notification-management/{broadcast}/recipients',
+        [NotificationManagementController::class, 'recipientsList']
+    )->name('v2.admin.notification-management.recipients');
 });
 
 Route::middleware(['auth'])->group(function () {
