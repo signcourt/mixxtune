@@ -129,23 +129,16 @@ const releaseChildren = (
             href: routes.releasesDraft,
             queryStatus: 'draft',
         },
-        {
-            id: 'releases-review',
-            label: 'In Review',
-            href: routes.releasesReview,
-            queryStatus: 'submitted',
-        },
+        /*
+         * W75: artist / label menu = All Releases (every status, also drafts
+         * and rejected), Drafts, Changes Requested, Rejected. "In Review" and
+         * "Live" stay in the admin menu; owners still see them under All.
+         */
         {
             id: 'releases-changes',
             label: 'Changes Requested',
             href: routes.releasesChanges,
             queryStatus: 'changes_requested',
-        },
-        {
-            id: 'releases-live',
-            label: 'Live',
-            href: routes.releasesLive,
-            queryStatus: 'live',
         },
         {
             id: 'releases-rejected',
