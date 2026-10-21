@@ -372,7 +372,7 @@ const adminNavigation = (
                     ? [
                           {
                               id: 'account-level-management',
-                              label: 'Level Management',
+                              label: 'Label Management',
                               href: routes.labelHierarchy,
                               permission: 'labels.view',
                           },

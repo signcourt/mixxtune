@@ -172,7 +172,7 @@ class LabelHierarchyController extends Controller
         abort_unless(
             (string) $request->user()?->role === 'super_admin',
             403,
-            'Only Super Admin can manage catalogue levels.'
+            'Only Super Admin can manage labels and sub-labels.'
         );
 
         $this->authorizeAdmin($request);
@@ -346,7 +346,7 @@ class LabelHierarchyController extends Controller
         abort_unless(
             (string) $request->user()?->role === 'super_admin',
             403,
-            'Only Super Admin can manage catalogue levels.'
+            'Only Super Admin can manage labels and sub-labels.'
         );
 
         $this->authorizeAdmin($request);
@@ -438,7 +438,7 @@ class LabelHierarchyController extends Controller
         ) {
             return back()->withErrors([
                 'parent_label_id' =>
-                    'A master/root label cannot be moved under another level.',
+                    'A master/root label cannot be moved under another label.',
             ]);
         }
 
@@ -446,7 +446,7 @@ class LabelHierarchyController extends Controller
             if ($newParentId === null) {
                 return back()->withErrors([
                     'parent_label_id' =>
-                        'A child level must remain inside a master hierarchy.',
+                        'A sub-label must stay under a master label.',
                 ]);
             }
 
@@ -485,7 +485,7 @@ class LabelHierarchyController extends Controller
             ) {
                 return back()->withErrors([
                     'parent_label_id' =>
-                        'A level cannot be moved to a different master account.',
+                        'A sub-label cannot be moved to a different master account.',
                 ]);
             }
         }
@@ -590,7 +590,7 @@ class LabelHierarchyController extends Controller
         abort_unless(
             (string) $request->user()?->role === 'super_admin',
             403,
-            'Only Super Admin can manage catalogue levels.'
+            'Only Super Admin can manage labels and sub-labels.'
         );
 
         $this->authorizeAdmin($request);
@@ -603,7 +603,7 @@ class LabelHierarchyController extends Controller
         if ($label->parent_label_id === null) {
             return back()->withErrors([
                 'label' =>
-                    'Master/root labels cannot be deleted from Level Management.',
+                    'Master/root labels cannot be deleted from Label Management.',
             ]);
         }
 
@@ -616,7 +616,7 @@ class LabelHierarchyController extends Controller
         if ($descendants->isNotEmpty()) {
             return back()->withErrors([
                 'label' =>
-                    'Move or remove this level’s child levels before deleting it.',
+                    'Move or remove the sub-labels of this label before deleting it.',
             ]);
         }
 
@@ -631,7 +631,7 @@ class LabelHierarchyController extends Controller
         if ($hasReleases) {
             return back()->withErrors([
                 'label' =>
-                    'This level contains catalogue releases and cannot be deleted.',
+                    'This sub-label contains catalogue releases and cannot be deleted.',
             ]);
         }
 
@@ -646,7 +646,7 @@ class LabelHierarchyController extends Controller
         if ($hasArtists) {
             return back()->withErrors([
                 'label' =>
-                    'This level contains artists and cannot be deleted.',
+                    'This sub-label contains artists and cannot be deleted.',
             ]);
         }
 
@@ -658,7 +658,7 @@ class LabelHierarchyController extends Controller
         ] as $table => $what) {
             if (\Illuminate\Support\Facades\Schema::hasTable($table) && \Illuminate\Support\Facades\Schema::hasColumn($table, 'label_id') && DB::table($table)->where('label_id', $label->id)->exists()) {
                 return back()->withErrors([
-                    'label' => 'This level has '.$what.' and cannot be deleted.',
+                    'label' => 'This sub-label has '.$what.' and cannot be deleted.',
                 ]);
             }
         }

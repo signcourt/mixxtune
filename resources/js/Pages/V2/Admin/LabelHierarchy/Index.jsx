@@ -146,8 +146,8 @@ export default function Index({
     const isOpen = (id) => expanded.has(id) || autoOpen.has(id);
 
     return (
-        <PanelLayout role={role} title="Level Management" subtitle="Master labels and their direct sub-labels (two levels only)">
-            <Head title="Level Management" />
+        <PanelLayout role={role} title="Label Management" subtitle="Master labels and their sub-labels">
+            <Head title="Label Management" />
             <PageMessages />
 
             <div className="space-y-5">
