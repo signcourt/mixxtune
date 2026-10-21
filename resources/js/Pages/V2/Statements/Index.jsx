@@ -1,675 +1,231 @@
-import {
-    Head,
-    Link,
-    router,
-} from '@inertiajs/react';
+import { Head, Link, router, usePage } from "@inertiajs/react";
+import { CheckCircle2, Clock3, Download, FileText, Loader2, Search, WalletCards } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
-import {
-    CheckCircle2,
-    Clock3,
-    Download,
-    FileText,
-    WalletCards,
-} from 'lucide-react';
+import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import StatementEmailPanel from "@/V2/Admin/StatementEmailPanel";
 
-import {
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react';
+/* MIXXTUNE_STATEMENTS_V2 (W43) */
 
-import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
-import StatementEmailPanel from '@/V2/Admin/StatementEmailPanel';
-
-const statusStyles = {
-    pending:
-        'bg-amber-50 text-amber-700 ring-amber-200',
-
-    approved:
-        'bg-blue-50 text-blue-700 ring-blue-200',
-
-    available:
-        'bg-emerald-50 text-emerald-700 ring-emerald-200',
-
-    paid:
-        'bg-green-50 text-green-700 ring-green-200',
-
-    cancelled:
-        'bg-rose-50 text-rose-700 ring-rose-200',
-};
-
-const formatCurrency = (
-    value,
-    currency = 'INR'
-) => {
+const money = (v, c = "INR") => {
     try {
-        return new Intl.NumberFormat(
-            'en-IN',
-            {
-                style: 'currency',
-                currency:
-                    currency || 'INR',
-                maximumFractionDigits: 2,
-            }
-        ).format(
-            Number(value ?? 0)
-        );
+        return new Intl.NumberFormat("en-IN", { style: "currency", currency: c || "INR", maximumFractionDigits: 2 }).format(Number(v ?? 0));
     } catch {
-        return `${currency} ${Number(
-            value ?? 0
-        ).toFixed(2)}`;
+        return `${c} ${Number(v ?? 0).toFixed(2)}`;
     }
 };
 
-const formatMonth = (value) => {
-    if (!value) {
-        return 'Unknown Month';
-    }
-
-    const date = new Date(
-        `${value}-01T00:00:00`
-    );
-
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-        return value;
-    }
-
-    return new Intl.DateTimeFormat(
-        'en-IN',
-        {
-            month: 'long',
-            year: 'numeric',
-        }
-    ).format(date);
+/* statement_month comes as "2026-07" or "2026-07-01" (the old code broke on the second) */
+const monthName = (v) => {
+    if (!v) return "Unknown month";
+    const m = String(v).match(/^(\d{4})-(\d{2})/);
+    if (!m) return String(v);
+    return new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(new Date(Number(m[1]), Number(m[2]) - 1, 1));
 };
 
-const formatDate = (value) => {
-    if (!value) {
-        return '—';
-    }
-
-    const date = new Date(value);
-
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-        return value;
-    }
-
-    return new Intl.DateTimeFormat(
-        'en-IN',
-        {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        }
-    ).format(date);
+const day = (v) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? String(v) : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(d);
 };
 
-export default function Index({
-    role = 'artist',
-    statements = {},
-    filters = {},
-}) {
-    const rows =
-        statements.data ?? [];
+const STATUS = {
+    pending: ["Waiting for approval", "bg-amber-50 text-amber-800"],
+    generated: ["Generated", "bg-amber-50 text-amber-800"],
+    approved: ["Approved · pending in wallet", "bg-blue-50 text-blue-700"],
+    available: ["Available to withdraw", "bg-emerald-50 text-emerald-700"],
+    paid: ["Paid", "bg-green-50 text-green-700"],
+    cancelled: ["Cancelled", "bg-rose-50 text-rose-700"],
+};
 
-    /* MIXXTUNE_FINANCE_CLEANUP_V1: search + status run on the server over all statements */
-    const [search, setSearch] =
-        useState(filters.search ?? '');
+export default function Index({ role = "artist", statements = {}, filters = {}, summary = {}, months = [] }) {
+    const page = usePage().props;
+    const flash = page.flash ?? {};
+    const errors = page.errors ?? {};
+    const staff = role === "admin" || role === "super_admin";
+    const rows = statements.data ?? [];
+    const [search, setSearch] = useState(filters.search ?? "");
+    const [busy, setBusy] = useState(null);
+    const first = useRef(true);
 
-    const [status, setStatus] =
-        useState(filters.status ?? '');
-
-    const firstRun = useRef(true);
+    const go = (patch) =>
+        router.get(window.location.pathname, { search: filters.search || undefined, status: filters.status || undefined, month: filters.month || undefined, ...patch, page: undefined }, { preserveState: true, preserveScroll: true, replace: true });
 
     useEffect(() => {
-        if (firstRun.current) {
-            firstRun.current = false;
-            return undefined;
+        if (first.current) {
+            first.current = false;
+            return;
         }
+        const t = setTimeout(() => go({ search: search.trim() || undefined }), 350);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
 
-        const timer = window.setTimeout(() => {
-            router.get(
-                window.location.pathname,
-                {
-                    search: search.trim() || undefined,
-                    status: status || undefined,
-                },
-                {
-                    preserveState: true,
-                    preserveScroll: true,
-                    replace: true,
-                }
-            );
-        }, 400);
+    const act = (s, kind) => {
+        const text = kind === "approve"
+            ? `Approve ${monthName(s.statement_month)} for ${s.owner_name}?\n${money(s.net_payable, s.currency)} goes to the owner's PENDING wallet balance.\nAn e-mailed code is needed next.`
+            : `Make ${money(s.net_payable, s.currency)} of ${s.owner_name} AVAILABLE to withdraw?\nAn e-mailed code is needed next.`;
+        if (!window.confirm(text)) return;
+        setBusy(`${kind}${s.id}`);
+        router.post(`/v2/admin/finance/statements/${s.id}/${kind}`, {}, { preserveScroll: true, onFinish: () => setBusy(null) });
+    };
 
-        return () => window.clearTimeout(timer);
-    }, [search, status]);
-
-    const filteredRows = rows;
-
-
-    const totals =
-        useMemo(() => {
-            return rows.reduce(
-                (result, item) => {
-                    result.gross +=
-                        Number(
-                            item.gross_earnings ??
-                                0
-                        );
-
-                    result.deductions +=
-                        Number(
-                            item.commission_amount ??
-                                0
-                        ) +
-                        Number(
-                            item.tax_amount ??
-                                0
-                        ) +
-                        Number(
-                            item.other_deductions ??
-                                0
-                        );
-
-                    result.net +=
-                        Number(
-                            item.net_payable ??
-                                0
-                        );
-
-                    if (
-                        item.status ===
-                        'available'
-                    ) {
-                        result.available +=
-                            Number(
-                                item.net_payable ??
-                                    0
-                            );
-                    }
-
-                    return result;
-                },
-                {
-                    gross: 0,
-                    deductions: 0,
-                    net: 0,
-                    available: 0,
-                }
-            );
-        }, [rows]);
-
-    const title =
-        role === 'artist'
-            ? 'My Statements'
-            : role === 'label'
-              ? 'Label Statements'
-              : 'Royalty Statements';
+    const filtered = !!(filters.search || filters.status || filters.month);
+    const title = role === "artist" ? "My Statements" : role === "label" ? "Label Statements" : "Royalty Statements";
+    const actionError = errors.approve || errors.available;
 
     return (
-        <PanelLayout
-            role={role}
-            title={title}
-            subtitle="Monthly royalty statements and downloadable payment records"
-        >
+        <PanelLayout role={role} title={title} subtitle={staff ? "Every owner's monthly statement: check, approve, download, e-mail" : "Your monthly royalty statements and PDFs"}>
             <Head title={title} />
 
-            <div className="space-y-6">
-                {/* MIXXTUNE_OWNER_STATEMENT_V1 */}
-                {role === 'super_admin' && <StatementEmailPanel />}
+            {role === "super_admin" && <div className="mb-4"><StatementEmailPanel /></div>}
 
-                <header className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
-                        <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-violet-700">
-                                    Mixx Tune Finance
-                                </span>
+            {flash.success && (
+                <div className="mb-3 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" /> {flash.success}
+                </div>
+            )}
+            {actionError && <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</div>}
 
-                                <span className="text-xs font-medium text-slate-500">
-                                    Statement Centre
-                                </span>
-                            </div>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Stat label="Gross earnings" value={money(summary.gross)} hint={`${Number(summary.count ?? 0).toLocaleString("en-IN")} statement(s)${filtered ? " · filtered" : ""}`} />
+                <Stat label="Deductions" value={money(summary.deductions)} hint="commission, tax, advance recovery" />
+                <Stat label="Net payable" value={money(summary.net)} tone="text-violet-700" />
+                {staff ? (
+                    <Stat label="Waiting for approval" value={`${summary.pending_count ?? 0}`} tone={summary.pending_count ? "text-amber-700" : "text-slate-900"} hint={summary.pending_count ? `${money(summary.pending_net)} not in wallets yet` : "nothing waiting"} />
+                ) : (
+                    <Stat label="Wallet available" value={money(summary.wallet)} tone="text-emerald-700" hint={<Link href="/v2/wallet" className="font-semibold text-violet-700">Open wallet →</Link>} />
+                )}
+            </div>
 
-                            <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                                {title}
-                            </h1>
+            {staff && summary.pending_count > 0 && filters.status !== "pending" && (
+                <button type="button" onClick={() => go({ status: "pending" })} className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-left text-sm text-amber-800">
+                    {summary.pending_count} statement(s) are waiting for approval — owners don't see this money yet. <b>Show them →</b>
+                </button>
+            )}
 
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                                Review gross earnings,
-                                deductions, net payable
-                                amounts and statement
-                                payment status.
-                            </p>
-                        </div>
-
-                        <div className="flex flex-wrap gap-3">
-                            <Link
-                                href="/v2/royalties"
-                                className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-700"
-                            >
-                                View Royalties
-                            </Link>
-
-                            <Link
-                                href="/v2/wallet"
-                                className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                            >
-                                Open Wallet
-                            </Link>
-                        </div>
+            <section className="mt-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex flex-col gap-2 border-b border-slate-100 p-3 lg:flex-row lg:items-center">
+                    <div className="relative min-w-0 flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={staff ? "Label, artist, month or statement ID" : "Month or statement ID"} className="h-10 w-full rounded-xl border border-slate-300 pl-9 pr-3 text-sm" />
                     </div>
-                </header>
-
-                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <SummaryCard
-                        label="Gross Earnings"
-                        value={formatCurrency(
-                            totals.gross
-                        )}
-                        description="Before deductions"
-                        icon={
-                            <FileText
-                                size={20}
-                            />
-                        }
-                        tone="violet"
-                    />
-
-                    <SummaryCard
-                        label="Total Deductions"
-                        value={formatCurrency(
-                            totals.deductions
-                        )}
-                        description="Commission, tax and adjustments"
-                        icon={
-                            <Clock3
-                                size={20}
-                            />
-                        }
-                        tone="amber"
-                    />
-
-                    <SummaryCard
-                        label="Net Payable"
-                        value={formatCurrency(
-                            totals.net
-                        )}
-                        description="Total payable amount"
-                        icon={
-                            <CheckCircle2
-                                size={20}
-                            />
-                        }
-                        tone="blue"
-                    />
-
-                    <SummaryCard
-                        label="Wallet Available"
-                        value={formatCurrency(
-                            totals.available
-                        )}
-                        description="Ready for withdrawal"
-                        icon={
-                            <WalletCards
-                                size={20}
-                            />
-                        }
-                        tone="emerald"
-                    />
-                </section>
-
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
-                        <input
-                            type="search"
-                            value={search}
-                            onChange={(event) =>
-                                setSearch(
-                                    event.target.value
-                                )
-                            }
-                            placeholder="Search month, label, artist, currency or statement ID..."
-                            className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        />
-
-                        <select
-                            value={status}
-                            onChange={(event) =>
-                                setStatus(
-                                    event.target.value
-                                )
-                            }
-                            className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        >
-                            <option value="">
-                                All Statuses
-                            </option>
-
-                            <option value="pending">
-                                Pending
-                            </option>
-
-                            <option value="approved">
-                                Approved
-                            </option>
-
-                            <option value="available">
-                                Available
-                            </option>
-
-                            <option value="paid">
-                                Paid
-                            </option>
-
-                            <option value="cancelled">
-                                Cancelled
-                            </option>
+                    <div className="grid grid-cols-2 gap-2 sm:flex">
+                        <select value={filters.month || ""} onChange={(e) => go({ month: e.target.value || undefined })} className="h-10 min-w-0 rounded-xl border border-slate-300 bg-white pl-3 pr-8 text-sm">
+                            <option value="">All months</option>
+                            {months.map((m) => <option key={m} value={m}>{monthName(m)}</option>)}
                         </select>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSearch('');
-                                setStatus('');
-                            }}
-                            className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                        >
-                            Clear Filters
-                        </button>
-                    </div>
-                </section>
-
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-200 px-5 py-4">
-                        <h2 className="text-lg font-bold text-slate-950">
-                            Statement History
-                        </h2>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                            {Number(statements.total ?? filteredRows.length).toLocaleString('en-IN')}{' '}
-                            statements found
-                        </p>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                            <thead className="bg-slate-50">
-                                <tr>
-                                    {[
-                                        'Statement',
-                                        'Gross',
-                                        'Deductions',
-                                        'Net Payable',
-                                        'Currency',
-                                        'Status',
-                                        'Approved',
-                                        'PDF',
-                                    ].map(
-                                        (heading) => (
-                                            <th
-                                                key={
-                                                    heading
-                                                }
-                                                className="whitespace-nowrap px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500"
-                                            >
-                                                {
-                                                    heading
-                                                }
-                                            </th>
-                                        )
-                                    )}
-                                </tr>
-                            </thead>
-
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredRows.length >
-                                0 ? (
-                                    filteredRows.map(
-                                        (item) => {
-                                            const deductions =
-                                                Number(
-                                                    item.commission_amount ??
-                                                        0
-                                                ) +
-                                                Number(
-                                                    item.tax_amount ??
-                                                        0
-                                                ) +
-                                                Number(
-                                                    item.other_deductions ??
-                                                        0
-                                                );
-
-                                            return (
-                                                <tr
-                                                    key={
-                                                        item.id
-                                                    }
-                                                    className="transition hover:bg-slate-50"
-                                                >
-                                                    <Cell>
-                                                        <div>
-                                                            <p className="font-bold text-slate-900">
-                                                                {formatMonth(
-                                                                    item.statement_month
-                                                                )}
-                                                            </p>
-
-                                                            <p className="mt-1 text-xs text-slate-400">
-                                                                {item.public_id ||
-                                                                    `#${item.id}`}
-                                                            </p>
-                                                        </div>
-                                                    </Cell>
-
-                                                    <Cell>
-                                                        {formatCurrency(
-                                                            item.gross_earnings,
-                                                            item.currency
-                                                        )}
-                                                    </Cell>
-
-                                                    <Cell>
-                                                        {formatCurrency(
-                                                            deductions,
-                                                            item.currency
-                                                        )}
-                                                    </Cell>
-
-                                                    <Cell>
-                                                        <span className="font-black text-slate-950">
-                                                            {formatCurrency(
-                                                                item.net_payable,
-                                                                item.currency
-                                                            )}
-                                                        </span>
-                                                    </Cell>
-
-                                                    <Cell>
-                                                        {item.currency ||
-                                                            'INR'}
-                                                    </Cell>
-
-                                                    <Cell>
-                                                        <StatusBadge
-                                                            status={
-                                                                item.status
-                                                            }
-                                                        />
-                                                    </Cell>
-
-                                                    <Cell>
-                                                        {formatDate(
-                                                            item.approved_at
-                                                        )}
-                                                    </Cell>
-
-                                                    <Cell>
-                                                        <a
-                                                            href={`/v2/statements/${item.id}/download`}
-                                                            className="inline-flex items-center gap-2 rounded-xl bg-violet-50 px-3 py-2 text-sm font-bold text-violet-700 transition hover:bg-violet-100"
-                                                        >
-                                                            <Download
-                                                                size={
-                                                                    16
-                                                                }
-                                                            />
-
-                                                            PDF
-                                                        </a>
-                                                    </Cell>
-                                                </tr>
-                                            );
-                                        }
-                                    )
-                                ) : (
-                                    <tr>
-                                        <td
-                                            colSpan="8"
-                                            className="px-5 py-16 text-center text-sm text-slate-500"
-                                        >
-                                            No statements
-                                            match the selected
-                                            filters.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                {statements.links && (
-                    <div className="flex flex-wrap justify-center gap-2">
-                        {statements.links.map(
-                            (link, index) => (
-                                <Link
-                                    key={index}
-                                    href={
-                                        link.url ??
-                                        '#'
-                                    }
-                                    preserveScroll
-                                    preserveState
-                                    className={[
-                                        'rounded-xl border px-3 py-2 text-sm font-semibold',
-                                        link.active
-                                            ? 'border-violet-600 bg-violet-600 text-white'
-                                            : 'border-slate-300 bg-white text-slate-700',
-                                        !link.url
-                                            ? 'pointer-events-none opacity-40'
-                                            : '',
-                                    ].join(
-                                        ' '
-                                    )}
-                                    dangerouslySetInnerHTML={{
-                                        __html:
-                                            link.label,
-                                    }}
-                                />
-                            )
+                        <select value={filters.status || ""} onChange={(e) => go({ status: e.target.value || undefined })} className="h-10 min-w-0 rounded-xl border border-slate-300 bg-white pl-3 pr-8 text-sm">
+                            <option value="">All statuses</option>
+                            <option value="pending">Waiting for approval</option>
+                            <option value="approved">Approved</option>
+                            <option value="available">Available</option>
+                            <option value="paid">Paid</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                        {filtered && (
+                            <button type="button" onClick={() => { setSearch(""); router.get(window.location.pathname, {}, { preserveState: true, replace: true }); }} className="col-span-2 h-10 rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700">
+                                Clear
+                            </button>
                         )}
+                    </div>
+                </div>
+
+                {rows.length === 0 ? (
+                    <div className="px-5 py-14 text-center">
+                        <FileText className="mx-auto h-10 w-10 text-slate-300" />
+                        <div className="mt-3 text-sm font-semibold text-slate-700">{filtered ? "No statement matches" : "No statements yet"}</div>
+                        <div className="mx-auto mt-1 max-w-md text-xs text-slate-500">
+                            {filtered
+                                ? "Clear the filters to see every statement."
+                                : staff
+                                  ? "Statements are made when a monthly sales report is imported and published (Finance → Revenue Imports), or with \"Generate statements\" on Finance & Royalties."
+                                  : "Your statement appears here after the monthly store report is processed and approved."}
+                        </div>
+                        {!filtered && staff && (
+                            <Link href="/v2/admin/finance" className="mt-3 inline-flex h-9 items-center rounded-lg bg-violet-600 px-4 text-xs font-semibold text-white">Open Finance & Royalties</Link>
+                        )}
+                    </div>
+                ) : (
+                    <ul className="divide-y divide-slate-100">
+                        {rows.map((s) => {
+                            const [label, cls] = STATUS[s.status] ?? [s.status, "bg-slate-100 text-slate-600"];
+                            const ded = Number(s.commission_amount ?? 0) + Number(s.tax_amount ?? 0) + Number(s.other_deductions ?? 0);
+                            const dates = [
+                                s.approved_at && `approved ${day(s.approved_at)}`,
+                                s.available_at && `available ${day(s.available_at)}`,
+                                s.paid_at && `paid ${day(s.paid_at)}`,
+                            ].filter(Boolean).join(" · ");
+                            return (
+                                <li key={s.id} className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-sm font-bold text-slate-900">{monthName(s.statement_month)}</span>
+                                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>
+                                        </div>
+                                        {staff && <div className="mt-0.5 truncate text-sm text-slate-700">{s.owner_name} <span className="text-xs text-slate-500">· {s.owner_type}</span></div>}
+                                        <div className="mt-0.5 text-xs text-slate-500">
+                                            Gross {money(s.gross_earnings, s.currency)} · deductions {money(ded, s.currency)}{Number(s.other_deductions) > 0 ? ` (incl. advance recovery ${money(s.other_deductions, s.currency)})` : ""}
+                                        </div>
+                                        <div className="text-[11px] text-slate-400">{s.public_id || `#${s.id}`}{dates ? ` · ${dates}` : ""}</div>
+                                    </div>
+                                    <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end">
+                                        <div className="mr-2 text-right">
+                                            <div className="text-base font-black text-slate-900">{money(s.net_payable, s.currency)}</div>
+                                            <div className="text-xs text-slate-500">net payable</div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            <a href={`/v2/statements/${s.id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                                <Download className="h-3.5 w-3.5" /> PDF
+                                            </a>
+                                            {staff && s.invoice_id && (
+                                                <a href={`/v2/invoices/${s.invoice_id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700">
+                                                    <FileText className="h-3.5 w-3.5" /> Invoice
+                                                </a>
+                                            )}
+                                            {role === "super_admin" && s.status === "pending" && (
+                                                <button type="button" disabled={!!busy} onClick={() => act(s, "approve")} className="inline-flex h-9 items-center gap-1 rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white disabled:opacity-50">
+                                                    {busy === `approve${s.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Approve
+                                                </button>
+                                            )}
+                                            {role === "super_admin" && s.status === "approved" && (
+                                                <button type="button" disabled={!!busy} onClick={() => act(s, "available")} className="inline-flex h-9 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50">
+                                                    {busy === `available${s.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WalletCards className="h-3.5 w-3.5" />} Make available
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+
+                {statements.last_page > 1 && (
+                    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm">
+                        {statements.prev_page_url ? <Link href={statements.prev_page_url} preserveScroll className="font-semibold text-violet-700">← Previous</Link> : <span />}
+                        <span className="text-xs text-slate-500">Page {statements.current_page} of {statements.last_page} · {statements.total}</span>
+                        {statements.next_page_url ? <Link href={statements.next_page_url} preserveScroll className="font-semibold text-violet-700">Next →</Link> : <span />}
                     </div>
                 )}
+            </section>
+
+            <div className="mt-4 flex items-start gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+                <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                    How a statement moves: <b>Waiting for approval</b> → <b>Approved</b> (money shows as pending in the wallet) → <b>Available</b> (can be withdrawn) → <b>Paid</b>.
+                </span>
             </div>
         </PanelLayout>
     );
 }
 
-function SummaryCard({
-    label,
-    value,
-    description,
-    icon,
-    tone,
-}) {
-    const tones = {
-        violet:
-            'bg-violet-50 text-violet-700 ring-violet-100',
-
-        amber:
-            'bg-amber-50 text-amber-700 ring-amber-100',
-
-        blue:
-            'bg-blue-50 text-blue-700 ring-blue-100',
-
-        emerald:
-            'bg-emerald-50 text-emerald-700 ring-emerald-100',
-    };
-
+function Stat({ label, value, tone = "text-slate-900", hint }) {
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <p className="text-sm font-medium text-slate-500">
-                        {label}
-                    </p>
-
-                    <p className="mt-2 text-2xl font-black tracking-tight text-slate-950">
-                        {value}
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-slate-400">
-                        {description}
-                    </p>
-                </div>
-
-                <div
-                    className={[
-                        'flex h-11 w-11 items-center justify-center rounded-xl ring-1',
-                        tones[tone] ??
-                            tones.violet,
-                    ].join(' ')}
-                >
-                    {icon}
-                </div>
-            </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-semibold text-slate-500">{label}</div>
+            <div className={`mt-1 text-xl font-black ${tone}`}>{value}</div>
+            {hint && <div className="text-xs text-slate-500">{hint}</div>}
         </div>
-    );
-}
-
-function StatusBadge({
-    status = 'pending',
-}) {
-    const normalized =
-        String(status)
-            .toLowerCase();
-
-    return (
-        <span
-            className={[
-                'inline-flex rounded-full px-3 py-1 text-xs font-bold capitalize ring-1 ring-inset',
-                statusStyles[
-                    normalized
-                ] ??
-                    'bg-slate-50 text-slate-700 ring-slate-200',
-            ].join(' ')}
-        >
-            {normalized.replaceAll(
-                '_',
-                ' '
-            )}
-        </span>
-    );
-}
-
-function Cell({
-    children,
-}) {
-    return (
-        <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
-            {children}
-        </td>
     );
 }

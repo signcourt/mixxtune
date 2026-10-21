@@ -69,21 +69,84 @@ class StatementController extends Controller
             });
         }
 
+        /* MIXXTUNE_STATEMENTS_V2 (W43): month filter (month list keeps every month) */
+        $monthsQuery = clone $query;
+        $filters['month'] = preg_match('/^\d{4}-\d{2}$/', (string) $request->input('month', '')) ? (string) $request->input('month') : '';
+        if ($filters['month'] !== '') {
+            $query->where('statement_month', 'like', $filters['month'].'%');
+        }
+
+        /*
+         * MIXXTUNE_STATEMENTS_V2 (W43)
+         * Totals were added up in the browser from the 25 rows on screen only,
+         * and "Wallet Available" was the sum of statements marked available -
+         * not the wallet. Now: totals over every statement that matches the
+         * filters, the real wallet for owners, "waiting for approval" for staff.
+         */
+        $sum = (clone $query)->toBase()->reorder()->selectRaw(
+            'COUNT(*) as n, COALESCE(SUM(gross_earnings),0) as gross, '
+            .'COALESCE(SUM(COALESCE(commission_amount,0) + COALESCE(tax_amount,0) + COALESCE(other_deductions,0)),0) as deductions, '
+            .'COALESCE(SUM(net_payable),0) as net, '
+            ."COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END),0) as pending_n, "
+            ."COALESCE(SUM(CASE WHEN status = 'pending' THEN net_payable ELSE 0 END),0) as pending_net"
+        )->first();
+
+        $staff = in_array($role, ['admin', 'super_admin'], true);
+        $wallet = null;
+        if (! $staff) {
+            try {
+                $owner = app(\App\Services\V2\LabelAccess\LabelFinancialContextService::class)->owner($request->user());
+                $acc = $owner ? app(\App\Services\V2\WalletService::class)->account($owner) : null;
+                $wallet = $acc ? round((float) $acc->available_balance, 2) : 0.0;
+            } catch (\Throwable $e) {
+                report($e);
+                $wallet = 0.0;
+            }
+        }
+
+        $summary = [
+            'count' => (int) ($sum->n ?? 0),
+            'gross' => round((float) ($sum->gross ?? 0), 2),
+            'deductions' => round((float) ($sum->deductions ?? 0), 2),
+            'net' => round((float) ($sum->net ?? 0), 2),
+            'pending_count' => (int) ($sum->pending_n ?? 0),
+            'pending_net' => round((float) ($sum->pending_net ?? 0), 2),
+            'wallet' => $wallet,
+        ];
+
+        $page = $query
+            ->orderByDesc('statement_month')
+            ->orderByDesc('id')
+            ->paginate(25)
+            ->withQueryString();
+
+        $labels = DB::table('labels')->whereIn('id', $page->getCollection()->pluck('label_id')->filter())->pluck('name', 'id');
+        $artists = DB::table('artists')->whereIn('id', $page->getCollection()->pluck('artist_id')->filter())->get(['id', 'stage_name', 'legal_name'])->keyBy('id');
+        $invoices = \Illuminate\Support\Facades\Schema::hasTable('invoices')
+            ? DB::table('invoices')->whereIn('royalty_statement_id', $page->getCollection()->pluck('id'))->pluck('id', 'royalty_statement_id')
+            : collect();
+
+        $page->getCollection()->transform(function (RoyaltyStatement $s) use ($labels, $artists, $invoices) {
+            $artist = $s->artist_id ? ($artists[$s->artist_id] ?? null) : null;
+            $s->setAttribute('owner_name', $s->label_id ? ($labels[$s->label_id] ?? 'Label #'.$s->label_id) : ($artist ? ($artist->stage_name ?: $artist->legal_name) : ($s->artist_id ? 'Artist #'.$s->artist_id : '—')));
+            $s->setAttribute('owner_type', $s->label_id ? 'Label' : ($s->artist_id ? 'Artist' : '—'));
+            $s->setAttribute('invoice_id', $invoices[$s->id] ?? null);
+
+            return $s;
+        });
+
+        $months = $monthsQuery->toBase()->reorder()->select('statement_month')->distinct()
+            ->orderByDesc('statement_month')->limit(36)->pluck('statement_month')
+            ->map(fn ($m) => substr((string) $m, 0, 7))->unique()->values();
+
         return Inertia::render(
             'V2/Statements/Index',
             [
                 'role' => $role,
-
                 'filters' => $filters,
-
-                'statements' =>
-                    $query
-                        ->orderByDesc(
-                            'statement_month'
-                        )
-                        ->orderByDesc('id')
-                        ->paginate(25)
-                        ->withQueryString(),
+                'summary' => $summary,
+                'months' => $months,
+                'statements' => $page,
             ]
         );
     }
