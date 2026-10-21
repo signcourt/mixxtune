@@ -84,12 +84,13 @@ class DashboardController extends Controller
          * Admin users continue to use scoped reported
          * earnings and never receive platform-wide profit.
          */
-        $profitSummary =
-            $role === 'super_admin'
-                ? $profit->summary(
-                    $profit->baseQuery()
-                )
-                : null;
+        $profitSummary = null;
+        $revenueTrend = [];
+
+        if ($role === 'super_admin') {
+            [$profitSummary, $revenueTrend] =
+                $this->profitWithTrend($profit);
+        }
 
         $recentReleases =
             (clone $releaseQuery)
@@ -102,9 +103,11 @@ class DashboardController extends Controller
                     'digital_release_date',
                     'created_at',
                     'submitted_at',
+                    'label_id',
                 ])
+                ->with('label:id,name')
                 ->orderByDesc('id')
-                ->limit(10)
+                ->limit(8)
                 ->get();
 
         $artistsQuery =
@@ -225,15 +228,23 @@ class DashboardController extends Controller
 
         $recentWithdrawals =
             (clone $withdrawalQuery)
+                ->leftJoin(
+                    'users as requester',
+                    'requester.id',
+                    '=',
+                    'withdrawals.user_id'
+                )
                 ->select([
-                    'id',
-                    'withdrawal_number',
-                    'amount',
-                    'currency',
-                    'status',
-                    'requested_at',
+                    'withdrawals.id',
+                    'withdrawals.withdrawal_number',
+                    'withdrawals.amount',
+                    'withdrawals.currency',
+                    'withdrawals.status',
+                    'withdrawals.requested_at',
+                    'withdrawals.created_at',
+                    'requester.name as requester_name',
                 ])
-                ->orderByDesc('id')
+                ->orderByDesc('withdrawals.id')
                 ->limit(5)
                 ->get();
 
@@ -270,200 +281,277 @@ class DashboardController extends Controller
             );
         }
 
+        /*
+         * W69 MIXXTUNE_DASHBOARD_V2: one grouped query for release statuses,
+         * one for deliveries, one for withdrawals (count + amount) instead of
+         * a separate COUNT per status.
+         */
+        $statusCounts = (clone $releaseQuery)
+            ->toBase()
+            ->reorder()
+            ->select('status')
+            ->selectRaw('COUNT(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status')
+            ->map(fn ($c) => (int) $c)
+            ->all();
+
+        $releaseCount = fn (string $status): int => (int) ($statusCounts[$status] ?? 0);
+
+        $deliveryCounts = (clone $deliveryQuery)
+            ->select('deliveries.status')
+            ->selectRaw('COUNT(*) as c')
+            ->groupBy('deliveries.status')
+            ->pluck('c', 'deliveries.status')
+            ->map(fn ($c) => (int) $c)
+            ->all();
+
+        $withdrawalCounts = ['pending' => ['count' => 0, 'amount' => 0.0], 'to_pay' => ['count' => 0, 'amount' => 0.0]];
+
+        foreach (
+            (clone $withdrawalQuery)
+                ->whereIn('withdrawals.status', ['pending', 'approved', 'processing'])
+                ->select('withdrawals.status')
+                ->selectRaw('COUNT(*) as c')
+                ->selectRaw('COALESCE(SUM(withdrawals.amount), 0) as a')
+                ->groupBy('withdrawals.status')
+                ->get()
+            as $row
+        ) {
+            $key = $row->status === 'pending' ? 'pending' : 'to_pay';
+            $withdrawalCounts[$key]['count'] += (int) $row->c;
+            $withdrawalCounts[$key]['amount'] += (float) $row->a;
+        }
+
+        $supportCounts = (clone $supportQuery)
+            ->whereIn('status', ['open', 'customer_reply', 'waiting'])
+            ->select('status')
+            ->selectRaw('COUNT(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status')
+            ->map(fn ($c) => (int) $c)
+            ->all();
+
+        $oldestSubmittedAt = (clone $releaseQuery)
+            ->where('status', 'submitted')
+            ->min('submitted_at');
+
+        $oldestWaitingDays = $oldestSubmittedAt
+            ? max(0, (int) \Illuminate\Support\Carbon::parse($oldestSubmittedAt)->startOfDay()->diffInDays(now()->startOfDay()))
+            : null;
+
+        $monthly = $analytics->monthlyTrend(
+            clone $analyticsQuery,
+            12,
+            true
+        );
+
+        $growth = $analytics->growthSummary($monthly);
+
+        $reportedTracks = (int) (clone $analyticsQuery)
+            ->toBase()
+            ->reorder()
+            ->whereNotNull('isrc')
+            ->where('isrc', '!=', '')
+            ->distinct()
+            ->count('isrc');
+
+        if ($role !== 'super_admin') {
+            $revenueTrend = collect($monthly)
+                ->map(fn ($row) => [
+                    'month' => $row['month'],
+                    'collected_revenue' => (float) $row['collected_revenue'],
+                    'user_earning' => (float) $row['earnings'],
+                    'profit' => null,
+                ])
+                ->values()
+                ->all();
+        }
+
+        $setup = $role === 'super_admin'
+            ? $this->setupChecks()
+            : null;
+
         return Inertia::render(
             'V2/Admin/Dashboard',
             [
                 'role' => $role,
 
                 'stats' => [
-                    'total_releases' =>
-                        (clone $releaseQuery)
-                            ->count(),
-
-                    'artists' =>
-                        (clone $artistsQuery)
-                            ->count(),
-
-                    'labels' =>
-                        (clone $labelsQuery)
-                            ->count(),
-
-                    'tracks' =>
-                        (clone $tracksQuery)
-                            ->count(),
-
-                    'draft' =>
-                        (clone $releaseQuery)
-                            ->where(
-                                'status',
-                                'draft'
-                            )
-                            ->count(),
-
-                    'submitted' =>
-                        (clone $releaseQuery)
-                            ->where(
-                                'status',
-                                'submitted'
-                            )
-                            ->count(),
-
-                    'approved' =>
-                        (clone $releaseQuery)
-                            ->where(
-                                'status',
-                                'approved'
-                            )
-                            ->count(),
-
-                    'processing' =>
-                        (clone $releaseQuery)
-                            ->where(
-                                'status',
-                                'processing'
-                            )
-                            ->count(),
-
-                    'delivered' =>
-                        (clone $releaseQuery)
-                            ->where(
-                                'status',
-                                'delivered'
-                            )
-                            ->count(),
-
-                    'live' =>
-                        (clone $releaseQuery)
-                            ->where(
-                                'status',
-                                'live'
-                            )
-                            ->count(),
-
-                    'rejected' =>
-                        (clone $releaseQuery)
-                            ->where(
-                                'status',
-                                'rejected'
-                            )
-                            ->count(),
-
-                    'failed_deliveries' =>
-                        (clone $deliveryQuery)
-                            ->where(
-                                'deliveries.status',
-                                'failed'
-                            )
-                            ->count(),
-
-                    'processing_deliveries' =>
-                        (clone $deliveryQuery)
-                            ->where(
-                                'deliveries.status',
-                                'processing'
-                            )
-                            ->count(),
-
-                    'live_deliveries' =>
-                        (clone $deliveryQuery)
-                            ->where(
-                                'deliveries.status',
-                                'live'
-                            )
-                            ->count(),
-
-                    'pending_withdrawals' =>
-                        (clone $withdrawalQuery)
-                            ->where(
-                                'status',
-                                'pending'
-                            )
-                            ->count(),
-
-                    'open_tickets' =>
-                        (clone $supportQuery)
-                            ->whereIn(
-                                'status',
-                                [
-                                    'open',
-                                    'customer_reply',
-                                    'waiting',
-                                ]
-                            )
-                            ->count(),
-
-                    'report_imports' =>
-                        DB::table(
-                            'report_imports'
-                        )->count(),
-
-                    'streams' =>
-                        (float) (
-                            $analyticsSummary[
-                                'streams'
-                            ] ?? 0
-                        ),
-
-                    'earnings' =>
-                        (float) (
-                            $analyticsSummary[
-                                'earnings'
-                            ] ?? 0
-                        ),
-
-                    'profit_earnings' =>
-                        $role === 'super_admin'
-                            ? (float) (
-                                $profitSummary[
-                                    'super_admin_profit'
-                                ] ?? 0
-                            )
-                            : null,
-
-                    'sale_units' =>
-                        (float) (
-                            $analyticsSummary[
-                                'sale_units'
-                            ] ?? 0
-                        ),
+                    'total_releases' => array_sum($statusCounts),
+                    'artists' => (clone $artistsQuery)->count(),
+                    'labels' => (clone $labelsQuery)->count(),
+                    'tracks' => (clone $tracksQuery)->count(),
+                    'draft' => $releaseCount('draft'),
+                    'submitted' => $releaseCount('submitted'),
+                    'changes_requested' => $releaseCount('changes_requested'),
+                    'approved' => $releaseCount('approved'),
+                    'processing' => $releaseCount('processing'),
+                    'delivered' => $releaseCount('delivered'),
+                    'live' => $releaseCount('live'),
+                    'rejected' => $releaseCount('rejected'),
+                    'oldest_waiting_days' => $oldestWaitingDays,
+                    'failed_deliveries' => (int) ($deliveryCounts['failed'] ?? 0),
+                    'processing_deliveries' => (int) ($deliveryCounts['processing'] ?? 0),
+                    'pending_deliveries' => (int) ($deliveryCounts['pending'] ?? 0),
+                    'live_deliveries' => (int) ($deliveryCounts['live'] ?? 0),
+                    'pending_withdrawals' => $withdrawalCounts['pending']['count'],
+                    'pending_withdrawals_amount' => round($withdrawalCounts['pending']['amount'], 2),
+                    'withdrawals_to_pay' => $withdrawalCounts['to_pay']['count'],
+                    'withdrawals_to_pay_amount' => round($withdrawalCounts['to_pay']['amount'], 2),
+                    'open_tickets' => array_sum($supportCounts),
+                    'tickets_need_reply' => (int) ($supportCounts['open'] ?? 0) + (int) ($supportCounts['customer_reply'] ?? 0),
+                    'report_imports' => DB::table('report_imports')->count(),
+                    'streams' => (float) ($analyticsSummary['streams'] ?? 0),
+                    'earnings' => (float) ($analyticsSummary['earnings'] ?? 0),
+                    'collected_revenue' => (float) ($analyticsSummary['collected_revenue'] ?? 0),
+                    'active_platforms' => (int) ($analyticsSummary['active_platforms'] ?? 0),
+                    'reported_tracks' => $reportedTracks,
+                    'profit_earnings' => $role === 'super_admin'
+                        ? (float) ($profitSummary['super_admin_profit'] ?? 0)
+                        : null,
+                    'profit_collected' => $role === 'super_admin'
+                        ? (float) ($profitSummary['collected_revenue'] ?? 0)
+                        : null,
+                    'profit_user_earning' => $role === 'super_admin'
+                        ? (float) ($profitSummary['user_earning'] ?? 0)
+                        : null,
+                    'sale_units' => (float) ($analyticsSummary['sale_units'] ?? 0),
                 ],
+
+                'setup' => $setup,
+
+                'growth' => [
+                    'month' => $growth['current_month'] ?? null,
+                    'previous_month' => $growth['previous_month'] ?? null,
+                    'streams_percent' => $growth['streams_percent'] ?? null,
+                    'earnings_percent' => $growth['earnings_percent'] ?? null,
+                ],
+
+                'revenueTrend' => array_slice($revenueTrend, -12),
 
                 'analytics' => [
-                    'monthly' =>
-                        $analytics->monthlyTrend(
-                            clone $analyticsQuery,
-                            12
-                        ),
-
-                    'topPlatforms' =>
-                        $analytics->topPlatforms(
-                            clone $analyticsQuery,
-                            6
-                        ),
-
-                    'topCountries' =>
-                        $analytics->topCountries(
-                            clone $analyticsQuery,
-                            6
-                        ),
-
-                    'topTracks' =>
-                        $analytics->topTracks(
-                            clone $analyticsQuery,
-                            6
-                        ),
+                    'monthly' => $monthly,
+                    'topPlatforms' => $analytics->topPlatforms(clone $analyticsQuery, 6),
+                    'topCountries' => $analytics->topCountries(clone $analyticsQuery, 6),
+                    'topTracks' => $analytics->topTracks(clone $analyticsQuery, 6),
                 ],
 
-                'recentReleases' =>
-                    $recentReleases,
+                'recentReleases' => $recentReleases->map(fn ($release) => [
+                    'id' => $release->id,
+                    'title' => $release->title,
+                    'primary_artist_name' => $release->primary_artist_name,
+                    'label_name' => $release->label?->name,
+                    'status' => $release->status,
+                    'upc' => $release->upc,
+                    'digital_release_date' => optional($release->digital_release_date)->toDateString(),
+                    'created_at' => optional($release->created_at)->toIso8601String(),
+                    'submitted_at' => optional($release->submitted_at)->toIso8601String(),
+                ])->values(),
 
-                'recentImports' =>
-                    $recentImports,
+                'recentImports' => $recentImports,
 
-                'recentWithdrawals' =>
-                    $recentWithdrawals,
+                'recentWithdrawals' => $recentWithdrawals,
             ]
         );
+    }
+
+    /**
+     * Super Admin: retained profit (same maths as summary()) plus a
+     * month-wise trend, in ONE pass over the report rows.
+     */
+    private function profitWithTrend(SuperAdminProfitService $profit): array
+    {
+        $summary = [
+            'collected_revenue' => 0.0,
+            'user_earning' => 0.0,
+            'super_admin_profit' => 0.0,
+        ];
+        $months = [];
+
+        foreach ($profit->baseQuery()->orderBy('id')->cursor() as $row) {
+            $calc = $profit->calculateRow($row);
+
+            foreach (array_keys($summary) as $field) {
+                $summary[$field] += $calc[$field];
+            }
+
+            $month = $profit->effectiveMonth($row);
+
+            if ($month === '') {
+                continue;
+            }
+
+            $months[$month] ??= ['month' => $month, 'collected_revenue' => 0.0, 'user_earning' => 0.0, 'profit' => 0.0];
+            $months[$month]['collected_revenue'] += $calc['collected_revenue'];
+            $months[$month]['user_earning'] += $calc['user_earning'];
+            $months[$month]['profit'] += $calc['super_admin_profit'];
+        }
+
+        foreach ($summary as $field => $value) {
+            $summary[$field] = round($value, 8);
+        }
+
+        ksort($months);
+
+        $trend = array_map(fn ($m) => [
+            'month' => $m['month'],
+            'collected_revenue' => round($m['collected_revenue'], 2),
+            'user_earning' => round($m['user_earning'], 2),
+            'profit' => round($m['profit'], 2),
+        ], array_values($months));
+
+        return [$summary, $trend];
+    }
+
+    /**
+     * Super Admin: things that are not set up yet. Counts only - nothing
+     * is guessed or filled in from here.
+     */
+    private function setupChecks(): array
+    {
+        $today = now()->toDateString();
+
+        $subWithoutShare = DB::table('labels')
+            ->whereNull('labels.deleted_at')
+            ->whereNotNull('labels.parent_label_id')
+            ->whereNotExists(function ($q) use ($today) {
+                $q->selectRaw('1')
+                    ->from('label_revenue_shares as s')
+                    ->whereColumn('s.master_label_id', 'labels.parent_label_id')
+                    ->whereColumn('s.beneficiary_id', 'labels.id')
+                    ->where('s.beneficiary_type', 'label')
+                    ->where('s.is_active', true)
+                    ->where(fn ($w) => $w->whereNull('s.effective_from')->orWhereDate('s.effective_from', '<=', $today))
+                    ->where(fn ($w) => $w->whereNull('s.effective_to')->orWhereDate('s.effective_to', '>=', $today));
+            })
+            ->count();
+
+        $mastersWithoutLogin = DB::table('labels')
+            ->whereNull('deleted_at')
+            ->whereNull('parent_label_id')
+            ->whereNull('user_id')
+            ->count();
+
+        $unmapped = DB::table('report_rows')
+            ->whereNull('label_id')
+            ->whereNotNull('isrc')
+            ->where('isrc', '!=', '')
+            ->selectRaw('COUNT(*) as c')
+            ->selectRaw('COALESCE(SUM(collected_revenue), 0) as r')
+            ->first();
+
+        $kycToReview = \Illuminate\Support\Facades\Schema::hasTable('payout_profiles')
+            ? DB::table('payout_profiles')->where('kyc_status', 'submitted')->count()
+            : 0;
+
+        return [
+            'sub_labels_without_share' => (int) $subWithoutShare,
+            'masters_without_login' => (int) $mastersWithoutLogin,
+            'unmapped_rows' => (int) ($unmapped->c ?? 0),
+            'unmapped_revenue' => round((float) ($unmapped->r ?? 0), 2),
+            'kyc_to_review' => (int) $kycToReview,
+        ];
     }
 
     private function scopeReleaseQuery(
@@ -578,7 +666,7 @@ class DashboardController extends Controller
             ) {
                 if ($artistIds->isNotEmpty()) {
                     $builder->whereIn(
-                        'artist_id',
+                        'withdrawals.artist_id',
                         $artistIds
                     );
                 }
@@ -586,12 +674,12 @@ class DashboardController extends Controller
                 if ($labelIds->isNotEmpty()) {
                     if ($artistIds->isNotEmpty()) {
                         $builder->orWhereIn(
-                            'label_id',
+                            'withdrawals.label_id',
                             $labelIds
                         );
                     } else {
                         $builder->whereIn(
-                            'label_id',
+                            'withdrawals.label_id',
                             $labelIds
                         );
                     }

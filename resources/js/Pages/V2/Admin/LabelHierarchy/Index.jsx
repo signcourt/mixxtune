@@ -92,7 +92,15 @@ export default function Index({
     totals = {},
 }) {
     const [q, setQ] = useState('');
-    const [show, setShow] = useState('all');
+    const [show, setShow] = useState(() => {
+        /* W69: the dashboard links here with ?show=share_missing / no_login */
+        try {
+            const wanted = new URLSearchParams(window.location.search).get('show');
+            return ['all', 'with_sub', 'no_login', 'share_missing', 'not_active'].includes(wanted) ? wanted : 'all';
+        } catch {
+            return 'all';
+        }
+    });
     const [limit, setLimit] = useState(PAGE);
     const [expanded, setExpanded] = useState(() => new Set());
     const [createParent, setCreateParent] = useState(null);
