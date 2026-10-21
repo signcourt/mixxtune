@@ -86,6 +86,13 @@ class LoginRequest extends FormRequest
             $this->throttleKey()
         );
 
+        /* W59: a suspended account cannot sign in (it could before) */
+        if (in_array((string) $user->account_status, \App\Http\Middleware\EnsureAccountActive::BLOCKED, true)) {
+            throw ValidationException::withMessages([
+                'login' => 'This account is suspended. Please contact Mixx Tune support.',
+            ]);
+        }
+
         return $user;
     }
 

@@ -55,82 +55,65 @@ class LabelHierarchyController extends Controller
                 'parent_commission_percentage',
             ]);
 
-        $rows = $labels->map(
-            function (Label $label) use (
-                $hierarchy,
-                $revenueShares
-            ) {
-                $ancestorIds = $hierarchy
-                    ->ancestorIds(
-                        (int) $label->id,
-                        true
-                    );
-
-                $depth = max(
-                    0,
-                    $ancestorIds->count() - 1
-                );
-
-                $canonicalShare = null;
-
-                if ($label->parent_label_id !== null) {
-                    $master = $labels->firstWhere(
-                        'id',
-                        (int) $label->parent_label_id
-                    );
-
-                    if ($master instanceof Label) {
-                        $canonicalShare =
-                            $revenueShares->resolve(
-                                $master,
-                                'label',
-                                (int) $label->id
-                            );
-                    }
-                }
-
-                return [
-                    'id' => (int) $label->id,
-                    'parent_label_id' =>
-                        $label->parent_label_id
-                            ? (int) $label->parent_label_id
-                            : null,
-                    'user_id' =>
-                        $label->user_id
-                            ? (int) $label->user_id
-                            : null,
-                    'name' => $label->name,
-                    'label_type' =>
-                        $label->label_type,
-                    'status' => $label->status,
-                    'depth' => $depth,
-                    'root_id' =>
-                        $hierarchy->rootLabelId(
-                            (int) $label->id
-                        ),
-                    'descendant_count' =>
-                        max(
-                            0,
-                            $hierarchy
-                                ->descendantIds(
-                                    (int) $label->id,
-                                    true
-                                )
-                                ->count() - 1
-                        ),
-                    'revenue_share_percentage' =>
-                        $canonicalShare
-                            ? (float) $canonicalShare
-                                ->revenue_share_percent
-                            : null,
-                    'parent_commission_percentage' =>
-                        $canonicalShare
-                            ? 100 - (float) $canonicalShare
-                                ->revenue_share_percent
-                            : null,
-                ];
+        /*
+         * W59: the tree is built in memory from one list (before: about
+         * 1,500-2,000 queries for 303 labels). Shares are loaded at once
+         * with the same rules as LabelRevenueShareService::resolve().
+         */
+        $parentOf = $labels->mapWithKeys(fn ($l) => [(int) $l->id => $l->parent_label_id ? (int) $l->parent_label_id : null])->all();
+        $childrenOf = [];
+        foreach ($parentOf as $id => $parent) {
+            if ($parent !== null) {
+                $childrenOf[$parent][] = $id;
             }
-        )->values();
+        }
+        $chain = function (int $id) use ($parentOf): array {
+            $seen = [];
+            $cur = $id;
+            while ($cur !== null && !isset($seen[$cur])) {
+                $seen[$cur] = true;
+                $cur = $parentOf[$cur] ?? null;
+            }
+
+            return array_keys($seen);
+        };
+        $countDesc = function (int $id) use (&$countDesc, $childrenOf): int {
+            $n = 0;
+            foreach ($childrenOf[$id] ?? [] as $child) {
+                $n += 1 + $countDesc($child);
+            }
+
+            return $n;
+        };
+        $today = now()->toDateString();
+        $shares = \App\Models\Finance\LabelRevenueShare::query()
+            ->where('beneficiary_type', 'label')
+            ->where('is_active', true)
+            ->where(fn ($q) => $q->whereNull('effective_from')->orWhereDate('effective_from', '<=', $today))
+            ->where(fn ($q) => $q->whereNull('effective_to')->orWhereDate('effective_to', '>=', $today))
+            ->orderBy('id')
+            ->get(['master_label_id', 'beneficiary_id', 'revenue_share_percent'])
+            ->unique(fn ($r) => $r->master_label_id.':'.$r->beneficiary_id)
+            ->keyBy(fn ($r) => $r->master_label_id.':'.$r->beneficiary_id);
+
+        $rows = $labels->map(function (Label $label) use ($chain, $countDesc, $shares) {
+            $ancestors = $chain((int) $label->id);
+            $share = $label->parent_label_id !== null ? $shares->get((int) $label->parent_label_id.':'.(int) $label->id) : null;
+
+            return [
+                'id' => (int) $label->id,
+                'parent_label_id' => $label->parent_label_id ? (int) $label->parent_label_id : null,
+                'user_id' => $label->user_id ? (int) $label->user_id : null,
+                'name' => $label->name,
+                'label_type' => $label->label_type,
+                'status' => $label->status,
+                'depth' => max(0, count($ancestors) - 1),
+                'root_id' => (int) end($ancestors),
+                'descendant_count' => $countDesc((int) $label->id),
+                'revenue_share_percentage' => $share ? (float) $share->revenue_share_percent : null,
+                'parent_commission_percentage' => $share ? 100 - (float) $share->revenue_share_percent : null,
+            ];
+        })->values();
 
         return Inertia::render(
             'V2/Admin/LabelHierarchy/Index',
@@ -574,12 +557,30 @@ class LabelHierarchyController extends Controller
             ]);
         }
 
+        /* W59: revenue rows / mappings / statements also keep a level from being deleted */
+        foreach ([
+            'report_rows' => 'revenue report rows',
+            'royalty_statements' => 'statements',
+            'revenue_label_mappings' => 'revenue name mappings',
+        ] as $table => $what) {
+            if (\Illuminate\Support\Facades\Schema::hasTable($table) && \Illuminate\Support\Facades\Schema::hasColumn($table, 'label_id') && DB::table($table)->where('label_id', $label->id)->exists()) {
+                return back()->withErrors([
+                    'label' => 'This level has '.$what.' and cannot be deleted.',
+                ]);
+            }
+        }
+
         $label->forceFill([
             'updated_by' =>
                 $request->user()->id,
         ])->save();
 
         $label->delete();
+
+        /* its share stops counting once the level is gone */
+        if (\Illuminate\Support\Facades\Schema::hasTable('label_revenue_shares')) {
+            DB::table('label_revenue_shares')->where('beneficiary_type', 'label')->where('beneficiary_id', $label->id)->update(['is_active' => false, 'updated_at' => now()]);
+        }
 
         return back()->with(
             'success',

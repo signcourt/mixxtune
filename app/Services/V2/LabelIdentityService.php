@@ -24,8 +24,9 @@ class LabelIdentityService
             trim((string) $name)
         );
 
+        /* W59: letters of every language count (a Hindi name was reduced to "" before) */
         return (string) preg_replace(
-            '/[^a-z0-9]+/i',
+            '/[^\p{L}\p{N}]+/u',
             '',
             $name
         );

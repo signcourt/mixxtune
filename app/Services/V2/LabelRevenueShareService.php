@@ -116,7 +116,28 @@ class LabelRevenueShareService
             ]);
         }
 
-        return LabelRevenueShare::query()
+        /*
+         * W59 MIXXTUNE_SUBLABEL_SHARE_SAFE_V1: changing an existing share %
+         * needs the e-mailed code (same as a label %), keeps who set it
+         * first, and is written to the audit log with the old value.
+         */
+        $existing = LabelRevenueShare::query()
+            ->where('master_label_id', $masterLabel->id)
+            ->where('beneficiary_type', $type)
+            ->where('beneficiary_id', $id)
+            ->first();
+
+        $oldPercent = $existing ? round((float) $existing->revenue_share_percent, 2) : null;
+
+        if ($existing && $oldPercent !== round($percent, 2)) {
+            app(ActionOtpGuard::class)->require(
+                $actor,
+                'label.share:'.$masterLabel->id.':'.$type.':'.$id.':'.round($percent, 2),
+                'change the revenue share of '.$type.' #'.$id.' from '.$oldPercent.'% to '.round($percent, 2).'%'
+            );
+        }
+
+        $saved = LabelRevenueShare::query()
             ->updateOrCreate(
                 [
                     'master_label_id' =>
@@ -148,9 +169,26 @@ class LabelRevenueShareService
                         $actor->id,
 
                     'created_by' =>
-                        $actor->id,
+                        $existing?->created_by ?? $actor->id,
                 ]
             );
+
+        if ($oldPercent !== round($percent, 2)) {
+            try {
+                app(AuditLogService::class)->record(
+                    'label.share_changed',
+                    'labels',
+                    'Revenue share of '.$type.' #'.$id.' under label #'.$masterLabel->id.': '.($oldPercent === null ? 'not set' : $oldPercent.'%').' -> '.round($percent, 2).'%.',
+                    ['percent' => $oldPercent],
+                    ['percent' => round($percent, 2), 'master_label_id' => $masterLabel->id, 'type' => $type, 'id' => $id],
+                    $saved
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $saved;
     }
 
     private function assertDescendantLabel(

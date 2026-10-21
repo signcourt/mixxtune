@@ -31,6 +31,11 @@ class LabelRateConfirmObserver
             return;
         }
 
+        /* W59: a bulk % change confirmed with its own code */
+        if (app()->bound('mixxtune.label_rate_confirmed')) {
+            return;
+        }
+
         $actor = auth()->user();
 
         app(ActionOtpGuard::class)->require(

@@ -104,8 +104,11 @@ class UserInvitationPasswordController extends Controller
                 null,
             'password_set_at' =>
                 now(),
+            /* W59: accepting an old invite never re-opens a suspended account */
             'account_status' =>
-                'active',
+                in_array((string) $user->account_status, \App\Http\Middleware\EnsureAccountActive::BLOCKED, true)
+                    ? $user->account_status
+                    : 'active',
             'last_login_at' =>
                 now(),
         ])->save();

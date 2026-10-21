@@ -299,26 +299,14 @@ class AssignmentManagementController extends Controller
             }
         }
 
-        $normalizedName = strtolower(
-            preg_replace(
-                '/[^a-z0-9]+/i',
-                '',
-                trim((string) $label->name)
-            )
-        );
+        $normalizedName = $this->labelGroupKey($label);
 
         $groupLabelIds = Label::query()
             ->whereNull('deleted_at')
-            ->get(['id', 'name'])
+            ->get(['id', 'name', 'user_id'])
             ->filter(
                 fn ($candidate) =>
-                    strtolower(
-                        preg_replace(
-                            '/[^a-z0-9]+/i',
-                            '',
-                            trim((string) $candidate->name)
-                        )
-                    ) === $normalizedName
+                    $this->labelGroupKey($candidate) === $normalizedName
             )
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
@@ -417,8 +405,10 @@ class AssignmentManagementController extends Controller
             $adminId,
             $request
         ) {
+            /* W59: only manager rows are replaced (other assignment kinds stay) */
             DB::table('admin_artist_assignments')
                 ->where('artist_id', $artist->id)
+                ->where('assignment_role', 'manager')
                 ->delete();
 
             if ($adminId) {
@@ -488,7 +478,7 @@ class AssignmentManagementController extends Controller
             $requestedLabel = Label::query()
                 ->whereKey($labelId)
                 ->whereNull('deleted_at')
-                ->first(['id', 'name']);
+                ->first(['id', 'name', 'user_id']);
 
             abort_unless(
                 $requestedLabel,
@@ -496,26 +486,14 @@ class AssignmentManagementController extends Controller
                 'Label not found.'
             );
 
-            $normalizedName = strtolower(
-                preg_replace(
-                    '/[^a-z0-9]+/i',
-                    '',
-                    trim((string) $requestedLabel->name)
-                )
-            );
+            $normalizedName = $this->labelGroupKey($requestedLabel);
 
             $logicalLabelIds = Label::query()
                 ->whereNull('deleted_at')
-                ->get(['id', 'name'])
+                ->get(['id', 'name', 'user_id'])
                 ->filter(
                     fn ($candidate) =>
-                        strtolower(
-                            preg_replace(
-                                '/[^a-z0-9]+/i',
-                                '',
-                                trim((string) $candidate->name)
-                            )
-                        ) === $normalizedName
+                        $this->labelGroupKey($candidate) === $normalizedName
                 )
                 ->pluck('id')
                 ->map(fn ($id) => (int) $id)
@@ -745,7 +723,8 @@ class AssignmentManagementController extends Controller
             'label_id' => [
                 'nullable',
                 'integer',
-                'exists:labels,id',
+                /* W59: never attach a new artist to a deleted label */
+                \Illuminate\Validation\Rule::exists('labels', 'id')->whereNull('deleted_at'),
             ],
             'admin_id' => [
                 'nullable',
@@ -1312,7 +1291,7 @@ class AssignmentManagementController extends Controller
             'kyc_status' => [
                 'required',
                 'string',
-                'in:pending,verified,rejected',
+                'in:pending,submitted,verified,rejected',
             ],
             'can_create_releases' => [
                 'required',
@@ -1330,6 +1309,18 @@ class AssignmentManagementController extends Controller
 
         if ($role !== 'super_admin') {
             unset($validated['can_withdraw']);
+
+            /* W59: only the super admin decides KYC and account status (managers could set "verified") */
+            $validated['kyc_status'] = $artist->kyc_status;
+            $validated['account_status'] = $artist->account_status;
+        }
+
+        /* W59: the same e-mail cannot belong to two artists */
+        if (
+            strtolower(trim((string) $validated['email'])) !== strtolower((string) $artist->email)
+            && Artist::query()->whereNull('deleted_at')->where('id', '!=', $artist->id)->whereRaw('LOWER(email) = ?', [strtolower(trim((string) $validated['email']))])->exists()
+        ) {
+            throw ValidationException::withMessages(['email' => 'Another artist already uses this e-mail.']);
         }
 
         $withdrawalStatus = array_key_exists(
@@ -1406,13 +1397,44 @@ class AssignmentManagementController extends Controller
             $role
         );
 
-        abort_if(
-            $artist->releases()->exists(),
-            422,
-            'Artist with releases cannot be deleted.'
-        );
+        /*
+         * W59: an artist is deleted only when nothing depends on it -
+         * releases, revenue rows, money in the wallet, credits on tracks,
+         * a revenue share - and only by the super admin.
+         */
+        if ($role !== 'super_admin') {
+            return back()->withErrors(['artist' => 'Only the super admin can delete an artist.']);
+        }
+
+        $blocks = [];
+        if ($artist->releases()->exists()) {
+            $blocks[] = 'releases';
+        }
+        foreach ([
+            'report_rows' => 'revenue report rows',
+            'royalty_statements' => 'statements',
+            'royalty_ledgers' => 'royalty ledger lines',
+            'track_contributors' => 'track credits',
+        ] as $table => $what) {
+            if (\Illuminate\Support\Facades\Schema::hasTable($table) && \Illuminate\Support\Facades\Schema::hasColumn($table, 'artist_id') && DB::table($table)->where('artist_id', $artist->id)->exists()) {
+                $blocks[] = $what;
+            }
+        }
+        if (\Illuminate\Support\Facades\Schema::hasTable('label_revenue_shares') && DB::table('label_revenue_shares')->where('beneficiary_type', 'artist')->where('beneficiary_id', $artist->id)->where('is_active', true)->exists()) {
+            $blocks[] = 'an active revenue share';
+        }
+
+        if ($blocks !== []) {
+            return back()->withErrors(['artist' => '"'.($artist->stage_name ?: $artist->legal_name).'" has '.implode(', ', $blocks).' - it cannot be deleted. Edit it or set it inactive instead.']);
+        }
 
         $artist->delete();
+
+        try {
+            app(\App\Services\V2\AuditLogService::class)->record('artist.deleted', 'artists', 'Artist "'.($artist->stage_name ?: $artist->legal_name).'" deleted (nothing linked).', ['id' => $artist->id], [], $artist, $request);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return redirect()
             ->route('v2.admin.artists.index')
@@ -1561,6 +1583,27 @@ class AssignmentManagementController extends Controller
                 $lockedLabel->save();
 
                 /*
+                 * W59: the row on the Labels page stands for every record
+                 * with the same name and owner - all of them get the %
+                 * (before, only one did and the others kept an old %).
+                 */
+                $key = $this->labelGroupKey($lockedLabel);
+                $siblings = Label::query()
+                    ->whereNull('deleted_at')
+                    ->where('id', '!=', $lockedLabel->id)
+                    ->get(['id', 'name', 'user_id'])
+                    ->filter(fn ($c) => $this->labelGroupKey($c) === $key);
+
+                foreach ($siblings as $sibling) {
+                    $twin = Label::query()->whereKey($sibling->id)->lockForUpdate()->first();
+                    if ($twin && round((float) $twin->revenue_share_percentage, 2) !== $rate) {
+                        $twin->revenue_share_percentage = $rate;
+                        $twin->save();
+                        $recalculator->recalculateForLabel($twin);
+                    }
+                }
+
+                /*
                  * Canonical recalculation.
                  *
                  * The service itself enforces the financial
@@ -1677,6 +1720,25 @@ class AssignmentManagementController extends Controller
                 2
             );
 
+            /*
+             * W59: a bulk % - also on labels that had no % yet - needs the
+             * e-mailed code; it covers every record shown in those rows.
+             */
+            $wantedKeys = Label::query()->whereIn('id', $labelIds->all())->get(['id', 'name', 'user_id'])->map(fn ($l) => $this->labelGroupKey($l))->unique();
+            $labelIds = Label::query()->whereNull('deleted_at')->get(['id', 'name', 'user_id'])
+                ->filter(fn ($l) => $wantedKeys->contains($this->labelGroupKey($l)))
+                ->pluck('id')->map(fn ($v) => (int) $v)->values();
+            $withoutRate = Label::query()->whereIn('id', $labelIds->all())->whereNull('revenue_share_percentage')->count();
+
+            app(\App\Services\V2\ActionOtpGuard::class)->require(
+                $request->user(),
+                'label.bulk_rate:'.sha1($labelIds->sort()->implode(',')).':'.$rate,
+                'set '.number_format($rate, 2).'% on '.$labelIds->count().' label record(s) ('.$withoutRate.' of them had no % yet)'
+            );
+
+            /* the bulk code already confirmed these % changes - no second code from the label observer */
+            app()->instance('mixxtune.label_rate_confirmed', true);
+
             DB::transaction(
                 function () use (
                     $labelIds,
@@ -1791,6 +1853,7 @@ class AssignmentManagementController extends Controller
                 ->get([
                     'id',
                     'name',
+                    'user_id',
                 ]);
 
             abort_unless(
@@ -1803,15 +1866,7 @@ class AssignmentManagementController extends Controller
             $normalizedNames = $selectedLabels
                 ->map(
                     fn ($label) =>
-                        strtolower(
-                            preg_replace(
-                                '/[^a-z0-9]+/i',
-                                '',
-                                trim(
-                                    (string) $label->name
-                                )
-                            )
-                        )
+                        $this->labelGroupKey($label)
                 )
                 ->filter()
                 ->unique()
@@ -1822,6 +1877,7 @@ class AssignmentManagementController extends Controller
                 ->get([
                     'id',
                     'name',
+                    'user_id',
                 ]);
 
             $groupLabelIds = $allLabels
@@ -1830,16 +1886,7 @@ class AssignmentManagementController extends Controller
                         $normalizedNames
                     ) {
                         $normalized =
-                            strtolower(
-                                preg_replace(
-                                    '/[^a-z0-9]+/i',
-                                    '',
-                                    trim(
-                                        (string)
-                                            $candidate->name
-                                    )
-                                )
-                            );
+                            $this->labelGroupKey($candidate);
 
                         return $normalizedNames
                             ->contains($normalized);
@@ -2174,22 +2221,26 @@ class AssignmentManagementController extends Controller
             ->orderBy('id')
             ->get();
 
+        /* W59: managers of all labels in two queries (before: 2 per row, ~600) */
+        $managerRows = DB::table('admin_label_assignments')
+            ->where('assignment_role', 'manager')
+            ->whereIn('label_id', $physicalLabels->pluck('id'))
+            ->get(['label_id', 'user_id']);
+        $managerUsers = User::query()
+            ->whereIn('id', $managerRows->pluck('user_id')->unique()->values())
+            ->get(['id', 'name', 'email'])
+            ->keyBy('id');
+
         $groups = $physicalLabels
             ->groupBy(
                 fn ($label) =>
-                    strtolower(
-                        preg_replace(
-                            '/[^a-z0-9]+/i',
-                            '',
-                            trim((string) $label->name)
-                        )
-                    )
+                    $this->labelGroupKey($label)
             )
             ->filter(
                 fn ($group, $key) =>
                     $key !== ''
             )
-            ->map(function ($group, $key) {
+            ->map(function ($group, $key) use ($managerRows, $managerUsers) {
                 /*
                  * Prefer an active record as representative.
                  * No physical records are merged or deleted.
@@ -2212,28 +2263,12 @@ class AssignmentManagementController extends Controller
                  * Assigned Managers only.
                  * Owner pivot rows are intentionally excluded.
                  */
-                $managerIds = DB::table(
-                    'admin_label_assignments'
-                )
-                    ->whereIn(
-                        'label_id',
-                        $labelIds
-                    )
-                    ->where(
-                        'assignment_role',
-                        'manager'
-                    )
+                $managers = $managerRows
+                    ->whereIn('label_id', $labelIds->all())
                     ->pluck('user_id')
                     ->unique()
-                    ->values();
-
-                $managers = User::query()
-                    ->whereIn('id', $managerIds)
-                    ->get([
-                        'id',
-                        'name',
-                        'email',
-                    ])
+                    ->map(fn ($id) => $managerUsers->get($id))
+                    ->filter()
                     ->values();
 
                 return [
@@ -2284,6 +2319,13 @@ class AssignmentManagementController extends Controller
 
                     'physical_count' =>
                         $group->count(),
+
+                    /* W59: same-name records with different % */
+                    'rates_differ' =>
+                        $group->pluck('revenue_share_percentage')
+                            ->map(fn ($v) => $v === null ? 'none' : (string) round((float) $v, 2))
+                            ->unique()
+                            ->count() > 1,
 
                     'can_withdraw' =>
                         $group->every(
@@ -2692,6 +2734,22 @@ class AssignmentManagementController extends Controller
                     $labels,
             ]
         );
+    }
+
+    /*
+     * W59 MIXXTUNE_LABEL_GROUP_KEY_V2: labels shown as one row = same name
+     * (any language, spaces / case / dashes ignored) AND same owner login.
+     * A name with no letters at all is never grouped with others.
+     */
+    private function labelGroupKey($label): string
+    {
+        $name = (string) preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(trim((string) ($label->name ?? ''))));
+
+        if ($name === '') {
+            return 'id:'.(int) $label->id;
+        }
+
+        return $name.'#'.(int) ($label->user_id ?? 0);
     }
 
     private function authorizeSuperAdmin(

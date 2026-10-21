@@ -19,6 +19,15 @@ class AuditLogService
     ): AuditLog {
         $request ??= request();
 
+        /* W59: actions done while a super admin uses "Login as" show who really did them */
+        try {
+            if ($request && $request->hasSession() && $request->session()->has('impersonator_user_id')) {
+                $newValues['_done_by_super_admin_via_login_as'] = (int) $request->session()->get('impersonator_user_id');
+            }
+        } catch (\Throwable $e) {
+            // no session (console / queue)
+        }
+
         return AuditLog::query()->create([
             'public_id' => (string) Str::ulid(),
             'user_id' => $request?->user()?->id,

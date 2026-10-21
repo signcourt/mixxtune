@@ -85,6 +85,11 @@ class WithdrawalController extends Controller
         WithdrawalService $withdrawals,
         LabelFinancialContextService $financialContext
     ): RedirectResponse {
+        /* W59: money is never requested on someone's behalf through "Login as" */
+        if ($request->hasSession() && $request->session()->has('impersonator_user_id')) {
+            return back()->withErrors(['amount' => 'Withdrawals cannot be requested while using "Login as". The owner must do this from their own login.']);
+        }
+
         $validated = $request->validate([
             'amount' => [
                 'required',

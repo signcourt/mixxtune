@@ -2366,6 +2366,11 @@ public function quickUpdate(
             $permissions
         );
 
+        /* W59: a super admin is changed only on the full Edit page; same safety rules as Edit */
+        abort_if($user->role === 'super_admin', 422, 'Use the full Edit page for a super admin.');
+        $this->guardSensitiveUserChange($request, $user, (string) $request->input('role', $user->role), (string) $request->input('account_status', $user->account_status), (string) $request->input('email', $user->email));
+        $beforeQuick = $user->only(['name', 'email', 'account_status', 'role', 'kyc_status', 'phone', 'country']);
+
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -2411,7 +2416,7 @@ public function quickUpdate(
             'kyc_status' => [
                 'nullable',
                 'string',
-                'in:pending,verified,rejected',
+                'in:pending,submitted,verified,rejected',
             ],
 
             // MIXXTUNE_QUICK_EDIT_PAYOUT_VALIDATION_V1
@@ -2772,8 +2777,10 @@ public function quickUpdate(
                 /*
                  * Never fabricate an empty payout profile.
                  */
+                /* W59: the default country alone is not payout data (it made empty profiles) */
                 $hasPayoutData =
                     collect($payoutData)
+                        ->except(['country_code'])
                         ->contains(
                             fn ($value) =>
                                 $value !== null
@@ -2824,6 +2831,7 @@ public function quickUpdate(
                         'permissions',
                         $validated
                     )
+                    && $request->boolean('permissions_touched')
                 ) {
                     $permissionData = [];
 
@@ -2940,6 +2948,11 @@ public function quickUpdate(
                     $validated['labels'] ?? []
                     as $labelData
                 ) {
+                    /* W59: rows of labels this user does not own (e.g. a manager's assigned labels) are skipped, not a 404 */
+                    if (!Label::query()->whereNull('deleted_at')->where('user_id', $user->id)->whereKey((int) ($labelData['id'] ?? 0))->exists()) {
+                        continue;
+                    }
+
                     $label = Label::query()
                         ->whereNull('deleted_at')
                         ->where(
@@ -3089,77 +3102,92 @@ public function quickUpdate(
                         );
                     }
 
-                    /*
-                     * Manager assignment:
-                     * schema uses user_id, not admin_id.
-                     */
-                    DB::table(
-                        'admin_label_assignments'
-                    )
-                        ->where(
-                            'label_id',
-                            $label->id
-                        )
-                        ->where(
-                            'assignment_role',
-                            'manager'
-                        )
-                        ->delete();
+                    /* W59: managers change only when a different manager was chosen (co-managers were dropped before) */
+                    $currentManagerIds = DB::table('admin_label_assignments')->where('label_id', $label->id)->where('assignment_role', 'manager')->pluck('user_id')->map(fn ($v) => (int) $v);
+                    $wantedManager = (int) ($labelData['manager_id'] ?? 0);
+                    $managerUnchanged = !array_key_exists('manager_id', $labelData)
+                        || ($wantedManager > 0 && $currentManagerIds->contains($wantedManager))
+                        || ($wantedManager === 0 && $currentManagerIds->isEmpty());
 
-                    $managerId =
-                        $labelData[
-                            'manager_id'
-                        ] ?? null;
-
-                    if ($managerId) {
-                        $manager = User::query()
-                            ->whereKey(
-                                (int) $managerId
-                            )
-                            ->where(
-                                'role',
-                                'admin'
-                            )
-                            ->where(
-                                'account_status',
-                                'active'
-                            )
-                            ->firstOrFail();
-
+                    if (!$managerUnchanged) {
+                        /*
+                         * Manager assignment:
+                         * schema uses user_id, not admin_id.
+                         */
                         DB::table(
                             'admin_label_assignments'
-                        )->insert([
-                            'user_id' =>
-                                $manager->id,
+                        )
+                            ->where(
+                                'label_id',
+                                $label->id
+                            )
+                            ->where(
+                                'assignment_role',
+                                'manager'
+                            )
+                            ->delete();
 
-                            'label_id' =>
-                                $label->id,
+                        $managerId =
+                            $labelData[
+                                'manager_id'
+                            ] ?? null;
 
-                            'assignment_role' =>
-                                'manager',
+                        if ($managerId) {
+                            $manager = User::query()
+                                ->whereKey(
+                                    (int) $managerId
+                                )
+                                ->where(
+                                    'role',
+                                    'admin'
+                                )
+                                ->where(
+                                    'account_status',
+                                    'active'
+                                )
+                                ->firstOrFail();
 
-                            'can_view' => true,
-                            'can_edit' => true,
+                            DB::table(
+                                'admin_label_assignments'
+                            )->insert([
+                                'user_id' =>
+                                    $manager->id,
 
-                            'can_manage_releases' =>
-                                true,
+                                'label_id' =>
+                                    $label->id,
 
-                            'can_manage_team' =>
-                                false,
+                                'assignment_role' =>
+                                    'manager',
 
-                            'can_manage_splits' =>
-                                false,
+                                'can_view' => true,
+                                'can_edit' => true,
 
-                            'assigned_by' =>
-                                $request->user()->id,
+                                'can_manage_releases' =>
+                                    true,
 
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]);
+                                'can_manage_team' =>
+                                    false,
+
+                                'can_manage_splits' =>
+                                    false,
+
+                                'assigned_by' =>
+                                    $request->user()->id,
+
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                        }
                     }
                 }
             }
         );
+
+        try {
+            app(AuditLogService::class)->record('user.quick_updated', 'users', 'Quick Edit saved for '.$user->email.'.', $beforeQuick, $user->fresh()->only(['name', 'email', 'account_status', 'role', 'kyc_status', 'phone', 'country']), $user, $request);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return back()->with(
             'success',
@@ -3185,6 +3213,8 @@ public function quickUpdate(
             422,
             'You cannot remove your own Super Admin role.'
         );
+
+        $this->guardSensitiveUserChange($request, $user, (string) $request->input('role', $user->role), (string) $request->input('account_status', $user->account_status), (string) $request->input('email', $user->email));
 
 $validated = $request->validate([
             'name' => [
@@ -4373,6 +4403,13 @@ $oldValues = [
             'Use your profile page to change your own password.'
         );
 
+        /* W59: a new password for someone else needs the e-mailed code */
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            $request->user(),
+            'user.password_reset:'.$user->id,
+            'make a new password for '.$user->email
+        );
+
         $temporaryPassword =
             Str::password(
                 length: 14,
@@ -4396,6 +4433,16 @@ $oldValues = [
             'invitation_error' =>
                 null,
         ]);
+
+        /* W59: old "remember me" and open sessions stop working */
+        $user->forceFill(['remember_token' => Str::random(60)])->save();
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('sessions')) {
+                DB::table('sessions')->where('user_id', $user->id)->delete();
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $audit->record(
             'user.password_reset',
@@ -4456,6 +4503,41 @@ $oldValues = [
         );
     }
 
+
+    /*
+     * W59 MIXXTUNE_USER_SAFETY_V1
+     * - you cannot suspend yourself; the last active super admin stays;
+     * - making / removing a super admin, or changing someone's login
+     *   e-mail, needs the e-mailed code (the e-mail is where login codes go).
+     */
+    private function guardSensitiveUserChange(Request $request, User $user, string $newRole, string $newStatus, string $newEmail): void
+    {
+        $actor = $request->user();
+
+        if ($user->id === $actor->id && $newStatus !== 'active') {
+            throw \Illuminate\Validation\ValidationException::withMessages(['account_status' => 'You cannot suspend your own account.']);
+        }
+
+        $wasSuper = $user->role === 'super_admin';
+        $staysActiveSuper = $newRole === 'super_admin' && $newStatus === 'active';
+
+        if ($wasSuper && !$staysActiveSuper) {
+            $others = User::query()->where('role', 'super_admin')->where('account_status', 'active')->where('id', '!=', $user->id)->count();
+            if ($others === 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['role' => 'This is the only active super admin - the role / status cannot be removed.']);
+            }
+        }
+
+        $guard = app(\App\Services\V2\ActionOtpGuard::class);
+
+        if ($wasSuper !== ($newRole === 'super_admin') || ($wasSuper && $newStatus !== $user->account_status)) {
+            $guard->require($actor, 'user.role:'.$user->id.':'.$newRole.':'.$newStatus, 'change the super admin role / status of '.$user->email);
+        }
+
+        if ($newEmail !== '' && strtolower(trim($newEmail)) !== strtolower((string) $user->email)) {
+            $guard->require($actor, 'user.email:'.$user->id.':'.sha1(strtolower(trim($newEmail))), 'change the login e-mail of '.$user->email.' to '.trim($newEmail));
+        }
+    }
 
     private function authorizeSuperAdmin(
         Request $request,

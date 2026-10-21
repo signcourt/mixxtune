@@ -26,7 +26,7 @@ export default function Index({
                 </Link>
             </div>
 
-            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <table className="min-w-full">
                     <thead className="bg-slate-50">
                         <tr>
@@ -95,6 +95,14 @@ export default function Index({
                         )}
                     </tbody>
                 </table>
+                {/* W59: page links (managers after the first 25 were not reachable) */}
+                {(admins.links || []).length > 3 && (
+                    <div className="flex flex-wrap gap-2 border-t border-slate-100 px-5 py-4">
+                        {admins.links.map((link, i) => (
+                            <Link key={`${link.label}-${i}`} href={link.url || '#'} preserveScroll className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${link.active ? 'border-violet-600 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-600'} ${!link.url ? 'pointer-events-none opacity-40' : ''}`} dangerouslySetInnerHTML={{ __html: link.label }} />
+                        ))}
+                    </div>
+                )}
             </section>
         </PanelLayout>
     );

@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import PageMessages from '@/V2/Shared/Components/PageMessages';
 import LabelOwnershipPanel from '@/V2/Admin/LabelOwnershipPanel';
 import LabelOwnershipBulkImport from '@/V2/Admin/LabelOwnershipBulkImport';
 import LabelRateHistory from '@/V2/Admin/LabelRateHistory';
@@ -296,6 +297,7 @@ export default function Index({
             subtitle="Assigned label accounts"
         >
             <Head title="Labels" />
+            <PageMessages />
 
             <div className="space-y-5">
                 {/* MIXXTUNE_LABEL_ADVANCED_FILTER_UI_V2 */}
@@ -698,7 +700,7 @@ export default function Index({
                     </div>
                 )}
 
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full">
                         <thead className="bg-slate-50">
                             <tr>
@@ -819,6 +821,11 @@ export default function Index({
                                                         labelId={label.id}
                                                         labelName={label.name}
                                                     />
+                                                    {label.rates_differ && (
+                                                        <div className="mt-1 text-[11px] font-semibold text-amber-700" title="Saving a % applies it to all records of this row">
+                                                            ⚠ {label.physical_count} records with different %
+                                                        </div>
+                                                    )}
                                                 </>
                                             ) : (
                                                 <span className="font-medium text-slate-700">
@@ -855,6 +862,11 @@ export default function Index({
                                                             : '0'
                                                     }
                                                     onChange={(event) => {
+                                                        /* W59: this changes every label and artist of the same owner */
+                                                        if (!window.confirm(`${event.target.value === '1' ? 'Allow' : 'Stop'} withdrawals for the owner of "${label.name}"? This applies to all labels and artists of that owner.`)) {
+                                                            event.target.value = label.can_withdraw ? '1' : '0';
+                                                            return;
+                                                        }
                                                         router.patch(
                                                             `/v2/admin/labels/${label.id}/withdrawal-status`,
                                                             {

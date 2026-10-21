@@ -4,6 +4,7 @@ import {
 } from '@inertiajs/react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import PageMessages from '@/V2/Shared/Components/PageMessages';
 
 export default function Index({
     role = 'admin',
@@ -19,6 +20,7 @@ export default function Index({
             subtitle="Assigned artist accounts"
         >
             <Head title="Artists" />
+            <PageMessages />
 
             <div className="mb-5 flex justify-end">
                 <a
@@ -59,7 +61,7 @@ export default function Index({
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 md:max-w-md"
                 />
 
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full">
                         <thead className="bg-slate-50">
                             <tr>

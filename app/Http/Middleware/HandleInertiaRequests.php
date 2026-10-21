@@ -51,6 +51,9 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                /* W59: one-time values the user pages show (were never sent, so a reset password was lost) */
+                'temporary_password' => fn () => $request->session()->get('temporary_password'),
+                'invitation_link' => fn () => $request->session()->get('invitation_link'),
             ],
             'impersonation' => fn () => [
                 'active' => $request->session()->has(

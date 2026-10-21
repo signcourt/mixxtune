@@ -407,9 +407,15 @@ export default function Index({
         setQuickEditSaving(true);
         setQuickEditErrors({});
 
+        /* W59: do not send permissions that were never touched (saving them wiped the role defaults) */
+        const payload = { ...quickEditForm };
+        if (!payload.permissions_touched) {
+            delete payload.permissions;
+        }
+
         router.patch(
             `/v2/admin/users/${quickEditUser.id}/quick-update`,
-            quickEditForm,
+            payload,
             {
                 preserveScroll: true,
 
@@ -1377,6 +1383,9 @@ export default function Index({
                                             current
                                         ) => ({
                                             ...current,
+
+                                            /* W59: permissions are saved only after a box was really changed */
+                                            permissions_touched: true,
 
                                             permissions:
                                                 {

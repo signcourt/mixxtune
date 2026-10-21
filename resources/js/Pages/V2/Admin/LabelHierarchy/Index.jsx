@@ -21,6 +21,7 @@ import {
 } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import PageMessages from '@/V2/Shared/Components/PageMessages';
 
 const normalizeId = (value) =>
     value === null ||
@@ -202,6 +203,7 @@ export default function Index({
             subtitle="Manage master labels and their direct sub-labels"
         >
             <Head title="Label Hierarchy" />
+            <PageMessages />
 
             <div className="space-y-6">
                 <section className="grid gap-4 md:grid-cols-3">
@@ -275,7 +277,7 @@ export default function Index({
                     </div>
                 </section>
 
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-5 py-4">
                         <h2 className="text-base font-bold text-slate-900">
                             Catalogue Hierarchy
