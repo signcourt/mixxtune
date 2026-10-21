@@ -31,23 +31,48 @@ class AssignmentManagementController extends Controller
             $permissions
         );
 
+        /* W60: search, status filter, last login, readable counts */
+        $q = trim((string) $request->query('q', ''));
+        $status = (string) $request->query('status', '');
+        $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $q).'%';
+
         $admins = User::query()
-            ->where(
-                'role',
-                'admin'
-            )
+            ->where('role', 'admin')
+            ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x->whereRaw("name LIKE ? ESCAPE '!'", [$like])->orWhereRaw("email LIKE ? ESCAPE '!'", [$like])))
+            ->when(in_array($status, ['active', 'pending', 'suspended'], true), fn ($w) => $w->where('account_status', $status))
             ->withCount([
                 'assignedArtists',
                 'assignedLabels',
             ])
             ->orderBy('name')
-            ->paginate(25);
+            ->paginate(25, ['id', 'name', 'email', 'role', 'account_status', 'last_login_at', 'created_at', 'invitation_status'])
+            ->withQueryString();
+
+        $admins->getCollection()->transform(fn ($a) => [
+            'id' => $a->id,
+            'name' => $a->name,
+            'email' => $a->email,
+            'account_status' => $a->account_status,
+            'invitation_status' => $a->invitation_status,
+            'assigned_artists_count' => (int) $a->assigned_artists_count,
+            'assigned_labels_count' => (int) $a->assigned_labels_count,
+            'last_login' => $a->last_login_at ? \Illuminate\Support\Carbon::parse($a->last_login_at)->timezone('Asia/Kolkata')->format('d M Y, h:i A') : null,
+            'created' => optional($a->created_at)->timezone('Asia/Kolkata')?->format('d M Y'),
+        ]);
 
         return Inertia::render(
             'V2/Admin/Admins/Index',
             [
                 'role' => 'super_admin',
                 'admins' => $admins,
+                'filters' => ['q' => $q, 'status' => $status],
+                'totals' => [
+                    'managers' => User::query()->where('role', 'admin')->count(),
+                    'active' => User::query()->where('role', 'admin')->where('account_status', 'active')->count(),
+                    'labels_without_manager' => Label::query()->whereNull('deleted_at')
+                        ->whereNotExists(fn ($e) => $e->selectRaw('1')->from('admin_label_assignments as ala')->whereColumn('ala.label_id', 'labels.id')->where('ala.assignment_role', 'manager'))
+                        ->count(),
+                ],
             ]
         );
     }
@@ -68,10 +93,47 @@ class AssignmentManagementController extends Controller
             'Manager not found.'
         );
 
-        $admin->load([
-            'assignedArtists:id,stage_name,email,account_status',
-            'assignedLabels:id,name,email,status',
-        ]);
+        /* W60: each label / artist shows its owner and its other managers */
+        $labelManagers = DB::table('admin_label_assignments as a')
+            ->join('users as u', 'u.id', '=', 'a.user_id')
+            ->where('a.assignment_role', 'manager')
+            ->where('a.user_id', '!=', $admin->id)
+            ->get(['a.label_id', 'u.name'])
+            ->groupBy('label_id');
+        $artistManagers = DB::table('admin_artist_assignments as a')
+            ->join('users as u', 'u.id', '=', 'a.user_id')
+            ->where('a.user_id', '!=', $admin->id)
+            ->get(['a.artist_id', 'u.name'])
+            ->groupBy('artist_id');
+
+        $labels = Label::query()
+            ->leftJoin('users as owner', 'owner.id', '=', 'labels.user_id')
+            ->whereNull('labels.deleted_at')
+            ->select(['labels.id', 'labels.name', 'labels.status', 'labels.parent_label_id', 'owner.email as owner_email'])
+            ->withCount('releases')
+            ->orderBy('labels.name')
+            ->get()
+            ->map(fn ($l) => [
+                'id' => (int) $l->id,
+                'name' => $l->name,
+                'status' => $l->status,
+                'sub' => trim(($l->parent_label_id ? 'sub-label · ' : '').'owner: '.($l->owner_email ?: 'none').' · '.(int) $l->releases_count.' releases'),
+                'others' => collect($labelManagers->get($l->id, []))->pluck('name')->unique()->values(),
+            ]);
+
+        $artists = Artist::query()
+            ->leftJoin('labels as lb', 'lb.id', '=', 'artists.label_id')
+            ->whereNull('artists.deleted_at')
+            ->orderBy('artists.stage_name')
+            ->select(['artists.id', 'artists.stage_name', 'artists.legal_name', 'artists.account_status', 'lb.name as label_name'])
+            ->get()
+            ->map(fn ($a) => [
+                'id' => (int) $a->id,
+                'name' => $a->stage_name ?: $a->legal_name,
+                'status' => $a->account_status,
+                'sub' => 'label: '.($a->label_name ?: 'none'),
+                'others' => collect($artistManagers->get($a->id, []))->pluck('name')->unique()->values(),
+            ]);
 
         return Inertia::render(
             'V2/Admin/Admins/Show',
@@ -83,41 +145,15 @@ class AssignmentManagementController extends Controller
                     'name' => $admin->name,
                     'email' => $admin->email,
                     'role' => $admin->role,
-                    'account_status' =>
-                        $admin->account_status,
+                    'account_status' => $admin->account_status,
+                    'last_login' => $admin->last_login_at ? \Illuminate\Support\Carbon::parse($admin->last_login_at)->timezone('Asia/Kolkata')->format('d M Y, h:i A') : null,
                 ],
 
-                'artists' =>
-                    Artist::query()
-                        ->select([
-                            'id',
-                            'stage_name',
-                            'email',
-                            'account_status',
-                        ])
-                        ->orderBy('stage_name')
-                        ->get(),
+                'artists' => $artists,
+                'labels' => $labels,
 
-                'labels' =>
-                    Label::query()
-                        ->select([
-                            'id',
-                            'name',
-                            'email',
-                            'status',
-                        ])
-                        ->orderBy('name')
-                        ->get(),
-
-                'assignedArtistIds' =>
-                    $admin
-                        ->assignedArtists
-                        ->pluck('id'),
-
-                'assignedLabelIds' =>
-                    $admin
-                        ->assignedLabels
-                        ->pluck('id'),
+                'assignedArtistIds' => DB::table('admin_artist_assignments')->where('user_id', $admin->id)->pluck('artist_id')->map(fn ($v) => (int) $v)->values(),
+                'assignedLabelIds' => DB::table('admin_label_assignments')->where('user_id', $admin->id)->where('assignment_role', 'manager')->pluck('label_id')->map(fn ($v) => (int) $v)->values(),
             ]
         );
     }
@@ -161,65 +197,59 @@ class AssignmentManagementController extends Controller
             ],
 
             'assignment_role' => [
-                'required',
+                'sometimes',
                 'string',
                 'in:manager,reviewer,finance,support,custom',
             ],
 
             'can_view' => [
-                'required',
+                'sometimes',
                 'boolean',
             ],
 
             'can_edit' => [
-                'required',
+                'sometimes',
                 'boolean',
             ],
 
             'can_manage_releases' => [
-                'required',
+                'sometimes',
                 'boolean',
             ],
 
             'can_manage_team' => [
-                'required',
+                'sometimes',
                 'boolean',
             ],
 
             'can_manage_splits' => [
-                'required',
+                'sometimes',
                 'boolean',
             ],
         ]);
 
+        /*
+         * W60: keep the flags the manager already had (the page used to
+         * overwrite them with fixed values); defaults for a new manager.
+         */
+        $current = DB::table('admin_label_assignments')->where('user_id', $admin->id)->where('assignment_role', 'manager')->first()
+            ?? DB::table('admin_artist_assignments')->where('user_id', $admin->id)->first();
+        $flag = fn (string $key, bool $default) => array_key_exists($key, $validated)
+            ? (bool) $validated[$key]
+            : ($current && isset($current->{$key}) ? (bool) $current->{$key} : $default);
+
         $pivot = [
-            'assignment_role' =>
-                $validated['assignment_role'],
-
-            'can_view' =>
-                $validated['can_view'],
-
-            'can_edit' =>
-                $validated['can_edit'],
-
-            'can_manage_releases' =>
-                $validated[
-                    'can_manage_releases'
-                ],
-
-            'can_manage_team' =>
-                $validated[
-                    'can_manage_team'
-                ],
-
-            'can_manage_splits' =>
-                $validated[
-                    'can_manage_splits'
-                ],
-
-            'assigned_by' =>
-                $request->user()->id,
+            'assignment_role' => 'manager',
+            'can_view' => $flag('can_view', true),
+            'can_edit' => $flag('can_edit', true),
+            'can_manage_releases' => $flag('can_manage_releases', true),
+            'can_manage_team' => $flag('can_manage_team', false),
+            'can_manage_splits' => $flag('can_manage_splits', false),
+            'assigned_by' => $request->user()->id,
         ];
+
+        $beforeLabels = DB::table('admin_label_assignments')->where('user_id', $admin->id)->where('assignment_role', 'manager')->pluck('label_id')->map(fn ($v) => (int) $v);
+        $beforeArtists = DB::table('admin_artist_assignments')->where('user_id', $admin->id)->pluck('artist_id')->map(fn ($v) => (int) $v);
 
         $artistSync = [];
 
@@ -255,9 +285,24 @@ class AssignmentManagementController extends Controller
             }
         );
 
+        $afterLabels = collect($validated['label_ids'] ?? [])->map(fn ($v) => (int) $v);
+        $afterArtists = collect($validated['artist_ids'] ?? [])->map(fn ($v) => (int) $v);
+        $diff = [
+            'labels_added' => $afterLabels->diff($beforeLabels)->count(),
+            'labels_removed' => $beforeLabels->diff($afterLabels)->count(),
+            'artists_added' => $afterArtists->diff($beforeArtists)->count(),
+            'artists_removed' => $beforeArtists->diff($afterArtists)->count(),
+        ];
+
+        try {
+            app(\App\Services\V2\AuditLogService::class)->record('manager.assignments_updated', 'users', 'Assignments of manager '.$admin->email.' changed.', ['labels' => $beforeLabels->count(), 'artists' => $beforeArtists->count()], $diff + ['labels' => $afterLabels->count(), 'artists' => $afterArtists->count()], $admin, $request);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return back()->with(
             'success',
-            'Admin assignments updated.'
+            'Saved for '.$admin->name.': '.$afterLabels->count().' label(s), '.$afterArtists->count().' artist(s) (labels +'.$diff['labels_added'].' / -'.$diff['labels_removed'].', artists +'.$diff['artists_added'].' / -'.$diff['artists_removed'].').'
         );
     }
 

@@ -1,409 +1,150 @@
-import { useState } from "react";
-import {
-    Head,
-    useForm,
-    usePage,
-} from '@inertiajs/react';
+import { useMemo, useState } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import PageMessages from '@/V2/Shared/Components/PageMessages';
 
-export default function Show({
-    role = 'super_admin',
-    admin,
-    artists = [],
-    labels = [],
-    assignedArtistIds = [],
-    assignedLabelIds = [],
-}) {
-    const {
-        data,
-        setData,
-        patch,
-        processing,
-    } = useForm({
-        artist_ids:
-            assignedArtistIds.map(Number),
-
-        label_ids:
-            assignedLabelIds.map(Number),
-
-        assignment_role: 'manager',
-
-        can_view: true,
-        can_edit: true,
-        can_manage_releases: true,
-        can_manage_team: false,
-        can_manage_splits: false,
+/*
+ * W60 MIXXTUNE_MANAGER_ASSIGN_V2
+ * A searchable list (not a wall of 282 chips): filters, select all shown,
+ * owner / other managers per row, a summary of what changes before saving.
+ * The manager's existing permission flags are kept by the server.
+ */
+export default function Show({ role = 'super_admin', admin, artists = [], labels = [], assignedArtistIds = [], assignedLabelIds = [] }) {
+    const form = useForm({
+        artist_ids: assignedArtistIds.map(Number),
+        label_ids: assignedLabelIds.map(Number),
     });
+    const [tab, setTab] = useState('labels');
 
-    const toggle = (
-        field,
-        id
-    ) => {
-        const numberId = Number(id);
-
-        setData(
-            field,
-            data[field].includes(numberId)
-                ? data[field].filter(
-                      (item) =>
-                          item !== numberId
-                  )
-                : [
-                      ...data[field],
-                      numberId,
-                  ]
-        );
+    const before = useMemo(() => ({ labels: new Set(assignedLabelIds.map(Number)), artists: new Set(assignedArtistIds.map(Number)) }), [assignedLabelIds, assignedArtistIds]);
+    const diff = (key, set) => {
+        const now = new Set(form.data[key]);
+        let added = 0;
+        let removed = 0;
+        now.forEach((id) => { if (!set.has(id)) added++; });
+        set.forEach((id) => { if (!now.has(id)) removed++; });
+        return { added, removed };
     };
+    const dl = diff('label_ids', before.labels);
+    const da = diff('artist_ids', before.artists);
+    const changed = dl.added + dl.removed + da.added + da.removed > 0;
 
-    const submit = (event) => {
-        event.preventDefault();
-
-        patch(
-            `/v2/admin/admins/${admin.id}/assignments`,
-            {
-                preserveScroll: true,
-            }
-        );
+    const submit = () => {
+        if (!changed) return;
+        const msg = `Save for ${admin.name}?\n\nLabels: +${dl.added} / -${dl.removed}\nArtists: +${da.added} / -${da.removed}`;
+        if (!window.confirm(msg)) return;
+        form.patch(`/v2/admin/admins/${admin.id}/assignments`, { preserveScroll: true });
     };
 
     return (
-        <PanelLayout
-            role={role}
-            title="Manager Assignments"
-            subtitle={`${admin.name} • ${admin.email}`}
-        >
+        <PanelLayout role={role} title="Manager Assignments" subtitle={`${admin.name} • ${admin.email}`}>
             <Head title="Manager Assignments" />
-            {/* W59: messages */}
-            <ShowMessages />
+            <PageMessages />
 
-            <form
-                onSubmit={submit}
-                className="space-y-6"
-            >
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 className="text-lg font-semibold text-slate-900">
-                        Assignment Permissions
-                    </h2>
-
-                    <div className="mt-4 grid gap-4 md:grid-cols-3">
-                        <select
-                            value={
-                                data.assignment_role
-                            }
-                            onChange={(event) =>
-                                setData(
-                                    'assignment_role',
-                                    event.target.value
-                                )
-                            }
-                            className="rounded-xl border border-slate-300 px-4 py-3"
-                        >
-                            <option value="manager">
-                                Manager
-                            </option>
-
-                            <option value="reviewer">
-                                Reviewer
-                            </option>
-
-                            <option value="finance">
-                                Finance
-                            </option>
-
-                            <option value="support">
-                                Support
-                            </option>
-
-                            <option value="custom">
-                                Custom
-                            </option>
-                        </select>
-
-                        {[
-                            [
-                                'can_view',
-                                'Can View',
-                            ],
-                            [
-                                'can_edit',
-                                'Can Edit',
-                            ],
-                            [
-                                'can_manage_releases',
-                                'Manage Releases',
-                            ],
-                            [
-                                'can_manage_team',
-                                'Manage Team',
-                            ],
-                            [
-                                'can_manage_splits',
-                                'Manage Splits',
-                            ],
-                        ].map(
-                            ([field, label]) => (
-                                <label
-                                    key={field}
-                                    className="flex items-center gap-3 rounded-xl border border-slate-200 p-3"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={
-                                            data[field]
-                                        }
-                                        onChange={(
-                                            event
-                                        ) =>
-                                            setData(
-                                                field,
-                                                event
-                                                    .target
-                                                    .checked
-                                            )
-                                        }
-                                    />
-
-                                    <span className="text-sm font-semibold text-slate-700">
-                                        {label}
-                                    </span>
-                                </label>
-                            )
-                        )}
+            <div className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Link href="/v2/admin/admins" className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">← Managers</Link>
+                    <div className="text-xs text-slate-500">
+                        Status: <b className="capitalize">{admin.account_status}</b> · Last login: {admin.last_login || 'never'}
                     </div>
-                </section>
-
-                <div className="grid gap-6 xl:grid-cols-2">
-                    <SelectionSection
-                        title="Assign Artists"
-                        items={artists}
-                        selected={
-                            data.artist_ids
-                        }
-                        nameKey="stage_name"
-                        statusKey="account_status"
-                        onToggle={(id) =>
-                            toggle(
-                                'artist_ids',
-                                id
-                            )
-                        }
-                    />
-
-                    <SelectionSection
-                        title="Assign Labels"
-                        items={labels}
-                        selected={
-                            data.label_ids
-                        }
-                        nameKey="name"
-                        statusKey="status"
-                        onToggle={(id) =>
-                            toggle(
-                                'label_ids',
-                                id
-                            )
-                        }
-                    />
                 </div>
 
-                <div className="sticky bottom-4 flex justify-end">
-                    <button
-                        type="submit"
-                        disabled={processing}
-                        className="rounded-xl bg-violet-600 px-7 py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
-                    >
-                        {processing
-                            ? 'Saving...'
-                            : 'Save Assignments'}
-                    </button>
+                <div className="rounded-2xl border border-violet-100 bg-violet-50/60 px-5 py-3 text-sm text-violet-900">
+                    A manager can see and work on the labels and artists ticked here (releases, catalogue, reports of those owners). Nothing else.
                 </div>
-            </form>
+
+                <div className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-2">
+                    {[
+                        ['labels', `Labels (${form.data.label_ids.length})`],
+                        ['artists', `Artists (${form.data.artist_ids.length})`],
+                    ].map(([k, t]) => (
+                        <button key={k} type="button" onClick={() => setTab(k)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${tab === k ? 'bg-violet-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{t}</button>
+                    ))}
+                </div>
+
+                {tab === 'labels' ? (
+                    <Picker items={labels} selected={form.data.label_ids} onChange={(ids) => form.setData('label_ids', ids)} noun="label" />
+                ) : (
+                    <Picker items={artists} selected={form.data.artist_ids} onChange={(ids) => form.setData('artist_ids', ids)} noun="artist" />
+                )}
+
+                <div className="sticky bottom-4 flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+                    <span className="text-sm text-slate-600">
+                        {changed ? `Labels +${dl.added} / -${dl.removed} · Artists +${da.added} / -${da.removed}` : 'No changes'}
+                    </span>
+                    <button type="button" disabled={form.processing || !changed} onClick={() => { form.setData({ artist_ids: assignedArtistIds.map(Number), label_ids: assignedLabelIds.map(Number) }); }} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-40">Undo changes</button>
+                    <button type="button" disabled={form.processing || !changed} onClick={submit} className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-bold text-white disabled:opacity-50">{form.processing ? 'Saving…' : 'Save assignments'}</button>
+                </div>
+            </div>
         </PanelLayout>
     );
 }
 
-function SelectionSection({
-    title,
-    items,
-    selected,
-    nameKey,
-    onToggle,
-}) {
-    const [query, setQuery] = useState("");
-    const [open, setOpen] = useState(false);
+function Picker({ items, selected, onChange, noun }) {
+    const [q, setQ] = useState('');
+    const [show, setShow] = useState('all');
+    const sel = useMemo(() => new Set(selected.map(Number)), [selected]);
+    const term = q.trim().toLowerCase();
 
-    const selectedIds = new Set(
-        (selected ?? []).map((id) => Number(id)),
+    const shown = useMemo(
+        () =>
+            items.filter((i) => {
+                if (show === 'mine' && !sel.has(i.id)) return false;
+                if (show === 'free' && ((i.others || []).length > 0 || sel.has(i.id))) return false;
+                if (show === 'others' && (i.others || []).length === 0) return false;
+                if (!term) return true;
+                return `${i.name} ${i.sub}`.toLowerCase().includes(term);
+            }),
+        [items, show, sel, term],
     );
+    const limit = 300;
+    const visible = shown.slice(0, limit);
 
-    const selectedItems = (items ?? []).filter((item) =>
-        selectedIds.has(Number(item.id)),
-    );
-
-    const search = query.trim().toLowerCase();
-
-    const suggestions =
-        search.length >= 3
-            ? (items ?? [])
-                  .filter((item) => {
-                      if (
-                          selectedIds.has(
-                              Number(item.id),
-                          )
-                      ) {
-                          return false;
-                      }
-
-                      const name = String(
-                          item[nameKey] ?? "",
-                      ).toLowerCase();
-
-                      const email = String(
-                          item.email ?? "",
-                      ).toLowerCase();
-
-                      return (
-                          name.includes(search) ||
-                          email.includes(search)
-                      );
-                  })
-                  .slice(0, 12)
-            : [];
-
-    const choose = (id) => {
-        if (!selectedIds.has(Number(id))) {
-            onToggle(id);
-        }
-
-        setQuery("");
-        setOpen(true);
+    const toggle = (id) => onChange(sel.has(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+    const selectShown = () => onChange(Array.from(new Set([...selected, ...shown.map((i) => i.id)])));
+    const clearShown = () => {
+        const drop = new Set(shown.map((i) => i.id));
+        onChange(selected.filter((x) => !drop.has(x)));
     };
 
     return (
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-base font-semibold text-slate-900">
-                        {title}
-                    </h2>
-
-                    <p className="mt-0.5 text-xs text-slate-500">
-                        Search by name or email.
-                    </p>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-2 border-b border-slate-100 p-3 lg:flex-row lg:items-center">
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${noun} name, owner or label`} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm lg:w-80" />
+                <select value={show} onChange={(e) => setShow(e.target.value)} className="rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                    <option value="all">All {noun}s</option>
+                    <option value="mine">Ticked for this manager</option>
+                    <option value="free">No manager at all</option>
+                    <option value="others">With another manager</option>
+                </select>
+                <div className="flex flex-1 flex-wrap justify-end gap-2 text-xs">
+                    <span className="self-center text-slate-500">{shown.length} shown · {selected.length} ticked</span>
+                    <button type="button" onClick={selectShown} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700">Tick all shown</button>
+                    <button type="button" onClick={clearShown} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700">Untick all shown</button>
                 </div>
-
-                {selectedItems.length > 0 && (
-                    <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
-                        {selectedItems.length} selected
-                    </span>
-                )}
             </div>
-
-            <div className="relative">
-                <div className="flex min-h-[46px] flex-wrap items-center gap-2 rounded-lg border border-slate-300 bg-white px-2.5 py-2 focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-100">
-                    {selectedItems.map((item) => (
-                        <span
-                            key={item.id}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-800"
-                        >
-                            <span className="max-w-[210px] truncate">
-                                {item[nameKey]}
+            <div className="max-h-[60vh] divide-y divide-slate-50 overflow-y-auto">
+                {visible.length === 0 && <div className="px-5 py-10 text-center text-sm text-slate-500">Nothing matches.</div>}
+                {visible.map((i) => (
+                    <label key={i.id} className={`flex cursor-pointer items-start gap-3 px-4 py-2.5 hover:bg-slate-50 ${sel.has(i.id) ? 'bg-violet-50/50' : ''}`}>
+                        <input type="checkbox" className="mt-1" checked={sel.has(i.id)} onChange={() => toggle(i.id)} />
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-slate-900">{i.name}</span>
+                            <span className="block truncate text-xs text-slate-500">
+                                {i.sub}
+                                {i.status && i.status !== 'active' ? ` · ${i.status}` : ''}
                             </span>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    onToggle(item.id)
-                                }
-                                className="flex h-4 w-4 items-center justify-center rounded-full text-sm leading-none text-violet-500 hover:bg-violet-200 hover:text-violet-900"
-                                title="Remove"
-                            >
-                                ×
-                            </button>
                         </span>
-                    ))}
-
-                    <input
-                        type="text"
-                        value={query}
-                        autoComplete="off"
-                        onFocus={() => setOpen(true)}
-                        onChange={(event) => {
-                            setQuery(event.target.value);
-                            setOpen(true);
-                        }}
-                        onBlur={() => {
-                            window.setTimeout(
-                                () => setOpen(false),
-                                180,
-                            );
-                        }}
-                        placeholder={
-                            selectedItems.length
-                                ? "Search more..."
-                                : "Type minimum 3 characters..."
-                        }
-                        className="min-w-[180px] flex-1 border-0 bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-slate-400 focus:ring-0"
-                    />
-                </div>
-
-                {open &&
-                    search.length > 0 &&
-                    search.length < 3 && (
-                        <div className="absolute left-0 right-0 z-50 mt-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-xl">
-                            Type {3 - search.length} more character
-                            {3 - search.length === 1 ? "" : "s"}.
-                        </div>
-                    )}
-
-                {open && search.length >= 3 && (
-                    <div className="absolute left-0 right-0 z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
-                        {suggestions.length > 0 ? (
-                            suggestions.map((item) => (
-                                <button
-                                    key={item.id}
-                                    type="button"
-                                    onMouseDown={(event) => {
-                                        event.preventDefault();
-                                        choose(item.id);
-                                    }}
-                                    className="flex w-full items-center justify-between gap-4 rounded-md px-3 py-2.5 text-left hover:bg-violet-50"
-                                >
-                                    <div className="min-w-0">
-                                        <div className="truncate text-sm font-semibold text-slate-900">
-                                            {item[nameKey]}
-                                        </div>
-
-                                        <div className="mt-0.5 truncate text-xs text-slate-500">
-                                            {item.email ?? "No email"}
-                                        </div>
-                                    </div>
-
-                                    <span className="text-xs font-semibold text-violet-600">
-                                        Select
-                                    </span>
-                                </button>
-                            ))
-                        ) : (
-                            <div className="px-3 py-4 text-center text-sm text-slate-500">
-                                No matching records found.
-                            </div>
+                        {(i.others || []).length > 0 && (
+                            <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700" title={i.others.join(', ')}>
+                                also: {i.others.slice(0, 2).join(', ')}{i.others.length > 2 ? ` +${i.others.length - 2}` : ''}
+                            </span>
                         )}
-                    </div>
-                )}
+                    </label>
+                ))}
+                {shown.length > limit && <div className="px-5 py-3 text-center text-xs text-slate-500">Showing the first {limit} - search to narrow down.</div>}
             </div>
         </section>
-    );
-}
-
-function ShowMessages() {
-    const { flash = {}, errors = {} } = usePage().props;
-    const list = Object.entries(errors).filter(([k]) => k !== 'action_otp');
-    return (
-        <>
-            {flash.success && <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-800">{flash.success}</div>}
-            {list.length > 0 && <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm text-rose-800">{list.map(([k, v]) => <div key={k}>{v}</div>)}</div>}
-        </>
     );
 }
