@@ -443,37 +443,18 @@ const adminNavigation = (
                               label: 'All Catalogue',
                               href: routes.catalogue,
                               permission: 'catalogue.view',
+                              /* W57: tools that now open from the All Catalogue page keep this item lit */
+                              activePrefixes: [
+                                  '/super-admin/catalogue-health',
+                                  '/super-admin/posters',
+                                  routes.legacyCatalogueImports,
+                              ],
                           },
                           {
+                              /* W57: Transfer History is a tab inside this page */
                               id: 'catalogue-ownership',
                               label: 'Ownership Transfer',
                               href: '/v2/admin/ownership',
-                              permission: 'catalogue.view',
-                          },
-                          {
-                              id: 'catalogue-transfer-history',
-                              label: 'Transfer History',
-                              href: '/v2/admin/ownership?section=history',
-                              permission: 'catalogue.view',
-                          },
-                          {
-                              /* MIXXTUNE_CATALOGUE_HEALTH_V1 */
-                              id: 'catalogue-health',
-                              label: 'Missing Details',
-                              href: '/super-admin/catalogue-health',
-                              permission: 'catalogue.view',
-                          },
-                          {
-                              /* MIXXTUNE_BULK_POSTERS_V1 */
-                              id: 'catalogue-bulk-posters',
-                              label: 'Bulk Posters',
-                              href: '/super-admin/posters',
-                              permission: 'catalogue.view',
-                          },
-                          {
-                              id: 'catalogue-legacy-import',
-                              label: 'Legacy Import',
-                              href: routes.legacyCatalogueImports,
                               permission: 'catalogue.view',
                           },
                       ]

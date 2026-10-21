@@ -1083,6 +1083,16 @@ function isChildActive(
 ) {
     const childPath = normalizePath(child.href);
 
+    /* W57: a menu item can stay lit for pages opened from it */
+    if (
+        (child.activePrefixes || []).some((prefix) => {
+            const p = normalizePath(prefix);
+            return currentPath === p || currentPath.startsWith(`${p}/`);
+        })
+    ) {
+        return true;
+    }
+
     if (currentPath !== childPath) {
         return false;
     }
@@ -1101,7 +1111,7 @@ function isChildActive(
     }
 
     if (child.id === "catalogue-ownership") {
-        return currentQuery?.get("section") !== "history";
+        return true;
     }
 
     if (child.id?.startsWith("legal-")) {

@@ -276,6 +276,27 @@ export default function Index({
                     </Link>
                 </div>
 
+                {/* W57: catalogue tools open from here (fewer menu buttons) */}
+                {role === 'super_admin' && (
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        {[
+                            ['/super-admin/catalogue-health', 'Missing Details', 'Poster, UPC, ISRC, label % or owner missing'],
+                            ['/super-admin/posters', 'Bulk Posters', 'Upload many posters by UPC / catalogue no.'],
+                            ['/v2/admin/ownership?section=history', 'Transfer History', 'Who moved which release / label, and why'],
+                            ['/super-admin/legacy-catalogue-imports', 'Legacy Import', 'Old catalogue from a CSV / Excel file'],
+                        ].map(([href, label, note]) => (
+                            <Link
+                                key={href}
+                                href={href}
+                                className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:border-violet-300 hover:bg-violet-50"
+                            >
+                                <div className="text-sm font-bold text-slate-900">{label} →</div>
+                                <div className="mt-0.5 text-xs text-slate-500">{note}</div>
+                            </Link>
+                        ))}
+                    </div>
+                )}
+
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 p-3 sm:p-4">
                         <label className="flex h-11 min-w-[240px] flex-1 items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 focus-within:border-violet-500">
