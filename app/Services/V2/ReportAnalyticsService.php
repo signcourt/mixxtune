@@ -520,23 +520,36 @@ class ReportAnalyticsService
             'rows' =>
                 (int) $result->rows_count,
 
+            /* W52: "Jio Saavn" and "JioSaavn" are one store */
             'active_platforms' =>
-                (clone $query)
+                (int) (clone $query)
                     ->whereNotNull('platform')
                     ->where('platform', '!=', '')
-                    ->distinct()
-                    ->count('platform'),
+                    ->toBase()
+                    ->reorder()
+                    ->select([])
+                    ->selectRaw('COUNT(DISTINCT '.$this->storeKeySql().') as n')
+                    ->value('n'),
         ];
     }
 
     public function monthlyTrend(
         Builder $query,
-        int $limit = 12
+        int $limit = 12,
+        bool $byReportingMonth = false
     ): array {
+        /*
+         * MIXXTUNE_ANALYTICS_V5 (W52): the Analytics page picks REPORTING
+         * months, so its trend / growth must be grouped by reporting month
+         * too (it used sale month: one July report holding a little July
+         * sale data was compared with "June sales" -> "-93%").
+         */
+        $col = $byReportingMonth ? 'reporting_month' : 'sale_month';
+
         return (clone $query)
-            ->whereNotNull('sale_month')
-            ->where('sale_month', '!=', '')
-            ->select('sale_month')
+            ->whereNotNull($col)
+            ->where($col, '!=', '')
+            ->selectRaw($col.' as sale_month')
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
             )
@@ -549,8 +562,8 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
-            ->groupBy('sale_month')
-            ->orderByDesc('sale_month')
+            ->groupBy($col)
+            ->orderByDesc($col)
             ->limit($limit)
             ->get()
             ->reverse()
@@ -783,6 +796,7 @@ class ReportAnalyticsService
             ->whereNotNull('platform')
             ->where('platform', '!=', '')
             ->selectRaw('MIN(platform) as platform')
+            ->selectRaw($this->storeKeySql().' as store_key')
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
             )
@@ -795,13 +809,13 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
-            ->groupByRaw($this->groupKey(['platform']))
+            ->groupByRaw($this->storeKeySql())
             ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
                 'name' =>
-                    $row->platform,
+                    self::STORE_NAMES[$row->store_key] ?? $row->platform,
 
                 'streams' =>
                     (float) $row->streams,
@@ -1142,6 +1156,45 @@ class ReportAnalyticsService
             ->all();
     }
 
+
+
+    /*
+     * MIXXTUNE_ANALYTICS_V5 (W52): one store = one slice. Spaces, dashes
+     * and case are ignored ("Jio Saavn" = "JioSaavn") and a few known DSP
+     * misspellings are mapped ("Jio Saavan" -> JioSaavn). Only the store
+     * NAME shown in analytics changes - report rows are not edited.
+     */
+    private const STORE_ALIASES = [
+        'jiosaavan' => 'jiosaavn',
+        'saavn' => 'jiosaavn',
+        'gaana.com' => 'gaana',
+        'wynkmusic' => 'wynk',
+        'amazonmusicunlimited' => 'amazonmusic',
+    ];
+
+    public const STORE_NAMES = [
+        'jiosaavn' => 'JioSaavn',
+        'spotify' => 'Spotify',
+        'youtube' => 'YouTube',
+        'applemusic' => 'Apple Music',
+        'itunes' => 'iTunes',
+        'amazonmusic' => 'Amazon Music',
+        'gaana' => 'Gaana',
+        'wynk' => 'Wynk Music',
+        'instagram' => 'Instagram',
+        'facebook' => 'Facebook',
+    ];
+
+    private function storeKeySql(): string
+    {
+        $base = "LOWER(REPLACE(REPLACE(REPLACE(TRIM(COALESCE(platform, '')), ' ', ''), '-', ''), '_', ''))";
+        $case = 'CASE '.$base;
+        foreach (self::STORE_ALIASES as $from => $to) {
+            $case .= " WHEN '".$from."' THEN '".$to."'";
+        }
+
+        return $case.' ELSE '.$base.' END';
+    }
 
     /*
      * MIXXTUNE_ANALYTICS_V4 (W51)

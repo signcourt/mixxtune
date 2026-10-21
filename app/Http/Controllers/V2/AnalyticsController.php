@@ -789,9 +789,11 @@ class AnalyticsController extends Controller
                 $trendFilters
             );
 
+            /* MIXXTUNE_ANALYTICS_V5 (W52): by reporting month, like the month boxes */
             $monthlyTrend = $analytics->monthlyTrend(
                 clone $trendQuery,
-                24
+                24,
+                true
             );
 
             $growthMonth =
@@ -817,7 +819,8 @@ class AnalyticsController extends Controller
                     ? []
                     : $analytics->monthlyTrend(
                         clone $filtered,
-                        24
+                        24,
+                        true
                     ),
 
             'platforms' =>

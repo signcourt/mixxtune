@@ -447,8 +447,8 @@ export default function Index({
 
                         <Card
                             title="Consumption Units"
-                            value={numberFormat(summary.sale_units)}
-                            subtitle="Imported sale / stream units"
+                            value={Number(summary.sale_units || 0) === 0 && Number(summary.streams || 0) > 0 ? '—' : numberFormat(summary.sale_units)}
+                            subtitle={Number(summary.sale_units || 0) === 0 && Number(summary.streams || 0) > 0 ? 'Not given in this report (streams only)' : 'Imported sale / stream units'}
                             icon={BarChart3}
                         />
 
@@ -607,7 +607,7 @@ export default function Index({
 
                                             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                                                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                                    Total
+                                                    Label earnings
                                                 </div>
 
                                                 <div className="mt-1 text-xl font-black text-slate-950">
@@ -764,7 +764,7 @@ export default function Index({
 
                                         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                                             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                                Total
+                                                Label earnings
                                             </div>
 
                                             <div className="mt-1 text-xl font-black text-slate-950">
@@ -840,7 +840,7 @@ export default function Index({
                                     </div>
                                 </div>
                             ) : (
-                                <EmptyState text="No imported country revenue data available." />
+                                <EmptyState text={Number(summary.rows || 0) > 0 ? 'This report has no country / territory column, so revenue by country cannot be shown.' : 'No imported country revenue data available.'} />
                             )}
                         </div>
                     </div>
