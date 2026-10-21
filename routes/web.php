@@ -977,6 +977,31 @@ Route::middleware([
 
 
             /*
+             * MIXXTUNE_BULK_POSTERS_V1
+             * Super Admin: posters for many releases at once
+             * (file name = UPC or catalogue number, exact match only).
+             */
+            Route::get(
+                '/posters',
+                [\App\Http\Controllers\V2\Admin\BulkPosterController::class, 'index']
+            )->name('posters.index');
+
+            Route::get(
+                '/posters/missing.csv',
+                [\App\Http\Controllers\V2\Admin\BulkPosterController::class, 'missingCsv']
+            )->name('posters.missing');
+
+            Route::post(
+                '/posters/match',
+                [\App\Http\Controllers\V2\Admin\BulkPosterController::class, 'match']
+            )->name('posters.match');
+
+            Route::post(
+                '/posters/upload',
+                [\App\Http\Controllers\V2\Admin\BulkPosterController::class, 'upload']
+            )->middleware('throttle:240,1')->name('posters.upload');
+
+            /*
              * Legacy Catalogue Bulk Import
              *
              * Super Admin only.

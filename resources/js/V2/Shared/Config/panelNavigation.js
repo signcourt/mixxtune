@@ -457,6 +457,13 @@ const adminNavigation = (
                               permission: 'catalogue.view',
                           },
                           {
+                              /* MIXXTUNE_BULK_POSTERS_V1 */
+                              id: 'catalogue-bulk-posters',
+                              label: 'Bulk Posters',
+                              href: '/super-admin/posters',
+                              permission: 'catalogue.view',
+                          },
+                          {
                               id: 'catalogue-legacy-import',
                               label: 'Legacy Import',
                               href: routes.legacyCatalogueImports,
