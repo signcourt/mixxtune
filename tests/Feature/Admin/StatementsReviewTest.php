@@ -102,7 +102,7 @@ class StatementsReviewTest extends TestCase
         $super = $this->user('super_admin');
         $mk = fn (array $x) => \Illuminate\Support\Facades\DB::table('report_imports')->insert(array_merge([
             'public_id' => (string) Str::ulid(), 'original_filename' => 'report.csv', 'stored_path' => 'x',
-            'status' => 'completed', 'total_rows' => 100, 'reporting_month' => '2026-07-01',
+            'status' => 'completed', 'total_rows' => 100, 'reporting_month' => '2026-07',
             'created_at' => now(), 'updated_at' => now(),
         ], $x));
 

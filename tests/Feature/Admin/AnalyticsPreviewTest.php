@@ -31,7 +31,7 @@ class AnalyticsPreviewTest extends TestCase
         return (int) DB::table('report_imports')->insertGetId([
             'public_id' => (string) Str::ulid(), 'original_filename' => $file, 'stored_path' => 'x',
             'status' => 'completed', 'financial_status' => $fin, 'total_rows' => 1, 'imported_rows' => 1,
-            'reporting_month' => '2026-07-01', 'created_at' => now(), 'updated_at' => now(),
+            'reporting_month' => '2026-07', 'created_at' => now(), 'updated_at' => now(),
         ]);
     }
 

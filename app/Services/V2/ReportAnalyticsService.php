@@ -782,7 +782,7 @@ class ReportAnalyticsService
         return (clone $query)
             ->whereNotNull('platform')
             ->where('platform', '!=', '')
-            ->select('platform')
+            ->selectRaw('MIN(platform) as platform')
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
             )
@@ -795,7 +795,7 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
-            ->groupBy('platform')
+            ->groupByRaw($this->groupKey(['platform']))
             ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
@@ -825,7 +825,7 @@ class ReportAnalyticsService
         return (clone $query)
             ->whereNotNull('country_code')
             ->where('country_code', '!=', '')
-            ->select('country_code')
+            ->selectRaw('MIN(country_code) as country_code')
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
             )
@@ -838,7 +838,7 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
-            ->groupBy('country_code')
+            ->groupByRaw($this->groupKey(['country_code']))
             ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
@@ -873,14 +873,7 @@ class ReportAnalyticsService
                         ->orWhereNotNull('album_title');
                 }
             )
-            ->select([
-                'track_id',
-                'track_title',
-                'track_artist',
-                'album_title',
-                'album_artist',
-                'isrc',
-            ])
+            ->selectRaw('MIN(track_id) as track_id, MIN(track_title) as track_title, MIN(track_artist) as track_artist, MIN(album_title) as album_title, MIN(album_artist) as album_artist, MIN(isrc) as isrc')
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
             )
@@ -893,14 +886,7 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
-            ->groupBy([
-                'track_id',
-                'track_title',
-                'track_artist',
-                'album_title',
-                'album_artist',
-                'isrc',
-            ])
+            ->groupByRaw($this->groupKey(['track_id', 'track_title', 'track_artist', 'album_title', 'album_artist', 'isrc']))
             ->orderByDesc('collected_revenue');
 
         if ($limit !== null) {
@@ -952,7 +938,7 @@ class ReportAnalyticsService
                     ->orWhereNotNull('album_artist');
             })
             ->selectRaw(
-                "COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), 'Unknown Artist') as name"
+                "MIN(COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), 'Unknown Artist')) as name"
             )
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
@@ -966,9 +952,7 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
-            ->groupByRaw(
-                "COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), 'Unknown Artist')"
-            )
+            ->groupByRaw($this->groupKey(["COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), 'Unknown Artist')"], true))
             ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
@@ -989,11 +973,7 @@ class ReportAnalyticsService
         return (clone $query)
             ->whereNotNull('album_title')
             ->where('album_title', '!=', '')
-            ->select([
-                'album_title',
-                'album_artist',
-                'upc',
-            ])
+            ->selectRaw('MIN(album_title) as album_title, MIN(album_artist) as album_artist, MIN(upc) as upc')
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
             )
@@ -1006,11 +986,7 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
-            ->groupBy([
-                'album_title',
-                'album_artist',
-                'upc',
-            ])
+            ->groupByRaw($this->groupKey(['album_title', 'album_artist', 'upc']))
             ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
@@ -1047,7 +1023,7 @@ class ReportAnalyticsService
         return (clone $query)
             ->whereNotNull('label_name')
             ->where('label_name', '!=', '')
-            ->select('label_name')
+            ->selectRaw('MIN(label_name) as label_name')
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
             )
@@ -1060,7 +1036,7 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
-            ->groupBy('label_name')
+            ->groupByRaw($this->groupKey(['label_name']))
             ->orderByDesc('collected_revenue')
             ->limit($limit)
             ->get()
@@ -1164,6 +1140,30 @@ class ReportAnalyticsService
                     (float) $row->earnings,
             ])
             ->all();
+    }
+
+
+    /*
+     * MIXXTUNE_ANALYTICS_V4 (W51)
+     * MySQL can fail with "1062 Duplicate entry ... for key <group_key>"
+     * when it groups text that differs only in trailing spaces / letter
+     * case (e.g. "VR Bros HD" and "VR Bros HD "): the 91k-row July report
+     * made /v2/analytics a 500 page. Every name grouping now uses one
+     * normalized key (trimmed, lower case, MD5 on MySQL so no collation
+     * can see two keys as equal) and shows one original spelling.
+     */
+    private function groupKey(array $columns, bool $raw = false): string
+    {
+        $mysql = in_array(\Illuminate\Support\Facades\DB::connection()->getDriverName(), ['mysql', 'mariadb'], true);
+        $parts = array_map(
+            fn ($c) => 'LOWER(TRIM(COALESCE('.($raw ? $c : $c).", '')))",
+            array_map(fn ($c) => $raw ? $c : $c, $columns)
+        );
+        $joined = count($parts) === 1
+            ? $parts[0]
+            : ($mysql ? "CONCAT_WS('|', ".implode(', ', $parts).')' : implode(" || '|' || ", $parts));
+
+        return $mysql ? 'MD5('.$joined.')' : $joined;
     }
 
 }

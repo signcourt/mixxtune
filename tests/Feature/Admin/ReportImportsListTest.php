@@ -30,7 +30,7 @@ class ReportImportsListTest extends TestCase
     {
         DB::table('report_imports')->insert([
             'public_id' => (string) Str::ulid(), 'original_filename' => 'bad.csv', 'stored_path' => 'x',
-            'status' => 'failed', 'error_message' => str_repeat('E', 5000), 'reporting_month' => '2026-07-01',
+            'status' => 'failed', 'error_message' => str_repeat('E', 5000), 'reporting_month' => '2026-07',
             'financial_status' => 'review_pending', 'column_map' => json_encode(['huge' => str_repeat('x', 1000)]),
             'created_at' => now(), 'updated_at' => now(),
         ]);

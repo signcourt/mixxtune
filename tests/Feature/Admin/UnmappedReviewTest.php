@@ -30,7 +30,7 @@ class UnmappedReviewTest extends TestCase
         return (int) DB::table('report_imports')->insertGetId([
             'public_id' => (string) Str::ulid(), 'original_filename' => $file, 'stored_path' => 'testing/'.$file,
             'status' => 'completed', 'financial_status' => $financialStatus, 'total_rows' => 1, 'imported_rows' => 1,
-            'duplicate_rows' => 0, 'failed_rows' => 0, 'reporting_month' => '2026-07-01', 'started_at' => now(), 'completed_at' => now(),
+            'duplicate_rows' => 0, 'failed_rows' => 0, 'reporting_month' => '2026-07', 'started_at' => now(), 'completed_at' => now(),
             'created_at' => now(), 'updated_at' => now(),
         ]);
     }
