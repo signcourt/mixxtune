@@ -52,7 +52,13 @@ class AnalyticsPreviewTest extends TestCase
         $super = $this->user('super_admin');
         $this->row($this->import('review_pending', 'july.csv'), null, 500);
 
+        /* W50: nothing published yet -> staff get the preview by themselves */
         $this->actingAs($super)->get('/v2/analytics')->assertOk()->assertInertia(fn (Assert $p) => $p
+            ->where('preview', true)
+            ->where('autoPreview', true)
+            ->where('summary.rows', 1));
+
+        $this->actingAs($super)->get('/v2/analytics?preview=0')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Analytics/Index')
             ->where('preview', false)
             ->where('summary.rows', 0)
@@ -80,5 +86,17 @@ class AnalyticsPreviewTest extends TestCase
             ->where('preview', false)
             ->where('unpublished', [])
             ->has('filterOptions.months', 0));
+    }
+
+    public function test_no_auto_preview_once_something_is_published(): void
+    {
+        $super = $this->user('super_admin');
+        $this->row($this->import('published', 'june.csv'), null, 100);
+        $this->row($this->import('review_pending', 'july.csv'), null, 500);
+
+        $this->actingAs($super)->get('/v2/analytics')->assertInertia(fn (Assert $p) => $p
+            ->where('preview', false)
+            ->where('autoPreview', false)
+            ->where('summary.rows', 1));
     }
 }

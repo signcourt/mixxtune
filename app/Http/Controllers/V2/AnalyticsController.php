@@ -461,6 +461,24 @@ class AnalyticsController extends Controller
         /* MIXXTUNE_ANALYTICS_V2 (W48): staff preview of reports not yet published */
         $preview = in_array($role, ['admin', 'super_admin'], true) && $request->boolean('preview');
 
+        /*
+         * MIXXTUNE_ANALYTICS_V3 (W50): when NOTHING is published yet, staff
+         * see the preview by themselves (with the "Preview" banner) instead
+         * of a page full of zeros. "Show published only" (preview=0) still
+         * works. Owners never get preview.
+         */
+        $autoPreview = false;
+        if (
+            in_array($role, ['admin', 'super_admin'], true)
+            && ! $request->has('preview')
+            && \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'financial_status')
+            && ! DB::table('report_imports')->where('financial_status', 'published')->exists()
+            && DB::table('report_imports')->whereIn('financial_status', ['review_pending', 'approved_scheduled'])->whereIn('status', ['completed', 'completed_with_errors'])->exists()
+        ) {
+            $preview = true;
+            $autoPreview = true;
+        }
+
         $base = $analytics->scopedQuery(
             $user,
             $permissions,
@@ -914,6 +932,8 @@ class AnalyticsController extends Controller
                 'filters' => $filters,
 
                 'preview' => $preview,
+
+                'autoPreview' => $autoPreview,
 
                 'unpublished' => in_array($role, ['admin', 'super_admin'], true) ? $this->unpublishedImports() : [],
 

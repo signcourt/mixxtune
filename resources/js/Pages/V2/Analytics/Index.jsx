@@ -229,6 +229,7 @@ export default function Index({
     financialAnalytics = {},
     importedRevenueAnalytics = {},
     preview = false,
+    autoPreview = false,
     unpublished = [],
 }) {
     /* MIXXTUNE_ANALYTICS_V2 (W48): keep every current filter, put From before To */
@@ -241,7 +242,7 @@ export default function Index({
     const setPreview = (on) => {
         const params = Object.fromEntries(new URLSearchParams(window.location.search));
         delete params.month; delete params.from_month; delete params.to_month;
-        router.get(window.location.pathname, { ...params, preview: on ? 1 : undefined }, { preserveScroll: true, replace: true });
+        router.get(window.location.pathname, { ...params, preview: on ? 1 : 0 }, { preserveScroll: true, replace: true });
     };
 
     const primaryCurrency =
@@ -417,7 +418,7 @@ export default function Index({
                 subtitle="Performance intelligence from imported royalty reports"
             >
                 <div className="space-y-6">
-                    <PublishBanner role={role} preview={preview} unpublished={unpublished} hasMonths={(filterOptions?.months || []).length > 0} onPreview={setPreview} />
+                    <PublishBanner role={role} preview={preview} autoPreview={autoPreview} unpublished={unpublished} hasMonths={(filterOptions?.months || []).length > 0} onPreview={setPreview} />
 
                     {/* RAW REPORT KPI CARDS */}
                     {!['label', 'artist'].includes(role) && (
@@ -464,7 +465,7 @@ export default function Index({
                     {/* MIXXTUNE_FINANCE_CLEANUP_V1: CSV of the rows behind this view (same filters, same access) */}
                     <div className="flex justify-end">
                         <a
-                            href={`/v2/analytics/export${typeof window !== 'undefined' ? window.location.search : ''}`}
+                            href={`/v2/analytics/export?${(() => { const q = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : ''); if (preview) q.set('preview', '1'); return q.toString(); })()}`}
                             className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
                         >
                             Export CSV
@@ -1251,14 +1252,14 @@ export default function Index({
 }
 
 /* MIXXTUNE_ANALYTICS_V2 (W48): why the numbers can be 0, and a staff preview */
-function PublishBanner({ role, preview, unpublished = [], hasMonths, onPreview }) {
+function PublishBanner({ role, preview, autoPreview = false, unpublished = [], hasMonths, onPreview }) {
     const staff = role === 'admin' || role === 'super_admin';
 
     if (staff && preview) {
         return (
             <div className="flex flex-col gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
                 <span>
-                    <b>Preview</b> - these numbers include {unpublished.length} report(s) that are not published yet. They can still change, and owners do not see them.
+                    <b>Preview</b> - {autoPreview ? 'nothing is published yet, so this shows ' : 'these numbers include '}{unpublished.length} report(s) that are not published yet{unpublished[0]?.month ? ` (${unpublished.map((u) => monthFormat(u.month)).join(', ')})` : ''}. They can still change, and owners do not see them until the report is approved and published.
                 </span>
                 <button type="button" onClick={() => onPreview(false)} className="h-9 shrink-0 rounded-lg border border-amber-300 bg-white px-3 text-xs font-semibold">
                     Show published only
