@@ -669,7 +669,13 @@ export default function TrackManager({
             /* W65: title from the file name when it is still empty */
             title: d.title
                 ? d.title
-                : file.name.replace(/\.wav$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim(),
+                : file.name
+                      .replace(/\.wav$/i, '')
+                      /* W68: drop converter tags like "(online-audio-converter.com)" */
+                      .replace(/[([][^)\]]*(\.com|\.net|\.org|converter|download)[^)\]]*[)\]]/gi, '')
+                      .replace(/[_]+/g, ' ')
+                      .replace(/\s+/g, ' ')
+                      .trim(),
         }));
         setUploadFileName(file.name);
     };
@@ -1272,13 +1278,8 @@ export default function TrackManager({
 
                                 </div>
 
-                                <SectionTitle
-                                    number="04"
-                                    title="Numbering & ISRC"
-                                    subtitle="Position on the release and the recording code."
-                                />
-
-                                <div className="mb-4 grid gap-2.5 sm:grid-cols-3">
+                                {/* W68: plain fields, no heading; ISRC is a simple Yes / No */}
+                                <div className="mb-4 grid gap-2.5 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-4">
                                     <Field label="Track number" required error={err('track_number')}>
                                         <input type="number" min="1" className={inputClass} value={data.track_number ?? ''} onChange={(e) => setField('track_number', e.target.value === '' ? '' : Number(e.target.value))} />
                                     </Field>
@@ -1287,37 +1288,33 @@ export default function TrackManager({
                                         <input type="number" min="1900" max={new Date().getFullYear() + 1} className={inputClass} value={data.release_year ?? ''} onChange={(e) => setField('release_year', e.target.value === '' ? '' : Number(e.target.value))} />
                                     </Field>
 
-                                    <Field label="Disc" hint="For multi-disc albums">
+                                    <Field label="Disc number">
                                         <input type="number" min="1" className={inputClass} value={data.disc_number ?? 1} onChange={(e) => setField('disc_number', e.target.value === '' ? 1 : Number(e.target.value))} />
                                     </Field>
-                                </div>
 
-                                <fieldset className="mb-4">
-                                    <legend className="mb-1 text-xs font-semibold text-slate-700">ISRC</legend>
-                                    <div className="grid gap-3 sm:grid-cols-2">
-                                        <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${data.isrc_is_auto_generated ? 'border-violet-400 bg-violet-50' : 'border-slate-200'}`}>
-                                            <input type="radio" name="isrc_mode" checked={Boolean(data.isrc_is_auto_generated)} onChange={() => setData((d) => ({ ...d, isrc_is_auto_generated: true, isrc: editingTrack?.isrc && !editingTrack?.isrc_is_auto_generated ? '' : d.isrc }))} className="mt-0.5" />
-                                            <span>
-                                                <span className="block text-sm font-semibold text-slate-900">New song - give an ISRC</span>
-                                                <span className="block text-xs text-slate-500">Mixx Tune assigns it when the release is approved</span>
-                                            </span>
-                                        </label>
-                                        <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${!data.isrc_is_auto_generated ? 'border-violet-400 bg-violet-50' : 'border-slate-200'}`}>
-                                            <input type="radio" name="isrc_mode" checked={!data.isrc_is_auto_generated} onChange={() => setField('isrc_is_auto_generated', false)} className="mt-0.5" />
-                                            <span>
-                                                <span className="block text-sm font-semibold text-slate-900">It already has an ISRC</span>
-                                                <span className="block text-xs text-slate-500">Old song released before - type its code</span>
-                                            </span>
-                                        </label>
-                                    </div>
+                                    <Field label="Generate ISRC" required>
+                                        <select
+                                            className={inputClass}
+                                            value={data.isrc_is_auto_generated ? 'yes' : 'no'}
+                                            onChange={(e) =>
+                                                e.target.value === 'yes'
+                                                    ? setData((d) => ({ ...d, isrc_is_auto_generated: true, isrc: editingTrack?.isrc && !editingTrack?.isrc_is_auto_generated ? '' : d.isrc }))
+                                                    : setField('isrc_is_auto_generated', false)
+                                            }
+                                        >
+                                            <option value="yes">Yes</option>
+                                            <option value="no">No - I have one</option>
+                                        </select>
+                                    </Field>
+
                                     {!data.isrc_is_auto_generated && (
-                                        <div className="mt-3 max-w-sm">
-                                            <Field label="Existing ISRC" required error={err('isrc')} hint="12 characters, e.g. INA1C2600001">
+                                        <div className="sm:col-span-2 lg:col-span-2">
+                                            <Field label="ISRC" required error={err('isrc')} hint="12 characters, e.g. INA1C2600001">
                                                 <input className={`${inputClass} font-mono uppercase`} value={data.isrc ?? ''} onChange={(e) => setField('isrc', e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))} placeholder="INXXX2600001" />
                                             </Field>
                                         </div>
                                     )}
-                                </fieldset>
+                                </div>
 
                                 {!data.is_instrumental && (
                                     <details className="mb-4 rounded-lg border border-slate-200 px-3 py-2" open={Boolean(data.lyrics)}>
