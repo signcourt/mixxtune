@@ -2670,7 +2670,7 @@ Route::middleware(['auth', 'verified'])
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth'])
+Route::middleware(['auth', 'verified'])
     ->prefix('v2/admin/ownership')
     ->name('v2.admin.ownership.')
     ->group(function () {
@@ -2681,6 +2681,11 @@ Route::middleware(['auth'])
                 'index',
             ]
         )->name('index');
+
+        /* W56 MIXXTUNE_OWNERSHIP_SAFE_V1 */
+        Route::get('/search', [\App\Http\Controllers\V2\Admin\OwnershipTransferController::class, 'search'])->middleware('throttle:120,1')->name('search');
+        Route::get('/preview', [\App\Http\Controllers\V2\Admin\OwnershipTransferController::class, 'preview'])->middleware('throttle:120,1')->name('preview');
+        Route::get('/export', [\App\Http\Controllers\V2\Admin\OwnershipTransferController::class, 'export'])->name('export');
 
         Route::post(
             '/release',

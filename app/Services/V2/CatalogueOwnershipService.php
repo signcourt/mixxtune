@@ -451,7 +451,7 @@ class CatalogueOwnershipService
         );
     }
 
-    public function transferRelease(
+    private function doTransferRelease(
         int $releaseId,
         string $ownerType,
         int $ownerId,
@@ -568,25 +568,7 @@ class CatalogueOwnershipService
         }
 
         if ($scope === 'pending_and_future') {
-            $protectedRowIds = DB::table(
-                'royalty_allocations as ra'
-            )
-                ->join(
-                    'royalty_statements as rs',
-                    'rs.id',
-                    '=',
-                    'ra.royalty_statement_id'
-                )
-                ->whereIn(
-                    'rs.status',
-                    [
-                        'approved',
-                        'available',
-                        'paid',
-                    ]
-                )
-                ->pluck('ra.report_row_id');
-
+            /* W56: only this release's rows; rows in approved / paid statements never move */
             $this->applyFinancialSnapshotLock(
                     DB::table('report_rows')
                 )
@@ -594,14 +576,7 @@ class CatalogueOwnershipService
                     'release_id',
                     $releaseId
                 )
-                ->when(
-                    $protectedRowIds->isNotEmpty(),
-                    fn ($query) =>
-                        $query->whereNotIn(
-                            'id',
-                            $protectedRowIds
-                        )
-                )
+                ->whereNotExists($this->paidAllocation())
                 ->update([
                     'artist_id' =>
                         $newArtistId,
@@ -692,7 +667,7 @@ class CatalogueOwnershipService
         ]);
     }
 
-    public function transferTrack(
+    private function doTransferTrack(
         int $trackId,
         int $newReleaseId,
         string $scope,
@@ -719,11 +694,31 @@ class CatalogueOwnershipService
         $oldReleaseId =
             (int) $track->release_id;
 
+        /* W56: the target release may already use this track number - put it at the end instead of failing */
+        $disc = (int) ($track->disc_number ?? 1) ?: 1;
+        $newNumber = (int) $track->track_number;
+        $clash = DB::table('tracks')
+            ->where('release_id', $newReleaseId)
+            ->where('id', '!=', $trackId)
+            ->where('disc_number', $track->disc_number)
+            ->where('track_number', $track->track_number)
+            ->exists();
+
+        if ($clash) {
+            $newNumber = (int) DB::table('tracks')
+                ->where('release_id', $newReleaseId)
+                ->where('disc_number', $track->disc_number)
+                ->max('track_number') + 1;
+        }
+
         DB::table('tracks')
             ->where('id', $trackId)
             ->update([
                 'release_id' =>
                     $newReleaseId,
+
+                'track_number' =>
+                    $newNumber,
 
                 'updated_at' =>
                     now(),
@@ -739,29 +734,7 @@ class CatalogueOwnershipService
                     DB::table('report_rows')
                 )
                 ->where('track_id', $trackId)
-                ->whereNotIn(
-                    'id',
-                    DB::table(
-                        'royalty_allocations as ra'
-                    )
-                        ->join(
-                            'royalty_statements as rs',
-                            'rs.id',
-                            '=',
-                            'ra.royalty_statement_id'
-                        )
-                        ->whereIn(
-                            'rs.status',
-                            [
-                                'approved',
-                                'available',
-                                'paid',
-                            ]
-                        )
-                        ->pluck(
-                            'ra.report_row_id'
-                        )
-                )
+                ->whereNotExists($this->paidAllocation())
                 ->update([
                     'release_id' =>
                         $newReleaseId,
@@ -817,11 +790,20 @@ class CatalogueOwnershipService
             'old_values' => [
                 'release_id' =>
                     $oldReleaseId,
+
+                'track_number' =>
+                    (int) $track->track_number,
             ],
 
             'new_values' => [
                 'release_id' =>
                     $newReleaseId,
+
+                'track_number' =>
+                    $newNumber,
+
+                'disc_number' =>
+                    $disc,
             ],
 
             'transferred_by' =>
@@ -829,7 +811,7 @@ class CatalogueOwnershipService
         ]);
     }
 
-    public function transferLabelUser(
+    private function doTransferLabelUser(
         int $labelId,
         int $newUserId,
         ?string $reason,
@@ -904,7 +886,7 @@ class CatalogueOwnershipService
         ]);
     }
 
-    public function transferArtistUser(
+    private function doTransferArtistUser(
         int $artistId,
         int $newUserId,
         ?string $reason,
@@ -977,6 +959,152 @@ class CatalogueOwnershipService
             'transferred_by' =>
                 $adminId,
         ]);
+    }
+
+    /*
+     * W56 MIXXTUNE_OWNERSHIP_SAFE_V1
+     *
+     * Every transfer runs in one transaction with the entity row locked,
+     * refuses a transfer to the current owner / to a login of the wrong
+     * kind, and afterwards recalculates pending-review earnings with the
+     * new owner's % (rows of approved / published reports never change).
+     */
+    private function paidAllocation(): \Closure
+    {
+        return function ($sub) {
+            $sub->selectRaw('1')
+                ->from('royalty_allocations as ra_lock')
+                ->join('royalty_statements as rs_lock', 'rs_lock.id', '=', 'ra_lock.royalty_statement_id')
+                ->whereColumn('ra_lock.report_row_id', 'report_rows.id')
+                ->whereIn('rs_lock.status', ['approved', 'available', 'paid']);
+        };
+    }
+
+    private function lockRow(string $table, int $id, string $field, string $what): object
+    {
+        $row = DB::table($table)->where('id', $id)->whereNull('deleted_at')->lockForUpdate()->first();
+
+        if (!$row) {
+            throw ValidationException::withMessages([$field => $what.' not found.']);
+        }
+
+        return $row;
+    }
+
+    private function activeLogin(int $userId, string $role, string $field): object
+    {
+        $user = DB::table('users')->where('id', $userId)->first();
+
+        if (!$user) {
+            throw ValidationException::withMessages([$field => 'User not found.']);
+        }
+
+        if ((string) $user->role !== $role) {
+            throw ValidationException::withMessages([
+                $field => 'Choose a '.$role.' login. '.$user->email.' is a '.str_replace('_', ' ', (string) $user->role).' account.',
+            ]);
+        }
+
+        if (($user->account_status ?? 'active') !== 'active') {
+            throw ValidationException::withMessages([
+                $field => $user->email.' is '.($user->account_status ?: 'not active').'. Only an active login can take over.',
+            ]);
+        }
+
+        return $user;
+    }
+
+    private function recalculate(?int $labelId, ?int $artistId): ?string
+    {
+        try {
+            $service = app(ReportEarningsRecalculationService::class);
+
+            if ($labelId) {
+                $label = \App\Models\Core\Label::query()->find($labelId);
+                if ($label) {
+                    $service->recalculateForLabel($label);
+                }
+            } elseif ($artistId) {
+                $artist = \App\Models\Core\Artist::query()->find($artistId);
+                if ($artist) {
+                    $service->recalculateForArtist($artist);
+                }
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return $exception->getMessage();
+        }
+
+        return null;
+    }
+
+    public function transferRelease(int $releaseId, string $ownerType, int $ownerId, string $scope, ?string $reason, int $adminId): void
+    {
+        DB::transaction(function () use ($releaseId, $ownerType, $ownerId, $scope, $reason, $adminId) {
+            $release = $this->lockRow('releases', $releaseId, 'release_id', 'Release');
+
+            if (
+                ($ownerType === 'label' && (int) $release->label_id === $ownerId)
+                || ($ownerType === 'artist' && empty($release->label_id) && (int) $release->artist_id === $ownerId)
+            ) {
+                throw ValidationException::withMessages(['owner_id' => 'This release already belongs to that '.$ownerType.'. Nothing to change.']);
+            }
+
+            $this->doTransferRelease($releaseId, $ownerType, $ownerId, $scope, $reason, $adminId);
+        });
+
+        if ($scope === 'pending_and_future') {
+            $this->recalculate($ownerType === 'label' ? $ownerId : null, $ownerType === 'artist' ? $ownerId : null);
+        }
+    }
+
+    public function transferTrack(int $trackId, int $newReleaseId, string $scope, ?string $reason, int $adminId): void
+    {
+        $target = null;
+
+        DB::transaction(function () use ($trackId, $newReleaseId, $scope, $reason, $adminId, &$target) {
+            $track = $this->lockRow('tracks', $trackId, 'track_id', 'Track');
+            $target = $this->lockRow('releases', $newReleaseId, 'release_id', 'Target release');
+
+            if ((int) $track->release_id === $newReleaseId) {
+                throw ValidationException::withMessages(['release_id' => 'The track is already on that release.']);
+            }
+
+            $this->doTransferTrack($trackId, $newReleaseId, $scope, $reason, $adminId);
+        });
+
+        if ($scope === 'pending_and_future' && $target) {
+            $this->recalculate($target->label_id ? (int) $target->label_id : null, $target->label_id ? null : (int) $target->artist_id);
+        }
+    }
+
+    public function transferLabelUser(int $labelId, int $newUserId, ?string $reason, int $adminId): void
+    {
+        DB::transaction(function () use ($labelId, $newUserId, $reason, $adminId) {
+            $label = $this->lockRow('labels', $labelId, 'label_id', 'Label');
+            $this->activeLogin($newUserId, 'label', 'user_id');
+
+            if ((int) $label->user_id === $newUserId) {
+                throw ValidationException::withMessages(['user_id' => 'That login already owns this label.']);
+            }
+
+            $this->doTransferLabelUser($labelId, $newUserId, $reason, $adminId);
+        });
+    }
+
+    public function transferArtistUser(int $artistId, int $newUserId, ?string $reason, int $adminId): void
+    {
+        DB::transaction(function () use ($artistId, $newUserId, $reason, $adminId) {
+            $artist = $this->lockRow('artists', $artistId, 'artist_id', 'Artist');
+            $this->activeLogin($newUserId, 'artist', 'user_id');
+
+            if ((int) $artist->user_id === $newUserId) {
+                throw ValidationException::withMessages(['user_id' => 'That login already belongs to this artist.']);
+            }
+
+            $this->doTransferArtistUser($artistId, $newUserId, $reason, $adminId);
+        });
     }
 
     private function persistentRule(

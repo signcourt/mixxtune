@@ -119,6 +119,23 @@ class ImportLegacyCatalogueJob implements ShouldQueue
     public function failed(
         ?Throwable $exception
     ): void {
+        /*
+         * W56: the database queue can hand a long job out a second time
+         * (retry_after shorter than the run). That second copy "fails" with
+         * MaxAttemptsExceeded while the first run is still working - it
+         * must not mark the import failed under the running copy.
+         */
+        if (
+            $exception instanceof \Illuminate\Queue\MaxAttemptsExceededException
+            && LegacyCatalogueImport::query()
+                ->whereKey($this->importId)
+                ->where('status', 'processing')
+                ->where('import_started_at', '>=', now()->subSeconds($this->timeout + 60))
+                ->exists()
+        ) {
+            return;
+        }
+
         LegacyCatalogueImport::query()
             ->whereKey($this->importId)
             ->whereNotIn(

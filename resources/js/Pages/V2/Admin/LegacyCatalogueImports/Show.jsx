@@ -1,4 +1,5 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -21,6 +22,22 @@ export default function Show({
 }) {
     const rows = catalogueImport?.rows ?? [];
 
+    /* W56: server messages, busy buttons, live status while the import runs */
+    const { flash = {}, errors = {} } = usePage().props;
+    const [busy, setBusy] = useState('');
+    const post = (key, url) => {
+        setBusy(key);
+        router.post(url, {}, { preserveScroll: true, onFinish: () => setBusy('') });
+    };
+    const running = ['queued', 'processing'].includes(catalogueImport?.status);
+    useEffect(() => {
+        if (!running) return undefined;
+        const t = window.setInterval(() => router.reload({ only: ['catalogueImport'] }), 5000);
+        return () => window.clearInterval(t);
+    }, [running]);
+    const canApprove = ['validated', 'validated_with_blocks'].includes(catalogueImport?.status);
+    const errorList = Object.entries(errors).filter(([k]) => k !== 'action_otp');
+
     return (
         <PanelLayout
             role="super_admin"
@@ -30,6 +47,25 @@ export default function Show({
             <Head title="Legacy Catalogue Preview" />
 
             <div className="space-y-6">
+                {flash.success && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-800">{flash.success}</div>}
+                {flash.error && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-800">{flash.error}</div>}
+                {errorList.length > 0 && (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm text-rose-800">
+                        {errorList.map(([k, v]) => <div key={k}>{v}</div>)}
+                    </div>
+                )}
+                {running && (
+                    <div className="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-800">
+                        Import is {catalogueImport.status} in the background… this page refreshes by itself every 5 seconds.
+                    </div>
+                )}
+                {catalogueImport?.status === 'failed' && (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-800">
+                        <div className="font-bold">The import failed - nothing was added to the catalogue.</div>
+                        {catalogueImport.failure_message && <div className="mt-1 text-xs">{catalogueImport.failure_message}</div>}
+                    </div>
+                )}
+
                 <div>
                     <Link
                         href="/super-admin/legacy-catalogue-imports"
@@ -54,7 +90,7 @@ export default function Show({
                                 {catalogueImport.original_filename}
                             </h1>
                             <p className="mt-2 text-sm text-slate-500">
-                                No live catalogue records are created from this preview page.
+                                Nothing is added to the live catalogue until you press "Import Now" at the bottom (a confirmation code is e-mailed first).
                             </p>
                         </div>
                     </div>
@@ -100,18 +136,11 @@ export default function Show({
 
                         <button
                             type="button"
-                            onClick={() =>
-                                router.post(
-                                    `/super-admin/legacy-catalogue-imports/${catalogueImport.id}/dry-run`,
-                                    {},
-                                    {
-                                        preserveScroll: true,
-                                    }
-                                )
-                            }
-                            className="inline-flex w-fit items-center justify-center rounded-2xl bg-blue-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-800"
+                            disabled={!!busy}
+                            onClick={() => post('dry', `/super-admin/legacy-catalogue-imports/${catalogueImport.id}/dry-run`)}
+                            className="inline-flex w-fit items-center justify-center rounded-2xl bg-blue-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-800 disabled:opacity-50"
                         >
-                            Run Final Dry Run
+                            {busy === 'dry' ? 'Checking…' : 'Run Final Dry Run'}
                         </button>
                     </div>
 
@@ -239,18 +268,14 @@ export default function Show({
                                         'Create missing catalogue-only Labels and Artists? No releases or tracks will be imported.'
                                     )
                                 ) {
-                                    router.post(
-                                        `/super-admin/legacy-catalogue-imports/${catalogueImport.id}/approve-entities`,
-                                        {},
-                                        {
-                                            preserveScroll: true,
-                                        }
-                                    );
+                                    post('approve', `/super-admin/legacy-catalogue-imports/${catalogueImport.id}/approve-entities`);
                                 }
                             }}
-                            className="inline-flex w-fit items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+                            disabled={!!busy || !canApprove}
+                            title={canApprove ? undefined : 'Only for a validated file'}
+                            className="inline-flex w-fit items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                            Approve Missing Entities
+                            {busy === 'approve' ? 'Working…' : 'Approve Missing Entities'}
                         </button>
                     </div>
                 </section>
@@ -292,6 +317,7 @@ export default function Show({
                         <button
                             type="button"
                             disabled={
+                                !!busy ||
                                 catalogueImport.status !== 'validated' ||
                                 Number(catalogueImport.blocked_rows ?? 0) > 0 ||
                                 Number(catalogueImport.imported_rows ?? 0) > 0
@@ -313,13 +339,7 @@ export default function Show({
                                     return;
                                 }
 
-                                router.post(
-                                    `/super-admin/legacy-catalogue-imports/${catalogueImport.id}/import`,
-                                    {},
-                                    {
-                                        preserveScroll: true,
-                                    }
-                                );
+                                post('import', `/super-admin/legacy-catalogue-imports/${catalogueImport.id}/import`);
                             }}
                             className="inline-flex w-fit shrink-0 items-center justify-center rounded-2xl bg-red-700 px-6 py-3 text-sm font-black text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                         >

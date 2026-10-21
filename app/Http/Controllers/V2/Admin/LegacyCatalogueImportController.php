@@ -55,10 +55,23 @@ class LegacyCatalogueImportController extends Controller
             ],
         ]);
 
-        $import = $service->stage(
-            $validated['catalogue_file'],
-            $request->user()
-        );
+        /* W56: a bad file (missing columns, unreadable) shows a message, not an error page */
+        try {
+            $import = $service->stage(
+                $validated['catalogue_file'],
+                $request->user()
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            report($e);
+
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'catalogue_file' => 'This file could not be read: '.mb_substr($e->getMessage(), 0, 300),
+            ]);
+        }
+
+        $this->audit('catalogue.legacy_file_uploaded', 'Legacy catalogue file uploaded: '.$import->original_filename.'.', ['import' => $import->public_id, 'rows' => $import->total_rows, 'blocked' => $import->blocked_rows]);
 
         return redirect()
             ->route(
@@ -96,14 +109,26 @@ class LegacyCatalogueImportController extends Controller
             $request->user()
         );
 
+        $this->audit('catalogue.legacy_entities_created', 'Legacy import '.$legacyCatalogueImport->public_id.': missing labels / artists created.', $result);
+
         return back()->with(
             'success',
             sprintf(
-                'Missing entities approved. Labels created: %d, Artists created: %d.',
+                'Missing labels / artists created. Labels: %d, artists: %d.%s',
                 $result['created_labels'],
-                $result['created_artists']
+                $result['created_artists'],
+                ($result['ambiguous'] ?? 0) > 0 ? ' '.$result['ambiguous'].' row(s) were blocked because the name matches more than one existing label / artist.' : ''
             )
         );
+    }
+
+    private function audit(string $action, string $description, array $values): void
+    {
+        try {
+            app(\App\Services\V2\AuditLogService::class)->record($action, 'catalogue', $description, [], $values, null, request());
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     public function import(
@@ -130,6 +155,13 @@ class LegacyCatalogueImportController extends Controller
                 'This catalogue has already been imported.'
             );
         }
+
+        /* W56: e-mailed code before releases / tracks are created in the live catalogue */
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            request()->user(),
+            'legacy.import:'.$legacyCatalogueImport->id,
+            'import '.$legacyCatalogueImport->total_rows.' legacy catalogue row(s) into the live catalogue'
+        );
 
         try {
             $claimed = \Illuminate\Support\Facades\DB::transaction(
@@ -191,6 +223,8 @@ class LegacyCatalogueImportController extends Controller
 
                 throw $dispatchException;
             }
+
+            $this->audit('catalogue.legacy_import_queued', 'Legacy catalogue import '.$legacyCatalogueImport->public_id.' queued ('.$legacyCatalogueImport->total_rows.' rows).', ['import' => $legacyCatalogueImport->public_id]);
 
             return redirect()
                 ->route(

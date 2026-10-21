@@ -509,6 +509,22 @@ class LegacyCatalogueImportService
                 $errors[] =
                     "UPC already exists in catalogue: {$upc}";
             }
+
+            /*
+             * W56: this importer makes one release per row and a UPC
+             * can belong to one release only - a second row with the
+             * same UPC would stop the whole import at the very end.
+             */
+            $duplicateUpc =
+                LegacyCatalogueImportRow::query()
+                    ->where('legacy_catalogue_import_id', $importId)
+                    ->where('upc', $upc)
+                    ->exists();
+
+            if ($duplicateUpc) {
+                $errors[] =
+                    "UPC {$upc} is used on more than one row of this file. This import makes one release per row; give each row its own UPC (or leave it empty).";
+            }
         }
 
         $artworkFilename = trim(
@@ -889,14 +905,23 @@ class LegacyCatalogueImportService
         LegacyCatalogueImport $import,
         $user
     ): array {
+        /* W56: only a validated file, and never twice into an imported one */
+        if (!in_array((string) $import->status, ['validated', 'validated_with_blocks'], true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'approve' => 'Missing labels / artists can only be created for a validated file (this one is '.$import->status.').',
+            ]);
+        }
+
         $createdLabels = 0;
         $createdArtists = 0;
+        $ambiguous = 0;
 
         DB::transaction(function () use (
             $import,
             $user,
             &$createdLabels,
-            &$createdArtists
+            &$createdArtists,
+            &$ambiguous
         ) {
             $rows = $import->rows()
                 ->orderBy('row_number')
@@ -914,6 +939,22 @@ class LegacyCatalogueImportService
                 $labelId = $this->resolveLabelId(
                     $row->label_name
                 );
+
+                /*
+                 * W56: a name that matches 2+ existing labels is never
+                 * guessed and never created again (that made duplicates
+                 * on every click). The row is blocked with a clear reason.
+                 */
+                if (!$labelId && $this->labelMatchCount($row->label_name) > 1) {
+                    $row->validation_errors = array_values(array_unique(array_merge(
+                        $row->validation_errors ?? [],
+                        ['Label name "'.$row->label_name.'" matches more than one existing label. Rename it in the file to the exact label.']
+                    )));
+                    $row->save();
+                    $ambiguous++;
+
+                    continue;
+                }
 
                 if (!$labelId) {
                     $label = $this->createCatalogueOnlyLabel(
@@ -944,6 +985,17 @@ class LegacyCatalogueImportService
                     $row->primary_artist,
                     (int) $row->resolved_label_id
                 );
+
+                if (!$artistId && $this->artistMatchCount($row->primary_artist, (int) $row->resolved_label_id) > 1) {
+                    $row->validation_errors = array_values(array_unique(array_merge(
+                        $row->validation_errors ?? [],
+                        ['Artist "'.$row->primary_artist.'" matches more than one artist of this label. Use the exact artist name.']
+                    )));
+                    $row->save();
+                    $ambiguous++;
+
+                    continue;
+                }
 
                 if (!$artistId) {
                     $artist =
@@ -1032,7 +1084,24 @@ class LegacyCatalogueImportService
         return [
             'created_labels' => $createdLabels,
             'created_artists' => $createdArtists,
+            'ambiguous' => $ambiguous,
         ];
+    }
+
+    private function labelMatchCount(?string $name): int
+    {
+        $normalized = $this->normalizeEntityName($name);
+
+        return $normalized === '' ? 0 : Label::query()->whereNull('deleted_at')->get(['id', 'name'])
+            ->filter(fn (Label $label) => $this->normalizeEntityName($label->name) === $normalized)->count();
+    }
+
+    private function artistMatchCount(?string $name, int $labelId): int
+    {
+        $normalized = $this->normalizeEntityName($name);
+
+        return $normalized === '' ? 0 : Artist::query()->whereNull('deleted_at')->where('label_id', $labelId)->get(['id', 'stage_name'])
+            ->filter(fn (Artist $artist) => $this->normalizeEntityName($artist->stage_name) === $normalized)->count();
     }
 
     private function createCatalogueOnlyLabel(
@@ -1228,6 +1297,36 @@ class LegacyCatalogueImportService
                         'Invalid validation state at row '
                         .$row->row_number
                     );
+                }
+            }
+
+            /*
+             * W56: catalogue may have changed since validation (another
+             * file imported, a release added by hand). Check again so the
+             * same song is never created twice.
+             */
+            foreach ($rows as $row) {
+                $isrc = trim((string) ($row->isrc ?? ''));
+                $upc = trim((string) ($row->upc ?? ''));
+
+                if ($isrc !== '' && Track::query()->where('isrc', $isrc)->exists()) {
+                    throw new \RuntimeException('Row '.$row->row_number.': ISRC '.$isrc.' is already in the catalogue (added after this file was checked). Nothing was imported - upload the file again so it is re-checked.');
+                }
+
+                if ($upc !== '' && Release::query()->where('upc', $upc)->exists()) {
+                    throw new \RuntimeException('Row '.$row->row_number.': UPC '.$upc.' is already in the catalogue (added after this file was checked). Nothing was imported - upload the file again so it is re-checked.');
+                }
+
+                if ($isrc === '' && $upc === '') {
+                    $same = Release::query()
+                        ->where('title', trim((string) $row->release_title))
+                        ->where('primary_artist_name', trim((string) $row->primary_artist))
+                        ->where('label_id', $row->resolved_label_id)
+                        ->exists();
+
+                    if ($same) {
+                        throw new \RuntimeException('Row '.$row->row_number.': a release "'.trim((string) $row->release_title).'" by '.trim((string) $row->primary_artist).' already exists on this label (no ISRC / UPC to tell them apart). Nothing was imported - remove the row or add its ISRC / UPC.');
+                    }
                 }
             }
 
