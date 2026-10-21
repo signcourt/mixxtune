@@ -97,7 +97,7 @@ class FinancialAdjustmentInertiaTest extends TestCase
                         )
                         ->has('adjustments')
                         ->has('adjustments.data')
-                        ->has('accounts')
+                        ->has('filters')
                         ->has('summary')
                         ->where(
                             'summary.credits',
@@ -114,16 +114,6 @@ class FinancialAdjustmentInertiaTest extends TestCase
                         ->where(
                             'summary.reversed',
                             0
-                        )
-                        ->where(
-                            'accounts',
-                            fn ($accounts) =>
-                                collect($accounts)
-                                    ->contains(
-                                        fn ($account) =>
-                                            (int) $account['id']
-                                                === $artist->id
-                                    )
                         )
             );
     }

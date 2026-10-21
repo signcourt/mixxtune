@@ -2939,6 +2939,10 @@ Route::middleware([
                 'reverse',
             ]
         )->name('reverse');
+
+        /* MIXXTUNE_ADJUSTMENTS_V2 */
+        Route::get('/owners', [\App\Http\Controllers\V3\SuperAdmin\FinancialAdjustmentController::class, 'owners'])->name('owners');
+        Route::get('/export', [\App\Http\Controllers\V3\SuperAdmin\FinancialAdjustmentController::class, 'export'])->name('export');
     });
 
 /*

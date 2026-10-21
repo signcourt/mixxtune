@@ -42,6 +42,8 @@ class StoreFinancialAdjustmentRequest extends FormRequest
                 'gt:0',
             ],
 
+            'notify_owner' => ['nullable', 'boolean'], /* MIXXTUNE_ADJUSTMENTS_V2 */
+
             'reason' => [
                 'required',
                 'string',

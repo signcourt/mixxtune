@@ -15,6 +15,8 @@ class ReverseFinancialAdjustmentRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'notify_owner' => ['nullable', 'boolean'], /* MIXXTUNE_ADJUSTMENTS_V2 */
+
             'reason' => [
                 'required',
                 'string',

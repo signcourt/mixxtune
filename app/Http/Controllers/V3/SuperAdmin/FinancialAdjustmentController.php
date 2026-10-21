@@ -23,94 +23,163 @@ class FinancialAdjustmentController extends Controller
     ) {
     }
 
-    public function index(): Response
+    /*
+     * MIXXTUNE_ADJUSTMENTS_V2
+     * - summary counted only on live adjustments (before: a reversal showed
+     *   up as a "posted debit", so a credit + its reversal looked like -₹1);
+     * - filters, search, CSV; owners found by search (before: a dropdown
+     *   limited to the first 500 owners A–Z, the rest could not be chosen);
+     * - the owner's wallet balance is shown before posting.
+     */
+    private function filtered(\Illuminate\Http\Request $request)
     {
-        $adjustments =
-            FinancialAdjustment::query()
-                ->with([
-                    'user:id,name,email,role',
-                    'walletTransaction:id,transaction_type,direction,amount,currency,balance_before,balance_after',
-                    'creator:id,name,email',
-                    'reversedBy:id,name,email',
-                    'reversalOf:id,adjustment_number,direction,amount,status',
-                ])
-                ->orderByDesc('id')
-                ->paginate(50)
-                ->withQueryString();
+        $q = FinancialAdjustment::query();
 
-        $accounts = DB::table('users')
-            ->whereIn(
-                'role',
-                [
-                    'label',
-                    'artist',
-                ]
-            )
-            ->select([
-                'id',
-                'name',
-                'email',
-                'role',
+        $search = trim((string) $request->query('search', ''));
+        if ($search !== '') {
+            $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
+            $q->where(fn ($w) => $w->where('adjustment_number', 'like', $like)
+                ->orWhere('reference_number', 'like', $like)
+                ->orWhere('reason', 'like', $like)
+                ->orWhereHas('user', fn ($u) => $u->where('name', 'like', $like)->orWhere('email', 'like', $like)->orWhere('client_id', 'like', $like)));
+        }
+
+        if (in_array($request->query('direction'), ['credit', 'debit'], true)) {
+            $q->where('direction', $request->query('direction'));
+        }
+
+        match ((string) $request->query('show', '')) {
+            'active' => $q->where('status', 'posted')->whereNull('reversal_of_id'),
+            'reversed' => $q->where('status', 'reversed'),
+            'reversals' => $q->whereNotNull('reversal_of_id'),
+            default => null,
+        };
+
+        $month = (string) $request->query('month', '');
+        if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $q->where('created_at', 'like', $month.'%');
+        }
+
+        return $q;
+    }
+
+    public function index(\Illuminate\Http\Request $request): Response
+    {
+        $adjustments = $this->filtered($request)
+            ->with([
+                'user:id,name,email,role',
+                'walletTransaction:id,transaction_type,direction,amount,currency,balance_before,balance_after',
+                'creator:id,name,email',
+                'reversedBy:id,name,email',
+                'reversalOf:id,adjustment_number,direction,amount,status',
             ])
-            ->orderBy('name')
-            ->limit(500)
-            ->get();
+            ->orderByDesc('id')
+            ->paginate(50)
+            ->withQueryString();
+
+        $live = fn () => FinancialAdjustment::query()->where('status', 'posted')->whereNull('reversal_of_id');
+
+        $credits = (float) $live()->where('direction', 'credit')->sum('amount');
+        $debits = (float) $live()->where('direction', 'debit')->sum('amount');
 
         $summary = [
-            'credits' =>
-                (float) FinancialAdjustment::query()
-                    ->where(
-                        'status',
-                        'posted'
-                    )
-                    ->where(
-                        'direction',
-                        'credit'
-                    )
-                    ->sum('amount'),
-
-            'debits' =>
-                (float) FinancialAdjustment::query()
-                    ->where(
-                        'status',
-                        'posted'
-                    )
-                    ->where(
-                        'direction',
-                        'debit'
-                    )
-                    ->sum('amount'),
-
-            'posted' =>
-                FinancialAdjustment::query()
-                    ->where(
-                        'status',
-                        'posted'
-                    )
-                    ->count(),
-
-            'reversed' =>
-                FinancialAdjustment::query()
-                    ->where(
-                        'status',
-                        'reversed'
-                    )
-                    ->count(),
+            'credits' => $credits,
+            'debits' => $debits,
+            'net' => round($credits - $debits, 2),
+            'posted' => $live()->count(),
+            'reversed' => FinancialAdjustment::query()->where('status', 'reversed')->count(),
+            'reversals' => FinancialAdjustment::query()->whereNotNull('reversal_of_id')->count(),
         ];
 
         return Inertia::render(
             'V3/SuperAdmin/Adjustments/Index',
             [
-                'adjustments' =>
-                    $adjustments,
-
-                'accounts' =>
-                    $accounts,
-
-                'summary' =>
-                    $summary,
+                'adjustments' => $adjustments,
+                'summary' => $summary,
+                'filters' => [
+                    'search' => (string) $request->query('search', ''),
+                    'direction' => (string) $request->query('direction', ''),
+                    'show' => (string) $request->query('show', ''),
+                    'month' => (string) $request->query('month', ''),
+                ],
             ]
         );
+    }
+
+    /** Owners (labels / artists) by name, e-mail or client ID, with their wallet balance. */
+    public function owners(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+
+        if (mb_strlen($q) < 2) {
+            return response()->json(['owners' => []]);
+        }
+
+        $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $q).'%';
+
+        $owners = DB::table('users')
+            ->whereIn('role', ['label', 'artist'])
+            ->where(fn ($w) => $w->where('name', 'like', $like)->orWhere('email', 'like', $like)->orWhere('client_id', 'like', $like))
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name', 'email', 'role', 'client_id']);
+
+        $balances = DB::table('wallets')->whereIn('user_id', $owners->pluck('id'))
+            ->groupBy('user_id')
+            ->select('user_id', DB::raw('SUM(available_balance) as available'), DB::raw('SUM(pending_balance) as pending'))
+            ->get()->keyBy('user_id');
+
+        return response()->json([
+            'owners' => $owners->map(fn ($o) => [
+                'id' => $o->id,
+                'name' => $o->name,
+                'email' => $o->email,
+                'role' => $o->role,
+                'client_id' => $o->client_id,
+                'available' => round((float) ($balances[$o->id]->available ?? 0), 2),
+                'pending' => round((float) ($balances[$o->id]->pending ?? 0), 2),
+            ])->values(),
+        ]);
+    }
+
+    public function export(\Illuminate\Http\Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $rows = $this->filtered($request)->with(['user:id,name,email,role', 'creator:id,name', 'walletTransaction:id,balance_before,balance_after'])->orderByDesc('id');
+
+        FinanceAudit::log('finance.adjustments_exported', 'Adjustment history exported (CSV).', ['filters' => $request->only(['search', 'direction', 'show', 'month'])]);
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['Adjustment', 'Date', 'Owner', 'E-mail', 'Role', 'Direction', 'Amount', 'Currency', 'Balance before', 'Balance after', 'Status', 'Reversal of', 'Reason', 'Reference', 'Posted by']);
+            $rows->chunk(500, function ($chunk) use ($out) {
+                foreach ($chunk as $a) {
+                    fputcsv($out, [
+                        $a->adjustment_number,
+                        $a->created_at?->copy()->timezone('Asia/Kolkata')->format('Y-m-d H:i'),
+                        $a->user?->name, $a->user?->email, $a->user?->role,
+                        $a->direction, number_format((float) $a->amount, 2, '.', ''), $a->currency ?? 'INR',
+                        $a->walletTransaction?->balance_before, $a->walletTransaction?->balance_after,
+                        $a->status, $a->reversal_of_id ? 'yes' : '', $a->reason, $a->reference_number, $a->creator?->name,
+                    ]);
+                }
+            });
+            fclose($out);
+        }, 'wallet-adjustments-'.now()->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /* MIXXTUNE_ADJUSTMENTS_V2: panel notice to the owner (switch on the form) */
+    private function tellOwner(?User $owner, string $title, string $message): void
+    {
+        if (!$owner) {
+            return;
+        }
+
+        try {
+            app(\App\Services\V2\PanelNotificationService::class)->send($owner, 'wallet.adjusted', $title, $message, '/v2/wallet');
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     public function store(
@@ -190,9 +259,18 @@ class FinancialAdjustmentController extends Controller
             $adjustment instanceof FinancialAdjustment ? $adjustment : $user
         );
 
+        if ($request->boolean('notify_owner', true)) {
+            $this->tellOwner(
+                $user,
+                $data['direction'] === 'credit' ? 'Money added to your wallet' : 'Money deducted from your wallet',
+                ($data['direction'] === 'credit' ? '₹'.number_format((float) $data['amount'], 2).' was added to' : '₹'.number_format((float) $data['amount'], 2).' was deducted from')
+                    .' your wallet. Reason: '.$data['reason']
+            );
+        }
+
         return back()->with(
             'success',
-            'Financial adjustment posted.'
+            'Financial adjustment posted'.($request->boolean('notify_owner', true) ? ' and the owner was told.' : '.')
         );
     }
 
@@ -221,6 +299,14 @@ class FinancialAdjustmentController extends Controller
             $adjustment,
             $before
         );
+
+        if ($request->boolean('notify_owner')) {
+            $this->tellOwner(
+                $adjustment->user,
+                'Wallet correction',
+                'An earlier '.$adjustment->direction.' of ₹'.number_format((float) $adjustment->amount, 2).' to your wallet was reversed. Reason: '.$request->validated()['reason']
+            );
+        }
 
         return back()->with(
             'success',
