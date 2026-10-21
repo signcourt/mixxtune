@@ -95,4 +95,34 @@ class StatementsReviewTest extends TestCase
             ->has('statements.data', 1)
             ->where('summary.net', 850));
     }
+
+    /* W45: where each monthly report is on its way to statements */
+    public function test_staff_see_report_pipeline_steps(): void
+    {
+        $super = $this->user('super_admin');
+        $mk = fn (array $x) => \Illuminate\Support\Facades\DB::table('report_imports')->insert(array_merge([
+            'public_id' => (string) Str::ulid(), 'original_filename' => 'report.csv', 'stored_path' => 'x',
+            'status' => 'completed', 'total_rows' => 100, 'reporting_month' => '2026-07-01',
+            'created_at' => now(), 'updated_at' => now(),
+        ], $x));
+
+        $mk(['financial_status' => 'review_pending', 'review_unmapped_rows' => 7]);
+        $mk(['financial_status' => 'approved_scheduled', 'publish_at' => now()->subDay()]);
+        $mk(['financial_status' => 'approved_scheduled', 'publish_at' => now()->addDay()]);
+        $mk(['financial_status' => 'published', 'published_at' => now()]);
+        $mk(['status' => 'failed']);
+
+        $this->actingAs($super)->get('/v2/admin/statements')->assertInertia(fn (Assert $p) => $p
+            ->has('pipeline', 5)
+            ->where('pipeline.0.step', 'failed')
+            ->where('pipeline.1.step', 'published')
+            ->where('pipeline.2.step', 'scheduled')
+            ->where('pipeline.3.step', 'late')
+            ->where('pipeline.4.step', 'review')
+            ->where('pipeline.4.unmapped', 7)
+            ->where('pipeline.4.month', 'July 2026'));
+
+        $owner = $this->user('artist');
+        $this->actingAs($owner)->get('/v2/statements')->assertInertia(fn (Assert $p) => $p->where('pipeline', []));
+    }
 }

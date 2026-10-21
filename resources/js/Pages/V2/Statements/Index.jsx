@@ -38,7 +38,7 @@ const STATUS = {
     cancelled: ["Cancelled", "bg-rose-50 text-rose-700"],
 };
 
-export default function Index({ role = "artist", statements = {}, filters = {}, summary = {}, months = [] }) {
+export default function Index({ role = "artist", statements = {}, filters = {}, summary = {}, months = [], pipeline = [] }) {
     const page = usePage().props;
     const flash = page.flash ?? {};
     const errors = page.errors ?? {};
@@ -104,6 +104,8 @@ export default function Index({ role = "artist", statements = {}, filters = {}, 
                 </button>
             )}
 
+            {staff && pipeline.length > 0 && <Pipeline items={pipeline} />}
+
             <section className="mt-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-2 border-b border-slate-100 p-3 lg:flex-row lg:items-center">
                     <div className="relative min-w-0 flex-1">
@@ -139,11 +141,11 @@ export default function Index({ role = "artist", statements = {}, filters = {}, 
                             {filtered
                                 ? "Clear the filters to see every statement."
                                 : staff
-                                  ? "Statements are made when a monthly sales report is imported and published (Finance → Revenue Imports), or with \"Generate statements\" on Finance & Royalties."
+                                  ? "Statements are made when a monthly sales report is uploaded, reviewed, approved and published (Financial → Revenue Imports). See \"Monthly reports → statements\" above for where each report is."
                                   : "Your statement appears here after the monthly store report is processed and approved."}
                         </div>
                         {!filtered && staff && (
-                            <Link href="/v2/admin/finance" className="mt-3 inline-flex h-9 items-center rounded-lg bg-violet-600 px-4 text-xs font-semibold text-white">Open Finance & Royalties</Link>
+                            <Link href="/v2/admin/reports/imports" className="mt-3 inline-flex h-9 items-center rounded-lg bg-violet-600 px-4 text-xs font-semibold text-white">Open Revenue Imports</Link>
                         )}
                     </div>
                 ) : (
@@ -227,5 +229,66 @@ function Stat({ label, value, tone = "text-slate-900", hint }) {
             <div className={`mt-1 text-xl font-black ${tone}`}>{value}</div>
             {hint && <div className="text-xs text-slate-500">{hint}</div>}
         </div>
+    );
+}
+
+/* MIXXTUNE_STATEMENTS_V2 (W45): monthly report -> statements, step by step */
+const STEPS = [
+    ["importing", "Import"],
+    ["review", "Review"],
+    ["scheduled", "Approved"],
+    ["published", "Published"],
+];
+const STEP_TONE = {
+    importing: "bg-slate-100 text-slate-700",
+    review: "bg-amber-50 text-amber-800",
+    scheduled: "bg-blue-50 text-blue-700",
+    late: "bg-red-50 text-red-700",
+    published: "bg-emerald-50 text-emerald-700",
+    failed: "bg-red-50 text-red-700",
+};
+
+function Pipeline({ items }) {
+    const waiting = items.filter((i) => ["review", "late", "failed"].includes(i.step)).length;
+    return (
+        <section className="mt-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
+                <h2 className="text-base font-semibold text-slate-900">Monthly reports → statements</h2>
+                <p className="text-xs text-slate-500">
+                    Statements are made only when a report is <b>published</b>. {waiting > 0 ? `${waiting} report(s) need you.` : "Nothing is waiting for you."}
+                </p>
+            </div>
+            <ul className="divide-y divide-slate-100">
+                {items.map((r) => {
+                    const at = r.step === "late" ? 2 : r.step === "failed" ? 0 : STEPS.findIndex(([k]) => k === r.step);
+                    return (
+                        <li key={r.id} className="flex flex-col gap-2 px-4 py-3 sm:px-5 lg:flex-row lg:items-center">
+                            <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-sm font-bold text-slate-900">{r.month ?? "No month"}</span>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STEP_TONE[r.step] ?? STEP_TONE.importing}`}>
+                                        {r.step === "late" ? "Publish overdue" : r.step === "failed" ? "Import failed" : STEPS[at]?.[1]}
+                                    </span>
+                                </div>
+                                <div className="truncate text-xs text-slate-500">
+                                    {r.file} · {Number(r.rows).toLocaleString("en-IN")} rows{r.unmapped > 0 ? ` · ${Number(r.unmapped).toLocaleString("en-IN")} unmapped` : ""}
+                                </div>
+                                <div className={`text-xs ${["late", "failed", "review"].includes(r.step) ? "font-semibold text-amber-800" : "text-slate-600"}`}>{r.todo}</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <ol className="hidden items-center gap-1 sm:flex">
+                                    {STEPS.map(([k, label], i) => (
+                                        <li key={k} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${i < at || r.step === "published" ? "bg-emerald-100 text-emerald-700" : i === at ? (r.step === "late" || r.step === "failed" ? "bg-red-100 text-red-700" : "bg-violet-100 text-violet-700") : "bg-slate-100 text-slate-400"}`}>
+                                            {label}
+                                        </li>
+                                    ))}
+                                </ol>
+                                <a href={r.url} className="inline-flex h-9 shrink-0 items-center rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white">Open report</a>
+                            </div>
+                        </li>
+                    );
+                })}
+            </ul>
+        </section>
     );
 }

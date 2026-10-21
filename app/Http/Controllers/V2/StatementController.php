@@ -147,8 +147,64 @@ class StatementController extends Controller
                 'summary' => $summary,
                 'months' => $months,
                 'statements' => $page,
+                'pipeline' => $staff ? $this->pipeline() : [],
             ]
         );
+    }
+
+    /*
+     * MIXXTUNE_STATEMENTS_V2 (W45): where each monthly report is on its way
+     * to statements (upload -> import -> review -> approve & schedule ->
+     * publish). Statements only exist after "published", so an empty page
+     * now says which step is waiting and links to it.
+     */
+    private function pipeline(): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('report_imports')) {
+            return [];
+        }
+
+        $hasFin = \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'financial_status');
+
+        return DB::table('report_imports')
+            ->orderByDesc('id')
+            ->limit(6)
+            ->get()
+            ->map(function ($r) use ($hasFin) {
+                $fin = $hasFin ? (string) ($r->financial_status ?? '') : '';
+                $publishAt = isset($r->publish_at) && $r->publish_at ? \Illuminate\Support\Carbon::parse($r->publish_at) : null;
+
+                if (in_array($r->status, ['queued', 'pending', 'processing'], true)) {
+                    [$step, $todo] = ['importing', 'The file is still being read. Refresh in a few minutes.'];
+                } elseif ($r->status === 'failed') {
+                    [$step, $todo] = ['failed', 'Import failed - open it, fix the file and upload again.'];
+                } elseif ($fin === 'published' || (isset($r->published_at) && $r->published_at)) {
+                    [$step, $todo] = ['published', 'Published - statements are made from this report.'];
+                } elseif ($fin === 'approved_scheduled') {
+                    $late = $publishAt && $publishAt->lt(now()->subMinutes(15));
+                    [$step, $todo] = $late
+                        ? ['late', 'Should have been published on '.$publishAt->timezone('Asia/Kolkata')->format('d M Y, h:i A').' - the automatic publisher (cron) may not be running.']
+                        : ['scheduled', 'Approved - publishes automatically'.($publishAt ? ' on '.$publishAt->timezone('Asia/Kolkata')->format('d M Y, h:i A') : '').'.'];
+                } else {
+                    [$step, $todo] = ['review', 'Waiting for your review: check unmapped rows, then "Approve & schedule".'];
+                }
+
+                $month = $r->reporting_month ?? null;
+
+                return [
+                    'id' => $r->id,
+                    'file' => $r->original_filename ?? ('Import #'.$r->id),
+                    'month' => $month ? \Illuminate\Support\Carbon::parse(strlen((string) $month) === 7 ? $month.'-01' : $month)->format('F Y') : null,
+                    'rows' => (int) ($r->total_rows ?? $r->review_row_count ?? 0),
+                    'unmapped' => (int) ($r->review_unmapped_rows ?? 0),
+                    'earnings' => isset($r->review_earnings) ? round((float) $r->review_earnings, 2) : null,
+                    'step' => $step,
+                    'todo' => $todo,
+                    'url' => '/v2/admin/reports/imports/'.$r->id.'/view',
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function download(
