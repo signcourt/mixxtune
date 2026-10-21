@@ -13,22 +13,16 @@ const wizardSteps = [
         mascotLabel: 'Recording vocals',
         mascotIcon: '🎙️',
     },
+    /* W64: the Stores step was removed */
     {
         number: 3,
-        title: 'Stores',
-        description: 'Choose where to distribute',
-        mascotLabel: 'Listening to the beat',
-        mascotIcon: '🎧',
-    },
-    {
-        number: 4,
         title: 'Territories',
-        description: 'Select your release territory',
+        description: 'Worldwide or chosen countries',
         mascotLabel: 'Planning worldwide delivery',
         mascotIcon: '🌍',
     },
     {
-        number: 5,
+        number: 4,
         title: 'Review & Publish',
         description: 'Review and publish your release',
         mascotLabel: 'Ready for launch',

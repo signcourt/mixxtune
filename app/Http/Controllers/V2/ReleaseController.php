@@ -1191,6 +1191,14 @@ class ReleaseController extends Controller
             $permissions
         );
 
+        /* W64: the Review step shows the label name (it said "Not provided" for admins) */
+        $release->setAttribute(
+            'label_name',
+            $release->label_id
+                ? Label::query()->whereKey($release->label_id)->value('name')
+                : null
+        );
+
         return Inertia::render(
             'V2/Releases/Create',
             [

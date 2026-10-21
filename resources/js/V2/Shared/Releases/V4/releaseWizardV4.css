@@ -2585,3 +2585,8 @@ summary {
         padding-right: 18px;
     }
 }
+
+/* W64: the Review step uses the full width (no empty side column) */
+.mixx-v4-step-grid.mixx-v4-step-grid--full {
+    grid-template-columns: minmax(0, 1fr);
+}

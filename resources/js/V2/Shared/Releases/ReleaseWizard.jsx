@@ -13,7 +13,7 @@ import ReleaseCoverArtCard from '@/V2/Shared/Releases/V4/ReleaseCoverArtCard';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import ReleaseDetailsStep from '@/V2/Shared/Releases/Steps/ReleaseDetailsStep';
 import TrackManager from '@/V2/Shared/Releases/Steps/TrackManager';
-import DistributionStep from '@/V2/Shared/Releases/Steps/DistributionStep';
+import TerritoryStep from '@/V2/Shared/Releases/Steps/TerritoryStep';
 import ReviewStep from '@/V2/Shared/Releases/Steps/ReviewStep';
 
 import {
@@ -27,6 +27,7 @@ const RELEASES_BASE_PATH =
         ? '/artist/releases'
         : '/v2/releases';
 
+/* W64: 4 steps - the Stores step was removed (all active stores are used) */
 const wizardSteps = [
     {
         id: 1,
@@ -38,17 +39,14 @@ const wizardSteps = [
     },
     {
         id: 3,
-        label: 'Stores',
+        label: 'Territories',
     },
     {
         id: 4,
-        label: 'Territory',
-    },
-    {
-        id: 5,
         label: 'Review & Publish',
     },
 ];
+const LAST_STEP = wizardSteps.length;
 
 const dateValue = (value) => {
     if (!value) return '';
@@ -84,7 +82,7 @@ export default function ReleaseWizard({
 
     const wizardStorageKey =
         typeof window !== 'undefined'
-            ? `mixxtune-release-wizard-step-${
+            ? `mixxtune-release-wizard4-step-${
                   release?.id ?? window.location.pathname
               }`
             : null;
@@ -106,7 +104,7 @@ export default function ReleaseWizard({
                 if (
                     Number.isInteger(parsedStep)
                     && parsedStep >= 1
-                    && parsedStep <= 5
+                    && parsedStep <= LAST_STEP
                 ) {
                     return parsedStep;
                 }
@@ -119,7 +117,7 @@ export default function ReleaseWizard({
 
         return Math.min(
             Math.max(step, 1),
-            5
+            LAST_STEP
         );
     });
 
@@ -131,10 +129,14 @@ export default function ReleaseWizard({
             return;
         }
 
-        window.sessionStorage.setItem(
-            wizardStorageKey,
-            String(currentStep)
-        );
+        try {
+            window.sessionStorage.setItem(
+                wizardStorageKey,
+                String(currentStep)
+            );
+        } catch (e) {
+            /* storage blocked */
+        }
     }, [
         currentStep,
         wizardStorageKey,
@@ -589,7 +591,7 @@ export default function ReleaseWizard({
                         data.completion_percentage
                         ?? 20
                     ),
-                    currentStep * 20
+                    Math.round(currentStep * 100 / LAST_STEP)
                 ),
         };
 
@@ -651,7 +653,7 @@ export default function ReleaseWizard({
         }
 
         setCurrentStep((step) =>
-            Math.min(step + 1, 5)
+            Math.min(step + 1, LAST_STEP)
         );
     };
 
@@ -695,13 +697,7 @@ saveState === 'saving'
 : ''
 }` }
                             style={{
-                                width: `${Math.max(
-                                    20,
-                                    Math.min(
-                                        currentStep * 20,
-                                        100
-                                    )
-                                )}%`,
+                                width: `${Math.round(currentStep * 100 / LAST_STEP)}%`,
                             }}
                         />
                     </div>
@@ -733,16 +729,13 @@ saveState === 'saving'
                                 </div>
 
                                 <p className="mt-1 text-xs font-medium text-slate-500 sm:text-sm">
-                                    Step {currentStep} of 5
+                                    Step {currentStep} of {LAST_STEP}
                                     {' · '}
                                     {wizardSteps[
                                         currentStep - 1
                                     ]?.label}
                                     {' · '}
-                                    {Math.min(
-                                        currentStep * 20,
-                                        100
-                                    )}% complete
+                                    {Math.round(currentStep * 100 / LAST_STEP)}% complete
                                 </p>
                             </div>
                         </div>
@@ -771,7 +764,7 @@ saveState === 'saving'
                             </span>
                         </div>
                         <p className="mt-1 text-sm leading-6 text-amber-800">
-                            You can change details, poster, UPC, tracks, ISRC, audio files and stores.
+                            You can change details, poster, UPC, tracks, ISRC, audio files and territories (stores: Distribution page).
                             Each save is written to the audit log and shows in All Catalogue at once.
                             The status does not change, and nothing is re-sent to the stores automatically.
                         </p>
@@ -790,7 +783,7 @@ saveState === 'saving'
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 <div className="min-h-[420px] p-6">
 
-                        <div className="mixx-v4-step-grid">
+                        <div className={`mixx-v4-step-grid ${currentStep === LAST_STEP ? 'mixx-v4-step-grid--full' : ''}`}>
                             <div className="mixx-v4-step-main">
                         {currentStep === 1 && (
                             <ReleaseDetailsStep
@@ -831,13 +824,11 @@ saveState === 'saving'
 
                         {currentStep === 3 && (
                             release?.id ? (
-                                <DistributionStep
+                                <TerritoryStep
                                     release={release}
                                     distributionStores={
                                         distributionStores
                                     }
-                                    mode="stores"
-                                    initialSection="stores"
                                     onMascotEvent={
                                         handleMascotEvent
                                     }
@@ -848,38 +839,13 @@ saveState === 'saving'
                                 />
                             ) : (
                                 <StepPlaceholder
-                                    title="Stores"
-                                    description="Save the release before selecting stores."
-                                />
-                            )
-                        )}
-
-                        {currentStep === 4 && (
-                            release?.id ? (
-                                <DistributionStep
-                                    release={release}
-                                    distributionStores={
-                                        distributionStores
-                                    }
-                                    mode="territory"
-                                    initialSection="territory"
-                                    onMascotEvent={
-                                        handleMascotEvent
-                                    }
-                                    onSaved={() => {
-                                        setMascotEvent(null);
-                                        setCurrentStep(5);
-                                    }}
-                                />
-                            ) : (
-                                <StepPlaceholder
                                     title="Territories"
                                     description="Save the release before selecting territories."
                                 />
                             )
                         )}
 
-                        {currentStep === 5 && (
+                        {currentStep === LAST_STEP && (
                             release?.id ? (
                                 <ReviewStep
                                     release={release}
@@ -914,7 +880,7 @@ saveState === 'saving'
                                     adminEdit={adminEdit}
                                 />
                             ) : (
-                                currentStep < 5 && (
+                                currentStep < LAST_STEP && (
                                     <ReleaseHelpfulTip
                                         currentStep={
                                             currentStep
@@ -968,7 +934,7 @@ function WizardTopActions({
     onSubmit,
 }) {
     const isLastStep =
-        currentStep === 5;
+        currentStep === LAST_STEP;
 
     return (
         <div className="flex items-center justify-end gap-3">

@@ -21,29 +21,19 @@ const tips = {
         ],
     },
 
+    /* W64: 3 = Territories (the Stores step was removed) */
     3: {
-        title: 'Helpful Tip',
-        text:
-            'Selecting more stores increases your fan reach and helps your music get discovered.',
-        items: [
-            'Add or remove stores before publishing',
-            'Some stores may take longer to go live',
-            'Earnings and reporting vary by store',
-        ],
-    },
-
-    4: {
         title: 'Helpful Tip',
         text:
             'Choosing the correct territories helps you reach the right audience and avoid restrictions.',
         items: [
             'Worldwide is recommended by default',
-            'You can exclude restricted countries',
-            'Territories can affect release dates',
+            'Untick a country to leave it out',
+            'All active stores are used automatically',
         ],
     },
 
-    5: {
+    4: {
         title: 'What happens next?',
         text:
             'After submission, the Mixx Tune team will review your release.',
