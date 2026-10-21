@@ -34,6 +34,7 @@ const defaultColumns = [
 
 function ReportTable({
     reports,
+    emptyHint = '',
     requested = false,
     onDelete,
     deletingId = null,
@@ -58,7 +59,7 @@ function ReportTable({
                 <div className="mt-1 text-sm text-slate-500">
                     {requested
                         ? 'Generate a report below and it will appear here.'
-                        : 'Automatic reports will appear here when available.'}
+                        : emptyHint || 'Automatic reports will appear here when available.'}
                 </div>
             </div>
         );
@@ -445,7 +446,10 @@ export default function ReportsIndex({
     months = [],
     hierarchyOptions = {},
     automaticReports = [],
+    unpublished = [],
 }) {
+    /* MIXXTUNE_REPORTS_V2 (W49) */
+    const staff = role === 'admin' || role === 'super_admin';
     const [tab, setTab] = useState('automatic');
     const [step, setStep] = useState(1);
 
@@ -1096,25 +1100,23 @@ export default function ReportsIndex({
         };
 
     return (
-        <PanelLayout>
+        <PanelLayout role={role} title="Financial Reports" subtitle="Monthly royalty reports ready to download, or build your own report">
             <Head title="Financial Reports" />
 
             <div className="space-y-6">
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600">
-                            Financial
-                        </p>
-
-                        <h1 className="mt-2 text-2xl font-black text-slate-950">
-                            Financial Reports
-                        </h1>
-
-                        <p className="mt-2 text-sm text-slate-500">
-                            View automatic royalty reports or generate custom reports.
-                        </p>
-                    </div>
-                </section>
+                {staff && unpublished.length > 0 && (
+                    <section className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <span>Reports here use only <b>published</b> months. Not published yet:</span>
+                            <a href="/v2/admin/reports/imports" className="inline-flex h-9 shrink-0 items-center rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white">Open Revenue Imports</a>
+                        </div>
+                        <ul className="mt-1.5 space-y-0.5 text-xs text-violet-800">
+                            {unpublished.map((u) => (
+                                <li key={u.id}>{u.month ? new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' }).format(new Date(Number(u.month.slice(0, 4)), Number(u.month.slice(5, 7)) - 1, 1)) : '—'} · {u.file} · {Number(u.rows).toLocaleString('en-IN')} rows · <b>{u.step}</b></li>
+                            ))}
+                        </ul>
+                    </section>
+                )}
 
                 <section>
                     <div className="mb-3">
@@ -1159,6 +1161,11 @@ export default function ReportsIndex({
                     ) : (
                         <ReportTable
                             role={role}
+                            emptyHint={
+                                staff
+                                    ? 'A month appears here when its report is published (Revenue Imports → review → Approve & schedule).'
+                                    : 'Your monthly report appears here after the store report for that month is published.'
+                            }
                             reports={reports}
                             requested={
                                 tab ===
@@ -1197,6 +1204,11 @@ export default function ReportsIndex({
                         <p className="mt-1 text-sm text-slate-500">
                             Create a custom royalty report in four steps.
                         </p>
+                        {months.length === 0 && (
+                            <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                Nothing to report yet - a report can be built once at least one month is published.
+                            </p>
+                        )}
                     </div>
 
                     <div className="grid gap-3 lg:grid-cols-4">

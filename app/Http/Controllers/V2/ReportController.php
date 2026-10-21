@@ -123,28 +123,13 @@ class ReportController extends Controller
             $permissions
         );
 
-        $query = $analytics->applyFilters(
-            clone $base,
-            $filters
-        );
-
-        $platforms = (clone $base)
-            ->whereNotNull('platform')
-            ->distinct()
-            ->orderBy('platform')
-            ->pluck('platform');
-
         $months = (clone $base)
             ->whereNotNull('reporting_month')
             ->distinct()
             ->orderByDesc('reporting_month')
             ->pluck('reporting_month');
 
-        $countries = (clone $base)
-            ->whereNotNull('country_code')
-            ->distinct()
-            ->orderBy('country_code')
-            ->pluck('country_code');
+
 
         /*
          * REAL AUTOMATIC MONTHLY REPORTS
@@ -473,119 +458,56 @@ class ReportController extends Controller
             $request->user()
         );
 
-        $revenueSummary = null;
+        /*
+         * MIXXTUNE_REPORTS_V2 (W49)
+         * The page uses only months, hierarchy and the automatic reports.
+         * Before, seven more heavy queries ran on every visit (summary,
+         * trend, top tracks / stores / countries, currencies and a 50-row
+         * table) over every report row and were thrown away - slow with
+         * 90,000+ rows a month. "Generated" showed today's date; it now
+         * shows when that month was published.
+         */
+        $publishedOn = \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'published_at')
+            ? \Illuminate\Support\Facades\DB::table('report_imports')
+                ->where('financial_status', 'published')
+                ->whereNotNull('published_at')
+                ->get(['reporting_month', 'published_at'])
+                ->groupBy(fn ($r) => substr((string) $r->reporting_month, 0, 7))
+                ->map(fn ($g) => $g->max('published_at'))
+            : collect();
 
-        if ($role === 'label') {
-            $teamAccess = app(
-                LabelTeamAccessService::class
-            );
+        $automaticReports = $automaticReports->map(function ($r) use ($publishedOn) {
+            $at = $publishedOn[$r['month']] ?? null;
+            $r['generatedAt'] = $at ? \Carbon\Carbon::parse($at)->timezone('Asia/Kolkata')->format('d M Y') : '—';
 
-            $label = $teamAccess->effectiveLabel(
-                $request->user()
-            );
+            return $r;
+        })->values();
 
-            /*
-             * Revenue summary is shown only when the
-             * team user has finance/report visibility.
-             * Catalogue rows themselves are already
-             * restricted by ReportAnalyticsService.
-             */
-            if (
-                $label
-                && $teamAccess->allows(
-                    $request->user(),
-                    'reports.view'
-                )
-            ) {
-                $revenueSummary =
-                    $revenueVisibility->summary(
-                        $label,
-                        $filters['month'] ?: null
-                    );
-            }
-        }
-
-        if ($role === 'artist') {
-            $artist = DB::table('artists')
-                ->where(
-                    'user_id',
-                    $request->user()->id
-                )
-                ->whereNull('deleted_at')
-                ->first();
-
-            if ($artist) {
-                $revenueSummary =
-                    $revenueVisibility
-                        ->artistSummary(
-                            (int) $artist->id,
-                            $filters['month'] ?: null
-                        );
-            }
-        }
+        $staff = in_array($role, ['admin', 'super_admin'], true);
 
         return Inertia::render(
             'V2/Reports/Index',
             [
                 'role' => $role,
-
-                'revenueSummary' =>
-                    $revenueSummary,
-
-                'filters' =>
-                    $filters,
-
-                'hierarchyOptions' =>
-                    $hierarchyOptions,
-
-                'summary' =>
-                    $analytics->summary(
-                        clone $query
-                    ),
-
-                'monthlyTrend' =>
-                    $analytics->monthlyTrend(
-                        clone $query
-                    ),
-
-                'topPlatforms' =>
-                    $analytics->topPlatforms(
-                        clone $query
-                    ),
-
-                'topCountries' =>
-                    $analytics->topCountries(
-                        clone $query
-                    ),
-
-                'topTracks' =>
-                    $analytics->topTracks(
-                        clone $query
-                    ),
-
-                'currencySummary' =>
-                    $analytics->currencySummary(
-                        clone $query
-                    ),
-
-                'platforms' =>
-                    $platforms,
-
-                'months' =>
-                    $months,
-
-                'automaticReports' =>
-                    $automaticReports,
-
-                'countries' =>
-                    $countries,
-
-                'rows' =>
-                    $query
-                        ->orderByDesc('sale_date')
+                'filters' => $filters,
+                'hierarchyOptions' => $hierarchyOptions,
+                'months' => $months,
+                'automaticReports' => $automaticReports,
+                'unpublished' => $staff && \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'financial_status')
+                    ? \Illuminate\Support\Facades\DB::table('report_imports')
+                        ->whereIn('status', ['completed', 'completed_with_errors'])
+                        ->whereIn('financial_status', ['review_pending', 'approved_scheduled'])
                         ->orderByDesc('id')
-                        ->paginate(50)
-                        ->withQueryString(),
+                        ->limit(10)
+                        ->get(['id', 'original_filename', 'reporting_month', 'financial_status', 'imported_rows'])
+                        ->map(fn ($r) => [
+                            'id' => (int) $r->id,
+                            'file' => $r->original_filename,
+                            'month' => $r->reporting_month ? substr((string) $r->reporting_month, 0, 7) : null,
+                            'step' => $r->financial_status === 'approved_scheduled' ? 'approved, not published yet' : 'waiting for review',
+                            'rows' => (int) $r->imported_rows,
+                        ])->values()
+                    : [],
             ]
         );
     }
