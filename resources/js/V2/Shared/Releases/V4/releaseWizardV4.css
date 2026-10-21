@@ -2590,3 +2590,48 @@ summary {
 .mixx-v4-step-grid.mixx-v4-step-grid--full {
     grid-template-columns: minmax(0, 1fr);
 }
+
+/* W67: compact Track Details window */
+.mixx-v6-track-modal {
+    width: min(920px, 100%);
+}
+
+.mixx-v6-modal-header {
+    padding: 18px 24px 14px;
+}
+
+.mixx-v6-modal-header h2 {
+    font-size: 19px;
+}
+
+.mixx-v6-modal-steps {
+    padding: 10px 24px;
+}
+
+.mixx-v6-details-form {
+    padding: 18px 24px 24px;
+}
+
+.mixx-v6-section-title {
+    margin: 4px 0 12px;
+    padding-top: 14px;
+}
+
+.mixx-v6-section-title > span {
+    min-width: 24px;
+    height: 24px;
+}
+
+.mixx-v6-section-title h3 {
+    font-size: 13px;
+}
+
+.mixx-v6-form-grid {
+    gap: 10px 14px;
+    margin-bottom: 16px;
+}
+
+.mixx-v6-modal-footer {
+    margin: 20px -24px -24px;
+    padding: 12px 24px;
+}

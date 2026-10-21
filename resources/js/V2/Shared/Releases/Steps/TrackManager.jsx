@@ -24,8 +24,21 @@ const TRACKS_BASE_PATH = ARTIST_CONTEXT
     ? '/artist/tracks'
     : '/v2/tracks';
 
+/* W67: compact fields (were 46px tall with large text) */
 const inputClass =
-    'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100';
+    'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] leading-5 text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 disabled:bg-slate-50 disabled:text-slate-400';
+
+/* W67: several names in one credit, saved as "A, B" in the same field */
+const splitNames = (value) =>
+    String(value ?? '')
+        .split(',')
+        .map((v) => v.trim());
+
+const joinNames = (list) =>
+    list
+        .map((v) => String(v ?? '').trim())
+        .filter(Boolean)
+        .join(', ');
 
 const trackTypes = [
     ['original', 'Original'],
@@ -422,7 +435,7 @@ export default function TrackManager({
     const checkForm = () => {
         const out = {};
         const need = (k, msg) => {
-            if (String(data[k] ?? '').trim() === '') out[k] = msg;
+            if (String(data[k] ?? '').replace(/[,\s]/g, '') === '') out[k] = msg;
         };
         need('title', 'Enter the track title.');
         need('primary_artist_name', 'Enter the primary artist.');
@@ -720,7 +733,10 @@ export default function TrackManager({
 
             title_language: sameLanguage ? data.language : data.title_language,
             lyrics_language: sameLanguage ? data.language : data.lyrics_language,
-            author_name: data.is_instrumental ? '' : data.author_name,
+            author_name: data.is_instrumental ? '' : joinNames(splitNames(data.author_name)),
+            composer_name: joinNames(splitNames(data.composer_name)),
+            primary_artist_name: joinNames(splitNames(data.primary_artist_name)),
+            featuring_artist_name: joinNames(splitNames(data.featuring_artist_name)),
             isrc: data.isrc_is_auto_generated ? (editingTrack?.isrc_is_auto_generated ? editingTrack.isrc ?? '' : '') : String(data.isrc ?? '').replace(/-/g, '').toUpperCase(),
         };
 
@@ -1155,15 +1171,15 @@ export default function TrackManager({
                                     </Field>
 
                                     <Field label="Primary artist / singer" required error={err('primary_artist_name')}>
-                                        <input className={inputClass} value={data.primary_artist_name} onChange={(e) => setField('primary_artist_name', e.target.value)} />
+                                        <MultiNameInput value={data.primary_artist_name} onChange={(v) => setField('primary_artist_name', v)} max={3} noun="artist" />
                                     </Field>
 
                                     <Field label="Featuring artist" error={err('featuring_artist_name')}>
-                                        <input className={inputClass} value={data.featuring_artist_name} onChange={(e) => setField('featuring_artist_name', e.target.value)} placeholder="Leave empty if none" />
+                                        <MultiNameInput value={data.featuring_artist_name} onChange={(v) => setField('featuring_artist_name', v)} max={5} noun="artist" placeholder="Leave empty if none" />
                                     </Field>
                                 </div>
 
-                                <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                                <div className="mb-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
                                     <Field label="Track type">
                                         <select className={inputClass} value={data.track_type} onChange={(e) => setField('track_type', e.target.value)}>
                                             {trackTypes.map(([value, label]) => (
@@ -1199,19 +1215,19 @@ export default function TrackManager({
 
                                 <div className="mixx-v6-form-grid">
                                     <Field label="Lyricist / writer" required={!data.is_instrumental} error={err('author_name')} hint={data.is_instrumental ? 'Not needed for an instrumental' : null}>
-                                        <input className={inputClass} value={data.author_name} onChange={(e) => setField('author_name', e.target.value)} disabled={Boolean(data.is_instrumental)} />
+                                        <MultiNameInput value={data.author_name} onChange={(v) => setField('author_name', v)} max={5} noun="lyricist" disabled={Boolean(data.is_instrumental)} />
                                     </Field>
 
                                     <Field label="Composer" required error={err('composer_name')}>
-                                        <input className={inputClass} value={data.composer_name} onChange={(e) => setField('composer_name', e.target.value)} />
+                                        <MultiNameInput value={data.composer_name} onChange={(v) => setField('composer_name', v)} max={5} noun="composer" />
                                     </Field>
                                 </div>
 
-                                <details className="mb-6 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3" open={moreCreditsFilled > 0}>
-                                    <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+                                <details className="mb-4 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2" open={moreCreditsFilled > 0}>
+                                    <summary className="cursor-pointer text-xs font-semibold text-slate-700">
                                         More credits (optional){moreCreditsFilled > 0 ? ` · ${moreCreditsFilled} filled` : ''}
                                     </summary>
-                                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                                    <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
                                         {[
                                             ['producer_name', 'Producer'],
                                             ['music_director_name', 'Music director'],
@@ -1262,7 +1278,7 @@ export default function TrackManager({
                                     subtitle="Position on the release and the recording code."
                                 />
 
-                                <div className="mb-6 grid gap-4 sm:grid-cols-3">
+                                <div className="mb-4 grid gap-2.5 sm:grid-cols-3">
                                     <Field label="Track number" required error={err('track_number')}>
                                         <input type="number" min="1" className={inputClass} value={data.track_number ?? ''} onChange={(e) => setField('track_number', e.target.value === '' ? '' : Number(e.target.value))} />
                                     </Field>
@@ -1276,17 +1292,17 @@ export default function TrackManager({
                                     </Field>
                                 </div>
 
-                                <fieldset className="mb-6">
-                                    <legend className="mb-2 text-sm font-semibold text-slate-700">ISRC</legend>
+                                <fieldset className="mb-4">
+                                    <legend className="mb-1 text-xs font-semibold text-slate-700">ISRC</legend>
                                     <div className="grid gap-3 sm:grid-cols-2">
-                                        <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${data.isrc_is_auto_generated ? 'border-violet-400 bg-violet-50' : 'border-slate-200'}`}>
+                                        <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${data.isrc_is_auto_generated ? 'border-violet-400 bg-violet-50' : 'border-slate-200'}`}>
                                             <input type="radio" name="isrc_mode" checked={Boolean(data.isrc_is_auto_generated)} onChange={() => setData((d) => ({ ...d, isrc_is_auto_generated: true, isrc: editingTrack?.isrc && !editingTrack?.isrc_is_auto_generated ? '' : d.isrc }))} className="mt-0.5" />
                                             <span>
                                                 <span className="block text-sm font-semibold text-slate-900">New song - give an ISRC</span>
                                                 <span className="block text-xs text-slate-500">Mixx Tune assigns it when the release is approved</span>
                                             </span>
                                         </label>
-                                        <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${!data.isrc_is_auto_generated ? 'border-violet-400 bg-violet-50' : 'border-slate-200'}`}>
+                                        <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${!data.isrc_is_auto_generated ? 'border-violet-400 bg-violet-50' : 'border-slate-200'}`}>
                                             <input type="radio" name="isrc_mode" checked={!data.isrc_is_auto_generated} onChange={() => setField('isrc_is_auto_generated', false)} className="mt-0.5" />
                                             <span>
                                                 <span className="block text-sm font-semibold text-slate-900">It already has an ISRC</span>
@@ -1304,8 +1320,8 @@ export default function TrackManager({
                                 </fieldset>
 
                                 {!data.is_instrumental && (
-                                    <details className="mb-6 rounded-xl border border-slate-200 px-4 py-3" open={Boolean(data.lyrics)}>
-                                        <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+                                    <details className="mb-4 rounded-lg border border-slate-200 px-3 py-2" open={Boolean(data.lyrics)}>
+                                        <summary className="cursor-pointer text-xs font-semibold text-slate-700">
                                             Lyrics (optional){data.lyrics ? ` · ${String(data.lyrics).split('\n').filter(Boolean).length} lines` : ''}
                                         </summary>
                                         <textarea
@@ -1373,7 +1389,7 @@ function Field({
 }) {
     return (
         <div className="min-w-0">
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
                 {label}
 
                 {required && (
@@ -1398,17 +1414,93 @@ function Field({
     );
 }
 
+function MultiNameInput({ value, onChange, max = 5, noun = 'name', placeholder = '', disabled = false }) {
+    const toRows = (v) => {
+        const list = splitNames(v).filter(Boolean);
+        return list.length ? list : [''];
+    };
+
+    const [rows, setRows] = useState(() => toRows(value));
+
+    /* follow outside changes (open another track, copy credits) */
+    useEffect(() => {
+        if (joinNames(rows) !== joinNames(splitNames(value))) {
+            setRows(toRows(value));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [value]);
+
+    const push = (next) => {
+        setRows(next);
+        onChange(joinNames(next));
+    };
+
+    const update = (index, text) => {
+        const next = [...rows];
+        next[index] = text.replace(/,/g, ' ');
+        push(next);
+    };
+
+    const add = () => {
+        if (rows.length < max) setRows([...rows, '']);
+    };
+
+    const remove = (index) => {
+        const next = rows.filter((_, i) => i !== index);
+        push(next.length ? next : ['']);
+    };
+
+    return (
+        <div className="space-y-1.5">
+            {rows.map((name, index) => (
+                <div key={index} className="flex items-center gap-1.5">
+                    <input
+                        className={inputClass}
+                        value={name}
+                        disabled={disabled}
+                        placeholder={index === 0 ? placeholder : `Another ${noun}`}
+                        aria-label={index === 0 ? undefined : `${noun} ${index + 1}`}
+                        onChange={(e) => update(index, e.target.value)}
+                    />
+                    {index === 0 ? (
+                        <button
+                            type="button"
+                            onClick={add}
+                            disabled={disabled || rows.length >= max}
+                            title={rows.length >= max ? `Up to ${max}` : `Add another ${noun}`}
+                            aria-label={`Add another ${noun}`}
+                            className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-lg font-semibold leading-none text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            +
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => remove(index)}
+                            disabled={disabled}
+                            aria-label={`Remove ${noun} ${index + 1}`}
+                            className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-base leading-none text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+}
+
 function Toggle({ label, hint, checked, onChange }) {
     return (
         <div className="min-w-0">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">{label}</span>
+            <span className="mb-1 block text-xs font-semibold text-slate-700">{label}</span>
             <button
                 type="button"
                 role="switch"
                 aria-checked={checked}
                 aria-label={label}
                 onClick={() => onChange(!checked)}
-                className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl border px-4 text-sm transition ${checked ? 'border-violet-400 bg-violet-50 text-violet-800' : 'border-slate-300 bg-white text-slate-600'}`}
+                className={`flex min-h-[38px] w-full items-center justify-between gap-2 rounded-lg border px-3 text-[13px] transition ${checked ? 'border-violet-400 bg-violet-50 text-violet-800' : 'border-slate-300 bg-white text-slate-600'}`}
             >
                 <span className="truncate">{checked ? 'Yes' : 'No'} <span className="text-xs text-slate-400">· {hint}</span></span>
                 <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition ${checked ? 'bg-violet-600' : 'bg-slate-300'}`}>
