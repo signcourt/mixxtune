@@ -273,6 +273,32 @@ class WalletController extends Controller
                         ->transactions()
                         ->orderByDesc('id')
                         ->paginate(30),
+
+                /* MIXXTUNE_RECOUPMENT_V2: advance still being repaid */
+                'advances' =>
+                    \App\Models\Finance\RecoupmentPlan::query()
+                        ->where('user_id', $financialOwner->id)
+                        ->where('status', 'active')
+                        ->where('outstanding_amount', '>', 0)
+                        ->orderBy('id')
+                        ->get()
+                        ->map(function ($p) {
+                            $recovery = max(0, (float) $p->recovery_uplift_percentage);
+                            if ($p->maximum_recovery_percentage !== null) {
+                                $recovery = min($recovery, max(0, (float) $p->maximum_recovery_percentage));
+                            }
+                            $recovery = min($recovery, max(0, (float) $p->base_percentage));
+
+                            return [
+                                'plan_number' => $p->plan_number,
+                                'title' => $p->title,
+                                'total' => round((float) $p->total_recoverable_amount, 2),
+                                'recovered' => round((float) $p->total_recovered_amount, 2),
+                                'outstanding' => round((float) $p->outstanding_amount, 2),
+                                'recovery' => round($recovery, 2),
+                            ];
+                        })
+                        ->values(),
             ]
         );
     }

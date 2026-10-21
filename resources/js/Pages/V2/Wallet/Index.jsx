@@ -21,6 +21,7 @@ export default function Index({
     withdrawalEnabled = true,
     owners = null,
     ownerSearch = '',
+    advances = [],
 }) {
     const [historyOpen, setHistoryOpen] =
         useState(false);
@@ -404,6 +405,10 @@ export default function Index({
                     </div>
                 </section>
 
+                {!isAdminMonitoring && advances.length > 0 && (
+                    <AdvanceCard advances={advances} />
+                )}
+
                 <div className="mt-5 grid gap-4 sm:grid-cols-3">
                     <SummaryCard
                         label="Pending Balance"
@@ -570,5 +575,39 @@ function Cell({ children }) {
         <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-600 sm:px-8 lg:first:pl-10 lg:last:pr-10">
             {children}
         </td>
+    );
+}
+
+/* MIXXTUNE_RECOUPMENT_V2: the owner sees the advance being repaid */
+function AdvanceCard({ advances }) {
+    const inr = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(v || 0));
+
+    return (
+        <section className="mt-5 rounded-xl border border-amber-200 bg-amber-50/60 px-6 py-5 sm:px-8">
+            <h2 className="text-[16px] font-semibold text-slate-950">Advance being repaid</h2>
+            <p className="mt-1 text-sm text-slate-600">
+                A part of your royalties goes to repay the advance / costs below until they are fully recovered. Questions? Open a support ticket.
+            </p>
+            <div className="mt-4 space-y-3">
+                {advances.map((a) => {
+                    const pct = a.total > 0 ? Math.min(100, Math.round((a.recovered / a.total) * 100)) : 0;
+                    return (
+                        <div key={a.plan_number} className="rounded-lg border border-amber-200 bg-white px-4 py-3">
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                <div className="text-sm font-semibold text-slate-900">{a.title} <span className="font-normal text-slate-500">· {a.plan_number}</span></div>
+                                <div className="text-sm font-semibold text-amber-800">Still to repay {inr(a.outstanding)}</div>
+                            </div>
+                            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
+                                <span>Repaid {inr(a.recovered)} of {inr(a.total)} ({pct}%)</span>
+                                <span>{a.recovery}% of revenue used for repayment</span>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </section>
     );
 }

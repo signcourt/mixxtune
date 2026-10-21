@@ -12,6 +12,30 @@ class StoreRecoupmentPlanRequest extends FormRequest
             === 'super_admin';
     }
 
+    /* MIXXTUNE_RECOUPMENT_V2: the old form sent initial_advance_amount */
+    protected function prepareForValidation(): void
+    {
+        if (! $this->filled('initial_amount') && $this->filled('initial_advance_amount')) {
+            $this->merge(['initial_amount' => $this->input('initial_advance_amount')]);
+        }
+
+        foreach (['label_id', 'artist_id', 'maximum_recovery_percentage', 'initial_amount'] as $key) {
+            if ($this->input($key) === '') {
+                $this->merge([$key => null]);
+            }
+        }
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'base_percentage' => 'owner share',
+            'recovery_uplift_percentage' => 'recovery %',
+            'maximum_recovery_percentage' => 'maximum recovery %',
+            'initial_amount' => 'advance amount',
+        ];
+    }
+
     public function rules(): array
     {
         return [
@@ -111,6 +135,10 @@ class StoreRecoupmentPlanRequest extends FormRequest
             'expense_date' => [
                 'nullable',
                 'date',
+            ],
+            'notify_owner' => [
+                'nullable',
+                'boolean',
             ],
         ];
     }

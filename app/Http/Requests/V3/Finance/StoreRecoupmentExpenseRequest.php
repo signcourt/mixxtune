@@ -67,6 +67,10 @@ class StoreRecoupmentExpenseRequest extends FormRequest
                 'nullable',
                 'date',
             ],
+            'notify_owner' => [
+                'nullable',
+                'boolean',
+            ],
         ];
     }
 }

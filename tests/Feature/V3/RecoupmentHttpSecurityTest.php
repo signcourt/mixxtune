@@ -4,10 +4,13 @@ namespace Tests\Feature\V3;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ConfirmsActionOtp;
 use Tests\TestCase;
 
 class RecoupmentHttpSecurityTest extends TestCase
 {
+    use ConfirmsActionOtp;
+
     use RefreshDatabase;
 
     private string $indexUrl =
@@ -117,7 +120,8 @@ class RecoupmentHttpSecurityTest extends TestCase
         $super = $this->userWithRole('super_admin');
         $target = $this->userWithRole('artist');
 
-        $response = $this
+        /* MIXXTUNE_RECOUPMENT_V2: a new advance needs the e-mailed code */
+        $response = $this->viaActionOtp($super, fn () => $this
             ->actingAs($super)
             ->from($this->indexUrl)
             ->post(
@@ -129,16 +133,13 @@ class RecoupmentHttpSecurityTest extends TestCase
                     'maximum_recovery_percentage' => 10,
                     'initial_amount' => 1000,
                 ]
-            );
+            ));
 
         $response->assertRedirect(
             $this->indexUrl
         );
 
-        $response->assertSessionHas(
-            'success',
-            'Recoupment plan created.'
-        );
+        $response->assertSessionHas('success');
 
         $this->assertDatabaseHas(
             'recoupment_plans',

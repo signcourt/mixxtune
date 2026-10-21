@@ -2970,6 +2970,12 @@ Route::middleware([
             ]
         )->name('index');
 
+        /* MIXXTUNE_RECOUPMENT_V2: owner search, CSV, edit plan, take a cost out */
+        Route::get('/owners', [\App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class, 'owners'])->name('owners');
+        Route::get('/export', [\App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class, 'export'])->name('export');
+        Route::post('/{plan}/update', [\App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class, 'update'])->name('update');
+        Route::post('/{plan}/expenses/{expense}/remove', [\App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class, 'removeExpense'])->name('expenses.remove');
+
         Route::post(
             '/',
             [
