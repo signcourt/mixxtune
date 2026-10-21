@@ -71,6 +71,9 @@ export default function Index({ role = "artist", counts = {}, recent = [] }) {
                                 Pick the type of problem below and fill in one short form. Each case gets a number, our team replies inside the case, and you can follow
                                 every case under <b>Case History</b>.
                             </p>
+                            <Link href="/v2/support?legal_section=history&tab=all" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-violet-700 hover:text-violet-900">
+                                <FolderClock size={15} /> Open Case History <ArrowRight size={14} />
+                            </Link>
                         </div>
                         <div className="grid grid-cols-3 gap-2 sm:w-[420px]">
                             <Link href="/v2/support?legal_section=history" className="rounded-xl border border-slate-200 px-3 py-2.5 hover:border-violet-300">

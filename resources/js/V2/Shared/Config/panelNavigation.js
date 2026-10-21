@@ -225,44 +225,8 @@ const ownerNavigation = (
             id: 'legal-operations',
             label: 'Legal Operations',
             icon: ShieldCheck,
+            /* W74: one click opens the Legal Operations page (no sub-menu); every topic + Case History is on that page */
             href: '/v2/legal-operations',
-            children: [
-                {
-                    id: 'legal-copyright-claims',
-                    label: 'Copyright & Claims',
-                    href: '/v2/support/create?category=copyright&legal_section=copyright',
-                },
-                {
-                    id: 'legal-youtube',
-                    label: 'YouTube Operations',
-                    href: '/v2/support/create?category=copyright&legal_section=youtube',
-                },
-                {
-                    id: 'legal-spotify',
-                    label: 'Spotify Operations',
-                    href: '/v2/support/create?category=general&legal_section=spotify',
-                },
-                {
-                    id: 'legal-dsp',
-                    label: 'Other DSP Operations',
-                    href: '/v2/support/create?category=general&legal_section=dsp',
-                },
-                {
-                    id: 'legal-rights',
-                    label: 'Rights & Ownership',
-                    href: '/v2/support/create?category=general&legal_section=rights',
-                },
-                {
-                    id: 'legal-requests',
-                    label: 'Legal Requests',
-                    href: '/v2/support/create?category=general&legal_section=request',
-                },
-                {
-                    id: 'legal-history',
-                    label: 'Case History',
-                    href: '/v2/support?legal_section=history',
-                },
-            ],
         },
     ];
 

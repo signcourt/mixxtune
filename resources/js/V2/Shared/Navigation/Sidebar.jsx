@@ -1058,6 +1058,11 @@ function isItemActive(
         );
     }
 
+    /* W74: the Legal Operations page and every case form / Case History opened from it */
+    if (item.id === "legal-operations") {
+        return currentPath === itemPath || Boolean(currentQuery?.get("legal_section"));
+    }
+
     if (item.id === "support") {
         if (currentQuery?.get("legal_section")) {
             return false;
