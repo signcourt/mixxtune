@@ -2210,6 +2210,14 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.admin.invoices.generate');
 
+/* MIXXTUNE_INVOICES_V2: make every missing invoice in one click */
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/v2/admin/invoices/generate-missing',
+        [\App\Http\Controllers\V2\Admin\InvoiceManagementController::class, 'generateMissing']
+    )
+    ->name('v2.admin.invoices.generate-missing');
+
 
 Route::middleware(['auth', 'verified'])
     ->get(

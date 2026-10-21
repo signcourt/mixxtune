@@ -46,9 +46,28 @@ class InvoiceController extends Controller
             [
                 'role' => $role,
 
+                /* MIXXTUNE_INVOICES_V2: names, month, net amount, type */
                 'invoices' => $query
+                    ->with('user:id,name,email')
                     ->orderByDesc('id')
-                    ->paginate(25),
+                    ->paginate(25)
+                    ->through(function (Invoice $v) {
+                        $net = (float) ($v->getAttribute('net_payable') ?? 0);
+
+                        return [
+                            'id' => $v->id,
+                            'number' => $v->invoice_number,
+                            'date' => $v->invoice_date?->format('d M Y'),
+                            'kind' => $v->getAttribute('withdrawal_id') ? 'Payout' : 'Monthly royalty',
+                            'month_label' => $v->statement ? app(\App\Services\V2\InvoiceService::class)->monthLabel($v->statement->statement_month) : null,
+                            'owner' => $v->user?->name,
+                            'currency' => $v->currency ?: 'INR',
+                            'total' => round((float) $v->total_amount, 2),
+                            'tds' => round((float) $v->tds_amount, 2),
+                            'net' => round($net > 0 ? $net : (float) $v->total_amount - (float) $v->tds_amount, 2),
+                            'status' => $v->status,
+                        ];
+                    }),
             ]
         );
     }
