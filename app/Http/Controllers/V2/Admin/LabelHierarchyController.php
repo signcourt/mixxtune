@@ -96,9 +96,32 @@ class LabelHierarchyController extends Controller
             ->unique(fn ($r) => $r->master_label_id.':'.$r->beneficiary_id)
             ->keyBy(fn ($r) => $r->master_label_id.':'.$r->beneficiary_id);
 
-        $rows = $labels->map(function (Label $label) use ($chain, $countDesc, $shares) {
+        /*
+         * W61 MIXXTUNE_LEVELS_V2: owner login, releases / artists per label,
+         * missing sub-label %, totals - all in a few grouped queries.
+         */
+        $owners = \App\Models\User::query()
+            ->whereIn('id', $labels->pluck('user_id')->filter()->unique()->values())
+            ->get(['id', 'name', 'email', 'account_status'])
+            ->keyBy('id');
+        $countBy = function (string $table) use ($labels): array {
+            if (!\Illuminate\Support\Facades\Schema::hasTable($table) || !\Illuminate\Support\Facades\Schema::hasColumn($table, 'label_id')) {
+                return [];
+            }
+            $q = DB::table($table)->whereIn('label_id', $labels->pluck('id'));
+            if (\Illuminate\Support\Facades\Schema::hasColumn($table, 'deleted_at')) {
+                $q->whereNull('deleted_at');
+            }
+
+            return $q->groupBy('label_id')->pluck(DB::raw('count(*) as c'), 'label_id')->map(fn ($c) => (int) $c)->all();
+        };
+        $releaseCounts = $countBy('releases');
+        $artistCounts = $countBy('artists');
+
+        $rows = $labels->map(function (Label $label) use ($chain, $countDesc, $shares, $owners, $releaseCounts, $artistCounts, $childrenOf) {
             $ancestors = $chain((int) $label->id);
             $share = $label->parent_label_id !== null ? $shares->get((int) $label->parent_label_id.':'.(int) $label->id) : null;
+            $owner = $label->user_id ? $owners->get((int) $label->user_id) : null;
 
             return [
                 'id' => (int) $label->id,
@@ -112,14 +135,32 @@ class LabelHierarchyController extends Controller
                 'descendant_count' => $countDesc((int) $label->id),
                 'revenue_share_percentage' => $share ? (float) $share->revenue_share_percent : null,
                 'parent_commission_percentage' => $share ? 100 - (float) $share->revenue_share_percent : null,
+                'label_percent' => $label->parent_label_id === null && $label->revenue_share_percentage !== null ? (float) $label->revenue_share_percentage : null,
+                'share_missing' => $label->parent_label_id !== null && !$share,
+                'children_count' => count($childrenOf[(int) $label->id] ?? []),
+                'owner_name' => $owner?->name,
+                'owner_email' => $owner?->email,
+                'owner_status' => $owner?->account_status,
+                'releases_count' => $releaseCounts[(int) $label->id] ?? 0,
+                'artists_count' => $artistCounts[(int) $label->id] ?? 0,
             ];
         })->values();
+
+        $masters = $rows->whereNull('parent_label_id');
+        $totals = [
+            'masters' => $masters->count(),
+            'sub_labels' => $rows->whereNotNull('parent_label_id')->count(),
+            'masters_with_sub' => $masters->where('children_count', '>', 0)->count(),
+            'sub_without_share' => $rows->where('share_missing', true)->count(),
+            'masters_without_login' => $masters->whereNull('owner_email')->count(),
+        ];
 
         return Inertia::render(
             'V2/Admin/LabelHierarchy/Index',
             [
                 'role' => (string) $request->user()->role,
                 'labels' => $rows,
+                'totals' => $totals,
             ]
         );
     }
@@ -285,12 +326,14 @@ class LabelHierarchyController extends Controller
                     true,
                     $request->user()
                 );
+
+                $this->audit('level.created', 'Sub-label "'.$child->name.'" (#'.$child->id.') created under "'.$parent->name.'" (#'.$parent->id.') with '.round((float) $data['revenue_share_percent'], 2).'%.', [], ['name' => $child->name, 'parent_label_id' => $parent->id, 'percent' => round((float) $data['revenue_share_percent'], 2)], $child, $request);
             }
         );
 
         return back()->with(
             'success',
-            'Level created successfully.'
+            'Sub-label "'.trim($data['name']).'" created under '.$parent->name.' ('.round((float) $data['revenue_share_percent'], 2).'% to the sub-label, '.round(100 - (float) $data['revenue_share_percent'], 2).'% stays with the master).'
         );
     }
 
@@ -447,13 +490,37 @@ class LabelHierarchyController extends Controller
             }
         }
 
+        $old = ['name' => $label->name, 'status' => $label->status, 'parent_label_id' => $label->parent_label_id];
+        $newName = trim($data['name']);
+
+        /*
+         * W61: renaming or changing the status of a MASTER label touches the
+         * owner's whole catalogue and reports - it needs the e-mailed code.
+         */
+        if (
+            $label->parent_label_id === null
+            && ($newName !== (string) $label->name || $data['status'] !== (string) $label->status)
+        ) {
+            app(\App\Services\V2\ActionOtpGuard::class)->require(
+                $request->user(),
+                'level.master:'.$label->id.':'.sha1($newName.'|'.$data['status']),
+                'change the master label "'.$label->name.'"'
+                    .($newName !== (string) $label->name ? ' to the name "'.$newName.'"' : '')
+                    .($data['status'] !== (string) $label->status ? ' (status '.$label->status.' -> '.$data['status'].')' : '')
+            );
+        }
+
+        $changedShare = false;
+
         DB::transaction(
             function () use (
                 $request,
                 $data,
                 $label,
                 $newParentId,
-                $revenueShares
+                $revenueShares,
+                $newName,
+                &$changedShare
             ) {
                 $label->forceFill([
                     'name' => trim($data['name']),
@@ -470,22 +537,48 @@ class LabelHierarchyController extends Controller
                         ->whereNull('deleted_at')
                         ->firstOrFail();
 
-                    $revenueShares->saveForLabel(
-                        $master,
-                        $label,
-                        (float) $data[
-                            'revenue_share_percent'
-                        ],
-                        true,
-                        $request->user()
-                    );
+                    /*
+                     * W61: an unchanged % is not saved again (that moved
+                     * the share's "effective from" date to today on every
+                     * name / status edit).
+                     */
+                    $current = $revenueShares->resolve($master, 'label', (int) $label->id);
+                    $wanted = round((float) $data['revenue_share_percent'], 2);
+
+                    if (!$current || round((float) $current->revenue_share_percent, 2) !== $wanted) {
+                        $revenueShares->saveForLabel(
+                            $master,
+                            $label,
+                            $wanted,
+                            true,
+                            $request->user()
+                        );
+                        $changedShare = true;
+                    }
                 }
             }
         );
 
+        $new = ['name' => $label->name, 'status' => $label->status, 'parent_label_id' => $label->parent_label_id];
+
+        if ($new !== $old) {
+            $this->audit('level.updated', ($label->parent_label_id === null ? 'Master' : 'Sub-label').' "'.$old['name'].'" (#'.$label->id.') changed.', $old, $new, $label, $request);
+        }
+
+        $what = [];
+        if ($new['name'] !== $old['name']) {
+            $what[] = 'name';
+        }
+        if ($new['status'] !== $old['status']) {
+            $what[] = 'status';
+        }
+        if ($changedShare) {
+            $what[] = 'share %';
+        }
+
         return back()->with(
             'success',
-            'Level updated successfully.'
+            $what ? 'Saved "'.$label->name.'": '.implode(', ', $what).' changed.' : 'Nothing changed for "'.$label->name.'".'
         );
     }
 
@@ -577,6 +670,8 @@ class LabelHierarchyController extends Controller
 
         $label->delete();
 
+        $this->audit('level.deleted', 'Sub-label "'.$label->name.'" (#'.$label->id.') deleted (it had no releases, artists or revenue).', ['name' => $label->name, 'parent_label_id' => $label->parent_label_id], [], $label, $request);
+
         /* its share stops counting once the level is gone */
         if (\Illuminate\Support\Facades\Schema::hasTable('label_revenue_shares')) {
             DB::table('label_revenue_shares')->where('beneficiary_type', 'label')->where('beneficiary_id', $label->id)->update(['is_active' => false, 'updated_at' => now()]);
@@ -584,7 +679,16 @@ class LabelHierarchyController extends Controller
 
         return back()->with(
             'success',
-            'Level deleted successfully.'
+            'Sub-label "'.$label->name.'" deleted.'
         );
+    }
+
+    private function audit(string $action, string $description, array $old, array $new, Label $label, Request $request): void
+    {
+        try {
+            app(\App\Services\V2\AuditLogService::class)->record($action, 'labels', $description, $old, $new, $label, $request);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }
