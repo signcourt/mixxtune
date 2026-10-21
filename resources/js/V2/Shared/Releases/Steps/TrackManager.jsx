@@ -361,7 +361,9 @@ export default function TrackManager({
 
     /* W65: local checks before saving, credits copy, same-language switch */
     const [localErrors, setLocalErrors] = useState({});
-    const [sameLanguage, setSameLanguage] = useState(true);
+    /* W66: title and lyrics language always follow the track language (the extra switch was removed) */
+    const sameLanguage = true;
+    const setSameLanguage = () => {};
 
     const err = (key) => errors[key] || localErrors[key] || null;
 
@@ -1229,7 +1231,7 @@ export default function TrackManager({
                                 <SectionTitle
                                     number="03"
                                     title="Genre & language"
-                                    subtitle="Filled from the release - change only if this track is different."
+                                    subtitle="Filled from the release - change only if this track is different. Title and lyrics use the same language."
                                 />
 
                                 <div className="mixx-v6-form-grid">
@@ -1247,41 +1249,11 @@ export default function TrackManager({
                                             options={TRACK_LANGUAGES}
                                             placeholder="Search language..."
                                             onChange={(value) => {
-                                                setField('language', value);
-                                                if (sameLanguage) {
-                                                    setData((d) => ({ ...d, language: value, title_language: value, lyrics_language: value }));
-                                                }
+                                                setData((d) => ({ ...d, language: value, title_language: value, lyrics_language: value }));
                                             }}
                                         />
                                     </Field>
 
-                                    <div className="flex items-end">
-                                        <label className="flex min-h-[46px] w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-4 text-sm text-slate-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={sameLanguage}
-                                                onChange={(e) => {
-                                                    setSameLanguage(e.target.checked);
-                                                    if (e.target.checked) {
-                                                        setData((d) => ({ ...d, title_language: d.language, lyrics_language: d.language }));
-                                                    }
-                                                }}
-                                                className="h-4 w-4 rounded border-slate-300 text-violet-600"
-                                            />
-                                            Title and lyrics are in this language too
-                                        </label>
-                                    </div>
-
-                                    {!sameLanguage && (
-                                        <>
-                                            <Field label="Title language" required error={err('title_language')}>
-                                                <SearchableTrackSelect value={data.title_language} options={TRACK_LANGUAGES} placeholder="Search..." onChange={(value) => setField('title_language', value)} />
-                                            </Field>
-                                            <Field label="Lyrics language" required error={err('lyrics_language')}>
-                                                <SearchableTrackSelect value={data.lyrics_language} options={TRACK_LANGUAGES} placeholder="Search..." onChange={(value) => setField('lyrics_language', value)} />
-                                            </Field>
-                                        </>
-                                    )}
                                 </div>
 
                                 <SectionTitle
