@@ -8,6 +8,7 @@ import {
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import StatusBadge from '@/V2/Shared/Components/StatusBadge';
 import EmptyState from '@/V2/Shared/Components/EmptyState';
+import PageMessages from '@/V2/Shared/Components/PageMessages';
 
 const formatDate = (value) => {
     if (!value) {
@@ -90,10 +91,12 @@ export default function ReleaseIndex({
         );
 
     useEffect(() => {
-        const saved =
-            window.localStorage.getItem(
-                viewStorageKey
-            );
+        let saved = null;
+        try {
+            saved = window.localStorage.getItem(viewStorageKey);
+        } catch (e) {
+            saved = null;
+        }
 
         if (
             saved === 'grid'
@@ -106,10 +109,11 @@ export default function ReleaseIndex({
     const changeView = (mode) => {
         setViewMode(mode);
 
-        window.localStorage.setItem(
-            viewStorageKey,
-            mode
-        );
+        try {
+            window.localStorage.setItem(viewStorageKey, mode);
+        } catch (e) {
+            /* storage blocked - the view still changes */
+        }
     };
 
     const updateFilters = (
@@ -164,10 +168,32 @@ export default function ReleaseIndex({
 
 
     /* MIXXTUNE_RELEASES_LIST_V2: clean header + one toolbar (status cards removed) */
+    /* W63: the title follows the menu item (My Drafts, In Review ...) instead of always "All Releases" */
+    const STATUS_TITLES = {
+        draft: role === 'artist' ? 'Drafts' : 'My Drafts',
+        submitted: 'In Review',
+        changes_requested: 'Changes Requested',
+        approved: 'Approved',
+        processing: 'Processing',
+        delivered: 'Delivered',
+        live: 'Live',
+        rejected: 'Rejected',
+        failed: 'Failed',
+    };
+    const STATUS_SUBTITLES = {
+        draft: 'Releases you started and have not sent for review yet. Only you can see your drafts.',
+        submitted: 'Sent for review - waiting for the Mixx Tune team.',
+        changes_requested: 'The team asked for changes - open, fix and send again.',
+        rejected: 'Not accepted - open a release to see the reason.',
+    };
     const pageTitle =
-        role === 'artist'
+        STATUS_TITLES[filters.status]
+        ?? (role === 'artist'
             ? 'My Releases'
-            : 'All Releases';
+            : 'All Releases');
+    const pageSubtitle =
+        STATUS_SUBTITLES[filters.status]
+        ?? 'Every release in every stage: drafts, review, approved and live';
 
     const selectClass =
         /* MIXXTUNE_MOBILE_LIST_V1: on phones two filters per row, full text visible */
@@ -177,9 +203,10 @@ export default function ReleaseIndex({
         <PanelLayout
             role={role}
             title={pageTitle}
-            subtitle="Every release in every stage: drafts, review, approved and live"
+            subtitle={pageSubtitle}
         >
             <Head title={pageTitle} />
+            <PageMessages />
 
             <div className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -414,7 +441,9 @@ export default function ReleaseIndex({
                             <EmptyState
                                 title="No releases found"
                                 description={
-                                    hasFilters
+                                    hasFilters && filters.status && !filters.search && !filters.label_id && !filters.month && !filters.release_type
+                                        ? `Nothing in "${pageTitle}" right now.`
+                                        : hasFilters
                                         ? 'No release matches the selected filters. Clear the filters and try again.'
                                         : 'Create your first release and distribute your music worldwide.'
                                 }

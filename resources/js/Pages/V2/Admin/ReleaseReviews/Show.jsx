@@ -1,6 +1,16 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { createContext, useContext, useState } from 'react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import PageMessages from '@/V2/Shared/Components/PageMessages';
+
+/*
+ * W63 MIXXTUNE_RELEASE_REVIEW_V2: messages + the checklist (approve
+ * errors were never shown), confirm before every action, "Approve & next",
+ * Delivery link, who did each step, edits locked when the status does not
+ * allow them, field errors shown, an emptied number no longer becomes 0.
+ */
+const EditLock = createContext(false);
+const numberOrNull = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
 
 const LANGUAGES = [
     'Assamese','Awadhi','Bengali','Bhojpuri','Bodo','Dogri','English',
@@ -124,15 +134,23 @@ export default function Show({
     release,
     availableActions = {},
     statusLogs = [],
+    submissionChecklist = null,
+    nextInQueue = null,
+    deliveryUrl = null,
+    canEditMetadata = true,
 }) {
     const [notes, setNotes] = useState('');
     const [processing, setProcessing] = useState(false);
+    const { errors = {} } = usePage().props;
+    const actionErrors = Object.entries(errors).filter(([k]) => k.includes('.'));
+    const checklistErrors = Object.entries(submissionChecklist?.errors ?? {});
 
-    const action = (endpoint, payload = {}) => {
+    const action = (endpoint, payload = {}, question = null) => {
+        if (question && !window.confirm(question)) return;
         setProcessing(true);
 
         router.post(endpoint, payload, {
-            preserveScroll: false,
+            preserveScroll: true,
             onFinish: () => setProcessing(false),
         });
     };
@@ -249,11 +267,13 @@ export default function Show({
             key: 'submitted_at',
             label: 'Submitted At',
             readonly: true,
+            display: formatDateTime(release.submitted_at),
         },
         {
             key: 'approved_at',
             label: 'Approved At',
             readonly: true,
+            display: formatDateTime(release.approved_at),
         },
     ];
 
@@ -264,7 +284,9 @@ export default function Show({
             subtitle={release.title}
         >
             <Head title={`Review ${release.title}`} />
+            <PageMessages />
 
+            <EditLock.Provider value={!canEditMetadata}>
             <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <Link
@@ -275,8 +297,21 @@ export default function Show({
                         <span>Review Queue</span>
                     </Link>
 
-                    <StatusBadge status={release.status} />
+                    <div className="flex flex-wrap items-center gap-2">
+                        {deliveryUrl && (
+                            <Link href={deliveryUrl} className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100">
+                                Open Delivery →
+                            </Link>
+                        )}
+                        <StatusBadge status={release.status} />
+                    </div>
                 </div>
+
+                {!canEditMetadata && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm text-slate-600">
+                        This release is <b>{STATUS_LABELS[release.status] ?? release.status}</b> - its details are locked here. {deliveryUrl ? 'Store work is done on the Delivery page.' : ''}
+                    </div>
+                )}
 
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="p-5 sm:p-6">
@@ -456,6 +491,28 @@ export default function Show({
                                 </div>
                             </div>
 
+                            {release.status === 'submitted' && submissionChecklist && (
+                                <div className={`mt-4 rounded-xl border p-3 text-xs ${checklistErrors.length ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
+                                    {checklistErrors.length ? (
+                                        <>
+                                            <div className="font-bold">Not ready to approve - {checklistErrors.length} thing(s) to fix:</div>
+                                            <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                                                {checklistErrors.slice(0, 12).map(([k, v]) => <li key={k}>{Array.isArray(v) ? v[0] : v}</li>)}
+                                            </ul>
+                                            <div className="mt-1">Fix them above, or press Request Changes to send it back to the owner.</div>
+                                        </>
+                                    ) : (
+                                        <div className="font-bold">✓ All checks passed - ready to approve.</div>
+                                    )}
+                                </div>
+                            )}
+
+                            {actionErrors.length > 0 && (
+                                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                                    {actionErrors.slice(0, 12).map(([k, v]) => <div key={k}>{Array.isArray(v) ? v[0] : v}</div>)}
+                                </div>
+                            )}
+
                             <textarea
                                 value={notes}
                                 onChange={(e) =>
@@ -470,11 +527,27 @@ export default function Show({
                                     <ActionButton
                                         label="Approve Release"
                                         className="bg-emerald-600 hover:bg-emerald-700"
-                                        disabled={processing}
+                                        disabled={processing || checklistErrors.length > 0}
                                         onClick={() =>
                                             action(
                                                 `/v2/admin/release-reviews/${release.id}/approve`,
-                                                { remarks: notes }
+                                                { remarks: notes },
+                                                `Approve "${release.title}"?`
+                                            )
+                                        }
+                                    />
+                                )}
+
+                                {availableActions.approve && nextInQueue && (
+                                    <ActionButton
+                                        label="Approve & open next"
+                                        className="bg-emerald-700 hover:bg-emerald-800"
+                                        disabled={processing || checklistErrors.length > 0}
+                                        onClick={() =>
+                                            action(
+                                                `/v2/admin/release-reviews/${release.id}/approve`,
+                                                { remarks: notes, next: 1 },
+                                                `Approve "${release.title}" and open "${nextInQueue.title}"?`
                                             )
                                         }
                                     />
@@ -491,7 +564,8 @@ export default function Show({
                                         onClick={() =>
                                             action(
                                                 `/v2/admin/release-reviews/${release.id}/request-changes`,
-                                                { notes }
+                                                { notes },
+                                                `Send "${release.title}" back to the owner with these notes?`
                                             )
                                         }
                                     />
@@ -508,7 +582,8 @@ export default function Show({
                                         onClick={() =>
                                             action(
                                                 `/v2/admin/release-reviews/${release.id}/reject`,
-                                                { reason: notes }
+                                                { reason: notes },
+                                                `Reject "${release.title}"? This is final - the owner cannot send it again.`
                                             )
                                         }
                                     />
@@ -522,16 +597,22 @@ export default function Show({
                                         onClick={() =>
                                             action(
                                                 `/v2/admin/release-reviews/${release.id}/start-processing`,
-                                                { remarks: notes }
+                                                { remarks: notes },
+                                                `Start processing "${release.title}"? You will go to its Delivery page.`
                                             )
                                         }
                                     />
                                 )}
                             </div>
+
+                            {(availableActions.request_changes || availableActions.reject) && (
+                                <p className="mt-3 text-[11px] leading-4 text-slate-400">Request Changes and Reject need a note of at least 3 letters - the owner sees it.</p>
+                            )}
                         </div>
                     </aside>
                 </div>
             </div>
+            </EditLock.Provider>
         </PanelLayout>
     );
 }
@@ -539,6 +620,8 @@ export default function Show({
 function EditableField({ release, field }) {
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
+    const locked = useContext(EditLock);
 
     const initial =
         field.type === 'boolean'
@@ -557,12 +640,13 @@ function EditableField({ release, field }) {
             {
                 [field.key]:
                     field.type === 'number'
-                        ? Number(value)
+                        ? numberOrNull(value)
                         : value,
             },
             {
                 preserveScroll: true,
-                onSuccess: () => setEditing(false),
+                onSuccess: () => { setEditing(false); setError(null); },
+                onError: (e) => setError(e[field.key] || Object.values(e)[0] || 'Not saved.'),
                 onFinish: () => setSaving(false),
             }
         );
@@ -581,7 +665,7 @@ function EditableField({ release, field }) {
                     {field.label}
                 </div>
 
-                {!field.readonly && !editing && (
+                {!field.readonly && !locked && !editing && (
                     <button
                         type="button"
                         onClick={() => setEditing(true)}
@@ -604,6 +688,8 @@ function EditableField({ release, field }) {
                         value={value}
                         setValue={setValue}
                     />
+
+                    {error && <div className="text-xs font-medium text-rose-600">{error}</div>}
 
                     <div className="flex gap-2">
                         <button
@@ -987,6 +1073,8 @@ function TrackEditableField({
 }) {
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
+    const locked = useContext(EditLock);
 
     const initial =
         field.type === 'boolean'
@@ -1003,12 +1091,13 @@ function TrackEditableField({
             {
                 [field.key]:
                     field.type === 'number'
-                        ? Number(value)
+                        ? numberOrNull(value)
                         : value,
             },
             {
                 preserveScroll: true,
-                onSuccess: () => setEditing(false),
+                onSuccess: () => { setEditing(false); setError(null); },
+                onError: (e) => setError(e[field.key] || Object.values(e)[0] || 'Not saved.'),
                 onFinish: () => setSaving(false),
             }
         );
@@ -1021,7 +1110,7 @@ function TrackEditableField({
                     {field.label}
                 </div>
 
-                {!editing && (
+                {!editing && !locked && (
                     <button
                         type="button"
                         onClick={() => setEditing(true)}
@@ -1055,6 +1144,8 @@ function TrackEditableField({
                             setValue={setValue}
                         />
                     )}
+
+                    {error && <div className="text-xs font-medium text-rose-600">{error}</div>}
 
                     <div className="flex gap-2">
                         <button
@@ -1206,6 +1297,7 @@ function ReviewHistory({ logs = [] }) {
                                         log.changed_at ||
                                         log.updated_at
                                 )}
+                                {log.changed_by_name ? ` · by ${log.changed_by_name}` : ''}
                             </div>
                         </div>
                     </div>

@@ -457,29 +457,15 @@ class ReleaseController extends Controller
                 'Label not found.'
             );
 
-            $normalizedName = strtolower(
-                preg_replace(
-                    '/[^a-z0-9]+/i',
-                    '',
-                    trim((string) $requestedLabel->name)
-                )
-            );
-
-            $logicalLabelIds = Label::query()
-                ->whereNull('deleted_at')
-                ->get(['id', 'name'])
-                ->filter(
-                    fn ($candidate) =>
-                        strtolower(
-                            preg_replace(
-                                '/[^a-z0-9]+/i',
-                                '',
-                                trim((string) $candidate->name)
-                            )
-                        ) === $normalizedName
-                )
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
+            /*
+             * W63: same unicode rule as LabelIdentityService (the old
+             * a-z0-9 rule turned every Hindi name into "" so one Hindi
+             * label showed the releases of all Hindi labels).
+             */
+            $logicalLabelIds = app(\App\Services\V2\LabelIdentityService::class)
+                ->ids((string) $requestedLabel->name)
+                ->push((int) $requestedLabel->id)
+                ->unique()
                 ->values();
 
             /*

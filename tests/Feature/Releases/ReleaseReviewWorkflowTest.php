@@ -978,8 +978,9 @@ class ReleaseReviewWorkflowTest extends TestCase
                 ]
             );
 
+        /* W63: after "Start Processing" the reviewer lands on the delivery page */
         $response
-            ->assertRedirect(route('v2.admin.release-reviews.index'))
+            ->assertRedirect('/v2/admin/distribution/'.$release->id)
             ->assertSessionHas(
                 'success',
                 'Release processing started.'
