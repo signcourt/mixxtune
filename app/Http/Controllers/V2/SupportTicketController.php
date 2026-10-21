@@ -27,7 +27,12 @@ class SupportTicketController extends Controller
     public function index(Request $request, PermissionService $permissions): Response
     {
         $tab = (string) $request->query('tab', 'active');
+        /* W73: ?legal_section=history (menu "Case History") = only Legal Operations cases */
+        $legal = $request->query('legal_section') === 'history';
         $base = SupportTicket::query()->where('user_id', $request->user()->id);
+        if ($legal) {
+            SupportDesk::scopeLegal($base);
+        }
 
         $query = (clone $base)->withCount(['messages' => fn ($q) => $q->where('is_internal', false)]);
 
@@ -38,9 +43,18 @@ class SupportTicketController extends Controller
             default => $query->where('status', '!=', 'closed'),
         };
 
+        $tickets = $query->orderByDesc('last_reply_at')->orderByDesc('id')->paginate(25)->withQueryString();
+        $tickets->getCollection()->transform(function ($t) {
+            $t->legal_section = SupportDesk::legalSectionOf($t->subject);
+
+            return $t;
+        });
+
         return Inertia::render('V2/Support/Index', [
             'role' => $permissions->role($request->user()),
             'tab' => in_array($tab, ['active', 'reply', 'closed', 'all'], true) ? $tab : 'active',
+            'legal' => $legal,
+            'legalSections' => collect(SupportDesk::LEGAL_SECTIONS)->map(fn ($m) => $m['title'])->all(),
             'counts' => [
                 'active' => (clone $base)->where('status', '!=', 'closed')->count(),
                 'reply' => (clone $base)->whereIn('status', ['admin_reply', 'waiting'])->count(),
@@ -48,39 +62,64 @@ class SupportTicketController extends Controller
                 'all' => (clone $base)->count(),
             ],
             'categories' => SupportDesk::CATEGORIES,
-            'tickets' => $query->orderByDesc('last_reply_at')->orderByDesc('id')->paginate(25)->withQueryString(),
+            'tickets' => $tickets,
         ]);
     }
 
     public function create(Request $request, PermissionService $permissions): Response
     {
+        $section = (string) $request->query('legal_section', '');
+        $section = array_key_exists($section, SupportDesk::LEGAL_SECTIONS) ? $section : null;
+
         return Inertia::render('V2/Support/Create', [
             'role' => $permissions->role($request->user()),
-            'legalSection' => $request->query('legal_section'),
+            'legalSection' => $section,
             'categories' => SupportDesk::CATEGORIES,
             'presetCategory' => array_key_exists((string) $request->query('category'), SupportDesk::CATEGORIES)
                 ? $request->query('category')
                 : null,
+            /* W73: the owner's own releases, to pick instead of typing title / UPC / ISRC */
+            'catalogue' => $section ? $this->ownCatalogue($request, $permissions) : [],
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'subject' => ['required', 'string', 'min:3', 'max:255'],
+            'subject' => ['required', 'string', 'min:3', 'max:200'],
             'category' => ['required', 'string', 'in:'.implode(',', array_keys(SupportDesk::CATEGORIES))],
             'priority' => ['required', 'string', 'in:'.implode(',', SupportDesk::PRIORITIES)],
             'message' => ['required', 'string', 'min:3', 'max:20000'],
             'attachments' => ['nullable', 'array', 'max:5'],
             'attachments.*' => SupportDesk::ATTACHMENT_RULES,
+            /* W73: Legal Operations case */
+            'legal_section' => ['nullable', 'string', 'in:'.implode(',', array_keys(SupportDesk::LEGAL_SECTIONS))],
+            'legal_issue_type' => ['nullable', 'required_with:legal_section', 'string', 'max:120'],
+            'content_url' => ['nullable', 'url', 'max:500'],
+            'evidence_url' => ['nullable', 'url', 'max:500'],
+        ], [
+            'legal_issue_type.required_with' => 'Choose what kind of problem this is.',
+            'content_url.url' => 'Enter a full link starting with https://',
+            'evidence_url.url' => 'Enter a full link starting with https://',
+            'attachments.max' => 'You can attach up to 5 files.',
+            'attachments.*.max' => 'Each file can be at most 20 MB.',
+            'attachments.*.mimes' => 'Allowed files: JPG, PNG, PDF, CSV, TXT, XLSX, ZIP, WAV, MP3.',
         ]);
+
+        $subject = trim($validated['subject']);
+        $category = $validated['category'];
+        if (!empty($validated['legal_section'])) {
+            $meta = SupportDesk::LEGAL_SECTIONS[$validated['legal_section']];
+            $category = $meta['category'];
+            $subject = mb_substr(SupportDesk::LEGAL_PREFIX.$meta['title'].': '.$subject, 0, 255);
+        }
 
         $ticket = SupportTicket::query()->create([
             'public_id' => (string) Str::ulid(),
             'ticket_number' => SupportDesk::newNumber(),
             'user_id' => $request->user()->id,
-            'subject' => $validated['subject'],
-            'category' => $validated['category'],
+            'subject' => $subject,
+            'category' => $category,
             'priority' => $validated['priority'],
             'status' => 'open',
             'last_reply_at' => now(),
@@ -94,10 +133,13 @@ class SupportTicketController extends Controller
         ]);
 
         /* before: nobody on the team was told about a new ticket */
-        $this->desk->notifyStaff($ticket, 'support.new_ticket', 'New support ticket', $request->user()->id);
+        $isLegal = !empty($validated['legal_section']);
+        $this->desk->notifyStaff($ticket, 'support.new_ticket', $isLegal ? 'New legal case' : 'New support ticket', $request->user()->id);
 
         return redirect()->route('v2.support.show', $ticket)
-            ->with('success', "Ticket {$ticket->ticket_number} created. We will reply here.");
+            ->with('success', $isLegal
+                ? "Case {$ticket->ticket_number} created. Our team will reply here; you can follow it under Legal Operations → Case History."
+                : "Ticket {$ticket->ticket_number} created. We will reply here.");
     }
 
     public function show(Request $request, SupportTicket $ticket, PermissionService $permissions): Response
@@ -213,5 +255,49 @@ class SupportTicketController extends Controller
         abort_unless(in_array($disk, ['local', 'public'], true) && Storage::disk($disk)->exists($file['path']), 404);
 
         return Storage::disk($disk)->download($file['path'], $file['name'] ?? basename($file['path']));
+    }
+
+    /** W73: up to 300 newest releases the user may see (title, artist, UPC, track ISRCs). */
+    private function ownCatalogue(Request $request, PermissionService $permissions): array
+    {
+        $user = $request->user();
+        $role = $permissions->role($user);
+        $query = \App\Models\Distribution\Release::query()->whereNull('deleted_at');
+
+        if ($role === 'artist') {
+            $artistId = \Illuminate\Support\Facades\DB::table('artists')->where('user_id', $user->id)->whereNull('deleted_at')->value('id');
+            $query->where('artist_id', $artistId ?: 0);
+        } elseif ($role === 'label') {
+            $team = app(\App\Services\V2\LabelAccess\LabelTeamAccessService::class);
+            $labelIds = $team->accessibleLabelIds($user);
+            $artistIds = $team->accessibleArtistIds($user);
+            if ($labelIds->isEmpty() && $artistIds->isEmpty()) {
+                return [];
+            }
+            $query->where(function ($w) use ($labelIds, $artistIds) {
+                if ($labelIds->isNotEmpty()) {
+                    $w->orWhereIn('label_id', $labelIds);
+                }
+                if ($artistIds->isNotEmpty()) {
+                    $w->orWhereIn('artist_id', $artistIds);
+                }
+            });
+        } else {
+            return [];
+        }
+
+        return $query->with(['tracks' => fn ($t) => $t->select(['id', 'release_id', 'title', 'isrc'])->orderBy('track_number')])
+            ->orderByDesc('id')
+            ->limit(300)
+            ->get(['id', 'title', 'primary_artist_name', 'upc'])
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'title' => (string) $r->title,
+                'artist' => (string) $r->primary_artist_name,
+                'upc' => $r->upc ? (string) $r->upc : null,
+                'tracks' => $r->tracks->map(fn ($t) => ['title' => (string) $t->title, 'isrc' => $t->isrc ? (string) $t->isrc : null])->values()->all(),
+            ])
+            ->values()
+            ->all();
     }
 }

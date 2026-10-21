@@ -78,6 +78,7 @@ export default function Index({ role = "admin", tickets = {}, counts = {}, filte
                         <div className="grid grid-cols-3 gap-2 sm:flex">
                             <select value={filters.category} onChange={(e) => go({ category: e.target.value })} className={select}>
                                 <option value="">All topics</option>
+                                <option value="legal">Legal Operations cases</option>
                                 {Object.entries(categories).map(([k, v]) => (
                                     <option key={k} value={k}>{v}</option>
                                 ))}

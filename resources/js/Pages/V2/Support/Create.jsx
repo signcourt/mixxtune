@@ -1,9 +1,13 @@
 import {
     Head,
+    Link,
     useForm,
 } from '@inertiajs/react';
+import { ArrowLeft, Info } from 'lucide-react';
+import { useMemo } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { FilePicker } from '@/V2/Shared/Support/supportUi';
 
 const LEGAL_CONFIG = {
     copyright: {
@@ -142,11 +146,21 @@ const LEGAL_CONFIG = {
     },
 };
 
+/* W73 MIXXTUNE_LEGAL_OPS_V2: link fields must be real links */
+const URL_FIELDS = ['content_url', 'evidence_url'];
+
+const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100';
+
+function FieldError({ message }) {
+    return message ? <p className="mt-1 text-xs font-medium text-red-600">{message}</p> : null;
+}
+
 export default function Create({
     role = 'artist',
     legalSection = null,
     categories = {},
     presetCategory = null,
+    catalogue = [],
 }) {
     const config = LEGAL_CONFIG[legalSection] || {
         title: 'New Support Ticket',
@@ -158,21 +172,15 @@ export default function Create({
         fields: [],
     };
 
-    const {
-        data,
-        setData,
-        post,
-        processing,
-        errors,
-    } = useForm({
-        subject: config.subject,
+    const { data, setData, post, processing, errors, transform, setError, clearErrors } = useForm({
+        subject: '',
         /* MIXXTUNE_SUPPORT_DESK_V1: topic chosen by the user (was always "general") */
         category: legalSection ? config.category : presetCategory || config.category,
         priority: 'normal',
         message: '',
         attachments: [],
+        legal_section: legalSection || '',
         legal_issue_type: '',
-        legal_context: legalSection || '',
         claimant: '',
         release: '',
         identifier: '',
@@ -180,162 +188,166 @@ export default function Create({
         evidence_url: '',
     });
 
+    /* "Title — Artist" labels for the catalogue picker */
+    const options = useMemo(
+        () => catalogue.map((r) => ({ ...r, label: `${r.title}${r.artist ? ` — ${r.artist}` : ''}` })),
+        [catalogue],
+    );
+    const picked = options.find((o) => o.label === data.release) || null;
+
+    const pickRelease = (value) => {
+        const match = options.find((o) => o.label === value);
+        setData((d) => ({
+            ...d,
+            release: value,
+            identifier: match && !d.identifier ? match.upc || '' : d.identifier,
+        }));
+    };
+
+    const errorFor = (name) => errors[name] || errors[`${name}.0`] || Object.entries(errors).find(([k]) => k.startsWith(`${name}.`))?.[1];
+
     const submit = (event) => {
         event.preventDefault();
 
-        const contextHeader = legalSection
-            ? `[Legal Operations: ${config.title}]`
-            : '';
+        /* the case text is wrapped in extra lines, so check the user's own text here */
+        clearErrors();
+        if (legalSection && data.message.trim().length < 3) {
+            setError('message', 'Please write what happened and what you need.');
+            return;
+        }
 
-        const structuredMessage = [
-            contextHeader,
-            data.legal_issue_type
-                ? `Issue Type: ${data.legal_issue_type}`
-                : '',
-            data.claimant
-                ? `Related Person / Company / Platform: ${data.claimant}`
-                : '',
-            data.release
-                ? `Release / Track / Matter: ${data.release}`
-                : '',
-            data.identifier
-                ? `ISRC / UPC: ${data.identifier}`
-                : '',
-            data.content_url
-                ? `Content URL: ${data.content_url}`
-                : '',
-            data.evidence_url
-                ? `Evidence / Reference URL: ${data.evidence_url}`
-                : '',
-            '',
-            'Details:',
-            data.message,
-        ]
-            .filter(Boolean)
-            .join('\n');
+        const lines = [
+            legalSection ? `[Legal Operations: ${config.title}]` : '',
+            data.legal_issue_type ? `Issue Type: ${data.legal_issue_type}` : '',
+            data.claimant ? `Related Person / Company / Platform: ${data.claimant}` : '',
+            data.release ? `Release / Track / Matter: ${data.release}` : '',
+            data.identifier ? `ISRC / UPC: ${data.identifier}` : '',
+            data.content_url ? `Content URL: ${data.content_url}` : '',
+            data.evidence_url ? `Evidence / Reference URL: ${data.evidence_url}` : '',
+        ].filter(Boolean);
 
-        post('/v2/support', {
-            forceFormData: true,
-            transform: (formData) => ({
-                ...formData,
-                subject: legalSection
-                    ? `${config.title} — ${data.subject || config.subject}`
-                    : data.subject,
-                message: structuredMessage,
-            }),
-        });
+        transform((d) => ({
+            ...d,
+            subject: d.subject.trim() || (legalSection ? d.legal_issue_type || config.subject : ''),
+            legal_section: legalSection || '',
+            legal_issue_type: legalSection ? d.legal_issue_type : '',
+            content_url: d.content_url.trim(),
+            evidence_url: d.evidence_url.trim(),
+            message: legalSection ? [...lines, '', 'Details:', d.message].join('\n') : d.message,
+        }));
+
+        post('/v2/support', { forceFormData: true, preserveScroll: true });
     };
 
     return (
-        <PanelLayout
-            role={role}
-            title={config.title}
-            subtitle={config.subtitle}
-        >
+        <PanelLayout role={role} title={config.title} subtitle={config.subtitle}>
             <Head title={config.title} />
 
-            <form
-                onSubmit={submit}
-                className="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
+            <form onSubmit={submit} className="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 {legalSection && (
-                    <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-violet-600">
-                            Legal Operations
+                    <div className="mb-5 flex flex-col gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-violet-600">Legal Operations · new case</div>
+                            <div className="mt-0.5 text-base font-semibold text-violet-900">{config.title}</div>
+                            <div className="mt-0.5 text-sm text-violet-700">{config.subtitle}</div>
                         </div>
-
-                        <div className="mt-1 text-base font-semibold text-violet-900">
-                            {config.title}
-                        </div>
-
-                        <div className="mt-1 text-sm text-violet-700">
-                            {config.subtitle}
-                        </div>
+                        <Link href="/v2/legal-operations" className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:text-violet-900">
+                            <ArrowLeft size={14} /> All legal topics
+                        </Link>
                     </div>
                 )}
 
-                <div className="grid gap-5 md:grid-cols-2">
-                    <label className="md:col-span-2">
-                        <span className="text-sm font-semibold text-slate-700">
-                            Subject
-                        </span>
-
-                        <input
-                            type="text"
-                            value={data.subject}
-                            onChange={(e) =>
-                                setData('subject', e.target.value)
-                            }
-                            className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500"
-                        />
-
-                        {errors.subject && (
-                            <p className="mt-1 text-xs text-red-600">
-                                {errors.subject}
-                            </p>
-                        )}
-                    </label>
-
+                <div className="grid gap-4 md:grid-cols-2">
                     {legalSection && config.issues.length > 0 && (
                         <label>
                             <span className="text-sm font-semibold text-slate-700">
-                                {config.issueLabel}
+                                {config.issueLabel} <span className="text-red-600">*</span>
                             </span>
-
-                            <select
-                                value={data.legal_issue_type}
-                                onChange={(e) =>
-                                    setData(
-                                        'legal_issue_type',
-                                        e.target.value
-                                    )
-                                }
-                                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500"
-                            >
-                                <option value="">
-                                    Select issue type
-                                </option>
-
+                            <select value={data.legal_issue_type} onChange={(e) => setData('legal_issue_type', e.target.value)} className={inputClass}>
+                                <option value="">Select issue type</option>
                                 {config.issues.map((issue) => (
                                     <option key={issue} value={issue}>
                                         {issue}
                                     </option>
                                 ))}
                             </select>
+                            <FieldError message={errors.legal_issue_type} />
                         </label>
                     )}
 
-                    {legalSection &&
-                        config.fields.map(([label, name]) => (
-                            <label key={name}>
-                                <span className="text-sm font-semibold text-slate-700">
-                                    {label}
-                                </span>
+                    <label className={legalSection ? '' : 'md:col-span-2'}>
+                        <span className="text-sm font-semibold text-slate-700">
+                            Subject {!legalSection && <span className="text-red-600">*</span>}
+                        </span>
+                        <input
+                            type="text"
+                            value={data.subject}
+                            onChange={(e) => setData('subject', e.target.value)}
+                            maxLength={200}
+                            placeholder={legalSection ? 'Short title, e.g. "Claim on my video Tum Hi Ho"' : 'Short title of the problem'}
+                            className={inputClass}
+                        />
+                        {legalSection && !errors.subject && <p className="mt-1 text-[11px] text-slate-400">Left empty? We use the issue type.</p>}
+                        <FieldError message={errors.subject} />
+                    </label>
 
-                                <input
-                                    type="text"
-                                    value={data[name]}
-                                    onChange={(e) =>
-                                        setData(name, e.target.value)
-                                    }
-                                    className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500"
-                                />
-                            </label>
-                        ))}
+                    {legalSection &&
+                        config.fields.map(([label, name]) =>
+                            name === 'release' ? (
+                                <label key={name}>
+                                    <span className="text-sm font-semibold text-slate-700">{label}</span>
+                                    <input
+                                        type="text"
+                                        list={options.length ? 'own-catalogue' : undefined}
+                                        value={data.release}
+                                        onChange={(e) => pickRelease(e.target.value)}
+                                        placeholder={options.length ? 'Type to pick one of your releases' : ''}
+                                        className={inputClass}
+                                    />
+                                    {options.length > 0 && (
+                                        <datalist id="own-catalogue">
+                                            {options.map((o) => (
+                                                <option key={o.id} value={o.label} />
+                                            ))}
+                                        </datalist>
+                                    )}
+                                    {picked && picked.tracks.length > 1 && (
+                                        <select
+                                            value=""
+                                            onChange={(e) => e.target.value && setData('identifier', e.target.value)}
+                                            className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700"
+                                        >
+                                            <option value="">Pick a track to use its ISRC…</option>
+                                            {picked.tracks
+                                                .filter((t) => t.isrc)
+                                                .map((t) => (
+                                                    <option key={t.isrc} value={t.isrc}>
+                                                        {t.title} · {t.isrc}
+                                                    </option>
+                                                ))}
+                                        </select>
+                                    )}
+                                </label>
+                            ) : (
+                                <label key={name}>
+                                    <span className="text-sm font-semibold text-slate-700">{label}</span>
+                                    <input
+                                        type={URL_FIELDS.includes(name) ? 'url' : 'text'}
+                                        inputMode={URL_FIELDS.includes(name) ? 'url' : undefined}
+                                        placeholder={URL_FIELDS.includes(name) ? 'https://' : ''}
+                                        value={data[name]}
+                                        onChange={(e) => setData(name, e.target.value)}
+                                        className={inputClass}
+                                    />
+                                    <FieldError message={errors[name]} />
+                                </label>
+                            ),
+                        )}
 
                     {!legalSection && Object.keys(categories).length > 0 && (
                         <label>
-                            <span className="text-sm font-semibold text-slate-700">
-                                Topic
-                            </span>
-
-                            <select
-                                value={data.category}
-                                onChange={(e) =>
-                                    setData('category', e.target.value)
-                                }
-                                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500"
-                            >
+                            <span className="text-sm font-semibold text-slate-700">Topic</span>
+                            <select value={data.category} onChange={(e) => setData('category', e.target.value)} className={inputClass}>
                                 {Object.entries(categories).map(([key, label]) => (
                                     <option key={key} value={key}>
                                         {label}
@@ -346,82 +358,50 @@ export default function Create({
                     )}
 
                     <label>
-                        <span className="text-sm font-semibold text-slate-700">
-                            Priority
-                        </span>
-
-                        <select
-                            value={data.priority}
-                            onChange={(e) =>
-                                setData('priority', e.target.value)
-                            }
-                            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500"
-                        >
+                        <span className="text-sm font-semibold text-slate-700">Priority</span>
+                        <select value={data.priority} onChange={(e) => setData('priority', e.target.value)} className={inputClass}>
                             <option value="low">Low</option>
                             <option value="normal">Normal</option>
                             <option value="high">High</option>
-                            <option value="urgent">Urgent</option>
+                            <option value="urgent">Urgent - money or a live release is at risk</option>
                         </select>
                     </label>
 
                     <label className="md:col-span-2">
                         <span className="text-sm font-semibold text-slate-700">
-                            {legalSection
-                                ? 'Detailed Description'
-                                : 'Message'}
+                            {legalSection ? 'What happened and what do you need?' : 'Message'} <span className="text-red-600">*</span>
                         </span>
-
                         <textarea
-                            rows={8}
+                            rows={7}
                             value={data.message}
-                            onChange={(e) =>
-                                setData('message', e.target.value)
-                            }
-                            placeholder={
-                                legalSection
-                                    ? 'Explain the matter, what happened, and what action you need.'
-                                    : 'Describe the issue clearly.'
-                            }
-                            className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-violet-500"
+                            onChange={(e) => setData('message', e.target.value)}
+                            placeholder={legalSection ? 'Explain the matter, since when, and what action you want us to take.' : 'Describe the issue clearly.'}
+                            className={inputClass}
                         />
-
-                        {errors.message && (
-                            <p className="mt-1 text-xs text-red-600">
-                                {errors.message}
-                            </p>
-                        )}
+                        <FieldError message={errors.message} />
                     </label>
 
-                    <label className="md:col-span-2">
-                        <span className="text-sm font-semibold text-slate-700">
-                            Attachments
-                        </span>
-
-                        <input
-                            type="file"
-                            multiple
-                            onChange={(e) =>
-                                setData(
-                                    'attachments',
-                                    Array.from(e.target.files || [])
-                                )
-                            }
-                            className="mt-2 block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        />
-                    </label>
+                    <div className="md:col-span-2">
+                        <span className="text-sm font-semibold text-slate-700">{legalSection ? 'Proof / documents' : 'Attachments'}</span>
+                        <div className="mt-1.5">
+                            <FilePicker files={data.attachments} onChange={(files) => setData('attachments', files)} error={errorFor('attachments')} />
+                        </div>
+                    </div>
                 </div>
 
-                <div className="mt-6 flex justify-end">
-                    <button
-                        type="submit"
-                        disabled={processing}
-                        className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {processing
-                            ? 'Submitting...'
-                            : legalSection
-                                ? 'Submit Legal Request'
-                                : 'Submit Ticket'}
+                {legalSection && (
+                    <p className="mt-5 flex items-start gap-2 rounded-xl bg-slate-50 px-3.5 py-2.5 text-xs leading-5 text-slate-600">
+                        <Info size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                        You get a case number at once. Our team replies inside the case and may ask for more proof; you can follow it under Legal Operations → Case History.
+                    </p>
+                )}
+
+                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Link href={legalSection ? '/v2/legal-operations' : '/v2/support'} className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        Cancel
+                    </Link>
+                    <button type="submit" disabled={processing} className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50">
+                        {processing ? 'Submitting...' : legalSection ? 'Submit case' : 'Submit ticket'}
                     </button>
                 </div>
             </form>

@@ -55,7 +55,10 @@ class SupportManagementController extends Controller
                 ->orWhereHas('user', fn ($u) => $u->where('name', 'like', $like)->orWhere('email', 'like', $like)));
         }
 
-        if (array_key_exists($f['category'], SupportDesk::CATEGORIES)) {
+        if ($f['category'] === 'legal') {
+            /* W73: every Legal Operations case */
+            SupportDesk::scopeLegal($query);
+        } elseif (array_key_exists($f['category'], SupportDesk::CATEGORIES)) {
             $query->where('category', $f['category']);
         }
 

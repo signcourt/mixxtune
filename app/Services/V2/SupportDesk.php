@@ -33,6 +33,55 @@ class SupportDesk
 
     public const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 
+    /*
+     * W73 MIXXTUNE_LEGAL_OPS_V2: Legal Operations sections. A legal case is a
+     * normal support ticket whose subject starts with "Legal · <title>:" (set
+     * by the server), so Case History and the staff desk can find them
+     * without a new table. Older cases used "<title> — ..." as subject.
+     */
+    public const LEGAL_SECTIONS = [
+        'copyright' => ['title' => 'Copyright & Claims', 'category' => 'copyright'],
+        'youtube' => ['title' => 'YouTube Operations', 'category' => 'copyright'],
+        'spotify' => ['title' => 'Spotify Operations', 'category' => 'general'],
+        'dsp' => ['title' => 'Other DSP Operations', 'category' => 'general'],
+        'rights' => ['title' => 'Rights & Ownership', 'category' => 'general'],
+        'request' => ['title' => 'Legal Request', 'category' => 'general'],
+    ];
+
+    public const LEGAL_PREFIX = 'Legal · ';
+
+    /** where-clause: only Legal Operations cases (new and old subject style) */
+    public static function scopeLegal($query, ?string $section = null)
+    {
+        $sections = $section !== null && isset(self::LEGAL_SECTIONS[$section])
+            ? [$section => self::LEGAL_SECTIONS[$section]]
+            : self::LEGAL_SECTIONS;
+
+        return $query->where(function ($w) use ($sections, $section) {
+            if ($section === null) {
+                $w->orWhere('subject', 'like', self::LEGAL_PREFIX.'%');
+            }
+            foreach ($sections as $meta) {
+                $title = $meta['title']; /* fixed titles, no % or _ in them */
+                $w->orWhere('subject', 'like', self::LEGAL_PREFIX.$title.':%')
+                    ->orWhere('subject', 'like', $title.' — %');
+            }
+        });
+    }
+
+    /** "Legal · YouTube Operations: Video blocked" -> ["youtube", "Video blocked"] */
+    public static function legalSectionOf(?string $subject): ?string
+    {
+        $subject = (string) $subject;
+        foreach (self::LEGAL_SECTIONS as $key => $meta) {
+            if (str_starts_with($subject, self::LEGAL_PREFIX.$meta['title'].':') || str_starts_with($subject, $meta['title'].' — ')) {
+                return $key;
+            }
+        }
+
+        return null;
+    }
+
     public const STATUSES = ['open', 'customer_reply', 'admin_reply', 'waiting', 'closed'];
 
     public const ATTACHMENT_RULES = ['file', 'max:20480', 'mimes:jpg,jpeg,png,pdf,csv,txt,xlsx,zip,wav,mp3'];
