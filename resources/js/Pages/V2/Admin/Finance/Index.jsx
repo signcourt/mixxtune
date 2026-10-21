@@ -170,12 +170,12 @@ export default function Index({
         {
             label: 'Gross Royalties',
             value: summary.gross,
-            note: 'Total generated earnings',
+            note: 'All statements in this view',
         },
         {
             label: 'Pending Approval',
             value: summary.pending,
-            note: 'Awaiting finance approval',
+            note: 'Waiting for your approval (not import)',
         },
         {
             label: 'Approved',
@@ -205,7 +205,7 @@ export default function Index({
         {
             label: 'Scheduled via Import',
             value: summary.scheduled_via_import,
-            note: 'Materialized, awaiting publish',
+            note: 'Report approved, publishes on its date',
         },
     ];
 
@@ -237,7 +237,7 @@ export default function Index({
                     </div>
                 )}
 
-                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {cards.map((card) => (
                         <div
                             key={card.label}
@@ -269,12 +269,17 @@ export default function Index({
                             </h2>
 
                             <p className="mt-1 text-sm text-slate-500">
-                                Create or rebuild monthly
-                                royalty statements.
+                                Statements are made automatically when a revenue report is
+                                published (Revenue Imports → Approve &amp; schedule). Use this only to
+                                build or rebuild a month by hand. Statements that are already
+                                approved, paid or paid via a report import are never changed.
                             </p>
                         </div>
 
-                        <div className="grid gap-3 md:grid-cols-[190px_190px_auto]">
+                        {/* W55: labelled fields */}
+                        <div className="grid gap-3 md:grid-cols-[200px_260px_max-content] md:items-end">
+                            <label className="block">
+                            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Month</span>
                             <input
                                 type="month"
                                 value={data.month}
@@ -284,10 +289,14 @@ export default function Index({
                                         event.target.value
                                     )
                                 }
-                                className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
+                                min="2026-07"
+                                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
                                 required
                             />
+                            </label>
 
+                            <label className="block">
+                            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Extra commission % (normally 0)</span>
                             <input
                                 type="number"
                                 min="0"
@@ -302,9 +311,10 @@ export default function Index({
                                         event.target.value
                                     )
                                 }
-                                placeholder="Commission %"
-                                className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
+                                placeholder="0"
+                                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
                             />
+                            </label>
 
                             <button
                                 type="submit"
@@ -383,6 +393,12 @@ export default function Index({
                             <option value="paid">
                                 Paid
                             </option>
+                            <option value="import_paid">
+                                Paid via report import
+                            </option>
+                            <option value="import_held">
+                                Held - owner not linked
+                            </option>
                         </select>
 
                         <button
@@ -459,12 +475,17 @@ export default function Index({
                                         </Cell>
 
                                         <Cell>
+                                            {/* W55: label statements show the label, not "Unknown Artist" */}
                                             <div className="font-semibold text-slate-900">
-                                                {item.artist_name}
+                                                {item.owner_type === 'label'
+                                                    ? item.label_name
+                                                    : item.artist_name}
                                             </div>
 
                                             <div className="mt-1 text-xs text-slate-500">
-                                                {item.label_name}
+                                                {item.owner_type === 'label'
+                                                    ? 'Label statement'
+                                                    : `Artist · ${item.label_name}`}
                                             </div>
                                         </Cell>
 
@@ -499,11 +520,22 @@ export default function Index({
                                         </Cell>
 
                                         <Cell>
-                                            <StatusBadge
-                                                status={
-                                                    item.status
-                                                }
-                                            />
+                                            {/* W55: import statements keep "pending" in the database; show what really happened */}
+                                            {isImportPaid(item) ? (
+                                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${importBadge(item.import_posting_status)[1]}`}>
+                                                    {item.import_posting_status === 'posted' || item.import_posting_status === 'completed'
+                                                        ? 'Credited'
+                                                        : item.import_posting_status === 'held_unclaimed'
+                                                          ? 'Held'
+                                                          : 'Scheduled'}
+                                                </span>
+                                            ) : (
+                                                <StatusBadge
+                                                    status={
+                                                        item.status
+                                                    }
+                                                />
+                                            )}
                                         </Cell>
 
                                         <Cell>
@@ -634,9 +666,9 @@ export default function Index({
                                             </p>
 
                                             <p className="mt-1 text-sm text-slate-500">
-                                                Change the filters or
-                                                generate statements for a
-                                                reporting month.
+                                                Statements appear here when a revenue report is
+                                                published (Revenue Imports → review → Approve &amp; schedule).
+                                                Or change the filters.
                                             </p>
                                         </td>
                                     </tr>

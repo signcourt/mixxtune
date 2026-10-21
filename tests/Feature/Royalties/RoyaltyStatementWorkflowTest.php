@@ -2621,4 +2621,51 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
     }
 
+
+    /* W55: rebuilding a month never touches a statement that already moved money */
+    public function test_regenerate_leaves_approved_and_import_paid_statements_alone(): void
+    {
+        [
+            ,
+            ,
+            $artist,
+            ,
+            ,
+            $admin,
+            $month,
+        ] = $this->createContext();
+
+        $service = $this->royalty();
+
+        $service->generateMonthlyStatements($month, 10, 'INR');
+
+        $approved = $service->approve($this->statement($artist, $month), $admin);
+        $net = (string) $approved->net_payable;
+
+        $again = $service->generateMonthlyStatements($month, 50, 'INR');
+
+        $this->assertSame(0, $again['updated']);
+        $this->assertSame(1, $again['skipped']);
+
+        $fresh = $this->statement($artist, $month);
+        $this->assertSame('approved', $fresh->status);
+        $this->assertSame($net, (string) $fresh->net_payable);
+
+        /* a pending statement paid through a report import is also left alone */
+        DB::table('royalty_statements')->where('id', $fresh->id)->update(['status' => 'pending']);
+        $importId = (int) DB::table('report_imports')->value('id');
+        $publicationId = DB::table('report_import_publications')->insertGetId([
+            'report_import_id' => $importId, 'status' => 'completed', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('report_import_postings')->insert([
+            'publication_id' => $publicationId, 'report_import_id' => $importId, 'owner_type' => 'artist',
+            'owner_id' => $artist->id, 'currency' => 'INR', 'posting_key' => 'w55-test',
+            'status' => 'posted', 'royalty_statement_id' => $fresh->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $third = $service->generateMonthlyStatements($month, 50, 'INR');
+        $this->assertSame(1, $third['skipped']);
+        $this->assertSame($net, (string) $this->statement($artist, $month)->net_payable);
+    }
 }

@@ -37,6 +37,7 @@ class OwnershipRoyaltyService
 
         $created = 0;
         $updated = 0;
+        $skipped = 0;
         $failed = [];
 
         foreach ($owners as $owner) {
@@ -75,6 +76,29 @@ class OwnershipRoyaltyService
                     )
                     ->first();
 
+                /*
+                 * W55 MIXXTUNE_REGENERATE_SAFE_V1
+                 *
+                 * Rebuilding may only touch a statement that is still
+                 * pending. An approved / available / paid statement, or one
+                 * paid through a report import, already moved money: putting
+                 * it back to "pending" with new amounts would let it be
+                 * approved (credited) a second time.
+                 */
+                if (
+                    $existing
+                    && (
+                        !in_array((string) $existing->status, ['pending', 'generated'], true)
+                        || DB::table('report_import_postings')
+                            ->where('royalty_statement_id', $existing->id)
+                            ->exists()
+                    )
+                ) {
+                    $skipped++;
+
+                    continue;
+                }
+
                 $this->generateOwnerStatement(
                     $month,
                     $owner['type'],
@@ -105,6 +129,7 @@ class OwnershipRoyaltyService
         return [
             'created' => $created,
             'updated' => $updated,
+            'skipped' => $skipped,
 
             'failed_count' =>
                 count($failed),

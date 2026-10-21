@@ -121,11 +121,37 @@ class FinanceController extends Controller
             );
         }
 
-        if ($filters['status'] !== '') {
+        /*
+         * W55: "Pending" / "Approved" mean the hand-approval path only;
+         * statements paid by a report import keep the old "pending" word in
+         * the database but are shown and filtered as import statements.
+         */
+        $postingStatus = function (array $statuses) {
+            return function ($sub) use ($statuses) {
+                $sub->select(DB::raw(1))
+                    ->from('report_import_postings as rip_f')
+                    ->whereColumn('rip_f.royalty_statement_id', 'statements.id')
+                    ->whereIn('rip_f.status', $statuses);
+            };
+        };
+
+        if ($filters['status'] === 'import_paid') {
+            $query->whereExists($postingStatus(['posted', 'completed']));
+        } elseif ($filters['status'] === 'import_held') {
+            $query->whereExists($postingStatus(['held_unclaimed']));
+        } elseif ($filters['status'] !== '') {
             $query->where(
                 'statements.status',
                 $filters['status']
             );
+
+            if (in_array($filters['status'], ['pending', 'approved'], true)) {
+                $query->whereNotExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('report_import_postings as rip_n')
+                        ->whereColumn('rip_n.royalty_statement_id', 'statements.id');
+                });
+            }
         }
 
         /*
@@ -249,6 +275,11 @@ class FinanceController extends Controller
                     'COALESCE(labels.user_id, artists.user_id) as owner_user_id'
                 ),
 
+                /* W55: label statements are named by the label, not "Unknown Artist" */
+                DB::raw(
+                    "CASE WHEN statements.artist_id IS NULL AND statements.label_id IS NOT NULL THEN 'label' ELSE 'artist' END as owner_type"
+                ),
+
                 DB::raw(
                     "COALESCE(
                         artists.stage_name,
@@ -350,13 +381,20 @@ class FinanceController extends Controller
         \App\Services\V2\FinanceAudit::log(
             'finance.statements_generated',
             'Statements generated for '.$validated['month'].'.',
-            ['month' => $validated['month'], 'created' => $result['created'] ?? null, 'updated' => $result['updated'] ?? null, 'failed' => $result['failed_count'] ?? null]
+            ['month' => $validated['month'], 'created' => $result['created'] ?? null, 'updated' => $result['updated'] ?? null, 'skipped' => $result['skipped'] ?? null, 'failed' => $result['failed_count'] ?? null]
         );
 
-        return back()->with(
-            'success',
-            "Statements generated. Created: {$result['created']}, updated: {$result['updated']}, failed: {$result['failed_count']}."
-        );
+        $skipped = (int) ($result['skipped'] ?? 0);
+
+        $message = 'Statements for '.$validated['month'].': created '.$result['created'].', rebuilt '.$result['updated']
+            .($skipped ? ', left unchanged '.$skipped.' (already approved / paid / paid via report import)' : '')
+            .($result['failed_count'] ? ', failed '.$result['failed_count'] : '').'.';
+
+        if (($result['created'] + $result['updated'] + $skipped + $result['failed_count']) === 0) {
+            $message = 'Nothing to generate for '.$validated['month'].': no published report has revenue for that month yet.';
+        }
+
+        return back()->with('success', $message);
     }
 
     public function approve(
