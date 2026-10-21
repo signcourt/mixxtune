@@ -65,16 +65,69 @@ class UnmappedRevenueController extends Controller
 
         if ($search !== '') {
             $base->where(function ($query) use ($search) {
-                $like = '%'.$search.'%';
+                /* MIXXTUNE_UNMAPPED_V2: % and _ in the search are plain text (works on MySQL and SQLite) */
+                $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
 
-                $query
-                    ->where('isrc', 'like', $like)
-                    ->orWhere('upc', 'like', $like)
-                    ->orWhere('track_title', 'like', $like)
-                    ->orWhere('track_artist', 'like', $like)
-                    ->orWhere('label_name', 'like', $like);
+                foreach (['isrc', 'upc', 'track_title', 'track_artist', 'label_name'] as $i => $column) {
+                    $query->{$i === 0 ? 'whereRaw' : 'orWhereRaw'}($column." LIKE ? ESCAPE '!'", [$like]);
+                }
             });
         }
+
+        /*
+         * MIXXTUNE_UNMAPPED_V2 (W46)
+         * Mapping only changes rows of reports still under review
+         * (financial_status = review_pending). Before, the list mixed in
+         * rows of approved / published reports: mapping them saved a rule
+         * but changed nothing (or failed with "Only review_pending ...").
+         * Now: "Can be mapped" (default) / "Locked" / "All" scope, and the
+         * scope follows the chosen report.
+         */
+        $openImports = DB::table('report_imports')->where('financial_status', 'review_pending')->select('id');
+
+        $scope = in_array($request->input('scope'), ['open', 'locked', 'all'], true) ? (string) $request->input('scope') : 'open';
+
+        if ($reportImportId !== null && $reportImportId > 0) {
+            $scope = DB::table('report_imports')->where('id', $reportImportId)->value('financial_status') === 'review_pending' ? 'open' : 'locked';
+        }
+
+        $scopeCounts = [
+            'open_rows' => (clone $base)->whereIn('report_import_id', $openImports)->count(),
+            'open_revenue' => round((float) (clone $base)->whereIn('report_import_id', $openImports)->sum('collected_revenue'), 2),
+            'locked_rows' => (clone $base)->whereNotIn('report_import_id', $openImports)->count(),
+            'locked_revenue' => round((float) (clone $base)->whereNotIn('report_import_id', $openImports)->sum('collected_revenue'), 2),
+        ];
+
+        if ($scope === 'open') {
+            $base->whereIn('report_import_id', $openImports);
+        } elseif ($scope === 'locked') {
+            $base->whereNotIn('report_import_id', $openImports);
+        }
+
+        /* reports that still have unmapped rows, for the report picker */
+        $imports = DB::table('report_imports as ri')
+            ->join('report_rows as rr', 'rr.report_import_id', '=', 'ri.id')
+            ->whereNull('rr.label_id')
+            ->whereNotNull('rr.isrc')
+            ->where('rr.isrc', '!=', '')
+            ->groupBy('ri.id', 'ri.original_filename', 'ri.reporting_month', 'ri.financial_status')
+            ->orderByDesc('ri.id')
+            ->limit(30)
+            ->get([
+                'ri.id', 'ri.original_filename', 'ri.reporting_month', 'ri.financial_status',
+                DB::raw('COUNT(*) as unmapped_rows'),
+                DB::raw('COALESCE(SUM(rr.collected_revenue), 0) as unmapped_revenue'),
+            ])
+            ->map(fn ($i) => [
+                'id' => (int) $i->id,
+                'file' => $i->original_filename,
+                'month' => $i->reporting_month,
+                'open' => $i->financial_status === 'review_pending',
+                'status' => $i->financial_status,
+                'rows' => (int) $i->unmapped_rows,
+                'revenue' => round((float) $i->unmapped_revenue, 2),
+            ])
+            ->values();
 
         /*
          * Keep the filtered base query untouched.
@@ -250,7 +303,11 @@ class UnmappedRevenueController extends Controller
                 'mappingPreview' => $request->session()->get(
                 'unmapped_mapping_preview'
             ),
-            'filters' => [
+                'scope' => $scope,
+                'scopeCounts' => $scopeCounts,
+                'imports' => $imports,
+                'filters' => [
+                    'scope' => $scope,
                     'sort' => $sort,
                     'direction' => $direction,
                     'search' => $search,

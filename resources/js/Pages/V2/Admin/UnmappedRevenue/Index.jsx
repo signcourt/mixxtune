@@ -66,6 +66,9 @@ export default function Index({
     filters = {},
     sourceImport = null,
     mappingPreview = null,
+    scope = 'open',
+    scopeCounts = {},
+    imports = [],
 }) {
     const {
         flash = {},
@@ -552,6 +555,7 @@ export default function Index({
                 direction,
                 report_import_id:
                     filters.report_import_id ?? '',
+                scope: filters.report_import_id ? undefined : scope,
             },
             {
                 preserveState: false,
@@ -574,6 +578,7 @@ export default function Index({
                 direction: 'desc',
                 report_import_id:
                     filters.report_import_id ?? '',
+                scope: filters.report_import_id ? undefined : scope,
             },
             {
                 preserveState: false,
@@ -598,6 +603,7 @@ export default function Index({
                 direction: nextDirection,
                 report_import_id:
                     filters.report_import_id ?? '',
+                scope: filters.report_import_id ? undefined : scope,
             },
             {
                 preserveState: false,
@@ -810,27 +816,13 @@ export default function Index({
     };
 
     return (
-        <PanelLayout>
+        <PanelLayout title="Unmapped Revenue" subtitle="Give every report ISRC its label / artist so the money reaches the right wallet">
             <Head title="Unmapped Revenue" />
 
             <div className="space-y-6">
                 <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-violet-700 ring-1 ring-inset ring-violet-600/20">
-                                Super Admin
-                            </span>
-
-                            <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-700 ring-1 ring-inset ring-amber-600/20">
-                                Revenue Control
-                            </span>
-                        </div>
-
-                        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
-                            Unmapped Revenue
-                        </h1>
-
-                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                        <p className="max-w-3xl text-sm leading-6 text-slate-500">
                             Resolve unmatched report ISRCs through the
                             Master → Catalogue Label → Artist hierarchy.
                             Saved mappings become persistent rules and
@@ -935,8 +927,14 @@ export default function Index({
                             ? 'Applying Rules...'
                             : 'Apply Saved Rules'}
                     </button>
+                    {!(sourceImport?.id || filters?.report_import_id) && (
+                        <p className="w-full text-xs text-slate-500 xl:text-right">Auto Resolve works on one report - choose it in "Report" below.</p>
+                    )}
                     </div>
                 </header>
+
+                {/* MIXXTUNE_UNMAPPED_V2 (W46): report picker + what can still be mapped */}
+                <ReportScope imports={imports} scope={scope} counts={scopeCounts} current={filters.report_import_id} />
 
                 {flash.success && (
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800">
@@ -1635,6 +1633,7 @@ export default function Index({
                                         labels={labels}
                                         artists={artists}
                                         reportImportId={reportImportId}
+                                        locked={scope === 'locked'}
                                         selected={
                                             selectedIsrcs.includes(
                                                 row.normalized_isrc ||
@@ -1657,12 +1656,19 @@ export default function Index({
                                             className="px-6 py-16 text-center"
                                         >
                                             <div className="text-base font-bold text-slate-800">
-                                                No unmapped ISRCs found
+                                                {search || month
+                                                    ? 'No unmapped ISRC matches the filters'
+                                                    : scope === 'open'
+                                                      ? 'Nothing left to map in reports under review'
+                                                      : 'No unmapped ISRCs here'}
                                             </div>
 
                                             <div className="mt-1 text-sm text-slate-500">
-                                                Try changing the
-                                                current filters.
+                                                {search || month
+                                                    ? 'Try changing the current filters.'
+                                                    : scope === 'open' && Number(scopeCounts.locked_rows || 0) > 0
+                                                      ? `${Number(scopeCounts.locked_rows).toLocaleString('en-IN')} unmapped rows sit in approved / published reports (see "Locked").`
+                                                      : 'New unmapped rows appear here when a report is uploaded.'}
                                             </div>
                                         </td>
                                     </tr>
@@ -1682,6 +1688,7 @@ function RevenueRow({
     row,
     labels,
     artists,
+    locked = false,
     reportImportId = '',
     selected = false,
     onToggleSelect,
@@ -2178,13 +2185,13 @@ function RevenueRow({
             }
         >
             <td className="w-12 px-4 py-4">
-                <input
+                {!locked && <input
                     type="checkbox"
                     checked={selected}
                     onChange={onToggleSelect}
                     aria-label={`Select ${row.isrc}`}
                     className="h-4 w-4 rounded border-slate-300"
-                />
+                />}
             </td>
 
             <td className="px-4 py-4">
@@ -2229,7 +2236,7 @@ function RevenueRow({
                             '—'}
                     </span>
 
-                    {row.report_label && (
+                    {row.report_label && !locked && (
                         <button
                             type="button"
                             onClick={
@@ -2281,6 +2288,11 @@ function RevenueRow({
             </td>
 
             <td className="px-4 py-4">
+                {locked ? (
+                    <div className="max-w-sm rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        This report is already approved / published, so mapping here cannot change it. Its money waits as held revenue: link the owner, then release it in Finance &amp; Royalties.
+                    </div>
+                ) : (
                 <div className="min-w-[500px] space-y-3">
                     <div className="grid gap-2 lg:grid-cols-3">
                         <div>
@@ -2501,6 +2513,7 @@ function RevenueRow({
                         </button>
                     </div>
                 </div>
+                )}
             </td>
         </tr>
     );
@@ -2572,5 +2585,65 @@ function Pagination({
                 ))}
             </div>
         </div>
+    );
+}
+
+/* MIXXTUNE_UNMAPPED_V2 (W46): choose a report, see what can still be mapped */
+function ReportScope({ imports = [], scope, counts = {}, current }) {
+    const go = (params) =>
+        router.get('/super-admin/unmapped-revenue', params, { preserveScroll: true, replace: true });
+    const inr = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(v || 0));
+    const mName = (v) => {
+        const m = String(v || '').match(/^(\d{4})-(\d{2})/);
+        return m ? new Intl.DateTimeFormat('en-IN', { month: 'short', year: 'numeric' }).format(new Date(Number(m[1]), Number(m[2]) - 1, 1)) : '—';
+    };
+    const tabs = [
+        ['open', 'Can be mapped', counts.open_rows, counts.open_revenue],
+        ['locked', 'Locked (approved / published)', counts.locked_rows, counts.locked_revenue],
+        ['all', 'All', Number(counts.open_rows || 0) + Number(counts.locked_rows || 0), Number(counts.open_revenue || 0) + Number(counts.locked_revenue || 0)],
+    ];
+
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                <label className="block min-w-0 flex-1">
+                    <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Report</span>
+                    <select
+                        value={current || ''}
+                        onChange={(e) => go(e.target.value ? { report_import_id: e.target.value } : { scope })}
+                        className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"
+                    >
+                        <option value="">All reports</option>
+                        {imports.map((i) => (
+                            <option key={i.id} value={i.id}>
+                                #{i.id} · {mName(i.month)} · {i.file} · {i.rows.toLocaleString('en-IN')} unmapped · {i.open ? 'under review' : 'locked'}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+                {!current && (
+                    <div className="grid gap-2 sm:grid-cols-3 lg:w-[620px]">
+                        {tabs.map(([k, label, n, amount]) => (
+                            <button
+                                key={k}
+                                type="button"
+                                onClick={() => go({ scope: k })}
+                                className={`rounded-xl border px-3 py-2 text-left ${scope === k ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:bg-slate-50'}`}
+                            >
+                                <div className="text-xs font-semibold text-slate-600">{label}</div>
+                                <div className="text-sm font-black text-slate-900">{Number(n || 0).toLocaleString('en-IN')} {Number(n) === 1 ? 'row' : 'rows'}</div>
+                                <div className="text-xs text-slate-500">{inr(amount)}</div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+            {scope === 'locked' && (
+                <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    These rows belong to reports that are already approved or published. Mapping can no longer change them; their money is kept as held revenue.
+                    Link the label / artist to its owner, then release the held money in <a href="/v2/admin/finance" className="font-semibold underline">Finance &amp; Royalties</a>. Saved rules will still map these ISRCs in future reports.
+                </p>
+            )}
+        </section>
     );
 }
