@@ -55,6 +55,17 @@ class ReleaseDeliveryWorkflowTest extends TestCase
             'artist_id' => $artist->id,
             'label_id' => $label->id,
 
+            /* W82: UPCs are typed by Mixx Tune before delivery (never generated) */
+            'upc' => (function () {
+                $body = '5'.str_pad((string) random_int(0, 9999999999), 10, '0', STR_PAD_LEFT);
+                $sum = 0;
+                foreach (array_reverse(str_split($body)) as $i => $d) {
+                    $sum += (int) $d * ($i % 2 === 0 ? 3 : 1);
+                }
+
+                return $body.((10 - $sum % 10) % 10);
+            })(),
+
             'catalog_number' =>
                 'MXT-DEL-'.uniqid(),
 

@@ -462,33 +462,7 @@ export default function Index({
 
                 <Section
                     title="Pending UPC"
-                    description={`${pendingUpc?.total ?? 0} releases waiting for UPC`}
-                    action={
-                        <button
-                            type="button"
-                            disabled={
-                                isOld ||
-                                
-                                busy ||
-                                selectedReleases.length ===
-                                    0
-                            }
-                            onClick={() =>
-                                window.confirm(`Generate UPC for ${selectedReleases.length} selected item(s)? A code is permanent once given.`) &&
-                                
-                                runAction(
-                                    '/v2/admin/identifiers/upc/bulk-generate',
-                                    {
-                                        release_ids:
-                                            selectedReleases,
-                                    }
-                                )
-                            }
-                            className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                        >
-                            Generate Selected UPC
-                        </button>
-                    }
+                    description={`${pendingUpc?.total ?? 0} releases waiting for UPC · type the UPC allotted to Mixx Tune (it is checked: 12 or 13 digits, correct last digit, not used before)`}
                 >
                     <div className="overflow-x-auto">
                         <table className="min-w-full">
@@ -617,18 +591,6 @@ export default function Index({
 
                                                 <Cell>
                                                     <div className="flex flex-wrap gap-2">
-                                                        <button
-                                                            type="button"
-                                                            disabled={busy || isOld}
-                                                            onClick={() =>
-                                                                runAction(
-                                                                    `/v2/admin/releases/${release.id}/upc/generate`
-                                                                )
-                                                            }
-                                                            className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-40"
-                                                        >
-                                                            Generate UPC
-                                                        </button>
 
                                                         <button
                                                             type="button"
@@ -642,9 +604,9 @@ export default function Index({
                                                                     release.title
                                                                 )
                                                             }
-                                                            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                                                            className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-40"
                                                         >
-                                                            Edit UPC
+                                                            Enter UPC
                                                         </button>
                                                     </div>
                                                 </Cell>

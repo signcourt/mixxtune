@@ -113,12 +113,12 @@ class DeliveryWorkflowService
             }
         }
 
-        if (blank($release->upc)) {
-            $this->upc->generate(
-                $release,
-                $user
-            );
-        }
+        /* W82: no automatic UPC - Mixx Tune types the allotted one first */
+        abort_if(
+            blank($release->upc),
+            422,
+            'No UPC yet. Enter the UPC allotted to Mixx Tune first (ISRC & UPC -> Pending UPC). DSP delivery was not started.'
+        );
 
         $release->refresh();
         $release->loadMissing('tracks');
@@ -236,7 +236,7 @@ class DeliveryWorkflowService
         }
 
         if (!$legacy && blank($release->upc)) {
-            $notes[] = 'A new UPC will be assigned when delivery starts.';
+            $blocking[] = 'No UPC yet - enter the UPC allotted to Mixx Tune (ISRC & UPC -> Pending UPC -> Enter UPC).';
         }
 
         if (!$legacy && $noIsrc > 0) {

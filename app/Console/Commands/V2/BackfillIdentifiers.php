@@ -50,10 +50,7 @@ class BackfillIdentifiers extends Command
                         continue;
                     }
 
-                    if (blank($release->upc)) {
-                        $upc->generate($release, $admin);
-                        $upcCount++;
-                    }
+                    /* W82: UPCs are never generated here; Mixx Tune types the allotted UPC on ISRC & UPC */
 
                     foreach ($release->tracks as $track) {
 
@@ -68,7 +65,7 @@ class BackfillIdentifiers extends Command
 
             });
 
-        $this->info("UPC generated: {$upcCount}");
+        $this->info("UPC generated: 0 (UPCs are typed on ISRC & UPC, never generated)");
         $this->info("ISRC generated: {$isrcCount}");
 
         return self::SUCCESS;

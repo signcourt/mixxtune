@@ -113,14 +113,14 @@ class SuperAdminFullEditTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->where('release.admin_edit', true)->where('release.editable', false));
 
         $this->actingAs($super)->patch(route('v2.releases.update', $release), $this->payload($artist, $label, [
-            'upc' => '222222222222',
+            'upc' => '222222222224',
             'artwork' => UploadedFile::fake()->image('cover.jpg', 3000, 3000),
         ]))->assertRedirect()->assertSessionHasNoErrors();
 
         $release->refresh();
         $this->assertSame('live', $release->status);
         $this->assertSame('New Gen Title', $release->title);
-        $this->assertSame('222222222222', $release->upc);
+        $this->assertSame('222222222224', $release->upc);
         $this->assertSame(5, (int) $release->wizard_step);
         $this->assertNotSame('releases/artwork/old-gen.jpg', $release->artwork_path);
         Storage::disk('public')->assertExists('releases/artwork/old-gen.jpg');
@@ -128,13 +128,13 @@ class SuperAdminFullEditTest extends TestCase
         $item = DB::table('catalogue_items')->where('release_id', $release->id)->first();
         $this->assertSame('New Gen Title', $item->title);
         $this->assertSame($release->artwork_path, $item->artwork_path);
-        $this->assertSame('222222222222', $item->upc);
+        $this->assertSame('222222222224', $item->upc);
 
         $audit = DB::table('audit_logs')->where('action', 'release.admin_edit')->first();
         $this->assertNotNull($audit);
         $this->assertSame($super->id, (int) $audit->user_id);
         $this->assertStringContainsString('Old Gen Title', (string) $audit->old_values);
-        $this->assertStringContainsString('222222222222', (string) $audit->new_values);
+        $this->assertStringContainsString('222222222224', (string) $audit->new_values);
     }
 
     public function test_super_admin_can_save_only_a_poster_on_an_old_release_with_missing_fields(): void

@@ -1030,8 +1030,8 @@ export default function ReleaseDetailsStep({
                         error={errors.upc}
                         hint={
                             data.generate_upc === false
-                                ? 'Enter your existing UPC below.'
-                                : 'Mixx Tune will assign a UPC.'
+                                ? 'Enter your existing UPC below (12 or 13 digits - we check it).'
+                                : 'Mixx Tune adds the UPC after review.'
                         }
                     >
                         <div className="flex h-[46px] items-center gap-5 rounded-xl border border-slate-200 bg-white px-4">

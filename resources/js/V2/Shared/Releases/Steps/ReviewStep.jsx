@@ -155,6 +155,18 @@ export default function ReviewStep({
                 ),
             step: 2,
         },
+        /* W83: lyricist and composer are needed for every track */
+        {
+            label: 'Lyricist and composer for every track',
+            passed:
+                tracks.length > 0 &&
+                tracks.every(
+                    (track) =>
+                        (Boolean(track.is_instrumental) || String(track.author_name ?? '').trim() !== '') &&
+                        String(track.composer_name ?? '').trim() !== ''
+                ),
+            step: 2,
+        },
         {
             label: 'Stores available',
             passed:
@@ -334,6 +346,9 @@ export default function ReviewStep({
                                             </div>
                                             <div className="truncate text-xs text-slate-500">{track.primary_artist_name || '—'}</div>
                                         </div>
+                                        {((!track.is_instrumental && !String(track.author_name ?? '').trim()) || !String(track.composer_name ?? '').trim()) && (
+                                            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Lyricist / composer missing</span>
+                                        )}
                                         <span className="text-xs font-medium text-slate-600">{track.isrc || 'ISRC at approval'}</span>
                                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${track.audio_path ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
                                             {track.audio_path ? 'Audio ✓' : 'Audio missing'}

@@ -202,6 +202,9 @@ class ReleaseValidationService
             return;
         }
 
+        $creditsNeeded = in_array((string) $release->status, ['draft', 'changes_requested', 'rejected'], true)
+            && !\App\Support\LegacyRelease::is($release);
+
         foreach (
             $release->tracks as $index => $track
         ) {
@@ -231,6 +234,26 @@ class ReleaseValidationService
                     "tracks.{$track->id}.audio"
                 ] =
                     "Track {$number} WAV file is required.";
+            }
+
+            /*
+             * W83 MIXXTUNE_CREDITS_REQUIRED: lyricist and composer are needed
+             * when the owner sends the release (draft / changes requested /
+             * rejected). Releases already sent, approved or live, and old
+             * catalogue, are not blocked by this.
+             */
+            if ($creditsNeeded) {
+                $missing = [];
+                if (!trim((string) $track->author_name) && !(bool) $track->is_instrumental) {
+                    $missing[] = 'lyricist';
+                }
+                if (!trim((string) $track->composer_name)) {
+                    $missing[] = 'composer';
+                }
+                if ($missing) {
+                    $errors["tracks.{$track->id}.credits"] =
+                        "Track {$number}: add the ".implode(' and ', $missing).' (Edit track -> Credits).';
+                }
             }
         }
     }

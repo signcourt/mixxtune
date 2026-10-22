@@ -397,22 +397,14 @@ class ProcessingController extends Controller
             }
         }
 
-        if (!$release->upc) {
-            $upc->generate(
-                $release,
-                $request->user()
-            );
-
-            $upcCreated = true;
-        }
-
+        /* W82: UPC is never generated - it is typed on ISRC & UPC */
         return back()->with(
             'success',
             "{$isrcCount} ISRC generated. "
             . (
-                $upcCreated
-                    ? 'UPC generated.'
-                    : 'UPC already available.'
+                $release->upc
+                    ? 'UPC already available.'
+                    : 'UPC still missing - enter the allotted UPC on ISRC & UPC -> Pending UPC.'
             )
         );
     }

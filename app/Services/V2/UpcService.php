@@ -12,6 +12,8 @@ use Illuminate\Validation\ValidationException;
 
 class UpcService
 {
+    public const MANUAL_ONLY = 'UPC is not made automatically. Enter the UPC allotted to Mixx Tune: ISRC & UPC -> Pending UPC -> Enter UPC.';
+
     public function __construct(
         private readonly NotificationService $notifications,
         private readonly ReleaseAuditService $audit
@@ -43,6 +45,14 @@ class UpcService
             throw ValidationException::withMessages([
                 'upc' =>
                     'UPC/EAN must contain 12 or 13 digits.',
+            ]);
+        }
+
+        /* W82: every typed UPC is checked - a wrong last digit means a typing mistake */
+        if (!$this->gs1Valid($code)) {
+            throw ValidationException::withMessages([
+                'upc' =>
+                    'This UPC is not valid: its last digit (check digit) does not match. Please check the number.',
             ]);
         }
 
@@ -175,6 +185,15 @@ class UpcService
                     'This release already has a UPC.',
             ]);
         }
+
+        /*
+         * W82 MIXXTUNE_UPC_MANUAL_ONLY: UPCs are never made up from a prefix.
+         * Mixx Tune types the UPC allotted to it (ISRC & UPC -> Pending UPC ->
+         * Enter UPC); an owner who has a UPC types it on the release.
+         */
+        throw ValidationException::withMessages([
+            'upc' => self::MANUAL_ONLY,
+        ]);
 
         /* W58: never invent codes for old catalogue */
         if (\App\Support\LegacyRelease::is($release)) {

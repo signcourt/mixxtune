@@ -795,6 +795,14 @@ class ReleaseController extends Controller
 
         $validated = $this->validateDraft($request);
 
+        /* W82: check a typed UPC before anything is saved (format, check digit, not used) */
+        if (!(bool) ($validated['generate_upc'] ?? true)) {
+            $typedUpc = app(UpcService::class)->validate((string) ($validated['upc'] ?? ''));
+            if (\App\Models\Distribution\Release::query()->where('upc', $typedUpc)->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['upc' => 'This UPC is already assigned to another release.']);
+            }
+        }
+
         [$artist, $label] = $this->resolveOwnership(
             $request,
             $permissions,
@@ -933,11 +941,7 @@ class ReleaseController extends Controller
         $upcService = app(UpcService::class);
 
         if ((bool) $validated['generate_upc']) {
-            $release = $upcService->generate(
-                $release,
-                $request->user()
-            );
-
+            /* W82: Mixx Tune enters the allotted UPC later (Pending UPC list) */
             $release->update([
                 'upc_is_auto_generated' => true,
             ]);
@@ -1340,6 +1344,8 @@ class ReleaseController extends Controller
                 && $newUpc !== (string) $release->upc
                 && !$request->boolean('generate_upc')
             ) {
+                $newUpc = app(UpcService::class)->validate($newUpc); /* W82: 12/13 digits + check digit */
+                $request->merge(['upc' => $newUpc]);
                 $request->validate([
                     'upc' => [
                         'regex:/^\d{12,14}$/',

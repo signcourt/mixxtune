@@ -23,6 +23,9 @@ class TrackFactory extends Factory
             'disc_number' => 1,
             'track_number' => 1,
             'title' => fake()->unique()->sentence(3),
+            /* W83: lyricist and composer are needed to send a release */
+            'author_name' => fake()->name(),
+            'composer_name' => fake()->name(),
             'version' => null,
             'subtitle' => null,
             'primary_artist_name' => fake()->name(),

@@ -1066,4 +1066,29 @@ class ReleaseReviewWorkflowTest extends TestCase
             $release->fresh()->status
         );
     }
+
+    /* W83 MIXXTUNE_CREDITS_REQUIRED */
+    public function test_submit_needs_lyricist_and_composer_but_sent_releases_can_still_be_approved(): void
+    {
+        [$artistUser, , , $release] = $this->createArtistContext();
+        $release->tracks()->update(['author_name' => null, 'composer_name' => '  ']);
+
+        $this->actingAs($artistUser)->getJson($this->checklistUrl($release))
+            ->assertOk()
+            ->assertJsonPath('ready', false);
+
+        $this->actingAs($artistUser)->post($this->submitUrl($release))->assertSessionHasErrors();
+        $this->assertSame('draft', $release->fresh()->status);
+
+        $release->tracks()->update(['author_name' => null, 'is_instrumental' => true, 'composer_name' => 'Ravi']); /* instrumental: no lyricist needed */
+        $release = $this->submitRelease($artistUser, $release);
+        $this->assertSame('submitted', $release->status);
+
+        /* a release that was already sent before the rule is not blocked at approval */
+        $release->tracks()->update(['author_name' => null, 'composer_name' => null]);
+        $this->actingAs($this->createSuperAdmin())
+            ->postJson($this->approveUrl($release->fresh()), ['remarks' => 'ok'])
+            ->assertRedirect(route('v2.admin.release-reviews.index'));
+        $this->assertSame('approved', $release->fresh()->status);
+    }
 }

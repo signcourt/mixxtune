@@ -294,7 +294,7 @@ export default function Show({
 
                             <div className="mt-5 space-y-3">
                                 <Action
-                                    label="Generate ISRC & UPC"
+                                    label="Generate missing ISRC (UPC is typed on ISRC & UPC)"
                                     loading={
                                         processing ===
                                         'identifiers'

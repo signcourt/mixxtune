@@ -626,54 +626,17 @@ class IdentifierWorkflowTest extends TestCase
         );
     }
 
-    public function test_manual_upc_does_not_require_valid_checksum(): void
+    /* W82: a typed UPC with a wrong check digit is refused */
+    public function test_manual_upc_with_wrong_check_digit_is_refused(): void
     {
-        [
-            ,
-            ,
-            ,
-            $release,
-            ,
-            $admin,
-        ] = $this->createContext();
+        [, , , $release, , $admin] = $this->createContext();
 
-        $upc = '890000000019';
+        $this->actingAs($admin)
+            ->postJson($this->assignUpcUrl($release), ['upc' => '890000000019'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('upc');
 
-        $response = $this
-            ->actingAs($admin)
-            ->postJson(
-                $this->assignUpcUrl($release),
-                [
-                    'upc' => $upc,
-                ]
-            );
-
-        $response
-            ->assertOk()
-            ->assertJsonPath(
-                'message',
-                'UPC assigned successfully.'
-            )
-            ->assertJsonPath(
-                'release.upc',
-                $upc
-            );
-
-        $release->refresh();
-
-        $this->assertSame(
-            $upc,
-            $release->upc
-        );
-
-        $this->assertDatabaseHas(
-            'upc_codes',
-            [
-                'code' => $upc,
-                'release_id' => $release->id,
-                'status' => 'assigned',
-            ]
-        );
+        $this->assertNull($release->fresh()->upc);
     }
 
     public function test_duplicate_upc_is_rejected(): void
@@ -732,46 +695,18 @@ class IdentifierWorkflowTest extends TestCase
         );
     }
 
-    public function test_super_admin_can_generate_upc(): void
+    /* W82: UPCs are never made up from a prefix */
+    public function test_upc_is_never_generated(): void
     {
-        [
-            ,
-            ,
-            ,
-            $release,
-            ,
-            $admin,
-        ] = $this->createContext();
+        [, , , $release, , $admin] = $this->createContext();
 
-        $response = $this
-            ->actingAs($admin)
-            ->postJson(
-                $this->generateUpcUrl(
-                    $release
-                ),
-                [
-                    'prefix' => '890000',
-                ]
-            );
+        $this->actingAs($admin)
+            ->postJson($this->generateUpcUrl($release), ['prefix' => '890000'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('upc');
 
-        $response
-            ->assertOk()
-            ->assertJsonPath(
-                'message',
-                'UPC generated successfully.'
-            );
-
-        $release->refresh();
-
-        $this->assertMatchesRegularExpression(
-            '/^[0-9]{12}$/',
-            (string) $release->upc
-        );
-
-        $this->assertSame(
-            $admin->id,
-            $release->upc_assigned_by
-        );
+        $this->assertNull($release->fresh()->upc);
+        $this->assertDatabaseMissing('upc_codes', ['release_id' => $release->id]);
     }
 
     public function test_invalid_upc_prefix_is_rejected(): void
@@ -805,97 +740,33 @@ class IdentifierWorkflowTest extends TestCase
 
     public function test_release_with_existing_upc_cannot_generate_another(): void
     {
-        [
-            ,
-            ,
-            ,
-            $release,
-            ,
-            $admin,
-        ] = $this->createContext();
+        [, , , $release, , $admin] = $this->createContext();
 
-        $this
-            ->actingAs($admin)
-            ->postJson(
-                $this->generateUpcUrl(
-                    $release
-                )
-            )
+        $this->actingAs($admin)
+            ->postJson($this->assignUpcUrl($release), ['upc' => '123456789012'])
             ->assertOk();
 
-        $originalUpc =
-            $release->fresh()->upc;
-
-        $response = $this
-            ->actingAs($admin)
-            ->postJson(
-                $this->generateUpcUrl(
-                    $release
-                )
-            );
-
-        $response
+        $this->actingAs($admin)
+            ->postJson($this->generateUpcUrl($release))
             ->assertStatus(422)
-            ->assertJsonValidationErrors(
-                'upc'
-            );
+            ->assertJsonValidationErrors('upc');
 
-        $this->assertSame(
-            $originalUpc,
-            $release->fresh()->upc
-        );
+        $this->assertSame('123456789012', $release->fresh()->upc);
     }
 
-    public function test_bulk_upc_generation_assigns_missing_releases(): void
+    /* W82: bulk generate makes no UPC either */
+    public function test_bulk_upc_generation_is_refused(): void
     {
-        [
-            ,
-            ,
-            ,
-            $firstRelease,
-            ,
-            $admin,
-        ] = $this->createContext();
+        [, , , $firstRelease, , $admin] = $this->createContext();
+        [, , , $secondRelease] = $this->createContext();
 
-        [
-            ,
-            ,
-            ,
-            $secondRelease,
-        ] = $this->createContext();
+        $this->actingAs($admin)
+            ->postJson($this->bulkUpcUrl(), ['release_ids' => [$firstRelease->id, $secondRelease->id], 'prefix' => '890000'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('upc');
 
-        $response = $this
-            ->actingAs($admin)
-            ->postJson(
-                $this->bulkUpcUrl(),
-                [
-                    'release_ids' => [
-                        $firstRelease->id,
-                        $secondRelease->id,
-                    ],
-                    'prefix' => '890000',
-                ]
-            );
-
-        $response
-            ->assertOk()
-            ->assertJsonPath(
-                'message',
-                '2 UPC codes generated.'
-            );
-
-        $this->assertNotNull(
-            $firstRelease->fresh()->upc
-        );
-
-        $this->assertNotNull(
-            $secondRelease->fresh()->upc
-        );
-
-        $this->assertNotSame(
-            $firstRelease->fresh()->upc,
-            $secondRelease->fresh()->upc
-        );
+        $this->assertNull($firstRelease->fresh()->upc);
+        $this->assertNull($secondRelease->fresh()->upc);
     }
 
     public function test_artist_cannot_assign_isrc(): void
@@ -986,11 +857,7 @@ class IdentifierWorkflowTest extends TestCase
 
         $this
             ->actingAs($admin)
-            ->postJson(
-                $this->generateUpcUrl(
-                    $release
-                )
-            )
+            ->postJson($this->assignUpcUrl($release), ['upc' => '987654321012'])
             ->assertOk();
 
         $this->assertDatabaseHas(
@@ -1009,7 +876,7 @@ class IdentifierWorkflowTest extends TestCase
                 'identifier_type' => 'upc',
                 'release_id' =>
                     $release->id,
-                'action' => 'auto_generated',
+                'action' => 'manual_assigned',
                 'performed_by' => $admin->id,
             ]
         );
