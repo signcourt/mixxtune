@@ -19,6 +19,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
     'name',
+    'full_name', /* W79: person the account is created for (name = account name) */
         'username',
     'email',
     'password',

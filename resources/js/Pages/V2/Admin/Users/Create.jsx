@@ -117,13 +117,16 @@ export default function Create({
     labels = [],
 }) {
     /* MIXXTUNE_CREATE_USER_LAYOUT_V2: Users page creates Label/Artist only;
-       Managers are created from Accounts & Access → Managers. */
+       Managers are created from Accounts & Access → Managers.
+       W79: compact form - account name + full name, username / client ID
+       made automatically, labels added row by row with their own %. */
     const isManagerForm = accountType === "manager";
     const initialRole = isManagerForm ? "admin" : "label";
     const backHref = isManagerForm ? "/v2/admin/admins" : "/v2/admin/users";
 
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors, transform } = useForm({
         name: "",
+        full_name: "",
         username: "",
         email: "",
         phone: "",
@@ -151,812 +154,387 @@ export default function Create({
 
         artist_ids: [],
         label_ids: [],
-        new_labels: initialRole === "label" ? [""] : [],
+        new_labels: [],
         permissions: permissionDefaultsForRole(initialRole),
     });
 
+    /* label rows: { kind: "existing" | "new", labelId, name, rate } */
+    const [labelRows, setLabelRows] = useState([]);
+    const [localError, setLocalError] = useState("");
+
     const isPayee = ["label", "artist"].includes(data.role);
     const req = (field) => fieldRequired(requiredFields, data.role, field);
+
+    /* only master labels nobody owns yet can be linked to a new account */
+    const freeLabels = (labels ?? []).filter((label) => !label.user_id && !label.parent_label_id);
+    const usedIds = new Set(labelRows.filter((row) => row.kind === "existing" && row.labelId).map((row) => Number(row.labelId)));
+
+    const addRow = (kind) => setLabelRows((rows) => [...rows, { key: `${kind}-${Date.now()}-${rows.length}`, kind, labelId: "", name: "", rate: "" }]);
+    const updateRow = (key, patch) => setLabelRows((rows) => rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+    const removeRow = (key) => setLabelRows((rows) => rows.filter((row) => row.key !== key));
 
     const toggleSelection = (field, id) => {
         const numberId = Number(id);
         const selected = data[field];
 
-        if (
-            field === "label_ids" &&
-            data.role === "label"
-        ) {
-            setData(
-                field,
-                selected.includes(numberId)
-                    ? []
-                    : [numberId],
-            );
-            return;
-        }
-
-        setData(
-            field,
-            selected.includes(numberId)
-                ? selected.filter((item) => item !== numberId)
-                : [...selected, numberId],
-        );
+        setData(field, selected.includes(numberId) ? selected.filter((item) => item !== numberId) : [...selected, numberId]);
     };
 
-    const togglePermission = (field, checked) => {
-        setData("permissions", {
-            ...data.permissions,
-            [field]: checked,
-        });
-    };
+    const togglePermission = (field, checked) => setData("permissions", { ...data.permissions, [field]: checked });
 
     const applyRoleDefaults = (selectedRole) => {
+        setLabelRows([]);
         setData((current) => ({
             ...current,
             role: selectedRole,
             artist_ids: selectedRole === "admin" ? current.artist_ids : [],
-            label_ids: ["admin", "label"].includes(selectedRole)
-                ? current.label_ids
-                : [],
-            new_labels:
-                selectedRole === "label"
-                    ? current.new_labels?.length
-                        ? current.new_labels
-                        : [""]
-                    : [],
+            label_ids: selectedRole === "admin" ? current.label_ids : [],
+            new_labels: [],
             permissions: permissionDefaultsForRole(selectedRole),
         }));
     };
 
-    const selectAll = (field, items) => {
-        setData(
-            field,
-            items.map((item) => Number(item.id)),
-        );
-    };
+    const selectAll = (field, items) => setData(field, items.map((item) => Number(item.id)));
 
-    const updateNewLabel = (index, value) => {
-        const next = [...(data.new_labels ?? [])];
-
-        next[index] = value;
-
-        setData("new_labels", next);
-    };
-
-    const clearNewLabel = () => {
-        setData("new_labels", [""]);
-    };
-
-    const generateUsername = () => {
-        const source = data.name || data.email?.split("@")[0] || "user";
-
-        let generated = source
-            .toLowerCase()
-            .normalize("NFKD")
-            .replace(/[^a-z0-9]/g, "")
-            .slice(0, 40);
-
-        if (generated.length < 4) {
-            generated = `${generated || "user"}account`.slice(0, 40);
-        }
-
-        setData("username", generated);
-    };
-
-    const setAllPermissions = (value) => {
-        setData(
-            "permissions",
-            Object.fromEntries(
-                permissionOptions.map(([field]) => [field, value]),
-            ),
-        );
-    };
+    const setAllPermissions = (value) =>
+        setData("permissions", Object.fromEntries(permissionOptions.map(([field]) => [field, value])));
 
     const submit = (event) => {
         event.preventDefault();
+        setLocalError("");
 
-        post("/v2/admin/users", {
-            preserveScroll: true,
+        if (data.role === "label") {
+            const rows = labelRows.filter((row) => (row.kind === "existing" ? row.labelId : row.name.trim()));
+            if (rows.length === 0) {
+                setLocalError("Add at least one label: pick an existing label or create a new one.");
+                return;
+            }
+            if (rows.some((row) => row.rate === "" || Number(row.rate) < 0 || Number(row.rate) > 100)) {
+                setLocalError("Every label needs a revenue % between 0 and 100.");
+                return;
+            }
+        }
+
+        transform((d) => {
+            if (d.role !== "label") {
+                return { ...d, label_ids: d.role === "admin" ? d.label_ids : [], new_labels: [] };
+            }
+            const existing = labelRows.filter((row) => row.kind === "existing" && row.labelId);
+            const created = labelRows.filter((row) => row.kind === "new" && row.name.trim());
+            const first = existing[0] || created[0];
+
+            return {
+                ...d,
+                revenue_share_percentage: first ? first.rate : d.revenue_share_percentage,
+                label_ids: existing.map((row) => Number(row.labelId)),
+                label_rates: Object.fromEntries(existing.map((row) => [String(row.labelId), row.rate])),
+                new_labels: created.map((row) => row.name.trim()),
+                new_label_rates: created.map((row) => row.rate),
+            };
         });
+
+        post("/v2/admin/users", { preserveScroll: true });
     };
 
-    const nameLabel =
-        data.role === "label"
-            ? "Owner name (account name)"
-            : data.role === "artist"
-              ? "Artist name (account name)"
-              : "Manager name";
-
     const pageTitle = isManagerForm ? "Create Manager" : "Create User";
+    const err = (key) => errors[key];
 
     return (
         <PanelLayout
             role={role}
             title={pageTitle}
-            subtitle={
-                isManagerForm
-                    ? "Create a Manager account and choose the Artists and Labels they handle"
-                    : "Create a Label or Artist account"
-            }
+            subtitle={isManagerForm ? "Create a Manager account and choose the Artists and Labels they handle" : "Create a Label or Artist account"}
         >
             <Head title={pageTitle} />
             {/* MIXXTUNE_USER_REQUIRED_FIELDS_V1 */}
             {canEditRequiredFields && (
-                <UserRequiredFieldsPanel
-                    requiredFields={requiredFields}
-                    options={requiredFieldOptions}
-                    currentRole={data.role}
-                />
+                <UserRequiredFieldsPanel requiredFields={requiredFields} options={requiredFieldOptions} currentRole={data.role} />
             )}
 
-            <form onSubmit={submit} className="space-y-5">
-                {/* =====================================================
-                    1. ACCOUNT
-                ====================================================== */}
+            <form onSubmit={submit} className="mx-auto max-w-[1200px] space-y-4">
+                {/* 1. ACCOUNT */}
                 <Card>
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                            <h2 className="text-lg font-semibold text-slate-900">
-                                {isManagerForm ? "Manager account" : "Account type"}
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                {isManagerForm
-                                    ? "Login details for the new Manager."
-                                    : "Choose what kind of account you are creating."}
-                            </p>
-                        </div>
-
-                        <Link
-                            href={backHref}
-                            className="text-sm font-semibold text-slate-500 hover:text-slate-900"
-                        >
-                            {isManagerForm ? "Back to Managers" : "Back to Users"}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-[15px] font-bold text-slate-900">{isManagerForm ? "Manager account" : "Account"}</h2>
+                        <Link href={backHref} className="text-xs font-semibold text-slate-500 hover:text-slate-900">
+                            ← {isManagerForm ? "Back to Managers" : "Back to Users"}
                         </Link>
                     </div>
 
                     {!isManagerForm && (
-                        <div className="mt-4 flex flex-wrap gap-3">
+                        <div className="mt-3 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1" role="radiogroup" aria-label="Account type">
                             {[
-                                ["label", "Label", "Owns one label and receives its earnings"],
-                                ["artist", "Artist", "Individual artist account with own earnings"],
-                            ].map(([value, title, help]) => (
+                                ["label", "Label"],
+                                ["artist", "Artist"],
+                            ].map(([value, title]) => (
                                 <button
                                     key={value}
                                     type="button"
+                                    role="radio"
+                                    aria-checked={data.role === value}
                                     onClick={() => applyRoleDefaults(value)}
-                                    className={[
-                                        "min-w-[220px] flex-1 rounded-xl border px-4 py-3 text-left transition sm:flex-none",
-                                        data.role === value
-                                            ? "border-violet-500 bg-violet-50 ring-2 ring-violet-100"
-                                            : "border-slate-300 bg-white hover:bg-slate-50",
-                                    ].join(" ")}
+                                    className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${data.role === value ? "bg-white text-violet-700 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <span
-                                            className={[
-                                                "flex h-4 w-4 items-center justify-center rounded-full border",
-                                                data.role === value
-                                                    ? "border-violet-600"
-                                                    : "border-slate-400",
-                                            ].join(" ")}
-                                        >
-                                            {data.role === value && (
-                                                <span className="h-2 w-2 rounded-full bg-violet-600" />
-                                            )}
-                                        </span>
-                                        <span className="text-sm font-semibold text-slate-900">
-                                            {title}
-                                        </span>
-                                    </div>
-                                    <div className="mt-1 pl-6 text-xs text-slate-500">
-                                        {help}
-                                    </div>
+                                    {title}
                                 </button>
                             ))}
                         </div>
                     )}
+                    {errors.role && <div className="mt-1 text-xs text-red-600">{errors.role}</div>}
 
-                    {errors.role && (
-                        <div className="mt-2 text-xs text-red-600">{errors.role}</div>
-                    )}
-
-                    <SubHeading>Account</SubHeading>
-
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <Field
-                            label={nameLabel}
+                            label={data.role === "label" ? "Account name (label / company)" : data.role === "artist" ? "Account name (artist name)" : "Manager name"}
                             value={data.name}
-                            error={errors.name}
+                            error={err("name")}
                             required
+                            hint="Shown everywhere in the panel, e.g. on the dashboard."
                             onChange={(value) => setData("name", value)}
                         />
-
-                        <div>
+                        {isPayee && (
                             <Field
-                                label="Username"
-                                required={req("username")}
-                                value={data.username}
-                                error={errors.username}
-                                onChange={(value) =>
-                                    setData(
-                                        "username",
-                                        value
-                                            .toLowerCase()
-                                            .replace(/[^a-z0-9]/g, ""),
-                                    )
-                                }
+                                label="Full name (account holder)"
+                                value={data.full_name}
+                                error={err("full_name")}
+                                required
+                                hint="The person this account is created for."
+                                onChange={(value) => setData("full_name", value)}
                             />
-
-                            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                <button
-                                    type="button"
-                                    onClick={generateUsername}
-                                    className="text-xs font-semibold text-violet-600 hover:text-violet-800"
-                                >
-                                    Generate username
-                                </button>
-
-                                {!req("username") && (
-                                    <span className="text-xs text-slate-400">
-                                        Generated automatically if blank.
-                                    </span>
-                                )}
-                            </div>
+                        )}
+                        <Field label="E-mail" type="email" value={data.email} error={err("email")} required onChange={(value) => setData("email", value)} />
+                        <Field label="Phone" required={req("phone")} value={data.phone} error={err("phone")} onChange={(value) => setData("phone", value)} />
+                        <label>
+                            <FieldLabel label="Country" required />
+                            <select
+                                value={data.country_code}
+                                onChange={(event) => {
+                                    const code = event.target.value;
+                                    setData((current) => ({ ...current, country: code === "IN" ? "India" : "", country_code: code, state: "", state_code: "" }));
+                                }}
+                                className={inputClass(errors.country || errors.country_code)}
+                            >
+                                <option value="IN">India</option>
+                            </select>
+                        </label>
+                        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+                            <div><b className="text-slate-700">Username</b> and <b className="text-slate-700">Client ID</b> are created automatically when you save.</div>
                         </div>
-
-                        <Field
-                            label={isManagerForm ? "Email" : "Owner e-mail"}
-                            type="email"
-                            value={data.email}
-                            error={errors.email}
-                            required
-                            onChange={(value) => setData("email", value)}
-                        />
-
-                        <Field
-                            label="Phone"
-                            required={req("phone")}
-                            value={data.phone}
-                            error={errors.phone}
-                            onChange={(value) => setData("phone", value)}
-                        />
                     </div>
+
+                    {data.role === "artist" && (
+                        <div className="mt-3 grid gap-3 md:grid-cols-3">
+                            <Field
+                                label="Revenue %"
+                                type="number"
+                                value={data.revenue_share_percentage}
+                                error={err("revenue_share_percentage")}
+                                required
+                                hint="At 80%, ₹100 collected = ₹80 earning."
+                                onChange={(value) => setData("revenue_share_percentage", value)}
+                            />
+                        </div>
+                    )}
                 </Card>
 
-                {/* =====================================================
-                    2. LABEL (label accounts only)
-                ====================================================== */}
+                {/* 2. LABELS (label accounts) */}
                 {data.role === "label" && (
                     <Card>
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            Label
-                        </h2>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                            Link one existing Label <span className="font-semibold">or</span> type the name of a new Label.
-                        </p>
-
-                        <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                            <SelectionBox
-                                title="Existing Label"
-                                items={labels}
-                                selected={data.label_ids}
-                                nameKey="name"
-                                onToggle={(id) =>
-                                    toggleSelection("label_ids", id)
-                                }
-                                onClear={() => setData("label_ids", [])}
-                            />
-
-                            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                                <h2 className="text-sm font-semibold text-slate-900">
-                                    New Label
-                                </h2>
-
-                                <p className="mt-0.5 text-xs text-slate-500">
-                                    Only when the Label does not exist yet.
-                                </p>
-
-                                <div className="mt-3 flex items-start gap-3">
-                                    <div className="flex-1">
-                                        <input
-                                            type="text"
-                                            value={(data.new_labels ?? [""])[0] ?? ""}
-                                            placeholder="New label name"
-                                            onChange={(event) =>
-                                                updateNewLabel(0, event.target.value)
-                                            }
-                                            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                                        />
-
-                                        {errors["new_labels.0"] && (
-                                            <p className="mt-1 text-xs font-medium text-red-600">
-                                                {errors["new_labels.0"]}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    {((data.new_labels ?? [""])[0] ?? "") !== "" && (
-                                        <button
-                                            type="button"
-                                            onClick={clearNewLabel}
-                                            className="rounded-lg border border-red-200 px-3 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
-                                            title="Clear new label"
-                                        >
-                                            ×
-                                        </button>
-                                    )}
-                                </div>
-                            </section>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h2 className="text-[15px] font-bold text-slate-900">Labels & revenue %</h2>
+                                <p className="mt-0.5 text-xs text-slate-500">Each label keeps its own %. Add as many labels as this account owns.</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => addRow("existing")} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100">
+                                    + Add existing label
+                                </button>
+                                <button type="button" onClick={() => addRow("new")} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                    + Create new label
+                                </button>
+                            </div>
                         </div>
 
-                        {errors.label_ids && (
-                            <p className="mt-3 text-sm font-medium text-red-600">
-                                {errors.label_ids}
-                            </p>
+                        {labelRows.length === 0 ? (
+                            <div className="mt-3 rounded-lg border border-dashed border-slate-300 px-4 py-5 text-center text-xs text-slate-500">
+                                No label yet. Use <b>Add existing label</b> or <b>Create new label</b>.
+                            </div>
+                        ) : (
+                            <div className="mt-3 space-y-2">
+                                {labelRows.map((row, index) => (
+                                    <div key={row.key} className="grid items-end gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 sm:grid-cols-[1fr_140px_auto]">
+                                        {row.kind === "existing" ? (
+                                            <label>
+                                                <span className="text-xs font-semibold text-slate-600">Existing label {index + 1}</span>
+                                                <select
+                                                    value={row.labelId}
+                                                    onChange={(event) => {
+                                                        const picked = freeLabels.find((label) => String(label.id) === event.target.value);
+                                                        const own = picked && picked.revenue_share_percentage !== null && picked.revenue_share_percentage !== undefined && picked.revenue_share_percentage !== "";
+                                                        updateRow(row.key, { labelId: event.target.value, rate: own ? String(Number(picked.revenue_share_percentage)) : "", locked: Boolean(own) });
+                                                    }}
+                                                    className={inputClass(false)}
+                                                >
+                                                    <option value="">Choose a free label…</option>
+                                                    {freeLabels
+                                                        .filter((label) => !usedIds.has(Number(label.id)) || Number(label.id) === Number(row.labelId))
+                                                        .map((label) => (
+                                                            <option key={label.id} value={label.id}>
+                                                                {label.name}
+                                                            </option>
+                                                        ))}
+                                                </select>
+                                            </label>
+                                        ) : (
+                                            <label>
+                                                <span className="text-xs font-semibold text-slate-600">New label name {index + 1}</span>
+                                                <input type="text" value={row.name} onChange={(event) => updateRow(row.key, { name: event.target.value })} placeholder="e.g. Sanatan Records" className={inputClass(false)} />
+                                            </label>
+                                        )}
+                                        <label>
+                                            <span className="text-xs font-semibold text-slate-600">Revenue %</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                value={row.rate}
+                                                readOnly={Boolean(row.locked)}
+                                                title={row.locked ? "This label already has a %. Change it on the Labels page." : undefined}
+                                                onChange={(event) => updateRow(row.key, { rate: event.target.value })}
+                                                className={`${inputClass(false)} ${row.locked ? "bg-slate-100 text-slate-500" : ""}`}
+                                            />
+                                        </label>
+                                        <button type="button" onClick={() => removeRow(row.key)} className="h-[38px] rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-600 hover:bg-red-50" aria-label={`Remove label ${index + 1}`}>
+                                            Remove
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                         )}
-
-                        {errors.new_labels && (
-                            <p className="mt-3 text-sm font-medium text-red-600">
-                                {errors.new_labels}
-                            </p>
+                        {(localError || errors.label_ids || errors.new_labels || errors["new_labels.0"] || errors.revenue_share_percentage) && (
+                            <p className="mt-2 text-xs font-medium text-red-600">{localError || errors.label_ids || errors.new_labels || errors["new_labels.0"] || errors.revenue_share_percentage}</p>
                         )}
+                        <p className="mt-2 text-[11px] leading-5 text-slate-400">
+                            Positive collected revenue is paid at the label %; negative adjustments pass through at 100%. An existing label keeps its own % (grey box).
+                            Giving an existing label to this account needs the 6-digit code e-mailed to you when you press Create.
+                        </p>
                     </Card>
                 )}
 
-                {/* =====================================================
-                    3. DETAILS (label / artist)
-                ====================================================== */}
+                {/* 3. ADDRESS + KYC + BANK (label / artist) */}
                 {isPayee && (
                     <Card>
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            Details
-                        </h2>
-
-                        <SubHeading>Address</SubHeading>
-
-                        <div className="grid gap-4 md:grid-cols-3">
+                        <h2 className="text-[15px] font-bold text-slate-900">Address</h2>
+                        <div className="mt-3 grid gap-3 md:grid-cols-3">
+                            <Field label="Address line 1" value={data.address_line_1} error={err("address_line_1")} required={req("address_line_1")} onChange={(value) => setData("address_line_1", value)} />
+                            <Field label="Address line 2" value={data.address_line_2} error={err("address_line_2")} required={req("address_line_2")} onChange={(value) => setData("address_line_2", value)} />
+                            <Field label="City" value={data.city} error={err("city")} required={req("city")} onChange={(value) => setData("city", value)} />
                             <label>
-                                <FieldLabel
-                                    label="State"
-                                    required={req("state")}
-                                />
-
-                                {data.country_code === "IN" ? (
-                                    <select
-                                        value={data.state_code}
-                                        onChange={(event) => {
-                                            const code = event.target.value;
-
-                                            setData((current) => ({
-                                                ...current,
-                                                state_code: code,
-                                                state:
-                                                    indiaStateNameByCode[code] ??
-                                                    "",
-                                            }));
-                                        }}
-                                        className={inputClass(errors.state || errors.state_code)}
-                                        required={req("state")}
-                                    >
-                                        <option value="">Select state...</option>
-
-                                        {indiaStates.map(([code, name]) => (
-                                            <option key={code} value={code}>
-                                                {name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                ) : (
-                                    <input
-                                        type="text"
-                                        value={data.state}
-                                        onChange={(event) =>
-                                            setData(
-                                                "state",
-                                                event.target.value,
-                                            )
-                                        }
-                                        className={inputClass(errors.state || errors.state_code)}
-                                        required={req("state")}
-                                    />
-                                )}
-
-                                {(errors.state || errors.state_code) && (
-                                    <p className="mt-1 text-xs text-red-600">
-                                        {errors.state || errors.state_code}
-                                    </p>
-                                )}
-                            </label>
-
-                            <Field
-                                label="City"
-                                value={data.city}
-                                error={errors.city}
-                                required={req("city")}
-                                onChange={(value) => setData("city", value)}
-                            />
-
-                            <Field
-                                label="Pincode"
-                                value={data.postal_code}
-                                error={errors.postal_code}
-                                required={req("postal_code")}
-                                onChange={(value) =>
-                                    setData("postal_code", value)
-                                }
-                            />
-
-                            <Field
-                                label="Address line 1"
-                                value={data.address_line_1}
-                                error={errors.address_line_1}
-                                required={req("address_line_1")}
-                                onChange={(value) =>
-                                    setData("address_line_1", value)
-                                }
-                            />
-
-                            <Field
-                                label="Address line 2"
-                                required={req("address_line_2")}
-                                value={data.address_line_2}
-                                error={errors.address_line_2}
-                                onChange={(value) =>
-                                    setData("address_line_2", value)
-                                }
-                            />
-
-                            <label>
-                                <FieldLabel label="Country" required />
-
+                                <FieldLabel label="State" required={req("state")} />
                                 <select
-                                    value={data.country_code}
+                                    value={data.state_code}
                                     onChange={(event) => {
                                         const code = event.target.value;
-
-                                        setData((current) => ({
-                                            ...current,
-                                            country:
-                                                code === "IN"
-                                                    ? "India"
-                                                    : "",
-                                            country_code: code,
-                                            state: "",
-                                            state_code: "",
-                                        }));
+                                        setData((current) => ({ ...current, state_code: code, state: indiaStateNameByCode[code] ?? "" }));
                                     }}
-                                    className={inputClass(errors.country || errors.country_code)}
-                                    required
+                                    className={inputClass(errors.state || errors.state_code)}
                                 >
-                                    <option value="">
-                                        Select country
-                                    </option>
-
-                                    <option value="IN">
-                                        India
-                                    </option>
+                                    <option value="">Select state…</option>
+                                    {indiaStates.map(([code, name]) => (
+                                        <option key={code} value={code}>
+                                            {name}
+                                        </option>
+                                    ))}
                                 </select>
-
-                                {(errors.country || errors.country_code) && (
-                                    <p className="mt-1 text-xs text-red-600">
-                                        {errors.country || errors.country_code}
-                                    </p>
-                                )}
+                                {(errors.state || errors.state_code) && <p className="mt-1 text-xs text-red-600">{errors.state || errors.state_code}</p>}
                             </label>
+                            <Field label="Pincode" value={data.postal_code} error={err("postal_code")} required={req("postal_code")} onChange={(value) => setData("postal_code", value)} />
                         </div>
 
-                        <SubHeading>Revenue</SubHeading>
-
-                        <div className="grid gap-4 md:grid-cols-3">
+                        <div className="mt-5 grid gap-5 lg:grid-cols-2">
                             <div>
-                                <Field
-                                    label="Revenue %"
-                                    type="number"
-                                    value={data.revenue_share_percentage}
-                                    error={errors.revenue_share_percentage}
-                                    required
-                                    onChange={(value) =>
-                                        setData(
-                                            "revenue_share_percentage",
-                                            value,
-                                        )
-                                    }
-                                />
+                                <h2 className="text-[15px] font-bold text-slate-900">Tax & KYC</h2>
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                    <Field label="PAN" value={data.pan_number} error={err("pan_number")} required={req("pan_number")} onChange={(value) => setData("pan_number", value.toUpperCase().replace(/\s+/g, ""))} />
+                                    <Field label="GST" value={data.gst_number} error={err("gst_number")} required={req("gst_number")} onChange={(value) => setData("gst_number", value.toUpperCase().replace(/\s+/g, ""))} />
+                                </div>
                             </div>
-
-                            <p className="self-end pb-1 text-xs leading-5 text-slate-500 md:col-span-2">
-                                Positive collected revenue is paid at this %
-                                (at 80%, ₹100 collected = ₹80 earning). Negative
-                                adjustments pass through at 100%.
-                            </p>
-                        </div>
-
-                        <SubHeading>Bank details</SubHeading>
-
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <Field
-                                label="Account holder name"
-                                value={data.account_holder_name}
-                                error={errors.account_holder_name}
-                                required={req("account_holder_name")}
-                                onChange={(value) =>
-                                    setData("account_holder_name", value)
-                                }
-                            />
-
-                            <Field
-                                label="Bank account number"
-                                value={data.bank_account_number}
-                                error={errors.bank_account_number}
-                                required={req("bank_account_number")}
-                                onChange={(value) =>
-                                    setData("bank_account_number", value)
-                                }
-                            />
-
-                            <Field
-                                label="Bank name"
-                                value={data.bank_name}
-                                error={errors.bank_name}
-                                required={req("bank_name")}
-                                onChange={(value) =>
-                                    setData("bank_name", value)
-                                }
-                            />
-
-                            <Field
-                                label="IFSC code"
-                                value={data.ifsc_code}
-                                error={errors.ifsc_code}
-                                required={req("ifsc_code")}
-                                onChange={(value) =>
-                                    setData(
-                                        "ifsc_code",
-                                        value
-                                            .toUpperCase()
-                                            .replace(/\s+/g, ""),
-                                    )
-                                }
-                            />
-
-                            <Field
-                                label="Branch name"
-                                required={req("branch_name")}
-                                value={data.branch_name}
-                                error={errors.branch_name}
-                                onChange={(value) =>
-                                    setData("branch_name", value)
-                                }
-                            />
-                        </div>
-
-                        <SubHeading>Tax</SubHeading>
-
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <Field
-                                label="PAN"
-                                value={data.pan_number}
-                                error={errors.pan_number}
-                                required={req("pan_number")}
-                                onChange={(value) =>
-                                    setData(
-                                        "pan_number",
-                                        value
-                                            .toUpperCase()
-                                            .replace(/\s+/g, ""),
-                                    )
-                                }
-                            />
-
-                            <Field
-                                label="GST"
-                                required={req("gst_number")}
-                                value={data.gst_number}
-                                error={errors.gst_number}
-                                onChange={(value) =>
-                                    setData(
-                                        "gst_number",
-                                        value
-                                            .toUpperCase()
-                                            .replace(/\s+/g, ""),
-                                    )
-                                }
-                            />
+                            <div>
+                                <h2 className="text-[15px] font-bold text-slate-900">Bank details</h2>
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                    <Field label="Account holder name" value={data.account_holder_name} error={err("account_holder_name")} required={req("account_holder_name")} onChange={(value) => setData("account_holder_name", value)} />
+                                    <Field label="Account number" value={data.bank_account_number} error={err("bank_account_number")} required={req("bank_account_number")} onChange={(value) => setData("bank_account_number", value)} />
+                                    <Field label="Bank name" value={data.bank_name} error={err("bank_name")} required={req("bank_name")} onChange={(value) => setData("bank_name", value)} />
+                                    <Field label="IFSC" value={data.ifsc_code} error={err("ifsc_code")} required={req("ifsc_code")} onChange={(value) => setData("ifsc_code", value.toUpperCase().replace(/\s+/g, ""))} />
+                                    <Field label="Branch" value={data.branch_name} error={err("branch_name")} required={req("branch_name")} onChange={(value) => setData("branch_name", value)} />
+                                </div>
+                            </div>
                         </div>
                     </Card>
                 )}
 
-                {/* =====================================================
-                    MANAGER ASSIGNMENTS (manager form only)
-                ====================================================== */}
+                {/* MANAGER ASSIGNMENTS (manager form only) */}
                 {isManagerForm && (
                     <Card>
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            Manager assignments
-                        </h2>
-
-                        <p className="mt-1 text-sm text-slate-500">
-                            Select the Artists and Labels this Manager is
-                            responsible for.
-                        </p>
-
-                        <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                            <SelectionBox
-                                title="Assigned Artists"
-                                items={artists}
-                                selected={data.artist_ids}
-                                nameKey="stage_name"
-                                onToggle={(id) =>
-                                    toggleSelection("artist_ids", id)
-                                }
-                                onSelectAll={() =>
-                                    selectAll("artist_ids", artists)
-                                }
-                                onClear={() => setData("artist_ids", [])}
-                            />
-
-                            <SelectionBox
-                                title="Assigned Labels"
-                                items={labels}
-                                selected={data.label_ids}
-                                nameKey="name"
-                                onToggle={(id) =>
-                                    toggleSelection("label_ids", id)
-                                }
-                                onSelectAll={() =>
-                                    selectAll("label_ids", labels)
-                                }
-                                onClear={() => setData("label_ids", [])}
-                            />
+                        <h2 className="text-[15px] font-bold text-slate-900">Manager assignments</h2>
+                        <p className="mt-0.5 text-xs text-slate-500">Select the Artists and Labels this Manager is responsible for.</p>
+                        <div className="mt-3 grid gap-3 xl:grid-cols-2">
+                            <SelectionBox title="Assigned Artists" items={artists} selected={data.artist_ids} nameKey="stage_name" onToggle={(id) => toggleSelection("artist_ids", id)} onSelectAll={() => selectAll("artist_ids", artists)} onClear={() => setData("artist_ids", [])} />
+                            <SelectionBox title="Assigned Labels" items={labels} selected={data.label_ids} nameKey="name" onToggle={(id) => toggleSelection("label_ids", id)} onSelectAll={() => selectAll("label_ids", labels)} onClear={() => setData("label_ids", [])} />
                         </div>
                     </Card>
                 )}
 
-                {/* =====================================================
-                    PANEL PERMISSIONS
-                ====================================================== */}
+                {/* PANEL PERMISSIONS */}
                 <Card>
-                    <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <h2 className="text-lg font-semibold text-slate-900">
-                                Panel permissions
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Recommended defaults are already ticked for this
-                                account type.
-                            </p>
+                            <h2 className="text-[15px] font-bold text-slate-900">Panel permissions</h2>
+                            <p className="mt-0.5 text-xs text-slate-500">Recommended defaults are ticked for this account type.</p>
                         </div>
-
                         <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setAllPermissions(true)}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                                Select all
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setAllPermissions(false)}
-                                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                                Clear
-                            </button>
+                            <button type="button" onClick={() => setAllPermissions(true)} className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">Select all</button>
+                            <button type="button" onClick={() => setAllPermissions(false)} className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">Clear</button>
                         </div>
                     </div>
-
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="mt-3 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {permissionOptions.map(([field, label]) => (
-                            <label
-                                key={field}
-                                className={[
-                                    "flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition",
-                                    data.permissions[field]
-                                        ? "border-violet-400 bg-violet-50"
-                                        : "border-slate-200 bg-white",
-                                ].join(" ")}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={data.permissions[field]}
-                                    onChange={(event) =>
-                                        togglePermission(
-                                            field,
-                                            event.target.checked,
-                                        )
-                                    }
-                                />
-
-                                <span className="text-sm font-semibold text-slate-700">
-                                    {label}
-                                </span>
+                            <label key={field} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px] ${data.permissions[field] ? "border-violet-300 bg-violet-50 text-violet-900" : "border-slate-200 text-slate-700"}`}>
+                                <input type="checkbox" checked={data.permissions[field]} onChange={(event) => togglePermission(field, event.target.checked)} />
+                                <span className="font-medium">{label}</span>
                             </label>
                         ))}
                     </div>
                 </Card>
 
-                {/* =====================================================
-                    LOGIN & INVITATION
-                ====================================================== */}
-                <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
-                    <label className="flex cursor-pointer items-start gap-4">
-                        <input
-                            type="checkbox"
-                            checked={data.send_invitation}
-                            onChange={(event) =>
-                                setData(
-                                    "send_invitation",
-                                    event.target.checked,
-                                )
-                            }
-                            className="mt-1"
-                        />
-
+                {/* LOGIN & INVITATION */}
+                <Card>
+                    <label className="flex cursor-pointer items-start gap-3">
+                        <input type="checkbox" checked={data.send_invitation} onChange={(event) => setData("send_invitation", event.target.checked)} className="mt-1" />
                         <div>
-                            <div className="text-sm font-semibold text-slate-900">
-                                Send account invitation by e-mail
-                            </div>
-
-                            <p className="mt-1 text-xs leading-5 text-slate-500">
-                                The account is created as{" "}
-                                <span className="font-semibold text-amber-700">Pending</span>{" "}
-                                and becomes Active after the invitation is
-                                accepted and a password is set (link valid for
-                                seven days).
+                            <div className="text-sm font-semibold text-slate-900">Send account invitation by e-mail</div>
+                            <p className="mt-0.5 text-xs leading-5 text-slate-500">
+                                The account starts as <b className="text-amber-700">Pending</b> and becomes Active once the owner opens the link (valid 7 days) and sets a password.
                             </p>
+                            {!data.send_invitation && (
+                                <p className="mt-1 text-xs text-amber-700">No e-mail now. You can send the invitation or copy the link later from Edit User → Security.</p>
+                            )}
                         </div>
                     </label>
+                </Card>
 
-                    {!data.send_invitation && (
-                        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-                            Invitation is disabled. The account stays Pending
-                            until a valid invitation is later issued and
-                            accepted.
-                        </div>
-                    )}
-                </section>
-
-                {Object.keys(errors).length > 0 && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-                        Some information could not be saved. Review the
-                        highlighted fields before submitting again.
-                    </div>
+                {Object.keys(errors).filter((key) => !["action_otp", "bank_change_otp"].includes(key)).length > 0 && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">Some information could not be saved. Check the fields marked in red.</div>
                 )}
 
-                <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+                <div className="sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
                     <div className="text-xs text-slate-500">
-                        <span className="text-red-500">*</span> = required.
-                        New accounts are created as{" "}
-                        <span className="font-semibold text-amber-700">
-                            Pending
-                        </span>
-                        .
+                        <span className="text-red-500">*</span> required · new accounts start as <b className="text-amber-700">Pending</b>
                     </div>
-
-                    <div className="flex gap-3">
-                        <Link
-                            href={backHref}
-                            className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            Cancel
-                        </Link>
-
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="rounded-xl bg-violet-600 px-7 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {processing
-                                ? "Creating..."
-                                : isManagerForm
-                                  ? "Create Manager"
-                                  : data.role === "artist"
-                                    ? "Create Artist"
-                                    : "Create Label User"}
+                    <div className="flex gap-2">
+                        <Link href={backHref} className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</Link>
+                        <button type="submit" disabled={processing} className="rounded-lg bg-violet-600 px-6 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50">
+                            {processing ? "Creating..." : isManagerForm ? "Create Manager" : data.role === "artist" ? "Create Artist" : "Create Label Account"}
                         </button>
                     </div>
                 </div>
@@ -967,7 +545,7 @@ export default function Create({
 
 function Card({ children }) {
     return (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             {children}
         </section>
     );
@@ -983,14 +561,14 @@ function SubHeading({ children }) {
 
 function inputClass(error) {
     return [
-        "mt-1.5 w-full rounded-xl border bg-white px-4 py-2.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100",
+        "mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100",
         error ? "border-red-400" : "border-slate-300",
     ].join(" ");
 }
 
 function FieldLabel({ label, required = false }) {
     return (
-        <span className="text-sm font-semibold text-slate-700">
+        <span className="text-xs font-semibold text-slate-600">
             {label}
             {required ? (
                 <span className="ml-1 text-red-500">*</span>
@@ -1010,19 +588,18 @@ function Field({
     type = "text",
     error,
     required = false,
+    hint = null,
 }) {
     return (
         <label>
             <FieldLabel label={label} required={required} />
-
             <input
                 type={type}
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 className={inputClass(error)}
             />
-
-            {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
+            {error ? <div className="mt-1 text-xs text-red-600">{error}</div> : hint ? <div className="mt-1 text-[11px] text-slate-400">{hint}</div> : null}
         </label>
     );
 }

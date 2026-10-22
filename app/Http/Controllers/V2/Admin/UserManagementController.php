@@ -512,13 +512,18 @@ class UserManagementController extends Controller
                             'email',
                         ]),
 
+                /* W79: owner + parent so the form only offers labels that are still free */
                 'labels' =>
                     Label::query()
+                        ->whereNull('deleted_at')
                         ->orderBy('name')
                         ->get([
                             'id',
                             'name',
                             'email',
+                            'user_id',
+                            'parent_label_id',
+                            'revenue_share_percentage',
                         ]),
             ]
         );
@@ -547,6 +552,33 @@ class UserManagementController extends Controller
                 'max:150',
             ],
 
+            /* W79: account name = name; the person behind it = full_name */
+            /* nullable here: ownership transfer / bulk import also create users through this method */
+            'full_name' => [
+                'nullable',
+                'string',
+                'max:150',
+            ],
+            'label_rates' => [
+                'nullable',
+                'array',
+            ],
+            'label_rates.*' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:100',
+            ],
+            'new_label_rates' => [
+                'nullable',
+                'array',
+            ],
+            'new_label_rates.*' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:100',
+            ],
             'username' => [
                 'nullable',
                 $fieldReq('username'),
@@ -885,6 +917,25 @@ class UserManagementController extends Controller
             ]);
         }
 
+        $ratesBefore = $validated['role'] === 'label' ? $this->labelRatesBefore($validated) : [];
+
+        /*
+         * W79: an existing label picked on the form becomes owned by the new
+         * account when it has no owner yet. Giving a label an owner is a
+         * money-sensitive step, so it needs the e-mailed code (nothing is
+         * saved before the code is entered).
+         */
+        $orphanLabelIds = $validated['role'] === 'label' && ! app()->bound('mixxtune.ownership_tool_create')
+            ? Label::query()->whereIn('id', array_map('intval', $validated['label_ids'] ?? []))->whereNull('user_id')->whereNull('deleted_at')->orderBy('id')->pluck('id')->map(fn ($id) => (int) $id)->all()
+            : [];
+        if ($orphanLabelIds !== []) {
+            app(\App\Services\V2\ActionOtpGuard::class)->require(
+                $request->user(),
+                'user.create.link_labels:'.implode(',', $orphanLabelIds),
+                'give existing labels to the new account'
+            );
+        }
+
         $user = DB::transaction(
             function () use (
                 $validated,
@@ -899,6 +950,9 @@ class UserManagementController extends Controller
                 $user = User::query()->create([
                     'name' =>
                         $validated['name'],
+
+                    'full_name' =>
+                        filled($validated['full_name'] ?? null) ? trim($validated['full_name']) : null,
 
                     'username' =>
                         $username,
@@ -1299,6 +1353,27 @@ class UserManagementController extends Controller
                         ] = $labelPivot;
                     }
 
+                    /* W79: each new label row has its own % (else the account %) */
+
+                    $newRates = [];
+
+                    foreach (array_values($validated['new_labels'] ?? []) as $rateIndex => $rateName) {
+
+                        $typed = array_values($validated['new_label_rates'] ?? [])[$rateIndex] ?? null;
+
+                        if (trim((string) $rateName) !== '' && $typed !== null && $typed !== '') {
+
+                            $newRates[mb_strtolower(trim((string) $rateName))] = (float) $typed;
+
+                        }
+
+                    }
+
+                    $accountRate = isset($validated['revenue_share_percentage']) && $validated['revenue_share_percentage'] !== '' ? (float) $validated['revenue_share_percentage'] : null;
+
+                    $newRateFor = fn (string $name) => $newRates[mb_strtolower(trim($name))] ?? $accountRate;
+
+
                     foreach (
                         collect(
                             $validated['new_labels']
@@ -1343,10 +1418,9 @@ class UserManagementController extends Controller
                                     'user_id' =>
                                         $user->id,
 
+                                    /* W79: an owner never changes a label's existing % */
                                     'revenue_share_percentage' =>
-                                        (float) $validated[
-                                            'revenue_share_percentage'
-                                        ],
+                                        $label->revenue_share_percentage ?? $newRateFor($labelName),
 
                                     'updated_by' =>
                                         $request
@@ -1449,9 +1523,7 @@ class UserManagementController extends Controller
                                         'INR',
 
                                     'revenue_share_percentage' =>
-                                        (float) $validated[
-                                            'revenue_share_percentage'
-                                        ],
+                                        $newRateFor($labelName),
 
                                     'status' =>
                                         'active',
@@ -1511,6 +1583,23 @@ class UserManagementController extends Controller
                 return $user;
             }
         );
+
+        /* W79: picked labels without an owner now belong to this account */
+        foreach ($orphanLabelIds as $orphanId) {
+            DB::transaction(function () use ($orphanId, $user, $request, $audit) {
+                $label = Label::query()->whereKey($orphanId)->whereNull('user_id')->lockForUpdate()->first();
+                if (! $label) {
+                    return;
+                }
+                $label->forceFill(['user_id' => $user->id, 'updated_by' => $request->user()->id])->save();
+                $audit->record('label.owner_assigned', 'labels', "Label {$label->name} (#{$label->id}) given to new account {$user->email}.", ['user_id' => null], ['user_id' => $user->id], $label, $request);
+            });
+        }
+
+        /* W79: each label row on the form has its own revenue % (a label that already has a % keeps it) */
+        if ($validated['role'] === 'label') {
+            $this->applyLabelRates($user, $validated, $request, $ratesBefore);
+        }
 
         if (
             (bool) $validated['send_invitation']
@@ -1767,6 +1856,7 @@ return Inertia::render(
 
                 'managedUser' => [
                     'id' => $user->id,
+                    'full_name' => $user->full_name,
 
                     /*
                      * MIXXTUNE_QUICK_EDIT_FIELD_CONFIG_PAYLOAD_V1
@@ -3245,6 +3335,22 @@ $validated = $request->validate([
                 'max:100',
             ],
 
+            /* W79 */
+            'full_name' => [
+                'nullable',
+                'string',
+                'max:150',
+            ],
+            'new_label_rates' => [
+                'nullable',
+                'array',
+            ],
+            'new_label_rates.*' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:100',
+            ],
             'role' => [
                 'required',
                 'string',
@@ -3513,6 +3619,8 @@ $oldValues = [
                     ->all(),
         ];
 
+        $ratesBefore = $validated['role'] === 'label' ? $this->labelRatesBefore(['new_labels' => $validated['new_labels'] ?? []]) : [];
+
         DB::transaction(
             function () use (
                 $validated,
@@ -3522,6 +3630,9 @@ $oldValues = [
                 $user->update([
                     'name' =>
                         $validated['name'],
+
+                    'full_name' =>
+                        filled($validated['full_name'] ?? null) ? trim($validated['full_name']) : $user->full_name,
 
                     'email' =>
                         strtolower(
@@ -3819,6 +3930,16 @@ $oldValues = [
                         ] = $ownerPivot;
                     }
 
+                    $newRates = [];
+                    foreach (array_values($validated['new_labels'] ?? []) as $rateIndex => $rateName) {
+                        $typed = array_values($validated['new_label_rates'] ?? [])[$rateIndex] ?? null;
+                        if (trim((string) $rateName) !== '' && $typed !== null && $typed !== '') {
+                            $newRates[mb_strtolower(trim((string) $rateName))] = (float) $typed;
+                        }
+                    }
+                    $accountRate = isset($validated['revenue_share_percentage']) && $validated['revenue_share_percentage'] !== '' ? (float) $validated['revenue_share_percentage'] : null;
+                    $newRateFor = fn (string $name) => $newRates[mb_strtolower(trim($name))] ?? $accountRate;
+
                     /*
                      * Unlimited new labels.
                      */
@@ -3965,10 +4086,9 @@ $oldValues = [
                                     'currency' =>
                                         'INR',
 
+                                    /* W79: the % typed next to this new label (else the account %, else Rate Pending) */
                                     'revenue_share_percentage' =>
-                                        (float) $validated[
-                                            'revenue_share_percentage'
-                                        ],
+                                        $newRateFor($labelName),
 
                                     'status' =>
                                         'active',
@@ -3999,15 +4119,17 @@ $oldValues = [
                             $label->save();
                         }
 
-                        $label->forceFill([
-                            'revenue_share_percentage' =>
-                                (float) $validated[
-                                    'revenue_share_percentage'
-                                ],
-
-                            'updated_by' =>
-                                $request->user()->id,
-                        ])->save();
+                        /*
+                         * W79: before, every label typed here got the account % written over
+                         * its own % (and a 500 when the form sent no account %). Now only a
+                         * label without a % gets the one typed next to it.
+                         */
+                        if ($label->revenue_share_percentage === null && $newRateFor($labelName) !== null) {
+                            $label->forceFill([
+                                'revenue_share_percentage' => $newRateFor($labelName),
+                                'updated_by' => $request->user()->id,
+                            ])->save();
+                        }
 
                         $labelSync[
                             (int) $label->id
@@ -4345,11 +4467,17 @@ $oldValues = [
             }
         );
 
+        /* W79: a new label added on the edit form gets its own % */
+        if ($validated['role'] === 'label') {
+            $this->applyLabelRates($user, ['new_labels' => $validated['new_labels'] ?? [], 'new_label_rates' => $validated['new_label_rates'] ?? []], $request, $ratesBefore);
+        }
+
         $user->refresh();
 
         $newValues = [
             'user' => $user->only([
                 'name',
+                'full_name',
                 'username',
                 'email',
                 'phone',
@@ -4550,6 +4678,88 @@ $oldValues = [
             403,
             'Super Admin access required.'
         );
+    }
+
+    /**
+     * W79: per-label revenue % from the account form.
+     * label_rates[label_id] for chosen labels, new_label_rates[i] for the
+     * i-th new label name. Only labels owned by this account are touched;
+     * an empty value leaves the label as it is.
+     */
+    /** W79: label id => rate before this save, for the labels the form names (null = no % yet) */
+    private function labelRatesBefore(array $validated): array
+    {
+        $before = [];
+        foreach (array_keys($validated['label_rates'] ?? []) as $labelId) {
+            $label = Label::query()->find((int) $labelId);
+            if ($label) {
+                $before[(int) $label->id] = $label->revenue_share_percentage;
+            }
+        }
+        foreach ($validated['new_labels'] ?? [] as $name) {
+            $name = trim((string) $name);
+            $label = $name !== '' ? app(LabelIdentityService::class)->representative($name) : null;
+            if ($label) {
+                $before[(int) $label->id] = $label->revenue_share_percentage;
+            }
+        }
+
+        return $before;
+    }
+
+    private function applyLabelRates(User $user, array $validated, Request $request, array $before = []): void
+    {
+        $targets = [];
+
+        foreach (($validated['label_rates'] ?? []) as $labelId => $rate) {
+            $hadRate = array_key_exists((int) $labelId, $before) && $before[(int) $labelId] !== null && $before[(int) $labelId] !== '';
+            if ($rate !== null && $rate !== '' && ! $hadRate) {
+                $targets[] = [Label::query()->whereKey((int) $labelId)->where('user_id', $user->id)->first(), (float) $rate];
+            }
+        }
+
+        foreach (array_values($validated['new_labels'] ?? []) as $index => $name) {
+            $rate = array_values($validated['new_label_rates'] ?? [])[$index] ?? null;
+            $name = trim((string) $name);
+            if ($name === '' || $rate === null || $rate === '') {
+                continue;
+            }
+            $label = Label::query()
+                ->where('user_id', $user->id)
+                ->whereNull('deleted_at')
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+                ->first()
+                ?? app(LabelIdentityService::class)->representative($name);
+            $targets[] = [$label && (int) $label->user_id === (int) $user->id ? $label : null, (float) $rate];
+        }
+
+        foreach ($targets as [$label, $rate]) {
+            if (! $label || ($label->revenue_share_percentage !== null && (float) $label->revenue_share_percentage === $rate)) {
+                continue;
+            }
+            /*
+             * A label created in this same save, or one that had no % yet, gets
+             * its first % without the e-mailed code (same rule as the observer).
+             * A label that already had a % keeps the normal code check.
+             */
+            $firstRate = ! array_key_exists((int) $label->id, $before) || $before[(int) $label->id] === null || $before[(int) $label->id] === '';
+            if ($firstRate) {
+                app()->instance('mixxtune.label_rate_confirmed', true);
+            }
+            try {
+                $label->forceFill([
+                    'revenue_share_percentage' => $rate,
+                    'updated_by' => $request->user()->id,
+                ])->save();
+            } finally {
+                if ($firstRate) {
+                    app()->forgetInstance('mixxtune.label_rate_confirmed');
+                }
+            }
+
+            /* same as the edit form: earnings already imported follow the new rate */
+            app(ReportEarningsRecalculationService::class)->recalculateForLabel($label);
+        }
     }
 
     private function permissionFields(): array

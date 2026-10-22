@@ -51,8 +51,11 @@ export default function Edit({
         }
     }, [flash.temporary_password, flash.invitation_link]);
 
-    const { data, setData, patch, processing, errors } = useForm({
+    const { data, setData, patch, processing, errors, transform } = useForm({
         name: managedUser?.name ?? "",
+
+        /* W79: the person the account is created for */
+        full_name: managedUser?.full_name ?? "",
 
         email: managedUser?.email ?? "",
 
@@ -128,7 +131,9 @@ export default function Edit({
                   )
                 : assignedLabelIds.map(Number),
 
-        new_labels: [""],
+        /* W79: new label rows appear only after "+ Create new label" */
+        new_labels: [],
+        new_label_rates: [],
 
         permissions: Object.fromEntries(
             permissionOptions.map(([field]) => [
@@ -158,30 +163,37 @@ export default function Edit({
         );
     };
 
-    const addNewLabel = () => {
-        if ((data.new_labels ?? []).length >= 1) {
-            return;
-        }
+    const [showExistingPicker, setShowExistingPicker] = useState(false);
 
-        setData("new_labels", [""]);
+    const addNewLabel = () => {
+        setData((current) => ({
+            ...current,
+            new_labels: [...(current.new_labels ?? []), ""],
+            new_label_rates: [...(current.new_label_rates ?? []), ""],
+        }));
     };
 
     const updateNewLabel = (index, value) => {
         const next = [...(data.new_labels ?? [])];
-
         next[index] = value;
-
         setData("new_labels", next);
     };
 
-    const removeNewLabel = (index) => {
-        const next = (data.new_labels ?? []).filter(
-            (_, itemIndex) => itemIndex !== index,
-        );
-
-        setData("new_labels", next.length ? next : [""]);
+    const updateNewLabelRate = (index, value) => {
+        const next = [...(data.new_label_rates ?? [])];
+        next[index] = value;
+        setData("new_label_rates", next);
     };
 
+    const removeNewLabel = (index) => {
+        setData((current) => ({
+            ...current,
+            new_labels: (current.new_labels ?? []).filter((_, i) => i !== index),
+            new_label_rates: (current.new_label_rates ?? []).filter((_, i) => i !== index),
+        }));
+    };
+
+    const [labelError, setLabelError] = useState("");
 
     /*
      * MIXXTUNE_QUICK_EDIT_FIELD_TOGGLE_V1
@@ -228,7 +240,8 @@ export default function Edit({
     };
 
     const quickEditFieldMap = {
-        "Full Name": "name",
+        "Account Name": "name",
+        "Full Name (account holder)": "full_name",
         "Email": "email",
         "Phone": "phone",
         "Country": "country",
@@ -254,68 +267,42 @@ export default function Edit({
         "Branch Name": "branch_name",
     };
 
-    // MIXXTUNE_FF429_D3R_SWITCH_V1
+    // MIXXTUNE_FF429_D3R_SWITCH_V1 (W79: small switch; the legend at the top explains it)
     const QuickEditToggle = ({ field }) => {
-        const enabled =
-            quickEditFieldEnabled(field);
+        const enabled = quickEditFieldEnabled(field);
 
         return (
             <button
                 type="button"
-                onClick={() =>
-                    toggleQuickEditField(field)
-                }
+                onClick={() => toggleQuickEditField(field)}
                 aria-pressed={enabled}
-                title={
-                    enabled
-                        ? "Enabled in Quick Edit"
-                        : "Disabled in Quick Edit"
-                }
-                className={[
-                    "inline-flex shrink-0 items-center gap-2 rounded-full border px-2 py-1 text-[10px] font-bold transition-all duration-200",
-                    enabled
-                        ? "border-violet-300 bg-violet-50 text-violet-700 shadow-sm"
-                        : "border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:text-violet-600",
-                ].join(" ")}
+                title={enabled ? "Shown in Quick Edit - click to hide" : "Hidden in Quick Edit - click to show"}
+                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1 py-0.5 text-[10px] font-semibold ${enabled ? "text-violet-700" : "text-slate-400 hover:text-violet-600"}`}
             >
-                <span
-                    className={[
-                        "relative inline-flex h-[18px] w-8 shrink-0 rounded-full transition-colors duration-200",
-                        enabled
-                            ? "bg-violet-600"
-                            : "bg-slate-200",
-                    ].join(" ")}
-                >
-                    <span
-                        className={[
-                            "absolute top-[3px] h-3 w-3 rounded-full bg-white shadow-sm transition-all duration-200",
-                            enabled
-                                ? "left-[17px]"
-                                : "left-[3px]",
-                        ].join(" ")}
-                    />
+                <span className={`relative inline-flex h-3.5 w-6 rounded-full transition-colors ${enabled ? "bg-violet-600" : "bg-slate-200"}`}>
+                    <span className={`absolute top-[2px] h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-all ${enabled ? "left-[12px]" : "left-[2px]"}`} />
                 </span>
-
-                <span>
-                    Quick Edit
-                </span>
-
-                <span
-                    className={[
-                        "min-w-[18px] text-[9px] font-extrabold",
-                        enabled
-                            ? "text-violet-700"
-                            : "text-slate-400",
-                    ].join(" ")}
-                >
-                    {enabled ? "ON" : "OFF"}
-                </span>
+                <span className="sr-only">Quick Edit {enabled ? "on" : "off"}</span>
+                QE
             </button>
         );
     };
 
     const submit = (event) => {
         event.preventDefault();
+        setLabelError("");
+
+        const named = (data.new_labels ?? []).map((name, i) => [String(name).trim(), (data.new_label_rates ?? [])[i]]).filter(([name]) => name !== "");
+        if (data.role === "label" && named.some(([, rate]) => rate === "" || rate === undefined || Number(rate) < 0 || Number(rate) > 100)) {
+            setLabelError("Every new label needs a revenue % between 0 and 100.");
+            return;
+        }
+
+        transform((d) => ({
+            ...d,
+            new_labels: named.map(([name]) => name),
+            new_label_rates: named.map(([, rate]) => rate),
+        }));
 
         patch(`/v2/admin/users/${managedUser.id}`, {
             preserveScroll: true,
@@ -406,19 +393,18 @@ export default function Edit({
         >
             <Head title="Edit User" />
 
-            <form onSubmit={submit} className="space-y-6">
+            <form onSubmit={submit} className="mx-auto max-w-[1200px] space-y-4">
 
                 {/* MIXXTUNE_AUTO_INLINE_QUICK_EDIT_V1 */}
                 <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-violet-100 bg-violet-50/70 px-6 py-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-violet-100 bg-violet-50/70 px-4 py-3 sm:px-5">
                         <div>
-                            <h2 className="text-lg font-semibold text-slate-900">
+                            <h2 className="text-[15px] font-bold text-slate-900">
                                 Account Details
                             </h2>
 
-                            <div className="mt-1 text-sm text-slate-500">
-                                Last login:{" "}
-                                {managedUser.last_login_at ?? "Never"}
+                            <div className="mt-0.5 text-xs text-slate-500">
+                                Last login: {managedUser.last_login_at ?? "Never"} · <span className="text-violet-700">QE</span> switch = field shown in the Quick Edit window
                             </div>
                         </div>
 
@@ -430,27 +416,38 @@ export default function Edit({
                         </Link>
                     </div>
 
-                    <div className="grid gap-5 p-6 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-3 p-4 sm:p-5 md:grid-cols-2 xl:grid-cols-3">
                         <Field
                             quickEditFieldMap={quickEditFieldMap}
                             QuickEditToggle={QuickEditToggle}
-                            label="Full Name"
+                            label="Account Name"
                             value={data.name}
                             error={errors.name}
                             required
                             onChange={(value) => setData("name", value)}
                         />
 
+                        {["label", "artist"].includes(data.role) && (
+                            <Field
+                                quickEditFieldMap={quickEditFieldMap}
+                                QuickEditToggle={QuickEditToggle}
+                                label="Full Name (account holder)"
+                                value={data.full_name}
+                                error={errors.full_name}
+                                onChange={(value) => setData("full_name", value)}
+                            />
+                        )}
+
                         <div>
                             <div className="flex min-h-[24px] items-center justify-between gap-3">
-                                <span className="text-sm font-semibold text-slate-700">
+                                <span className="text-xs font-semibold text-slate-600">
                                     Username
                                 </span>
 
                                 <QuickEditToggle field="username" />
                             </div>
 
-                            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+                            <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
                                 {managedUser?.username || "—"}
                             </div>
 
@@ -461,14 +458,14 @@ export default function Edit({
 
                         <div>
                             <div className="flex min-h-[24px] items-center justify-between gap-3">
-                                <span className="text-sm font-semibold text-slate-700">
+                                <span className="text-xs font-semibold text-slate-600">
                                     Client ID
                                 </span>
 
                                 <QuickEditToggle field="client_id" />
                             </div>
 
-                            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm font-medium text-slate-700">
+                            <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm font-medium text-slate-700">
                                 {managedUser?.client_id || "—"}
                             </div>
 
@@ -539,69 +536,6 @@ export default function Edit({
                             />
                         )}
 
-                        {data.role === "label" && (
-                            <div className="md:col-span-2">
-                                <div className="mb-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div className="text-sm font-bold text-slate-900">
-                                            Revenue Rate by Label
-                                        </div>
-
-                                        <QuickEditToggle field="label_revenue_rates" />
-                                    </div>
-
-                                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                                        Each owned label has its own royalty rate.
-                                        Blank means Rate Pending.
-                                    </p>
-                                </div>
-
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    {(ownedLabels ?? []).map((label) => (
-                                        <div
-                                            key={label.id}
-                                            className="rounded-xl border border-slate-200 bg-slate-50 p-4"
-                                        >
-                                            <div className="mb-2 text-sm font-bold text-slate-900">
-                                                {label.name}
-                                            </div>
-
-                                            <div className="mb-3 text-xs text-slate-500">
-                                                Label ID: {label.id}
-                                            </div>
-
-                                            <Field
-                            quickEditFieldMap={quickEditFieldMap}
-                            QuickEditToggle={QuickEditToggle}
-                                                label="Revenue Rate (%)"
-                                                type="number"
-                                                value={
-                                                    data.label_revenue_rates?.[
-                                                        String(label.id)
-                                                    ] ?? ""
-                                                }
-                                                error={
-                                                    errors[
-                                                        `label_revenue_rates.${label.id}`
-                                                    ]
-                                                }
-                                                onChange={(value) =>
-                                                    setData(
-                                                        "label_revenue_rates",
-                                                        {
-                                                            ...data.label_revenue_rates,
-                                                            [String(label.id)]:
-                                                                value,
-                                                        },
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
                         <SelectField
                             quickEditFieldMap={quickEditFieldMap}
                             QuickEditToggle={QuickEditToggle}
@@ -635,12 +569,139 @@ export default function Edit({
                     </div>
                 </section>
 
+                {data.role === "label" && (
+                    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h2 className="text-[15px] font-bold text-slate-900">Labels for this account</h2>
+                                <p className="mt-0.5 text-xs text-slate-500">Each label has its own revenue %. Blank means Rate Pending.</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => setShowExistingPicker((open) => !open)} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100">
+                                    {showExistingPicker ? "Close label picker" : "+ Add existing label"}
+                                </button>
+                                <button type="button" onClick={addNewLabel} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                    + Create new label
+                                </button>
+                            </div>
+                        </div>
+
+                            <div className="md:col-span-2">
+                                <div className="mb-1 mt-3 flex items-center justify-between gap-3">
+                                    <div className="text-xs font-semibold text-slate-600">Current labels and their %</div>
+                                    <QuickEditToggle field="label_revenue_rates" />
+                                </div>
+                                {(ownedLabels ?? []).length === 0 && <div className="rounded-lg border border-dashed border-slate-300 px-3 py-3 text-xs text-slate-500">No label owned yet.</div>}
+                                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                    {(ownedLabels ?? []).map((label) => (
+                                        <div
+                                            key={label.id}
+                                            className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5"
+                                        >
+                                            <div className="text-[13px] font-bold text-slate-900">
+                                                {label.name}
+                                            </div>
+
+                                            <div className="text-[11px] text-slate-500">
+                                                Label ID: {label.id}
+                                            </div>
+
+                                            <Field
+                            quickEditFieldMap={quickEditFieldMap}
+                            QuickEditToggle={QuickEditToggle}
+                                                label="Revenue Rate (%)"
+                                                type="number"
+                                                value={
+                                                    data.label_revenue_rates?.[
+                                                        String(label.id)
+                                                    ] ?? ""
+                                                }
+                                                error={
+                                                    errors[
+                                                        `label_revenue_rates.${label.id}`
+                                                    ]
+                                                }
+                                                onChange={(value) =>
+                                                    setData(
+                                                        "label_revenue_rates",
+                                                        {
+                                                            ...data.label_revenue_rates,
+                                                            [String(label.id)]:
+                                                                value,
+                                                        },
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        
+
+                        {showExistingPicker && (
+                            <div className="mt-3">
+                                <SelectionBox
+                                    title="Labels linked to this login"
+                                    quickEditField="label_ids"
+                                    QuickEditToggle={QuickEditToggle}
+                                    items={labels}
+                                    selected={data.label_ids}
+                                    nameKey="name"
+                                    onToggle={(id) => toggleSelection("label_ids", id)}
+                                    onSelectAll={() => setData("label_ids", labels.map((item) => Number(item.id)))}
+                                    onClear={() => setData("label_ids", [])}
+                                />
+                                <p className="mt-1 text-[11px] text-slate-400">A label you add here gets its % after saving (then set it above).</p>
+                            </div>
+                        )}
+
+                        {errors.label_ids && <p className="mt-2 text-xs font-medium text-red-600">{errors.label_ids}</p>}
+
+                        {(data.new_labels ?? []).length > 0 && (
+                            <div className="mt-3 space-y-2">
+                                {(data.new_labels ?? []).map((labelName, index) => (
+                                    <div key={index} className="grid items-end gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 sm:grid-cols-[1fr_140px_auto]">
+                                        <label>
+                                            <span className="text-xs font-semibold text-slate-600">New label name {index + 1}</span>
+                                            <input
+                                                type="text"
+                                                value={labelName}
+                                                placeholder="e.g. Sanatan Records"
+                                                onChange={(event) => updateNewLabel(index, event.target.value)}
+                                                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                                            />
+                                            {errors[`new_labels.${index}`] && <p className="mt-1 text-xs font-medium text-red-600">{errors[`new_labels.${index}`]}</p>}
+                                        </label>
+                                        <label>
+                                            <span className="text-xs font-semibold text-slate-600">Revenue %</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                value={(data.new_label_rates ?? [])[index] ?? ""}
+                                                onChange={(event) => updateNewLabelRate(index, event.target.value)}
+                                                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                                            />
+                                        </label>
+                                        <button type="button" onClick={() => removeNewLabel(index)} className="h-[38px] rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-600 hover:bg-red-50">
+                                            Remove
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {(labelError || errors.new_labels) && <p className="mt-2 text-xs font-medium text-red-600">{labelError || errors.new_labels}</p>}
+                    </section>
+                )}
+
                                 {/* ================================================
                     ADDRESS DETAILS
                 ================================================= */}
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                     <div>
-                        <h2 className="text-lg font-semibold text-slate-900">
+                        <h2 className="text-[15px] font-bold text-slate-900">
                             Address Details
                         </h2>
 
@@ -649,7 +710,7 @@ export default function Edit({
                         </p>
                     </div>
 
-                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <Field
                             quickEditFieldMap={quickEditFieldMap}
                             QuickEditToggle={QuickEditToggle}
@@ -724,9 +785,9 @@ export default function Edit({
                 {/* ================================================
                     TAX & KYC
                 ================================================= */}
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                     <div>
-                        <h2 className="text-lg font-semibold text-slate-900">
+                        <h2 className="text-[15px] font-bold text-slate-900">
                             Tax & KYC Details
                         </h2>
 
@@ -735,7 +796,7 @@ export default function Edit({
                         </p>
                     </div>
 
-                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <div>
                             <Field
                             quickEditFieldMap={quickEditFieldMap}
@@ -790,9 +851,9 @@ export default function Edit({
                 {/* ================================================
                     BANK & PAYOUT
                 ================================================= */}
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                     <div>
-                        <h2 className="text-lg font-semibold text-slate-900">
+                        <h2 className="text-[15px] font-bold text-slate-900">
                             Bank & Payout Details
                         </h2>
 
@@ -801,7 +862,7 @@ export default function Edit({
                         </p>
                     </div>
 
-                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <Field
                             quickEditFieldMap={quickEditFieldMap}
                             QuickEditToggle={QuickEditToggle}
@@ -880,8 +941,8 @@ export default function Edit({
                     </div>
                 </section>
 
-<section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold text-slate-900">
+<section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                    <h2 className="text-[15px] font-bold text-slate-900">
                         Security & Invitation
                     </h2>
 
@@ -1003,124 +1064,10 @@ export default function Edit({
                     </div>
                 )}
 
-                {data.role === "label" && (
-                    <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-6 shadow-sm">
-                        <div className="mb-5">
-                            <h2 className="text-lg font-semibold text-slate-900">
-                                Labels for this Account
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Super Admin can manage all labels assigned to
-                                this login.
-                            </p>
-                        </div>
-
-                        <SelectionBox
-                            title="Select Labels"
-                            quickEditField="label_ids"
-                            QuickEditToggle={QuickEditToggle}
-                            items={labels}
-                            selected={data.label_ids}
-                            nameKey="name"
-                            onToggle={(id) => toggleSelection("label_ids", id)}
-                            onSelectAll={() =>
-                                setData(
-                                    "label_ids",
-                                    labels.map((item) => Number(item.id)),
-                                )
-                            }
-                            onClear={() => setData("label_ids", [])}
-                        />
-
-                        {errors.label_ids && (
-                            <p className="mt-3 text-sm font-medium text-red-600">
-                                {errors.label_ids}
-                            </p>
-                        )}
-
-                        <div className="mt-5 rounded-xl border border-violet-200 bg-white p-5">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <div className="text-sm font-bold text-slate-900">
-                                        Create New Labels
-                                    </div>
-
-                                    <div className="mt-1 text-xs text-slate-500">
-                                        Create additional labels for this Label account.
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={addNewLabel}
-                                    className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
-                                >
-                                    + Add Label
-                                </button>
-                            </div>
-
-                            <div className="mt-4 space-y-3">
-                                {(data.new_labels ?? []).map(
-                                    (labelName, index) => (
-                                        <div
-                                            key={index}
-                                            className="flex items-start gap-3"
-                                        >
-                                            <div className="flex-1">
-                                                <input
-                                                    type="text"
-                                                    value={labelName}
-                                                    placeholder={`New label ${index + 1}`}
-                                                    onChange={(event) =>
-                                                        updateNewLabel(
-                                                            index,
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    className="w-full rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 px-4 py-3 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                                                />
-
-                                                {errors[
-                                                    `new_labels.${index}`
-                                                ] && (
-                                                    <p className="mt-1 text-xs font-medium text-red-600">
-                                                        {
-                                                            errors[
-                                                                `new_labels.${index}`
-                                                            ]
-                                                        }
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    removeNewLabel(index)
-                                                }
-                                                className="rounded-xl border border-red-200 px-3 py-3 text-sm font-semibold text-red-600 hover:bg-red-50"
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-                                    ),
-                                )}
-                            </div>
-
-                            {errors.new_labels && (
-                                <p className="mt-3 text-sm font-medium text-red-600">
-                                    {errors.new_labels}
-                                </p>
-                            )}
-                        </div>
-                    </section>
-                )}
-
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                            <h2 className="text-lg font-semibold text-slate-900">
+                            <h2 className="text-[15px] font-bold text-slate-900">
                                 Panel Permissions
                             </h2>
 
@@ -1166,12 +1113,12 @@ export default function Edit({
                         </div>
                     </div>
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="mt-3 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {permissionOptions.map(([field, label]) => (
                             <label
                                 key={field}
                                 className={[
-                                    "flex cursor-pointer items-center gap-3 rounded-xl border p-4",
+                                    "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px]",
                                     data.permissions[field]
                                         ? "border-violet-400 bg-violet-50"
                                         : "border-slate-200 bg-white",
@@ -1196,7 +1143,7 @@ export default function Edit({
                     </div>
                 </section>
 
-                {Object.keys(errors).length > 0 && (
+                {Object.keys(errors).filter((key) => !["action_otp", "bank_change_otp"].includes(key)).length > 0 && (
                     <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                         Some information could not be saved. Please review the
                         highlighted fields and try again.
@@ -1237,7 +1184,7 @@ function Field({
     return (
         <label>
             <span className="flex min-h-[24px] items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-700">
+                <span className="text-xs font-semibold text-slate-600">
                     {label}
                     {required && <span className="ml-1 text-red-500">*</span>}
                 </span>
@@ -1254,7 +1201,7 @@ function Field({
                 value={value ?? ""}
                 onChange={(event) => onChange(event.target.value)}
                 className={[
-                    "mt-2 w-full rounded-xl border px-4 py-3 text-sm",
+                    "mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100",
                     error ? "border-red-400" : "border-slate-300",
                 ].join(" ")}
             />
@@ -1276,7 +1223,7 @@ function SelectField({
     return (
         <label>
             <span className="flex min-h-[24px] items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-700">
+                <span className="text-xs font-semibold text-slate-600">
                     {label}
                 </span>
 
@@ -1291,7 +1238,7 @@ function SelectField({
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 className={[
-                    "mt-2 w-full rounded-xl border px-4 py-3 text-sm",
+                    "mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100",
                     error ? "border-red-400" : "border-slate-300",
                 ].join(" ")}
             >
@@ -1309,13 +1256,13 @@ function SelectField({
 
 function InfoCard({ label, value }) {
     return (
-        <div className="rounded-xl bg-slate-50 p-4">
-            <div className="text-xs font-semibold uppercase text-slate-500">
+        <div className="rounded-lg bg-slate-50 px-3 py-2">
+            <div className="text-[11px] font-semibold uppercase text-slate-500">
                 {label}
             </div>
 
-            <div className="mt-2 break-all text-sm font-semibold capitalize text-slate-900">
-                {value}
+            <div className="mt-1 break-all text-sm font-semibold capitalize text-slate-900">
+                {String(value ?? "").replaceAll("_", " ")}
             </div>
         </div>
     );

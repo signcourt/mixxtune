@@ -211,10 +211,14 @@ class LabelOwnershipService
         $previous = app('request');
         app()->instance('request', $sub);
 
+        /* W79: this tool gives the labels their owner itself (its own code + history), so store() must not */
+        app()->instance('mixxtune.ownership_tool_create', true);
+
         try {
             app()->call([app(UserManagementController::class), 'store'], ['request' => $sub]);
         } finally {
             app()->instance('request', $previous);
+            app()->forgetInstance('mixxtune.ownership_tool_create');
         }
 
         $warning = $session->pull('warning');
