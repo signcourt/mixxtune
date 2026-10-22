@@ -5,20 +5,6 @@ import { useEffect, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 
-const permissionOptions = [
-    ["can_view_catalogue", "View Catalogue"],
-    ["can_create_releases", "Create Releases"],
-    ["can_manage_releases", "Manage Releases"],
-    ["can_view_reports", "View Reports"],
-    ["can_view_royalties", "View Royalties"],
-    ["can_manage_wallet", "Manage Wallet"],
-    ["can_manage_withdrawals", "Manage Withdrawals"],
-    ["can_manage_users", "Manage Users"],
-    ["can_manage_support", "Manage Support"],
-    ["can_manage_settings", "Manage Settings"],
-    ["can_manage_delivery", "Manage Delivery"],
-    ["can_manage_identifiers", "Manage ISRC / UPC"],
-];
 
 export default function Edit({
     ownedLabels = [],
@@ -31,6 +17,7 @@ export default function Edit({
     assignedArtistIds = [],
     assignedLabelIds = [],
     kycLock = null,
+    panelTabs = null,
 }) {
     const { flash = {} } = usePage().props;
 
@@ -136,19 +123,13 @@ export default function Edit({
         new_labels: [],
         new_label_rates: [],
 
-        permissions: Object.fromEntries(
-            permissionOptions.map(([field]) => [
-                field,
-                Boolean(permissions?.[field]),
-            ]),
-        ),
+        /* W81: allow / block single sidebar tabs (sent only after a change) */
+        tab_overrides: Object.fromEntries((panelTabs ?? []).map((tab) => [tab.key, tab.override])),
+        tab_overrides_touched: false,
     });
 
-    const updatePermission = (field, checked) => {
-        setData("permissions", {
-            ...data.permissions,
-            [field]: checked,
-        });
+    const setTabChoice = (key, choice) => {
+        setData((d) => ({ ...d, tab_overrides: { ...d.tab_overrides, [key]: choice }, tab_overrides_touched: true }));
     };
 
     const toggleSelection = (field, id) => {
@@ -1067,84 +1048,13 @@ export default function Edit({
                     </div>
                 )}
 
-                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <h2 className="text-[15px] font-bold text-slate-900">
-                                Panel Permissions
-                            </h2>
-
-                            <QuickEditToggle field="permissions" />
-                        </div>
-
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setData(
-                                        "permissions",
-                                        Object.fromEntries(
-                                            permissionOptions.map(([field]) => [
-                                                field,
-                                                true,
-                                            ]),
-                                        ),
-                                    )
-                                }
-                                className="rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 px-3 py-2 text-xs font-semibold"
-                            >
-                                Select All
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setData(
-                                        "permissions",
-                                        Object.fromEntries(
-                                            permissionOptions.map(([field]) => [
-                                                field,
-                                                false,
-                                            ]),
-                                        ),
-                                    )
-                                }
-                                className="rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 px-3 py-2 text-xs font-semibold"
-                            >
-                                Clear
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="mt-3 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {permissionOptions.map(([field, label]) => (
-                            <label
-                                key={field}
-                                className={[
-                                    "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px]",
-                                    data.permissions[field]
-                                        ? "border-violet-400 bg-violet-50"
-                                        : "border-slate-200 bg-white",
-                                ].join(" ")}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={data.permissions[field]}
-                                    onChange={(event) =>
-                                        updatePermission(
-                                            field,
-                                            event.target.checked,
-                                        )
-                                    }
-                                />
-
-                                <span className="text-sm font-semibold text-slate-700">
-                                    {label}
-                                </span>
-                            </label>
-                        ))}
-                    </div>
-                </section>
+                <PanelAccessCard
+                    tabs={panelTabs}
+                    choices={data.tab_overrides}
+                    onChoose={setTabChoice}
+                    accountRole={managedUser.role}
+                    formRole={data.role}
+                />
 
                 {Object.keys(errors).filter((key) => !["action_otp", "bank_change_otp"].includes(key)).length > 0 && (
                     <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -1618,5 +1528,93 @@ function KycLockPanel({ userId, lock }) {
                 </details>
             )}
         </div>
+    );
+}
+
+/* W81 MIXXTUNE_PANEL_ACCESS: per-account allow / block of sidebar tabs above the role default */
+const ROLE_TITLES = { label: "Label", artist: "Artist", admin: "Manager" };
+
+function PanelAccessCard({ tabs, choices = {}, onChoose, accountRole, formRole }) {
+    const header = (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+                <h2 className="text-[15px] font-bold text-slate-900">Panel access</h2>
+                <p className="text-xs text-slate-500">
+                    Sidebar tabs this account can open. <b>Default</b> follows the {ROLE_TITLES[accountRole] ?? "role"} setting;
+                    Allow / Block is only for this account.
+                </p>
+            </div>
+            <Link href="/v2/admin/panel-access" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-300">
+                Role defaults →
+            </Link>
+        </div>
+    );
+
+    if (!tabs) {
+        return (
+            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                {header}
+                <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                    {accountRole === "super_admin" ? "A Super Admin always sees every tab." : "This account type has no panel tab settings."}
+                </p>
+            </section>
+        );
+    }
+
+    return (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            {header}
+            {formRole && formRole !== accountRole && (
+                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    The role is being changed. Save first - then the tabs of the new role show here.
+                </p>
+            )}
+            <div className="mt-3 grid grid-cols-1 gap-1.5 lg:grid-cols-2">
+                {tabs.map((tab) => {
+                    const choice = choices[tab.key] ?? "default";
+                    const on = choice === "default" ? tab.role_default || tab.old_extra : choice === "allow";
+                    const options = [
+                        ["default", `Default · ${tab.role_default || tab.old_extra ? "On" : "Off"}`],
+                        ["allow", "Allow"],
+                        ["block", "Block"],
+                    ];
+                    return (
+                        <div key={tab.key} className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg border border-slate-200 px-2.5 py-1.5">
+                            <div className="min-w-0 flex-1 basis-40">
+                                <div className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800">
+                                    <span className={`h-2 w-2 shrink-0 rounded-full ${on ? "bg-emerald-500" : "bg-slate-300"}`} />
+                                    <span className="truncate">{tab.name}</span>
+                                    {tab.old_extra && choice === "default" && (
+                                        <span className="rounded bg-sky-50 px-1 text-[10px] font-bold text-sky-700" title="Given with the old permission boxes">old extra</span>
+                                    )}
+                                </div>
+                                <div className="truncate text-[11px] text-slate-400">{tab.help}</div>
+                            </div>
+                            <div className="flex shrink-0 overflow-hidden rounded-md border border-slate-200 text-[11px] font-semibold">
+                                {options.map(([value, text]) => (
+                                    <button
+                                        key={value}
+                                        type="button"
+                                        aria-pressed={choice === value}
+                                        onClick={() => onChoose(tab.key, value)}
+                                        className={`px-2 py-1 ${
+                                            choice === value
+                                                ? value === "block"
+                                                    ? "bg-rose-600 text-white"
+                                                    : value === "allow"
+                                                      ? "bg-emerald-600 text-white"
+                                                      : "bg-violet-600 text-white"
+                                                : "bg-white text-slate-600 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        {text}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </section>
     );
 }

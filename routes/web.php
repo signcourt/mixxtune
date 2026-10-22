@@ -3128,3 +3128,12 @@ Route::middleware(['auth', 'verified'])
         Route::post('users/{user}/kyc-unlock/revoke', [\App\Http\Controllers\V2\Admin\KycUnlockController::class, 'revoke'])->whereNumber('user')->name('users.kyc-unlock.revoke');
         Route::get('kyc-unlocks/{unlock}/document', [\App\Http\Controllers\V2\Admin\KycUnlockController::class, 'document'])->whereNumber('unlock')->name('kyc-unlocks.document');
     });
+
+/* W81 MIXXTUNE_PANEL_ACCESS: default sidebar tabs per role (Super Admin) */
+Route::middleware(['auth', 'verified'])
+    ->prefix('v2/admin')
+    ->name('v2.admin.')
+    ->group(function () {
+        Route::get('panel-access', [\App\Http\Controllers\V2\Admin\PanelAccessController::class, 'index'])->name('panel-access.index');
+        Route::put('panel-access', [\App\Http\Controllers\V2\Admin\PanelAccessController::class, 'update'])->middleware('throttle:30,1')->name('panel-access.update');
+    });

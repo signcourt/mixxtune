@@ -12,7 +12,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        /* W81 MIXXTUNE_PANEL_ACCESS: one copy per request (its lookups are cached inside) */
+        $this->app->scoped(\App\Services\V2\PanelAccess::class);
     }
 
     /**

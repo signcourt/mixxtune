@@ -270,6 +270,12 @@ class PermissionService
             return ['*'];
         }
 
+        /* W81 MIXXTUNE_PANEL_ACCESS: Label / Artist / Manager access per sidebar tab */
+        $panelAccess = app(PanelAccess::class);
+        if ($panelAccess->handles($role)) {
+            return $panelAccess->permissions($user);
+        }
+
         $basePermissions =
             $this->rolePermissions[$role]
             ?? [];

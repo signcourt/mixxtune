@@ -1344,75 +1344,12 @@ export default function Index({
 
 {/* MIXXTUNE_QUICK_EDIT_PERMISSION_UI_V1 */}
 
-{quickFieldEnabled("permissions") && (
-    <div className="mb-5 overflow-hidden rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-50/90 via-white to-white p-5 shadow-sm shadow-indigo-100/60">
-        <div className="mb-1 flex items-center gap-2 text-sm font-extrabold tracking-tight text-slate-900">
-            Panel Permissions
-        </div>
-
-        <div className="mb-4 text-xs text-slate-500">
-            Control which Back Stage modules this user can access.
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {quickEditPermissionOptions.map(
-                ([key, label]) => {
-                    const checked =
-                        Boolean(
-                            quickEditForm
-                                .permissions?.[
-                                    key
-                                ]
-                        );
-
-                    return (
-                        <label
-                            key={key}
-                            className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50/50 hover:shadow-md"
-                        >
-                            <input
-                                type="checkbox"
-                                checked={
-                                    checked
-                                }
-                                onChange={(
-                                    e
-                                ) =>
-                                    setQuickEditForm(
-                                        (
-                                            current
-                                        ) => ({
-                                            ...current,
-
-                                            /* W59: permissions are saved only after a box was really changed */
-                                            permissions_touched: true,
-
-                                            permissions:
-                                                {
-                                                    ...(
-                                                        current.permissions ??
-                                                        {}
-                                                    ),
-
-                                                    [key]:
-                                                        e
-                                                            .target
-                                                            .checked,
-                                                },
-                                        })
-                                    )
-                                }
-                                className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-                            />
-
-                            <span className="text-sm font-medium text-slate-700">
-                                {label}
-                            </span>
-                        </label>
-                    );
-                }
-            )}
-        </div>
+{/* W81: panel access moved to tab settings on Edit User (the old boxes here hid tabs by mistake) */}
+{quickFieldEnabled("permissions") && quickEditUser?.id && (
+    <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+        <b className="text-slate-800">Panel access</b> is now set per sidebar tab on{" "}
+        <a href={`/v2/admin/users/${quickEditUser.id}/edit`} className="font-semibold text-violet-700 underline">Edit User</a>
+        {" "}(defaults per role on <a href="/v2/admin/panel-access" className="font-semibold text-violet-700 underline">Panel Access</a>).
     </div>
 )}
 

@@ -1575,14 +1575,17 @@ class UserManagementController extends Controller
                         );
                 }
 
-                UserPanelPermission::query()
-                    ->updateOrCreate(
-                        [
-                            'user_id' =>
-                                $user->id,
-                        ],
-                        $permissionValues
-                    );
+                /* W81: new accounts follow the role defaults; old boxes only if a form still sends them */
+                if ($request->has('permissions')) {
+                    UserPanelPermission::query()
+                        ->updateOrCreate(
+                            [
+                                'user_id' =>
+                                    $user->id,
+                            ],
+                            $permissionValues
+                        );
+                }
 
                 return $user;
             }
@@ -1787,11 +1790,12 @@ class UserManagementController extends Controller
             'assignedLabels:id,name,email',
         ]);
 
+        /* W81: only read the old boxes - opening this page used to save them all unticked */
         $panelPermissions =
             UserPanelPermission::query()
-                ->firstOrCreate([
-                    'user_id' => $user->id,
-                ]);
+                ->where('user_id', $user->id)
+                ->first()
+            ?? new UserPanelPermission();
 
                 $payoutProfile =
             \App\Models\Finance\PayoutProfile::query()
@@ -1860,6 +1864,7 @@ return Inertia::render(
 
                 /* W80 MIXXTUNE_KYC_EDIT_LOCK */
                 'kycLock' => in_array($user->role, ['label', 'artist'], true) ? $this->kycLockPayload($user) : null,
+                'panelTabs' => app(\App\Services\V2\PanelAccess::class)->handles((string) $user->role) ? app(\App\Services\V2\PanelAccess::class)->tabsFor($user) : null,
 
                 'managedUser' => [
                     'id' => $user->id,
@@ -4248,6 +4253,8 @@ $oldValues = [
                 }
 
 
+                /* W81: the old boxes are written only when a form still sends them */
+                if ($request->has('permissions')) {
                 $permissionValues = [
                     'user_id' => $user->id,
                     'updated_by' =>
@@ -4274,6 +4281,34 @@ $oldValues = [
                         ],
                         $permissionValues
                     );
+                }
+
+                /* W81 MIXXTUNE_PANEL_ACCESS: allow / block single sidebar tabs for this account */
+                if (
+                    $request->boolean('tab_overrides_touched')
+                    && is_array($request->input('tab_overrides'))
+                    && app(\App\Services\V2\PanelAccess::class)->handles((string) $user->role)
+                ) {
+                    $tabChoices = $request->validate([
+                        'tab_overrides' => ['array'],
+                        'tab_overrides.*' => ['in:default,allow,block'],
+                    ])['tab_overrides'];
+
+                    $tabChanges = app(\App\Services\V2\PanelAccess::class)
+                        ->saveOverrides($user, $tabChoices, (int) $request->user()->id);
+
+                    if ($tabChanges) {
+                        app(\App\Services\V2\AuditLogService::class)->record(
+                            'panel.user_access_changed',
+                            'permissions',
+                            'Panel access of '.($user->name ?: $user->email).' changed: '.implode(', ', array_map(fn ($k, $c) => $k.' '.$c['to'], array_keys($tabChanges), $tabChanges)).'.',
+                            array_map(fn ($c) => $c['from'], $tabChanges),
+                            array_map(fn ($c) => $c['to'], $tabChanges),
+                            $user,
+                            $request
+                        );
+                    }
+                }
                 /*
                  * ADMIN_MANAGED_PAYOUT_PROFILE
                  *

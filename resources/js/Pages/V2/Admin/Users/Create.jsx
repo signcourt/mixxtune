@@ -217,7 +217,9 @@ export default function Create({
             }
         }
 
-        transform((d) => {
+        transform((all) => {
+            /* W81: panel access follows the role defaults - the old boxes are not sent */
+            const { permissions: _oldBoxes, ...d } = all;
             if (d.role !== "label") {
                 return { ...d, label_ids: d.role === "admin" ? d.label_ids : [], new_labels: [] };
             }
@@ -515,25 +517,18 @@ export default function Create({
                     </Card>
                 )}
 
-                {/* PANEL PERMISSIONS */}
+                {/* PANEL ACCESS (W81) */}
                 <Card>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                            <h2 className="text-[15px] font-bold text-slate-900">Panel permissions</h2>
-                            <p className="mt-0.5 text-xs text-slate-500">Recommended defaults are ticked for this account type.</p>
+                            <h2 className="text-[15px] font-bold text-slate-900">Panel access</h2>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                                The new account gets the sidebar tabs set for its role. To allow or block a tab for only this account, open Edit User after creating it.
+                            </p>
                         </div>
-                        <div className="flex gap-2">
-                            <button type="button" onClick={() => setAllPermissions(true)} className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">Select all</button>
-                            <button type="button" onClick={() => setAllPermissions(false)} className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">Clear</button>
-                        </div>
-                    </div>
-                    <div className="mt-3 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {permissionOptions.map(([field, label]) => (
-                            <label key={field} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[13px] ${data.permissions[field] ? "border-violet-300 bg-violet-50 text-violet-900" : "border-slate-200 text-slate-700"}`}>
-                                <input type="checkbox" checked={data.permissions[field]} onChange={(event) => togglePermission(field, event.target.checked)} />
-                                <span className="font-medium">{label}</span>
-                            </label>
-                        ))}
+                        <a href="/v2/admin/panel-access" target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-300">
+                            Role defaults →
+                        </a>
                     </div>
                 </Card>
 

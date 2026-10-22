@@ -317,6 +317,12 @@ const adminNavigation = (
                               href: routes.admins,
                               permission: 'admins.view',
                           },
+                          /* W81 MIXXTUNE_PANEL_ACCESS */
+                          {
+                              id: 'account-panel-access',
+                              label: 'Panel Access',
+                              href: '/v2/admin/panel-access',
+                          },
                       ]
                     : []),
                 {
