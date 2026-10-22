@@ -71,14 +71,11 @@ class ReleaseTrackController extends Controller
             )
         );
 
-        $audio = $request->file('audio');
+        /* W87: the WAV may already be uploaded in the background (token) */
+        $audioFile = $this->takeAudio($request, $release);
+        abort_unless($audioFile, 422, 'Upload the WAV master first.');
 
-        $audioPath = $audio->store(
-            'tracks/audio',
-            'public'
-        );
-
-        unset($validated['audio']);
+        unset($validated['audio'], $validated['audio_upload_token']);
 
         $track = Track::query()->create([
             ...$validated,
@@ -102,16 +99,16 @@ class ReleaseTrackController extends Controller
                 false,
 
             'audio_path' =>
-                $audioPath,
+                $audioFile['path'],
 
             'audio_original_name' =>
-                $audio->getClientOriginalName(),
+                $audioFile['name'],
 
             'audio_mime_type' =>
-                $audio->getMimeType(),
+                $audioFile['mime'],
 
             'audio_size_bytes' =>
-                $audio->getSize(),
+                $audioFile['size'],
 
             'audio_validation_status' =>
                 'pending',
@@ -198,7 +195,10 @@ class ReleaseTrackController extends Controller
         $adminEdit = $adminEditService->active($request, $track->release);
         $before = $adminEdit ? $track->only(self::AUDIT_FIELDS) : [];
 
-        if ($request->hasFile('audio')) {
+        /* W87: a new WAV comes as a file or as a background-upload token */
+        $audioFile = $this->takeAudio($request, $track->release);
+
+        if ($audioFile) {
             /* Super Admin edit keeps the old audio file on disk (recoverable). */
             if ($track->audio_path && !$adminEdit) {
                 Storage::disk('public')->delete(
@@ -206,28 +206,14 @@ class ReleaseTrackController extends Controller
                 );
             }
 
-            $audio = $request->file('audio');
-
-            $validated['audio_path'] =
-                $audio->store(
-                    'tracks/audio',
-                    'public'
-                );
-
-            $validated['audio_original_name'] =
-                $audio->getClientOriginalName();
-
-            $validated['audio_mime_type'] =
-                $audio->getMimeType();
-
-            $validated['audio_size_bytes'] =
-                $audio->getSize();
-
-            $validated['audio_validation_status'] =
-                'pending';
+            $validated['audio_path'] = $audioFile['path'];
+            $validated['audio_original_name'] = $audioFile['name'];
+            $validated['audio_mime_type'] = $audioFile['mime'];
+            $validated['audio_size_bytes'] = $audioFile['size'];
+            $validated['audio_validation_status'] = 'pending';
         }
 
-        unset($validated['audio']);
+        unset($validated['audio'], $validated['audio_upload_token']);
 
         if (
             array_key_exists('isrc', $validated)
@@ -237,7 +223,7 @@ class ReleaseTrackController extends Controller
         }
 
         $audioWasReplaced =
-            $request->hasFile('audio');
+            $audioFile !== null;
 
         $track->update([
             ...$validated,
@@ -444,6 +430,87 @@ class ReleaseTrackController extends Controller
         );
     }
 
+    /*
+     * W87 MIXXTUNE_BACKGROUND_WAV_UPLOAD
+     * The WAV is sent as soon as it is picked; the owner fills the track
+     * details meanwhile. The file is checked like a normal upload and kept
+     * for 24 hours under a one-time token tied to this user and release.
+     */
+    public function uploadAudio(
+        Request $request,
+        Release $release,
+        ReleaseAccessService $access
+    ): \Illuminate\Http\JsonResponse {
+        $access->authorizeUpdate($request->user(), $release);
+
+        $request->validate([
+            'audio' => [
+                'required',
+                'file',
+                'mimes:wav,wave',
+                'max:'.(\App\Services\V2\PlatformRules::audioMaxMb() * 1024),
+            ],
+        ], [
+            'audio.mimes' => 'Only WAV files can be uploaded.',
+        ]);
+
+        $audio = $request->file('audio');
+        $token = Str::random(40);
+
+        \Illuminate\Support\Facades\Cache::put('track-audio-upload:'.$token, [
+            'user_id' => (int) $request->user()->id,
+            'release_id' => (int) $release->id,
+            'path' => $audio->store('tracks/audio', 'public'),
+            'name' => $audio->getClientOriginalName(),
+            'mime' => $audio->getMimeType(),
+            'size' => $audio->getSize(),
+        ], now()->addDay());
+
+        return response()->json([
+            'token' => $token,
+            'name' => $audio->getClientOriginalName(),
+            'size' => $audio->getSize(),
+        ]);
+    }
+
+    /** the WAV of this request: a file sent now, or one uploaded before with a token */
+    private function takeAudio(Request $request, Release $release): ?array
+    {
+        if ($request->hasFile('audio')) {
+            $audio = $request->file('audio');
+
+            return [
+                'path' => $audio->store('tracks/audio', 'public'),
+                'name' => $audio->getClientOriginalName(),
+                'mime' => $audio->getMimeType(),
+                'size' => $audio->getSize(),
+            ];
+        }
+
+        $token = (string) $request->input('audio_upload_token', '');
+        if ($token === '') {
+            return null;
+        }
+
+        $upload = \Illuminate\Support\Facades\Cache::get('track-audio-upload:'.$token);
+
+        if (
+            !is_array($upload)
+            || (int) $upload['user_id'] !== (int) $request->user()->id
+            || (int) $upload['release_id'] !== (int) $release->id
+            || !Storage::disk('public')->exists($upload['path'])
+        ) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'audio' => 'The uploaded WAV was not found (it is kept for 24 hours). Please choose the file again.',
+            ]);
+        }
+
+        /* used once - only by the user and release it was made for */
+        \Illuminate\Support\Facades\Cache::forget('track-audio-upload:'.$token);
+
+        return $upload;
+    }
+
     private function validateTrack(
         Request $request,
         ?Track $track,
@@ -582,8 +649,15 @@ class ReleaseTrackController extends Controller
                 'string',
             ],
 
+            /* W87: uploaded in the background while the details are filled */
+            'audio_upload_token' => [
+                'nullable',
+                'string',
+                'size:40',
+            ],
+
             'audio' => [
-                $audioRequired
+                $audioRequired && !$request->filled('audio_upload_token')
                     ? 'required'
                     : 'nullable',
 

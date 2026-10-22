@@ -7,6 +7,7 @@ import {
 import {
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 
@@ -329,6 +330,63 @@ export default function TrackManager({
     const [uploadFileName, setUploadFileName] =
         useState('');
 
+    /* W87 MIXXTUNE_BACKGROUND_WAV_UPLOAD: the WAV uploads while the details are filled */
+    const [bgUpload, setBgUpload] =
+        useState({ status: 'idle', progress: 0, token: null, error: '' });
+    const bgAbort = useRef(null);
+    const backgroundUploadOn = !ARTIST_CONTEXT && Boolean(release?.id);
+
+    const stopBackgroundUpload = () => {
+        if (bgAbort.current) {
+            bgAbort.current.abort();
+            bgAbort.current = null;
+        }
+        setBgUpload({ status: 'idle', progress: 0, token: null, error: '' });
+    };
+
+    const startBackgroundUpload = (file) => {
+        if (bgAbort.current) {
+            bgAbort.current.abort();
+        }
+        const controller = new AbortController();
+        bgAbort.current = controller;
+        setBgUpload({ status: 'uploading', progress: 0, token: null, error: '' });
+        onMascotEvent('track-uploading');
+
+        const form = new FormData();
+        form.append('audio', file);
+
+        window.axios
+            .post(`${RELEASES_BASE_PATH}/${release.id}/audio-uploads`, form, {
+                signal: controller.signal,
+                onUploadProgress: (event) => {
+                    if (event.total) {
+                        setBgUpload((u) => ({ ...u, progress: Math.min(99, Math.round((event.loaded * 100) / event.total)) }));
+                    }
+                },
+            })
+            .then((response) => {
+                if (bgAbort.current !== controller) {
+                    return;
+                }
+                bgAbort.current = null;
+                setBgUpload({ status: 'done', progress: 100, token: response.data?.token ?? null, error: '' });
+                onMascotEvent('track-uploaded');
+            })
+            .catch((error) => {
+                if (controller.signal.aborted) {
+                    return;
+                }
+                bgAbort.current = null;
+                const message =
+                    error?.response?.data?.errors?.audio?.[0]
+                    ?? error?.response?.data?.message
+                    ?? 'Upload stopped - check the internet and choose the file again.';
+                setBgUpload({ status: 'error', progress: 0, token: null, error: message });
+                onMascotEvent('track-error');
+            });
+    };
+
     const [playingTrackId, setPlayingTrackId] =
         useState(null);
 
@@ -620,6 +678,8 @@ export default function TrackManager({
             return;
         }
 
+        stopBackgroundUpload();
+
         clearErrors();
         setEditingTrack(null);
 
@@ -678,6 +738,11 @@ export default function TrackManager({
                       .trim(),
         }));
         setUploadFileName(file.name);
+
+        if (backgroundUploadOn) {
+            startBackgroundUpload(file);
+            setModalStage('details');
+        }
     };
 
     const continueToDetails = () => {
@@ -717,12 +782,25 @@ export default function TrackManager({
             return;
         }
 
+        /* W87: the WAV went up in the background - send its token, not the file again */
+        const useToken = hasAudio && backgroundUploadOn;
+        if (useToken && bgUpload.status !== 'done') {
+            window.alert(
+                bgUpload.status === 'error'
+                    ? bgUpload.error
+                    : 'The WAV is still uploading. Save again when it shows "WAV uploaded".'
+            );
+            return;
+        }
+
         setData(
             'is_explicit',
             data.parental_advisory === 'yes'
         );
 
-        if (hasAudio) {
+        const sendsFile = hasAudio && !useToken;
+
+        if (sendsFile) {
             setUploadFileName(
                 data.audio.name
             );
@@ -743,6 +821,7 @@ export default function TrackManager({
             composer_name: joinNames(splitNames(data.composer_name)),
             primary_artist_name: joinNames(splitNames(data.primary_artist_name)),
             featuring_artist_name: joinNames(splitNames(data.featuring_artist_name)),
+            ...(useToken ? { audio: undefined, audio_upload_token: bgUpload.token } : {}),
             isrc: data.isrc_is_auto_generated ? (editingTrack?.isrc_is_auto_generated ? editingTrack.isrc ?? '' : '') : String(data.isrc ?? '').replace(/-/g, '').toUpperCase(),
         };
 
@@ -752,7 +831,7 @@ export default function TrackManager({
             preserveState: true,
 
             onStart: () => {
-                if (hasAudio) {
+                if (sendsFile) {
                     setUploading(true);
 
                     onMascotEvent(
@@ -763,7 +842,7 @@ export default function TrackManager({
 
             onProgress: (progress) => {
                 if (
-                    hasAudio
+                    sendsFile
                     && progress?.percentage
                         !== undefined
                 ) {
@@ -778,19 +857,20 @@ export default function TrackManager({
             onSuccess: () => {
                 setUploadProgress(100);
 
-                if (hasAudio) {
+                if (sendsFile) {
                     onMascotEvent(
                         'track-uploaded'
                     );
                 }
 
                 window.setTimeout(() => {
+                    setBgUpload({ status: 'idle', progress: 0, token: null, error: '' });
                     setUploading(false);
                     setFormVisible(false);
                     setEditingTrack(null);
                     setModalStage('upload');
                     onSaved();
-                }, hasAudio ? 700 : 0);
+                }, sendsFile ? 700 : 0);
             },
 
             onError: () => {
@@ -1160,6 +1240,29 @@ export default function TrackManager({
                                 className="mixx-v6-details-form"
                                 noValidate
                             >
+                                {/* W87: WAV upload status while the details are filled */}
+                                {bgUpload.status !== 'idle' && (
+                                    <div className={`mb-4 rounded-xl border px-3.5 py-2.5 text-xs ${bgUpload.status === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700' : bgUpload.status === 'done' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-violet-200 bg-violet-50 text-violet-800'}`}>
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <span className="min-w-0 truncate font-semibold">
+                                                {bgUpload.status === 'uploading' && `Uploading ${uploadFileName} · ${bgUpload.progress}% - fill in the details meanwhile`}
+                                                {bgUpload.status === 'done' && `WAV uploaded ✓ ${uploadFileName}`}
+                                                {bgUpload.status === 'error' && bgUpload.error}
+                                            </span>
+                                            {bgUpload.status === 'error' && (
+                                                <button type="button" onClick={() => data.audio instanceof File ? startBackgroundUpload(data.audio) : setModalStage('upload')} className="rounded-lg bg-white px-2.5 py-1 font-bold text-rose-700 ring-1 ring-rose-200">
+                                                    Try again
+                                                </button>
+                                            )}
+                                        </div>
+                                        {bgUpload.status === 'uploading' && (
+                                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-violet-100">
+                                                <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${bgUpload.progress}%` }} />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* W65 MIXXTUNE_TRACK_FORM_V2: song first, then credits, genre, codes, lyrics */}
                                 <SectionTitle
                                     number="01"
@@ -1347,8 +1450,10 @@ export default function TrackManager({
                                         Cancel
                                     </button>
 
-                                    <button type="submit" disabled={processing} className="mixx-v6-primary-button">
-                                        {processing ? 'Saving Track...' : editingTrack ? 'Update Track' : 'Save Track'}
+                                    <button type="submit" disabled={processing || bgUpload.status === 'uploading'} className="mixx-v6-primary-button">
+                                        {bgUpload.status === 'uploading'
+                                            ? `WAV uploading ${bgUpload.progress}%…`
+                                            : processing ? 'Saving Track...' : editingTrack ? 'Update Track' : 'Save Track'}
                                     </button>
                                 </div>
                             </form>

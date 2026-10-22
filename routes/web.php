@@ -3137,3 +3137,12 @@ Route::middleware(['auth', 'verified'])
         Route::get('panel-access', [\App\Http\Controllers\V2\Admin\PanelAccessController::class, 'index'])->name('panel-access.index');
         Route::put('panel-access', [\App\Http\Controllers\V2\Admin\PanelAccessController::class, 'update'])->middleware('throttle:30,1')->name('panel-access.update');
     });
+
+/* W87 MIXXTUNE_BACKGROUND_WAV_UPLOAD: the WAV uploads while the track details are filled */
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/v2/releases/{release}/audio-uploads',
+        [\App\Http\Controllers\V2\ReleaseTrackController::class, 'uploadAudio']
+    )
+    ->middleware('throttle:30,1')
+    ->name('v2.release-tracks.audio-upload');
