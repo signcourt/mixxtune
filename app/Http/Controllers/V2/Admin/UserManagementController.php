@@ -541,8 +541,12 @@ class UserManagementController extends Controller
 
         /* MIXXTUNE_USER_REQUIRED_FIELDS_V1: per-role required fields chosen by super admin */
         $fieldRequirements = app(\App\Services\V2\UserFieldRequirementService::class);
+        /* W80: "owner fills KYC & bank after login" - those fields are not required now */
+        $kycByOwner = $request->boolean('kyc_by_owner');
+        $ownerFilled = ['pan_number', 'gst_number', 'account_holder_name', 'bank_account_number', 'bank_name', 'ifsc_code', 'branch_name', 'upi_id'];
         $fieldReq = fn (string $field) => \Illuminate\Validation\Rule::requiredIf(
-            fn () => $fieldRequirements->isRequired((string) $request->input('role'), $field)
+            fn () => ! ($kycByOwner && in_array($field, $ownerFilled, true))
+                && $fieldRequirements->isRequired((string) $request->input('role'), $field)
         );
 
         $validated = $request->validate([
@@ -1853,6 +1857,9 @@ return Inertia::render(
                             ]
                         )
                         ->values(),
+
+                /* W80 MIXXTUNE_KYC_EDIT_LOCK */
+                'kycLock' => in_array($user->role, ['label', 'artist'], true) ? $this->kycLockPayload($user) : null,
 
                 'managedUser' => [
                     'id' => $user->id,
@@ -4760,6 +4767,34 @@ $oldValues = [
             /* same as the edit form: earnings already imported follow the new rate */
             app(ReportEarningsRecalculationService::class)->recalculateForLabel($label);
         }
+    }
+
+    /** W80: lock state of the owner's KYC + the history of openings (newest first) */
+    private function kycLockPayload(User $user): array
+    {
+        $lock = app(\App\Services\V2\KycEditLock::class);
+        $state = $lock->state($user);
+        $history = \Illuminate\Support\Facades\Schema::hasTable('kyc_edit_unlocks')
+            ? \App\Models\Finance\KycEditUnlock::query()->with('unlocker:id,name')->where('user_id', $user->id)->latest('id')->limit(10)->get()
+            : collect();
+        $fmt = fn ($d) => $d ? $d->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A') : null;
+
+        return [
+            'can_owner_edit' => $state['can_edit'],
+            'state' => $state['state'],
+            'unlock_days' => \App\Services\V2\KycEditLock::UNLOCK_DAYS,
+            'history' => $history->map(fn ($u) => [
+                'id' => $u->id,
+                'reason' => $u->reason,
+                'by' => $u->unlocker?->name,
+                'at' => $fmt($u->created_at),
+                'expires' => $fmt($u->expires_at),
+                'used' => $fmt($u->used_at),
+                'revoked' => $fmt($u->revoked_at),
+                'active' => $u->isActive(),
+                'document_name' => $u->document_name,
+            ])->values()->all(),
+        ];
     }
 
     private function permissionFields(): array

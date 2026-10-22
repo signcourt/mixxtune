@@ -3113,3 +3113,18 @@ Route::middleware(['auth', 'verified'])
         Route::post('unlock', [\App\Http\Controllers\V2\Admin\ActionOtpController::class, 'unlock'])->middleware('throttle:20,1')->name('unlock');
         Route::post('resend', [\App\Http\Controllers\V2\Admin\ActionOtpController::class, 'resend'])->middleware('throttle:10,1')->name('resend');
     });
+
+/* W80 MIXXTUNE_KYC_EDIT_LOCK: owner fills / corrects own KYC; Super Admin opens it again with a signed form */
+Route::middleware(['auth', 'verified'])
+    ->post('/v2/kyc-profile', [\App\Http\Controllers\V2\PayoutProfileController::class, 'save'])
+    ->middleware('throttle:20,1')
+    ->name('v2.kyc-profile.save');
+
+Route::middleware(['auth', 'verified'])
+    ->prefix('v2/admin')
+    ->name('v2.admin.')
+    ->group(function () {
+        Route::post('users/{user}/kyc-unlock', [\App\Http\Controllers\V2\Admin\KycUnlockController::class, 'store'])->whereNumber('user')->middleware('throttle:20,1')->name('users.kyc-unlock');
+        Route::post('users/{user}/kyc-unlock/revoke', [\App\Http\Controllers\V2\Admin\KycUnlockController::class, 'revoke'])->whereNumber('user')->name('users.kyc-unlock.revoke');
+        Route::get('kyc-unlocks/{unlock}/document', [\App\Http\Controllers\V2\Admin\KycUnlockController::class, 'document'])->whereNumber('unlock')->name('kyc-unlocks.document');
+    });

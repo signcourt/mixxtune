@@ -30,6 +30,7 @@ export default function Edit({
     labels = [],
     assignedArtistIds = [],
     assignedLabelIds = [],
+    kycLock = null,
 }) {
     const { flash = {} } = usePage().props;
 
@@ -838,6 +839,8 @@ export default function Edit({
                         />
                     </div>
 
+                    {kycLock && <KycLockPanel userId={managedUser.id} lock={kycLock} />}
+
                     {payoutProfile?.verified_at && (
                         <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                             KYC verified at:{" "}
@@ -1512,5 +1515,108 @@ function SelectionBox({
                 </div>
             )}
         </section>
+    );
+}
+
+
+/* W80 MIXXTUNE_KYC_EDIT_LOCK: can the owner change KYC / bank now; Super Admin opens it with the signed form */
+const KYC_STATE_TEXT = {
+    first_time: ["Owner can fill KYC & bank (first time)", "bg-sky-50 text-sky-800 ring-sky-200"],
+    sent_back: ["Sent back - owner can correct it", "bg-amber-50 text-amber-800 ring-amber-200"],
+    waiting: ["Locked - waiting for verification", "bg-slate-100 text-slate-700 ring-slate-200"],
+    verified: ["Locked - verified", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
+    unlocked: ["Open for one change by the owner", "bg-violet-50 text-violet-800 ring-violet-200"],
+};
+
+function KycLockPanel({ userId, lock }) {
+    const [open, setOpen] = useState(false);
+    const form = useForm({ reason: "", document: null });
+    const [label, tone] = KYC_STATE_TEXT[lock.state] ?? [lock.state, "bg-slate-100 text-slate-700 ring-slate-200"];
+    const active = (lock.history ?? []).find((item) => item.active);
+
+    const send = (event) => {
+        event.preventDefault();
+        form.post(`/v2/admin/users/${userId}/kyc-unlock`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setOpen(false);
+                form.reset();
+            },
+        });
+    };
+
+    const lockAgain = () => {
+        if (!window.confirm("Lock KYC again? The owner will not be able to change it.")) return;
+        router.post(`/v2/admin/users/${userId}/kyc-unlock/revoke`, {}, { preserveScroll: true });
+    };
+
+    return (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold text-slate-600">Owner access:</span>
+                    <span className={`rounded-full px-2.5 py-0.5 font-bold ring-1 ring-inset ${tone}`}>{label}</span>
+                    {active && <span className="text-slate-500">until {active.expires}</span>}
+                </div>
+                <div className="flex gap-2">
+                    {active ? (
+                        <button type="button" onClick={lockAgain} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                            Lock again
+                        </button>
+                    ) : (
+                        ["waiting", "verified"].includes(lock.state) && (
+                            <button type="button" onClick={() => setOpen((v) => !v)} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100">
+                                {open ? "Cancel" : "Allow owner to change KYC / bank"}
+                            </button>
+                        )
+                    )}
+                </div>
+            </div>
+
+            {open && (
+                <form onSubmit={send} className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                    <label>
+                        <span className="text-xs font-semibold text-slate-600">Reason (support ticket no. etc.) *</span>
+                        <input type="text" value={form.data.reason} onChange={(e) => form.setData("reason", e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" placeholder="e.g. TKT-123: new bank account" />
+                        {form.errors.reason && <span className="mt-1 block text-xs text-red-600">{form.errors.reason}</span>}
+                    </label>
+                    <label>
+                        <span className="text-xs font-semibold text-slate-600">Signed change form (PDF / photo) *</span>
+                        <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => form.setData("document", e.target.files?.[0] ?? null)} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs" />
+                        {form.errors.document && <span className="mt-1 block text-xs text-red-600">{form.errors.document}</span>}
+                    </label>
+                    <button type="submit" disabled={form.processing} className="h-[38px] rounded-lg bg-violet-600 px-4 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
+                        {form.processing ? "Saving..." : `Open for ${lock.unlock_days} days`}
+                    </button>
+                    {form.errors.kyc_unlock && <span className="text-xs text-red-600 sm:col-span-3">{form.errors.kyc_unlock}</span>}
+                    <p className="text-[11px] text-slate-500 sm:col-span-3">
+                        The owner can then change KYC / bank once and send it again for verification. A bank change still needs the code e-mailed to the owner and puts payouts on hold for 48 hours.
+                    </p>
+                </form>
+            )}
+
+            {(lock.history ?? []).length > 0 && (
+                <details className="mt-2 text-xs">
+                    <summary className="cursor-pointer font-semibold text-slate-600">History of openings ({lock.history.length})</summary>
+                    <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+                        {lock.history.map((item) => (
+                            <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                <span className="min-w-0">
+                                    <span className="font-semibold text-slate-800">{item.at}</span>
+                                    <span className="text-slate-500"> · by {item.by ?? "—"} · {item.reason}</span>
+                                    <span className="block text-[11px] text-slate-400">
+                                        {item.active ? `open until ${item.expires}` : item.used ? `used ${item.used}` : item.revoked ? `locked again ${item.revoked}` : `ended ${item.expires}`}
+                                    </span>
+                                </span>
+                                <a href={`/v2/admin/kyc-unlocks/${item.id}/document`} className="shrink-0 font-semibold text-violet-700 hover:text-violet-900">
+                                    Signed form ↓
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </details>
+            )}
+        </div>
     );
 }

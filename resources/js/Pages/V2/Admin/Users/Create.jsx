@@ -135,6 +135,8 @@ export default function Create({
         role: initialRole,
         revenue_share_percentage: "",
         send_invitation: true,
+        /* W80: the owner fills KYC & bank himself after login, we verify */
+        kyc_by_owner: false,
 
         account_holder_name: "",
         bank_account_number: "",
@@ -451,16 +453,43 @@ export default function Create({
                             <Field label="Pincode" value={data.postal_code} error={err("postal_code")} required={req("postal_code")} onChange={(value) => setData("postal_code", value)} />
                         </div>
 
-                        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+                        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                            <h2 className="text-[15px] font-bold text-slate-900">KYC & bank</h2>
+                            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1" role="radiogroup" aria-label="Who fills KYC and bank details">
+                                {[
+                                    [false, "I fill it now"],
+                                    [true, "Owner fills after login"],
+                                ].map(([value, title]) => (
+                                    <button
+                                        key={String(value)}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={data.kyc_by_owner === value}
+                                        onClick={() => setData("kyc_by_owner", value)}
+                                        className={`rounded-md px-3 py-1 text-xs font-semibold transition ${data.kyc_by_owner === value ? "bg-white text-violet-700 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                                    >
+                                        {title}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {data.kyc_by_owner ? (
+                            <p className="mt-3 rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2.5 text-xs leading-5 text-violet-900">
+                                The owner fills PAN, GST and bank details once under <b>KYC & Payout</b> after the first login and sends them to you. You verify them in KYC Reviews; after that they are locked.
+                                A later change needs a Support request and your <b>Allow change</b> with the signed form.
+                            </p>
+                        ) : (
+                        <div className="mt-3 grid gap-5 lg:grid-cols-2">
                             <div>
-                                <h2 className="text-[15px] font-bold text-slate-900">Tax & KYC</h2>
+                                <h2 className="text-[13px] font-bold text-slate-700">Tax & KYC</h2>
                                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                                     <Field label="PAN" value={data.pan_number} error={err("pan_number")} required={req("pan_number")} onChange={(value) => setData("pan_number", value.toUpperCase().replace(/\s+/g, ""))} />
                                     <Field label="GST" value={data.gst_number} error={err("gst_number")} required={req("gst_number")} onChange={(value) => setData("gst_number", value.toUpperCase().replace(/\s+/g, ""))} />
                                 </div>
                             </div>
                             <div>
-                                <h2 className="text-[15px] font-bold text-slate-900">Bank details</h2>
+                                <h2 className="text-[13px] font-bold text-slate-700">Bank details</h2>
                                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                                     <Field label="Account holder name" value={data.account_holder_name} error={err("account_holder_name")} required={req("account_holder_name")} onChange={(value) => setData("account_holder_name", value)} />
                                     <Field label="Account number" value={data.bank_account_number} error={err("bank_account_number")} required={req("bank_account_number")} onChange={(value) => setData("bank_account_number", value)} />
@@ -470,6 +499,7 @@ export default function Create({
                                 </div>
                             </div>
                         </div>
+                        )}
                     </Card>
                 )}
 
