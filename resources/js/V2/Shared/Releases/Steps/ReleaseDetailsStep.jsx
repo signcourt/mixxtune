@@ -1,5 +1,6 @@
 import {
     useMemo,
+    useRef,
     useState,
 } from 'react';
 
@@ -485,7 +486,7 @@ export default function ReleaseDetailsStep({
 
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         <Field
-                            label="Catalogue Level"
+                            label="Catalogue Label"
                             required
                             error={errors.label_id}
                         >
@@ -499,7 +500,7 @@ export default function ReleaseDetailsStep({
                                 }
                             >
                                 <option value="">
-                                    Select catalogue level
+                                    Select catalogue label
                                 </option>
 
                                 {labels.map(
@@ -715,7 +716,7 @@ export default function ReleaseDetailsStep({
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {!isOperator && (
                     <Field
-                        label="Catalogue Level"
+                        label="Catalogue Label"
                         required
                         error={errors.label_id}
                     >
@@ -732,7 +733,7 @@ export default function ReleaseDetailsStep({
                             }
                         >
                             <option value="">
-                                Select catalogue level
+                                Select catalogue label
                             </option>
 
                             {labels.map(
@@ -751,7 +752,7 @@ export default function ReleaseDetailsStep({
 
                         {labels.length > 1 && (
                             <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
-                                Select the exact catalogue level that owns this release.
+                                Select the exact catalogue label that owns this release.
                             </p>
                         )}
                     </Field>
@@ -769,7 +770,7 @@ export default function ReleaseDetailsStep({
                             data.primary_genre ?? ''
                         }
                         options={GENRES}
-                        placeholder="Search genre..."
+                        placeholder="Select genre"
                         onChange={(value) =>
                             setData(
                                 'primary_genre',
@@ -787,7 +788,7 @@ export default function ReleaseDetailsStep({
                     <SearchableSelect
                         value={data.sub_genre ?? ''}
                         options={SUB_GENRES}
-                        placeholder="Search sub genre..."
+                        placeholder="Select sub genre"
                         onChange={(value) =>
                             setData(
                                 'sub_genre',
@@ -805,7 +806,7 @@ export default function ReleaseDetailsStep({
                     <SearchableSelect
                         value={data.language ?? ''}
                         options={LANGUAGES}
-                        placeholder="Type language..."
+                        placeholder="Select language"
                         onChange={(value) =>
                             setData(
                                 'language',
@@ -1145,6 +1146,10 @@ function ArtistRow({
     );
 }
 
+/*
+ * W85: looks like a dropdown (arrow on the right). Click opens the whole
+ * list to scroll; typing narrows it down. The chosen value stays shown.
+ */
 function SearchableSelect({
     value,
     options,
@@ -1153,6 +1158,7 @@ function SearchableSelect({
 }) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
+    const inputRef = useRef(null);
 
     const filtered = useMemo(() => {
         const search = query
@@ -1170,24 +1176,36 @@ function SearchableSelect({
         );
     }, [options, query]);
 
-    const displayedValue =
-        open ? query : value;
+    const openList = () => {
+        setQuery('');
+        setOpen(true);
+    };
 
     return (
         <div className="relative">
             <input
+                ref={inputRef}
                 type="text"
-                className={fieldClass}
-                value={displayedValue}
-                placeholder={placeholder}
+                className={`${fieldClass} cursor-pointer pr-10`}
+                value={open ? query : value ?? ''}
+                placeholder={open && value ? value : placeholder}
                 autoComplete="off"
-                onFocus={() => {
-                    setQuery(value ?? '');
-                    setOpen(true);
-                }}
+                onFocus={openList}
+                onClick={() => !open && openList()}
                 onChange={(event) => {
                     setQuery(event.target.value);
                     setOpen(true);
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter' && open && filtered.length > 0) {
+                        event.preventDefault();
+                        onChange(filtered[0]);
+                        setOpen(false);
+                        inputRef.current?.blur();
+                    }
+                    if (event.key === 'Escape') {
+                        setOpen(false);
+                    }
                 }}
                 onBlur={() => {
                     window.setTimeout(
@@ -1197,8 +1215,28 @@ function SearchableSelect({
                 }}
             />
 
+            <button
+                type="button"
+                tabIndex={-1}
+                aria-label="Show list"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                    if (open) {
+                        setOpen(false);
+                        inputRef.current?.blur();
+                    } else {
+                        inputRef.current?.focus();
+                    }
+                }}
+                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500"
+            >
+                <svg viewBox="0 0 20 20" fill="currentColor" className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`}>
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06z" clipRule="evenodd" />
+                </svg>
+            </button>
+
             {open && (
-                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
                     {filtered.length > 0 ? (
                         filtered.map((option) => (
                             <button
@@ -1209,8 +1247,9 @@ function SearchableSelect({
                                 }
                                 onClick={() => {
                                     onChange(option);
-                                    setQuery(option);
+                                    setQuery('');
                                     setOpen(false);
+                                    inputRef.current?.blur();
                                 }}
                                 className={`block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
                                     value === option
@@ -1223,7 +1262,7 @@ function SearchableSelect({
                         ))
                     ) : (
                         <div className="px-3 py-3 text-xs text-slate-400">
-                            No matching option
+                            No match - check the spelling
                         </div>
                     )}
                 </div>

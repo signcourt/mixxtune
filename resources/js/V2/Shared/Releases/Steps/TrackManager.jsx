@@ -1258,18 +1258,18 @@ export default function TrackManager({
 
                                 <div className="mixx-v6-form-grid">
                                     <Field label="Genre" required error={err('genre')}>
-                                        <SearchableTrackSelect value={data.genre} options={TRACK_GENRES} placeholder="Search genre..." onChange={(value) => setField('genre', value)} />
+                                        <SearchableTrackSelect value={data.genre} options={TRACK_GENRES} placeholder="Select genre" onChange={(value) => setField('genre', value)} />
                                     </Field>
 
                                     <Field label="Sub genre" required error={err('sub_genre')}>
-                                        <SearchableTrackSelect value={data.sub_genre} options={TRACK_SUB_GENRES} placeholder="Search sub genre..." onChange={(value) => setField('sub_genre', value)} />
+                                        <SearchableTrackSelect value={data.sub_genre} options={TRACK_SUB_GENRES} placeholder="Select sub genre" onChange={(value) => setField('sub_genre', value)} />
                                     </Field>
 
                                     <Field label="Language" required error={err('language')}>
                                         <SearchableTrackSelect
                                             value={data.language}
                                             options={TRACK_LANGUAGES}
-                                            placeholder="Search language..."
+                                            placeholder="Select language"
                                             onChange={(value) => {
                                                 setData((d) => ({ ...d, language: value, title_language: value, lyrics_language: value }));
                                             }}
@@ -1535,15 +1535,30 @@ function SearchableTrackSelect({
 
     return (
         <div className="relative">
+            {/* W85: dropdown arrow; click shows the whole list, typing narrows it */}
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`}>
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06z" clipRule="evenodd" />
+            </svg>
             <input
                 type="text"
                 autoComplete="off"
-                className={inputClass}
+                className={`${inputClass} cursor-pointer pr-9`}
                 value={open ? query : (value ?? '')}
-                placeholder={placeholder}
+                placeholder={open && value ? value : placeholder}
                 onFocus={() => {
-                    setQuery(value ?? '');
+                    setQuery('');
                     setOpen(true);
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter' && open && filteredOptions.length > 0) {
+                        event.preventDefault();
+                        onChange(filteredOptions[0]);
+                        setOpen(false);
+                        event.currentTarget.blur();
+                    }
+                    if (event.key === 'Escape') {
+                        setOpen(false);
+                    }
                 }}
                 onChange={(event) => {
                     setQuery(event.target.value);
@@ -1570,7 +1585,7 @@ function SearchableTrackSelect({
                                     }
                                     onClick={() => {
                                         onChange(option);
-                                        setQuery(option);
+                                        setQuery('');
                                         setOpen(false);
                                     }}
                                     className={`block w-full rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition ${

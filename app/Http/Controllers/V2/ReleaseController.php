@@ -145,7 +145,7 @@ class ReleaseController extends Controller
         if (!$allowed->contains($labelId)) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'label_id' => [
-                    'You cannot assign this release to the selected catalogue level.',
+                    'You cannot assign this release to the selected catalogue label.',
                 ],
             ]);
         }
@@ -2113,7 +2113,7 @@ class ReleaseController extends Controller
             abort_unless(
                 $labelId,
                 422,
-                'Select a catalogue level.'
+                'Select a catalogue label.'
             );
 
             $this->assertCatalogueLabelAllowed(
@@ -2225,7 +2225,7 @@ class ReleaseController extends Controller
             if (! $artist) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'artist_id' => [
-                        'The selected artist does not belong to the selected catalogue level.',
+                        'The selected artist does not belong to the selected catalogue label.',
                     ],
                 ]);
             }
