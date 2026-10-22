@@ -651,56 +651,55 @@ export default function ReleaseDetailsStep({
                 </div>
 
                 <div>
+                    {/* W84: same as Primary Artist - one box with + beside it (empty box = no featuring artist) */}
                     <div className="mb-2 flex items-center justify-between gap-3">
                         <label className="text-sm font-bold text-slate-700">
                             Featuring Artist
                         </label>
 
-                        {featuringArtists.length === 0 && (
-                            <button
-                                type="button"
-                                onClick={addFeaturingArtist}
-                                className="inline-flex h-7 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[10px] font-black text-violet-700 transition hover:bg-violet-100"
-                            >
-                                + Add
-                            </button>
-                        )}
+                        <span className="text-[10px] font-bold text-slate-400">
+                            Optional
+                        </span>
                     </div>
 
-                    {featuringArtists.length === 0 ? (
-                        <div className="flex h-[46px] items-center rounded-xl border border-dashed border-slate-200 px-3.5 text-xs text-slate-400">
-                            No featuring artist
-                        </div>
-                    ) : (
-                        <div className="space-y-2.5">
-                            {featuringArtists.map(
-                                (artist, index) => (
-                                    <ArtistRow
-                                        key={`featuring-${index}`}
-                                        value={artist.name}
-                                        placeholder="Enter featuring artist"
-                                        onChange={(value) =>
-                                            updateFeaturingArtist(
-                                                index,
-                                                value
-                                            )
-                                        }
-                                        onAdd={
-                                            index
-                                                === featuringArtists.length - 1
-                                                ? addFeaturingArtist
-                                                : null
-                                        }
-                                        onRemove={() =>
-                                            removeFeaturingArtist(
-                                                index
-                                            )
-                                        }
-                                    />
-                                )
-                            )}
-                        </div>
-                    )}
+                    <div className="space-y-2.5">
+                        {(featuringArtists.length > 0 ? featuringArtists : [normalizeArtist()]).map(
+                            (artist, index, rows) => (
+                                <ArtistRow
+                                    key={`featuring-${index}`}
+                                    value={artist.name}
+                                    placeholder={
+                                        index === 0
+                                            ? 'Enter featuring artist'
+                                            : 'Enter additional featuring artist'
+                                    }
+                                    onChange={(value) =>
+                                        updateFeaturingArtist(
+                                            index,
+                                            value
+                                        )
+                                    }
+                                    onAdd={
+                                        index === rows.length - 1
+                                            ? () =>
+                                                setFeaturingArtists([
+                                                    ...rows,
+                                                    normalizeArtist(),
+                                                ])
+                                            : null
+                                    }
+                                    onRemove={
+                                        rows.length > 1
+                                            ? () =>
+                                                removeFeaturingArtist(
+                                                    index
+                                                )
+                                            : null
+                                    }
+                                />
+                            )
+                        )}
+                    </div>
 
                     <ErrorText
                         error={

@@ -1827,6 +1827,16 @@ class ReleaseController extends Controller
         Request $request,
         bool $adminEdit = false
     ): array {
+        /* W84: an empty featuring-artist box (added with + but left blank) is simply ignored */
+        if (is_array($request->input('featuring_artists'))) {
+            $request->merge([
+                'featuring_artists' => array_values(array_filter(
+                    $request->input('featuring_artists'),
+                    fn ($row) => trim((string) (is_array($row) ? ($row['name'] ?? '') : $row)) !== ''
+                )),
+            ]);
+        }
+
         $rules = [
             'title' => [
                 'required',
