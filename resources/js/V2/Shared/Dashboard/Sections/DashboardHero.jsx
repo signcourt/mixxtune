@@ -38,9 +38,11 @@ export default function DashboardHero({
                         Welcome, {name}
                     </h2>
 
-                    <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
-                        {description}
-                    </p>
+                    {description && (
+                        <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
+                            {description}
+                        </p>
+                    )}
 
                 </div>
 

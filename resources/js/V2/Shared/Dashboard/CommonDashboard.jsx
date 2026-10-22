@@ -131,11 +131,8 @@ export default function CommonDashboard({
                 eyebrow={`${String(
                     panelName
                 ).toUpperCase()} OVERVIEW`}
-                description={
-                    isLabel
-                        ? 'Manage artists, releases, royalties and performance from one label workspace.'
-                        : 'Manage releases, analytics and account activity from one professional workspace.'
-                }
+                /* W88: the line under "Welcome, ..." is removed */
+                description=""
                 primaryAction={{
                     label: 'Create Release',
                     href:
