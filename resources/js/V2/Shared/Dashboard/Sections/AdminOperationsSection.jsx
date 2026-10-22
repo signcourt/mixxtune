@@ -115,7 +115,7 @@ export default function AdminOperationsSection({
                     subtitle="Latest release activity in your scope."
                     action={
                         <Link
-                            href="/admin/release-reviews"
+                            href="/v2/admin/release-reviews"
                             className="inline-flex items-center gap-2 text-sm font-bold text-violet-700"
                         >
                             Review Queue
@@ -141,7 +141,7 @@ export default function AdminOperationsSection({
                                         release.status ||
                                         'draft'
                                     }
-                                    href="/admin/release-reviews"
+                                    href="/v2/admin/release-reviews"
                                 />
                             ))
                         ) : (
@@ -197,7 +197,7 @@ export default function AdminOperationsSection({
                     subtitle="Latest artist and label payout requests."
                     action={
                         <Link
-                            href="/admin/withdrawals"
+                            href="/v2/admin/withdrawals"
                             className="inline-flex items-center gap-2 text-sm font-bold text-violet-700"
                         >
                             View Withdrawals
@@ -229,7 +229,7 @@ export default function AdminOperationsSection({
                                         item.status ||
                                         'pending'
                                     }
-                                    href="/admin/withdrawals"
+                                    href="/v2/admin/withdrawals"
                                 />
                             ))
                         ) : (

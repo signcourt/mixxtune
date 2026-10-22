@@ -41,6 +41,7 @@ class SuperAdminDashboardProfitCardTest extends TestCase
             'original_filename' => 'dashboard-profit.csv',
             'stored_path' => 'tests/dashboard-profit.csv',
             'status' => 'completed',
+            'financial_status' => 'published', /* W92: profit counts published reports */
             'total_rows' => 1,
             'imported_rows' => 1,
             'duplicate_rows' => 0,

@@ -33,8 +33,10 @@ export default function ProfitIndex({
     months = [],
     platforms = [],
     owners = [],
+    inReview = null,
 }) {
     const [form, setForm] = useState({
+        stage: filters.stage || 'published',
         month: filters.month || '',
         platform: filters.platform || '',
         owner_type: filters.owner_type || '',
@@ -63,6 +65,7 @@ export default function ProfitIndex({
 
     const clearFilters = () => {
         const empty = {
+            stage: 'published',
             month: '',
             platform: '',
             owner_type: '',
@@ -173,6 +176,35 @@ export default function ProfitIndex({
                             Export CSV
                         </a>
                     </div>
+                </section>
+
+                {/* W92: which reports are counted */}
+                <section className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-wrap gap-2">
+                        {[
+                            ['published', 'Published reports'],
+                            ['review', 'In review only'],
+                            ['all', 'All reports'],
+                        ].map(([value, text]) => (
+                            <button
+                                key={value}
+                                type="button"
+                                onClick={() => {
+                                    const next = { ...form, stage: value };
+                                    setForm(next);
+                                    router.get('/v2/admin/profit', next, { preserveState: true, preserveScroll: true, replace: true });
+                                }}
+                                className={`rounded-xl px-4 py-2 text-sm font-semibold ${form.stage === value ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
+                            >
+                                {text}
+                            </button>
+                        ))}
+                    </div>
+                    {inReview && Number(inReview.rows || 0) > 0 && (
+                        <p className="text-sm text-amber-300">
+                            Not counted yet - reports in review: profit {money(inReview.super_admin_profit)} · collected {money(inReview.collected_revenue)} ({number(inReview.rows)} rows). It is added when the report is published.
+                        </p>
+                    )}
                 </section>
 
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

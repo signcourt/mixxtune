@@ -416,6 +416,10 @@ class DashboardController extends Controller
                     'profit_user_earning' => $role === 'super_admin'
                         ? (float) ($profitSummary['user_earning'] ?? 0)
                         : null,
+                    /* W92: profit of reports still in review - shown apart, not counted */
+                    'profit_in_review' => $role === 'super_admin'
+                        ? (float) ($profit->summary($profit->withStage($profit->baseQuery(), 'review'))['super_admin_profit'] ?? 0)
+                        : null,
                     'sale_units' => (float) ($analyticsSummary['sale_units'] ?? 0),
                 ],
 
@@ -469,7 +473,8 @@ class DashboardController extends Controller
         ];
         $months = [];
 
-        foreach ($profit->baseQuery()->orderBy('id')->cursor() as $row) {
+        /* W92: profit counts published reports only (what owners already see in their wallets) */
+        foreach ($profit->withStage($profit->baseQuery(), 'published')->orderBy('id')->cursor() as $row) {
             $calc = $profit->calculateRow($row);
 
             foreach (array_keys($summary) as $field) {

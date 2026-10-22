@@ -20,13 +20,16 @@ class SuperAdminProfitController extends Controller
         $filters =
             $this->filters($request);
 
-        $query =
+        $base =
             $profit->baseQuery(
                 $filters['month'],
                 $filters['platform'],
                 $filters['owner_type'],
                 $filters['owner_id']
             );
+
+        /* W92: the big numbers count published reports only; reports still in review are shown apart */
+        $query = $profit->withStage(clone $base, $filters['stage']);
 
         return inertia(
             'V2/Admin/Profit/Index',
@@ -48,6 +51,11 @@ class SuperAdminProfitController extends Controller
 
                 'filters' =>
                     $filters,
+
+                'inReview' =>
+                    $filters['stage'] === 'published'
+                        ? $profit->summary($profit->withStage(clone $base, 'review'))
+                        : null,
 
                 'months' =>
                     $profit->months(),
@@ -73,11 +81,14 @@ class SuperAdminProfitController extends Controller
             $this->filters($request);
 
         $query =
-            $profit->baseQuery(
-                $filters['month'],
-                $filters['platform'],
-                $filters['owner_type'],
-                $filters['owner_id']
+            $profit->withStage(
+                $profit->baseQuery(
+                    $filters['month'],
+                    $filters['platform'],
+                    $filters['owner_type'],
+                    $filters['owner_id']
+                ),
+                $filters['stage']
             );
 
         $filename =
@@ -214,9 +225,18 @@ class SuperAdminProfitController extends Controller
                     'integer',
                     'min:1',
                 ],
+
+                /* W92: published (default) | review | all */
+                'stage' => [
+                    'nullable',
+                    'in:published,review,all',
+                ],
             ]);
 
         return [
+            'stage' =>
+                (string) ($validated['stage'] ?? 'published'),
+
             'month' =>
                 (string)
                     ($validated[

@@ -12,6 +12,7 @@ import {
 } from 'react';
 
 import TrackUploadOverlay from '@/V2/Shared/Releases/V5/Tracks/TrackUploadOverlay';
+import NameSuggestInput from '@/V2/Shared/Releases/NameSuggestInput';
 
 const ARTIST_CONTEXT =
     typeof window !== 'undefined'
@@ -292,6 +293,8 @@ export default function TrackManager({
 }) {
     /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Audio Maximum MB */
     const audioMaxMb = Number(usePage().props?.platformRules?.audio_max_mb) || 300;
+    /* W91: names already used on this account (from the release form data) */
+    const nameSuggestions = usePage().props?.artistNameSuggestions ?? [];
 
     const tracks = Array.isArray(release?.tracks)
         ? release.tracks
@@ -1280,11 +1283,11 @@ export default function TrackManager({
                                     </Field>
 
                                     <Field label="Primary artist / singer" required error={err('primary_artist_name')}>
-                                        <MultiNameInput value={data.primary_artist_name} onChange={(v) => setField('primary_artist_name', v)} max={3} noun="artist" />
+                                        <MultiNameInput suggestions={nameSuggestions} value={data.primary_artist_name} onChange={(v) => setField('primary_artist_name', v)} max={3} noun="artist" />
                                     </Field>
 
                                     <Field label="Featuring artist" error={err('featuring_artist_name')}>
-                                        <MultiNameInput value={data.featuring_artist_name} onChange={(v) => setField('featuring_artist_name', v)} max={5} noun="artist" placeholder="Leave empty if none" />
+                                        <MultiNameInput suggestions={nameSuggestions} value={data.featuring_artist_name} onChange={(v) => setField('featuring_artist_name', v)} max={5} noun="artist" placeholder="Leave empty if none" />
                                     </Field>
                                 </div>
 
@@ -1324,11 +1327,11 @@ export default function TrackManager({
 
                                 <div className="mixx-v6-form-grid">
                                     <Field label="Lyricist / writer" required={!data.is_instrumental} error={err('author_name')} hint={data.is_instrumental ? 'Not needed for an instrumental' : null}>
-                                        <MultiNameInput value={data.author_name} onChange={(v) => setField('author_name', v)} max={5} noun="lyricist" disabled={Boolean(data.is_instrumental)} />
+                                        <MultiNameInput suggestions={nameSuggestions} value={data.author_name} onChange={(v) => setField('author_name', v)} max={5} noun="lyricist" disabled={Boolean(data.is_instrumental)} />
                                     </Field>
 
                                     <Field label="Composer" required error={err('composer_name')}>
-                                        <MultiNameInput value={data.composer_name} onChange={(v) => setField('composer_name', v)} max={5} noun="composer" />
+                                        <MultiNameInput suggestions={nameSuggestions} value={data.composer_name} onChange={(v) => setField('composer_name', v)} max={5} noun="composer" />
                                     </Field>
                                 </div>
 
@@ -1516,7 +1519,7 @@ function Field({
     );
 }
 
-function MultiNameInput({ value, onChange, max = 5, noun = 'name', placeholder = '', disabled = false }) {
+function MultiNameInput({ value, onChange, max = 5, noun = 'name', placeholder = '', disabled = false, suggestions = [] }) {
     const toRows = (v) => {
         const list = splitNames(v).filter(Boolean);
         return list.length ? list : [''];
@@ -1556,13 +1559,15 @@ function MultiNameInput({ value, onChange, max = 5, noun = 'name', placeholder =
         <div className="space-y-1.5">
             {rows.map((name, index) => (
                 <div key={index} className="flex items-center gap-1.5">
-                    <input
+                    {/* W91: names used before are suggested while typing */}
+                    <NameSuggestInput
                         className={inputClass}
                         value={name}
                         disabled={disabled}
+                        suggestions={suggestions}
                         placeholder={index === 0 ? placeholder : `Another ${noun}`}
                         aria-label={index === 0 ? undefined : `${noun} ${index + 1}`}
-                        onChange={(e) => update(index, e.target.value)}
+                        onChange={(text) => update(index, text)}
                     />
                     {index === 0 ? (
                         <button

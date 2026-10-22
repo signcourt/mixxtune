@@ -34,3 +34,11 @@ Schedule::command('invitations:send-reminders')
     ->dailyAt('04:35')
     ->timezone('UTC')
     ->withoutOverlapping(30);
+
+/*
+| W91 MIXXTUNE_PENDING_AUDIO_CLEANUP
+| Every hour: delete background WAV uploads that no track used (older than 26 h).
+*/
+Schedule::command('tracks:clean-pending-audio')
+    ->hourly()
+    ->withoutOverlapping(30);

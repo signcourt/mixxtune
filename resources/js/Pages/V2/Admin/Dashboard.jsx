@@ -451,7 +451,12 @@ export default function Dashboard({
             ? {
                   title: 'Profit kept by Mixx Tune',
                   value: money(stats.profit_earnings),
-                  lines: [`Collected ${money(stats.profit_collected)}`, `Paid to accounts ${money(stats.profit_user_earning)}`],
+                  /* W92: published reports only; reports still in review are shown apart */
+                  lines: [
+                      `Collected ${money(stats.profit_collected)}`,
+                      `Paid to accounts ${money(stats.profit_user_earning)}`,
+                      ...(Number(stats.profit_in_review || 0) !== 0 ? [`In review, not counted ${money(stats.profit_in_review)}`] : []),
+                  ],
                   icon: BadgeIndianRupee,
                   href: '/v2/admin/profit',
                   tone: 'bg-emerald-100 text-emerald-700',

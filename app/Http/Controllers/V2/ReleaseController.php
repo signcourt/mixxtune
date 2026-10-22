@@ -2834,10 +2834,21 @@ class ReleaseController extends Controller
         }
 
         if ($rows->isNotEmpty()) {
+            /* W91: lyricists and composers too, for the Track Details window */
+            $trackColumns = ['primary_artist_name', 'featuring_artist_name'];
+            foreach (['author_name', 'composer_name'] as $column) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('tracks', $column)) {
+                    $trackColumns[] = $column;
+                }
+            }
             \App\Models\Distribution\Track::query()
                 ->whereIn('release_id', $rows->pluck('id'))
-                ->get(['primary_artist_name', 'featuring_artist_name'])
-                ->each(fn ($t) => $names->push($t->primary_artist_name, $t->featuring_artist_name));
+                ->get($trackColumns)
+                ->each(function ($t) use ($names, $trackColumns) {
+                    foreach ($trackColumns as $column) {
+                        $names->push($t->{$column});
+                    }
+                });
         }
 
         $artists = Artist::query()->whereNull('deleted_at');

@@ -109,7 +109,7 @@ export default function ArtistActivitySection({
                         </div>
 
                         <Link
-                            href="/artist/releases"
+                            href="/v2/releases"
                             className="inline-flex items-center gap-2 text-sm font-bold text-violet-700"
                         >
                             View All

@@ -63,4 +63,23 @@ class CatalogueHealthTest extends TestCase
 
         $this->actingAs($this->user('admin'))->get('/super-admin/catalogue-health')->assertForbidden();
     }
+
+    /* W93: tracks that lost lyricist / composer before W65 are listed (instrumental needs no lyricist) */
+    public function test_tracks_without_credits_are_listed(): void
+    {
+        $super = $this->user('super_admin');
+        $release = Release::factory()->create(['status' => 'live', 'created_by' => $super->id]);
+        $n = 0;
+        $make = function (array $x) use ($release, &$n) {
+            return \App\Models\Distribution\Track::factory()->create(array_merge(['release_id' => $release->id, 'track_number' => ++$n], $x));
+        };
+        $make(['title' => 'Gen Full Credits']);
+        $make(['title' => 'Gen No Composer', 'composer_name' => null]);
+        $make(['title' => 'Gen No Lyricist', 'author_name' => '']);
+        $make(['title' => 'Gen Instrumental', 'author_name' => null, 'is_instrumental' => true]);
+
+        $this->actingAs($super)->get('/super-admin/catalogue-health?check=track_no_credits')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('list.rows.total', 2)
+            ->where('list.rows.data', fn ($rows) => collect($rows)->pluck('track_title')->sort()->values()->all() === ['Gen No Composer', 'Gen No Lyricist']));
+    }
 }

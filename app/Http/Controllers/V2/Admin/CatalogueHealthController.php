@@ -29,6 +29,8 @@ class CatalogueHealthController extends Controller
         'no_tracks' => ['group' => 'Releases', 'label' => 'No tracks', 'kind' => 'release'],
         'track_no_isrc' => ['group' => 'Tracks', 'label' => 'Track without ISRC', 'kind' => 'track'],
         'track_no_audio' => ['group' => 'Tracks', 'label' => 'Track without audio file', 'kind' => 'track'],
+        /* W93: tracks saved before W65 lost lyricist / composer - type them on the release (Super Admin edit); never guessed */
+        'track_no_credits' => ['group' => 'Tracks', 'label' => 'Track without lyricist / composer', 'kind' => 'track'],
         'label_no_percent' => ['group' => 'Labels', 'label' => 'Label without revenue %', 'kind' => 'label'],
         'label_no_owner' => ['group' => 'Labels', 'label' => 'Label without owner login', 'kind' => 'label'],
     ];
@@ -85,6 +87,23 @@ class CatalogueHealthController extends Controller
                     'releases.id', 'releases.title', 'releases.upc', 'releases.status',
                 ])
                 ->orderBy('tracks.id');
+
+            if ($check === 'track_no_credits') {
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('tracks', 'composer_name')) {
+                    return $q->whereRaw('1 = 0');
+                }
+
+                return $q->where(function ($w) {
+                    $w->whereNull('tracks.composer_name')->orWhere('tracks.composer_name', '')
+                        ->orWhere(function ($lyr) {
+                            $lyr->where(function ($b) {
+                                $b->whereNull('tracks.author_name')->orWhere('tracks.author_name', '');
+                            })->where(function ($i) {
+                                $i->whereNull('tracks.is_instrumental')->orWhere('tracks.is_instrumental', false);
+                            });
+                        });
+                });
+            }
 
             return $check === 'track_no_isrc'
                 ? $this->blank($q, 'tracks.isrc')

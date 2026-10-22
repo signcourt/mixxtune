@@ -102,4 +102,31 @@ class BackgroundWavUploadTest extends TestCase
         $this->actingAs($user)->post(route('v2.release-tracks.store', $release), $this->details($artist))
             ->assertSessionHasErrors('audio');
     }
+
+    /* W91: unused uploads wait in tracks/audio-pending and are cleaned; used ones move to tracks/audio */
+    public function test_used_upload_moves_and_unused_ones_are_cleaned(): void
+    {
+        [$user, $release, $artist] = $this->owner();
+
+        $token = $this->actingAs($user)->postJson(route('v2.release-tracks.audio-upload', $release), ['audio' => UploadedFile::fake()->create('used.wav', 100, 'audio/wav')])->json('token');
+        $this->actingAs($user)->postJson(route('v2.release-tracks.audio-upload', $release), ['audio' => UploadedFile::fake()->create('left.wav', 100, 'audio/wav')]);
+
+        $this->actingAs($user)->post(route('v2.release-tracks.store', $release), $this->details($artist, ['audio_upload_token' => $token]))->assertSessionHasNoErrors();
+        $track = Track::query()->firstOrFail();
+        $this->assertStringStartsWith('tracks/audio/', $track->audio_path);
+        Storage::disk('public')->assertExists($track->audio_path);
+
+        $pending = Storage::disk('public')->files('tracks/audio-pending');
+        $this->assertCount(1, $pending);
+
+        /* still fresh: kept */
+        $this->artisan('tracks:clean-pending-audio')->assertSuccessful();
+        $this->assertCount(1, Storage::disk('public')->files('tracks/audio-pending'));
+
+        /* two days later: removed; the track's own file stays */
+        touch(Storage::disk('public')->path($pending[0]), now()->subDays(2)->getTimestamp());
+        $this->artisan('tracks:clean-pending-audio')->assertSuccessful();
+        $this->assertCount(0, Storage::disk('public')->files('tracks/audio-pending'));
+        Storage::disk('public')->assertExists($track->audio_path);
+    }
 }

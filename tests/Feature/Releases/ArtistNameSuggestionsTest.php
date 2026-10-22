@@ -35,11 +35,11 @@ class ArtistNameSuggestionsTest extends TestCase
         [, $otherLabel] = $this->owner();
 
         $release = Release::factory()->create(['label_id' => $myLabel->id, 'artist_id' => null, 'primary_artist_name' => 'Arijit Singh', 'featuring_artist_name' => 'Arun,  Neha Kakkar']);
-        Track::factory()->create(['release_id' => $release->id, 'primary_artist_name' => 'arijit singh', 'featuring_artist_name' => 'Asha Bhosle']);
+        Track::factory()->create(['release_id' => $release->id, 'primary_artist_name' => 'arijit singh', 'featuring_artist_name' => 'Asha Bhosle', 'author_name' => 'Gulzar', 'composer_name' => 'A R Rahman, Asha Bhosle']);
         Release::factory()->create(['label_id' => $otherLabel->id, 'artist_id' => null, 'primary_artist_name' => 'Arun Secret']);
 
         $this->actingAs($mine)->get(route('v2.releases.create'))->assertOk()->assertInertia(fn (Assert $p) => $p
-            ->where('artistNameSuggestions', fn ($names) => collect($names)->values()->all() === ['Arijit Singh', 'Arun', 'Asha Bhosle', 'Neha Kakkar']));
+            ->where('artistNameSuggestions', fn ($names) => collect($names)->values()->all() === ['Arijit Singh', 'A R Rahman', 'Arun', 'Asha Bhosle', 'Gulzar', 'Neha Kakkar']));
 
         $super = User::factory()->create(['role' => 'super_admin', 'account_status' => 'active', 'email_verified_at' => now()]);
         $this->actingAs($super)->get(route('v2.releases.create'))->assertOk()->assertInertia(fn (Assert $p) => $p

@@ -460,7 +460,8 @@ class ReleaseTrackController extends Controller
         \Illuminate\Support\Facades\Cache::put('track-audio-upload:'.$token, [
             'user_id' => (int) $request->user()->id,
             'release_id' => (int) $release->id,
-            'path' => $audio->store('tracks/audio', 'public'),
+            /* W91: kept apart until a track uses it; unused files are deleted after a day */
+            'path' => $audio->store('tracks/audio-pending', 'public'),
             'name' => $audio->getClientOriginalName(),
             'mime' => $audio->getMimeType(),
             'size' => $audio->getSize(),
@@ -507,6 +508,13 @@ class ReleaseTrackController extends Controller
 
         /* used once - only by the user and release it was made for */
         \Illuminate\Support\Facades\Cache::forget('track-audio-upload:'.$token);
+
+        /* W91: move it next to the other masters (old tokens may already point there) */
+        if (str_starts_with($upload['path'], 'tracks/audio-pending/')) {
+            $final = 'tracks/audio/'.basename($upload['path']);
+            Storage::disk('public')->move($upload['path'], $final);
+            $upload['path'] = $final;
+        }
 
         return $upload;
     }

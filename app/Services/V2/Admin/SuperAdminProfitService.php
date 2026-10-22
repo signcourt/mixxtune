@@ -90,6 +90,35 @@ public function baseQuery(
         return $query;
     }
 
+    /*
+     * W92 MIXXTUNE_PROFIT_PUBLISHED_ONLY
+     * stage = published : rows of published reports (and old rows that were
+     *                     never part of a report import) - this is the money
+     *                     owners already see in their wallets;
+     * stage = review    : rows of reports not published yet (waiting for
+     *                     review / approved and scheduled);
+     * stage = all       : everything (the old behaviour).
+     */
+    public function withStage(Builder $query, string $stage): Builder
+    {
+        if (!in_array($stage, ['published', 'review'], true)
+            || !\Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'financial_status')) {
+            return $query;
+        }
+
+        $published = DB::table('report_imports')->select('id')->where('financial_status', 'published');
+
+        if ($stage === 'published') {
+            return $query->where(function ($q) use ($published) {
+                $q->whereNull('report_rows.report_import_id')
+                    ->orWhereIn('report_rows.report_import_id', $published);
+            });
+        }
+
+        return $query->whereNotNull('report_rows.report_import_id')
+            ->whereNotIn('report_rows.report_import_id', $published);
+    }
+
     public function calculateRow(
         object $row
     ): array {

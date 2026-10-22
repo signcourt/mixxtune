@@ -74,6 +74,10 @@ class SuperAdminProfitHttpTest extends TestCase
             'status' =>
                 'completed',
 
+            /* W92: profit counts published reports */
+            'financial_status' =>
+                'published',
+
             'total_rows' =>
                 3,
 

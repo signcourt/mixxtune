@@ -175,3 +175,4 @@ html.mt-night .mixx-v5-upload-studio, html.mt-night .mixx-v3-sidebar, html.mt-ni
 html.mt-night .mixx-v3-sidebar *{color:inherit}
 html.mt-night .mixx-v3-sidebar [class*="active"], html.mt-night .mixx-v3-sidebar .is-active{background:rgba(139,92,246,.15) !important}
 html.mt-night .mt-main label, html.mt-night .mt-main h1, html.mt-night .mt-main h2, html.mt-night .mt-main h3{color:inherit}
+html.mt-night .mt-main .bg-slate-50\/90, html.mt-night .mt-main .bg-slate-50\/95, html.mt-night .mt-main .bg-slate-100\/80, html.mt-night .mt-main .bg-white\/70, html.mt-night .mt-main .bg-white\/60{background-color:rgba(15,23,42,.92) !important}
