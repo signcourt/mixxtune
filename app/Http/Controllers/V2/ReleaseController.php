@@ -194,10 +194,13 @@ class ReleaseController extends Controller
                 true
             ) ? (string) $request->input('release_type') : '',
 
-            'month' => preg_match(
-                '/^\d{4}-\d{2}$/',
-                (string) $request->input('month', '')
-            ) ? (string) $request->input('month') : '',
+            /* W76: the release-date month filter was removed (an old link with ?month= no longer hides releases) */
+            'artist' => mb_substr(trim((string) $request->input('artist', '')), 0, 190),
+            'language' => mb_substr(trim((string) $request->input('language', '')), 0, 60),
+            'genre' => mb_substr(trim((string) $request->input('genre', '')), 0, 100),
+            'upc' => in_array($request->input('upc'), ['has', 'missing'], true) ? (string) $request->input('upc') : '',
+            'artwork' => in_array($request->input('artwork'), ['has', 'missing'], true) ? (string) $request->input('artwork') : '',
+            'stores' => in_array($request->input('stores'), ['live', 'sent', 'not_sent'], true) ? (string) $request->input('stores') : '',
 
             'label_id' => $request->integer('label_id') > 0
                 ? (string) $request->integer('label_id')
@@ -625,8 +628,33 @@ class ReleaseController extends Controller
             $query->where('release_type', $filters['release_type']);
         }
 
-        if ($filters['month'] !== '') {
-            $query->where('digital_release_date', 'like', $filters['month'].'%');
+        /* W76: more filters (all applied on the server, every page) */
+        if ($filters['artist'] !== '') {
+            $query->where('primary_artist_name', $filters['artist']);
+        }
+        if ($filters['language'] !== '') {
+            $query->where('language', $filters['language']);
+        }
+        if ($filters['genre'] !== '') {
+            $query->where('primary_genre', $filters['genre']);
+        }
+        if ($filters['upc'] === 'has') {
+            $query->whereNotNull('upc')->where('upc', '!=', '');
+        } elseif ($filters['upc'] === 'missing') {
+            $query->where(fn ($w) => $w->whereNull('upc')->orWhere('upc', ''));
+        }
+        if ($filters['artwork'] === 'has') {
+            $query->whereNotNull('artwork_path')->where('artwork_path', '!=', '');
+        } elseif ($filters['artwork'] === 'missing') {
+            $query->where(fn ($w) => $w->whereNull('artwork_path')->orWhere('artwork_path', ''));
+        }
+        $deliveries = fn () => DB::table('release_store_deliveries')->select('release_id');
+        if ($filters['stores'] === 'live') {
+            $query->whereIn('releases.id', $deliveries()->where('status', 'live'));
+        } elseif ($filters['stores'] === 'sent') {
+            $query->whereIn('releases.id', $deliveries());
+        } elseif ($filters['stores'] === 'not_sent') {
+            $query->whereNotIn('releases.id', $deliveries());
         }
 
         if ($filters['status'] !== '') {
@@ -645,6 +673,13 @@ class ReleaseController extends Controller
 
             'title_desc' =>
                 $query->orderByDesc('title'),
+
+            /* W76 */
+            'release_newest' =>
+                $query->orderByRaw('digital_release_date IS NULL')->orderByDesc('digital_release_date')->orderByDesc('id'),
+
+            'release_oldest' =>
+                $query->orderByRaw('digital_release_date IS NULL')->orderBy('digital_release_date')->orderBy('id'),
 
             default =>
                 $query->orderByDesc('id'),
@@ -674,6 +709,13 @@ class ReleaseController extends Controller
                     ->whereNull('deleted_at')
                     ->orderBy('name')
                     ->get(['id', 'name']),
+
+                /* W76: choices for the artist / language / genre filters (only what the viewer has) */
+                'filterOptions' => [
+                    'artists' => $this->distinctValues($labelOptionsQuery, 'primary_artist_name'),
+                    'languages' => $this->distinctValues($labelOptionsQuery, 'language'),
+                    'genres' => $this->distinctValues($labelOptionsQuery, 'primary_genre'),
+                ],
 
                 'releases' =>
                     $query
@@ -719,6 +761,24 @@ class ReleaseController extends Controller
                 ],
             ]
         );
+    }
+
+    /** W76: sorted distinct non-empty values of one release column inside the viewer's scope */
+    private function distinctValues($scoped, string $column): array
+    {
+        return (clone $scoped)
+            ->toBase()
+            ->reorder()
+            ->select($column)
+            ->whereNotNull($column)
+            ->where($column, '!=', '')
+            ->distinct()
+            ->orderBy($column)
+            ->limit(500)
+            ->pluck($column)
+            ->map(fn ($v) => (string) $v)
+            ->values()
+            ->all();
     }
 
     public function create(

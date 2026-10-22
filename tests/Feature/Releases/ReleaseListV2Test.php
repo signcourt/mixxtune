@@ -76,7 +76,8 @@ class ReleaseListV2Test extends TestCase
         )->pluck('title')->all();
 
         $this->assertSame(['Gen Album Two'], $titles('release_type=album'));
-        $this->assertSame(['Gen Single One'], $titles('month=2026-07'));
+        /* W76: the release-date month filter was removed - an old ?month= link shows everything */
+        $this->assertCount(2, $titles('month=2026-07'));
         $this->assertSame(['Gen Album Two'], $titles('search=INGEN2600001'));
         $this->assertSame(['Gen Single One'], $titles('search=Alpha+Gen'));
         $this->assertSame(['Gen Album Two'], $titles('label_id='.$labelB->id));

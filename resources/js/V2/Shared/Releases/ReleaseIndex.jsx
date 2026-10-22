@@ -56,6 +56,7 @@ export default function ReleaseIndex({
     filters = {},
     statusCounts = {},
     labelOptions = [],
+    filterOptions = {},
 }) {
     const rows = Array.isArray(releases?.data)
         ? releases.data
@@ -79,10 +80,8 @@ export default function ReleaseIndex({
         useState(filters.search ?? '');
 
     
-    const basePath =
-        role === 'artist'
-            ? '/releases'
-            : '/v2/releases';
+    /* W76: artists used "/releases", which does not exist (every filter change gave a 404) */
+    const basePath = '/v2/releases';
 
     const canCreate =
         role === 'artist'
@@ -120,12 +119,15 @@ export default function ReleaseIndex({
         changes,
         options = {}
     ) => {
+        /* W76: only filters that are set go into the link (no "?artist=&genre=&..." clutter) */
+        const merged = { ...filters, ...changes };
+        const clean = Object.fromEntries(
+            Object.entries(merged).filter(([key, value]) => value !== '' && value !== null && value !== undefined && !(key === 'sort' && value === 'latest'))
+        );
+
         router.get(
             basePath,
-            {
-                ...filters,
-                ...changes,
-            },
+            clean,
             {
                 preserveState: true,
                 preserveScroll: true,
@@ -159,8 +161,13 @@ export default function ReleaseIndex({
         Boolean(filters.search)
         || Boolean(filters.status)
         || Boolean(filters.label_id)
-        || Boolean(filters.month)
         || Boolean(filters.release_type)
+        || Boolean(filters.artist)
+        || Boolean(filters.language)
+        || Boolean(filters.genre)
+        || Boolean(filters.upc)
+        || Boolean(filters.artwork)
+        || Boolean(filters.stores)
         || (
             filters.sort
             && filters.sort !== 'latest'
@@ -332,21 +339,6 @@ export default function ReleaseIndex({
                             </select>
                         )}
 
-                        <label className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
-                            <span>Release date</span>
-                            <input
-                                type="month"
-                                value={filters.month ?? ''}
-                                onChange={(event) =>
-                                    updateFilters({
-                                        month:
-                                            event.target
-                                                .value,
-                                    })
-                                }
-                                className="border-0 bg-transparent p-0 text-sm text-slate-700 outline-none focus:ring-0"
-                            />
-                        </label>
 
                         <select
                             aria-label="Type"
@@ -366,6 +358,52 @@ export default function ReleaseIndex({
                             <option value="album">Album</option>
                         </select>
 
+                        {(filterOptions.artists?.length ?? 0) > 1 && (
+                            <select aria-label="Artist" value={filters.artist ?? ''} onChange={(event) => updateFilters({ artist: event.target.value })} className={`${selectClass} max-w-[220px]`}>
+                                <option value="">Artist: All</option>
+                                {filterOptions.artists.map((name) => (
+                                    <option key={name} value={name}>{name}</option>
+                                ))}
+                            </select>
+                        )}
+
+                        {(filterOptions.languages?.length ?? 0) > 1 && (
+                            <select aria-label="Language" value={filters.language ?? ''} onChange={(event) => updateFilters({ language: event.target.value })} className={`${selectClass} max-w-[200px]`}>
+                                <option value="">Language: All</option>
+                                {filterOptions.languages.map((name) => (
+                                    <option key={name} value={name}>{name}</option>
+                                ))}
+                            </select>
+                        )}
+
+                        {(filterOptions.genres?.length ?? 0) > 1 && (
+                            <select aria-label="Genre" value={filters.genre ?? ''} onChange={(event) => updateFilters({ genre: event.target.value })} className={`${selectClass} max-w-[200px]`}>
+                                <option value="">Genre: All</option>
+                                {filterOptions.genres.map((name) => (
+                                    <option key={name} value={name}>{name}</option>
+                                ))}
+                            </select>
+                        )}
+
+                        <select aria-label="UPC" value={filters.upc ?? ''} onChange={(event) => updateFilters({ upc: event.target.value })} className={selectClass}>
+                            <option value="">UPC: All</option>
+                            <option value="has">Has UPC</option>
+                            <option value="missing">No UPC yet</option>
+                        </select>
+
+                        <select aria-label="Artwork" value={filters.artwork ?? ''} onChange={(event) => updateFilters({ artwork: event.target.value })} className={selectClass}>
+                            <option value="">Artwork: All</option>
+                            <option value="has">Has artwork</option>
+                            <option value="missing">No artwork</option>
+                        </select>
+
+                        <select aria-label="Stores" value={filters.stores ?? ''} onChange={(event) => updateFilters({ stores: event.target.value })} className={selectClass}>
+                            <option value="">Stores: All</option>
+                            <option value="live">Live on a store</option>
+                            <option value="sent">Sent to stores</option>
+                            <option value="not_sent">Not sent yet</option>
+                        </select>
+
                         <select
                             aria-label="Sort"
                             value={filters.sort ?? 'latest'}
@@ -382,6 +420,8 @@ export default function ReleaseIndex({
                             <option value="oldest">Oldest first</option>
                             <option value="title_asc">Title A–Z</option>
                             <option value="title_desc">Title Z–A</option>
+                            <option value="release_newest">Release date: newest</option>
+                            <option value="release_oldest">Release date: oldest</option>
                         </select>
 
                         <div className="flex h-11 overflow-hidden rounded-xl border border-slate-200">
@@ -441,7 +481,7 @@ export default function ReleaseIndex({
                             <EmptyState
                                 title="No releases found"
                                 description={
-                                    hasFilters && filters.status && !filters.search && !filters.label_id && !filters.month && !filters.release_type
+                                    hasFilters && filters.status && !filters.search && !filters.label_id && !filters.release_type && !filters.artist && !filters.language && !filters.genre && !filters.upc && !filters.artwork && !filters.stores
                                         ? `Nothing in "${pageTitle}" right now.`
                                         : hasFilters
                                         ? 'No release matches the selected filters. Clear the filters and try again.'
