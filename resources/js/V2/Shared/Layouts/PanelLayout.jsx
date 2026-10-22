@@ -7,6 +7,7 @@ import ImpersonationBanner from "@/V2/Shared/Components/ImpersonationBanner";
 import MaintenanceExperience from "@/V2/Shared/Maintenance/MaintenanceExperience";
 import BankChangeOtpPrompt from "@/V2/Shared/Components/BankChangeOtpPrompt";
 import HighlightNoticeBanner from "@/V2/Shared/Components/HighlightNoticeBanner";
+import DayNightSwitch from "@/V2/Shared/Components/DayNightSwitch";
 
 export default function PanelLayout({
     role = null,
@@ -138,7 +139,7 @@ export default function PanelLayout({
                     onMobileClose={() => setMobileOpen(false)}
                 />
 
-                <div className="min-h-screen transition-all duration-300 lg:pl-[272px]">
+                <div className="mt-main min-h-screen transition-all duration-300 lg:pl-[272px]">
                     <header className="sticky top-0 z-30 flex min-h-20 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur lg:px-7">
                         <div className="flex items-center gap-4">
                             <button
@@ -165,6 +166,9 @@ export default function PanelLayout({
                         </div>
 
                         <div className="flex items-center gap-2">
+                            {/* W90: day / night switch */}
+                            <DayNightSwitch />
+
                             <div ref={notificationRef} className="relative">
                                 <button
                                     type="button"

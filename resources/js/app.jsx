@@ -1,4 +1,5 @@
 import '../css/app.css';
+import '../css/night.css';
 import './bootstrap';
 import './V2/Shared/Releases/V3/releaseWizardV3.css';
 import './V2/Shared/Releases/V4/releaseWizardV4.css';
