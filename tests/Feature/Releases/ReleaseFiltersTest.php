@@ -45,17 +45,14 @@ class ReleaseFiltersTest extends TestCase
         $this->assertSame(['Filter B'], $titles('?artist=Bhanu'));
         $this->assertSame(['Filter A'], $titles('?language=Hindi'));
         $this->assertSame(['Filter B'], $titles('?genre=Pop'));
-        $this->assertSame(['Filter A'], $titles('?upc=has'));
-        $this->assertSame(['Filter B'], $titles('?upc=missing'));
-        $this->assertSame(['Filter B'], $titles('?artwork=missing'));
-        $this->assertSame(['Filter A'], $titles('?stores=live'));
-        $this->assertSame(['Filter B'], $titles('?stores=not_sent'));
-        $this->assertSame(['Filter A', 'Filter B'], $titles('?upc=nonsense'));
+        /* W77: UPC / artwork / stores filters were removed - old links show everything */
+        $this->assertSame(['Filter A', 'Filter B'], $titles('?upc=missing&stores=live&artwork=has'));
 
         $this->actingAs($super)->get('/v2/releases?sort=release_newest')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('releases.data.0.title', 'Filter A')
             ->where('filterOptions.artists', ['Asha', 'Bhanu'])
             ->where('filterOptions.languages', ['Hindi', 'Punjabi'])
-            ->missing('filters.month'));
+            ->missing('filters.month')
+            ->missing('filters.upc'));
     }
 }

@@ -79,6 +79,10 @@ export default function ReleaseIndex({
     const [searchValue, setSearchValue] =
         useState(filters.search ?? '');
 
+    /* W77: advanced filters panel (open by itself when one of them is set) */
+    const advancedCount = ['label_id', 'artist', 'language', 'genre'].filter((key) => Boolean(filters[key])).length;
+    const [advancedOpen, setAdvancedOpen] = useState(advancedCount > 0);
+
     
     /* W76: artists used "/releases", which does not exist (every filter change gave a 404) */
     const basePath = '/v2/releases';
@@ -165,9 +169,6 @@ export default function ReleaseIndex({
         || Boolean(filters.artist)
         || Boolean(filters.language)
         || Boolean(filters.genre)
-        || Boolean(filters.upc)
-        || Boolean(filters.artwork)
-        || Boolean(filters.stores)
         || (
             filters.sort
             && filters.sort !== 'latest'
@@ -288,6 +289,24 @@ export default function ReleaseIndex({
                             />
                         </label>
 
+                        {/* W77: Label / Artist / Language / Genre live under "Advanced" */}
+                        <button
+                            type="button"
+                            onClick={() => setAdvancedOpen((open) => !open)}
+                            aria-expanded={advancedOpen}
+                            aria-controls="release-advanced-filters"
+                            className={`inline-flex h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition ${advancedOpen || advancedCount > 0 ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-slate-200 bg-white text-slate-700 hover:border-violet-300'}`}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                <path d="M4 6h16M7 12h10M10 18h4" />
+                            </svg>
+                            Advanced
+                            {advancedCount > 0 && <span className="rounded-full bg-violet-600 px-1.5 text-[11px] font-bold text-white">{advancedCount}</span>}
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`}>
+                                <path d="M6 9l6 6 6-6" />
+                            </svg>
+                        </button>
+
                         <select
                             aria-label="Status"
                             value={filters.status ?? ''}
@@ -312,33 +331,6 @@ export default function ReleaseIndex({
                             <option value="failed">Failed</option>
                         </select>
 
-                        {labelOptions.length > 1 && (
-                            <select
-                                aria-label="Label"
-                                value={filters.label_id ?? ''}
-                                onChange={(event) =>
-                                    updateFilters({
-                                        label_id:
-                                            event.target
-                                                .value,
-                                    })
-                                }
-                                className={`${selectClass} max-w-[220px]`}
-                            >
-                                <option value="">Label: All</option>
-                                {labelOptions.map(
-                                    (label) => (
-                                        <option
-                                            key={label.id}
-                                            value={label.id}
-                                        >
-                                            {label.name}
-                                        </option>
-                                    )
-                                )}
-                            </select>
-                        )}
-
 
                         <select
                             aria-label="Type"
@@ -356,52 +348,6 @@ export default function ReleaseIndex({
                             <option value="single">Single</option>
                             <option value="ep">EP</option>
                             <option value="album">Album</option>
-                        </select>
-
-                        {(filterOptions.artists?.length ?? 0) > 1 && (
-                            <select aria-label="Artist" value={filters.artist ?? ''} onChange={(event) => updateFilters({ artist: event.target.value })} className={`${selectClass} max-w-[220px]`}>
-                                <option value="">Artist: All</option>
-                                {filterOptions.artists.map((name) => (
-                                    <option key={name} value={name}>{name}</option>
-                                ))}
-                            </select>
-                        )}
-
-                        {(filterOptions.languages?.length ?? 0) > 1 && (
-                            <select aria-label="Language" value={filters.language ?? ''} onChange={(event) => updateFilters({ language: event.target.value })} className={`${selectClass} max-w-[200px]`}>
-                                <option value="">Language: All</option>
-                                {filterOptions.languages.map((name) => (
-                                    <option key={name} value={name}>{name}</option>
-                                ))}
-                            </select>
-                        )}
-
-                        {(filterOptions.genres?.length ?? 0) > 1 && (
-                            <select aria-label="Genre" value={filters.genre ?? ''} onChange={(event) => updateFilters({ genre: event.target.value })} className={`${selectClass} max-w-[200px]`}>
-                                <option value="">Genre: All</option>
-                                {filterOptions.genres.map((name) => (
-                                    <option key={name} value={name}>{name}</option>
-                                ))}
-                            </select>
-                        )}
-
-                        <select aria-label="UPC" value={filters.upc ?? ''} onChange={(event) => updateFilters({ upc: event.target.value })} className={selectClass}>
-                            <option value="">UPC: All</option>
-                            <option value="has">Has UPC</option>
-                            <option value="missing">No UPC yet</option>
-                        </select>
-
-                        <select aria-label="Artwork" value={filters.artwork ?? ''} onChange={(event) => updateFilters({ artwork: event.target.value })} className={selectClass}>
-                            <option value="">Artwork: All</option>
-                            <option value="has">Has artwork</option>
-                            <option value="missing">No artwork</option>
-                        </select>
-
-                        <select aria-label="Stores" value={filters.stores ?? ''} onChange={(event) => updateFilters({ stores: event.target.value })} className={selectClass}>
-                            <option value="">Stores: All</option>
-                            <option value="live">Live on a store</option>
-                            <option value="sent">Sent to stores</option>
-                            <option value="not_sent">Not sent yet</option>
                         </select>
 
                         <select
@@ -473,6 +419,68 @@ export default function ReleaseIndex({
                             </button>
                         )}
                     </div>
+
+                    {advancedOpen && (
+                        <div id="release-advanced-filters" className="mt-3 grid gap-2.5 border-t border-slate-100 pt-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {labelOptions.length > 0 && (
+                            <select
+                                aria-label="Label"
+                                value={filters.label_id ?? ''}
+                                onChange={(event) =>
+                                    updateFilters({
+                                        label_id:
+                                            event.target
+                                                .value,
+                                    })
+                                }
+                                className={`${selectClass} w-full`}
+                            >
+                                <option value="">Label: All</option>
+                                {labelOptions.map(
+                                    (label) => (
+                                        <option
+                                            key={label.id}
+                                            value={label.id}
+                                        >
+                                            {label.name}
+                                        </option>
+                                    )
+                                )}
+                            </select>
+                        )}
+
+                        {(filterOptions.artists?.length ?? 0) > 0 && (
+                            <select aria-label="Artist" value={filters.artist ?? ''} onChange={(event) => updateFilters({ artist: event.target.value })} className={`${selectClass} w-full`}>
+                                <option value="">Artist: All</option>
+                                {filterOptions.artists.map((name) => (
+                                    <option key={name} value={name}>{name}</option>
+                                ))}
+                            </select>
+                        )}
+
+                        {(filterOptions.languages?.length ?? 0) > 0 && (
+                            <select aria-label="Language" value={filters.language ?? ''} onChange={(event) => updateFilters({ language: event.target.value })} className={`${selectClass} w-full`}>
+                                <option value="">Language: All</option>
+                                {filterOptions.languages.map((name) => (
+                                    <option key={name} value={name}>{name}</option>
+                                ))}
+                            </select>
+                        )}
+
+                        {(filterOptions.genres?.length ?? 0) > 0 && (
+                            <select aria-label="Genre" value={filters.genre ?? ''} onChange={(event) => updateFilters({ genre: event.target.value })} className={`${selectClass} w-full`}>
+                                <option value="">Genre: All</option>
+                                {filterOptions.genres.map((name) => (
+                                    <option key={name} value={name}>{name}</option>
+                                ))}
+                            </select>
+                        )}
+
+                            {labelOptions.length === 0 && (filterOptions.artists?.length ?? 0) === 0 && (
+                                <p className="text-sm text-slate-500">No releases yet to filter by label or artist.</p>
+                            )}
+                        </div>
+                    )}
                 </section>
 
                 {rows.length === 0 ? (
@@ -481,7 +489,7 @@ export default function ReleaseIndex({
                             <EmptyState
                                 title="No releases found"
                                 description={
-                                    hasFilters && filters.status && !filters.search && !filters.label_id && !filters.release_type && !filters.artist && !filters.language && !filters.genre && !filters.upc && !filters.artwork && !filters.stores
+                                    hasFilters && filters.status && !filters.search && !filters.label_id && !filters.release_type && !filters.artist && !filters.language && !filters.genre
                                         ? `Nothing in "${pageTitle}" right now.`
                                         : hasFilters
                                         ? 'No release matches the selected filters. Clear the filters and try again.'

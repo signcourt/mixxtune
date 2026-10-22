@@ -198,9 +198,6 @@ class ReleaseController extends Controller
             'artist' => mb_substr(trim((string) $request->input('artist', '')), 0, 190),
             'language' => mb_substr(trim((string) $request->input('language', '')), 0, 60),
             'genre' => mb_substr(trim((string) $request->input('genre', '')), 0, 100),
-            'upc' => in_array($request->input('upc'), ['has', 'missing'], true) ? (string) $request->input('upc') : '',
-            'artwork' => in_array($request->input('artwork'), ['has', 'missing'], true) ? (string) $request->input('artwork') : '',
-            'stores' => in_array($request->input('stores'), ['live', 'sent', 'not_sent'], true) ? (string) $request->input('stores') : '',
 
             'label_id' => $request->integer('label_id') > 0
                 ? (string) $request->integer('label_id')
@@ -628,7 +625,7 @@ class ReleaseController extends Controller
             $query->where('release_type', $filters['release_type']);
         }
 
-        /* W76: more filters (all applied on the server, every page) */
+        /* W76/W77: advanced filters (all applied on the server, every page) */
         if ($filters['artist'] !== '') {
             $query->where('primary_artist_name', $filters['artist']);
         }
@@ -637,24 +634,6 @@ class ReleaseController extends Controller
         }
         if ($filters['genre'] !== '') {
             $query->where('primary_genre', $filters['genre']);
-        }
-        if ($filters['upc'] === 'has') {
-            $query->whereNotNull('upc')->where('upc', '!=', '');
-        } elseif ($filters['upc'] === 'missing') {
-            $query->where(fn ($w) => $w->whereNull('upc')->orWhere('upc', ''));
-        }
-        if ($filters['artwork'] === 'has') {
-            $query->whereNotNull('artwork_path')->where('artwork_path', '!=', '');
-        } elseif ($filters['artwork'] === 'missing') {
-            $query->where(fn ($w) => $w->whereNull('artwork_path')->orWhere('artwork_path', ''));
-        }
-        $deliveries = fn () => DB::table('release_store_deliveries')->select('release_id');
-        if ($filters['stores'] === 'live') {
-            $query->whereIn('releases.id', $deliveries()->where('status', 'live'));
-        } elseif ($filters['stores'] === 'sent') {
-            $query->whereIn('releases.id', $deliveries());
-        } elseif ($filters['stores'] === 'not_sent') {
-            $query->whereNotIn('releases.id', $deliveries());
         }
 
         if ($filters['status'] !== '') {
