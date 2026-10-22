@@ -75,6 +75,7 @@ export default function ReleaseWizard({
     label = null,
     availableArtists = [],
     availableLabels = [],
+    artistNameSuggestions = [],
     distributionStores = [],
     adminEdit = false,
 }) {
@@ -798,6 +799,9 @@ saveState === 'saving'
                                 }
                                 availableLabels={
                                     availableLabels
+                                }
+                                artistNameSuggestions={
+                                    artistNameSuggestions
                                 }
                             />
                         )}

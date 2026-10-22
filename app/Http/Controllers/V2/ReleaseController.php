@@ -2780,6 +2780,15 @@ class ReleaseController extends Controller
             'availableLabels' =>
                 $availableLabels,
 
+            /* W86: names already used on this account's releases, for typing suggestions */
+            'artistNameSuggestions' =>
+                $this->artistNameSuggestions(
+                    $role,
+                    $artist,
+                    $label,
+                    $availableLabels
+                ),
+
             'distributionStores' =>
                 DistributionStore::query()
                     ->where('is_active', true)
@@ -2794,6 +2803,63 @@ class ReleaseController extends Controller
                     ]),
         ];
     }
+    /*
+     * W86 MIXXTUNE_ARTIST_NAME_SUGGESTIONS
+     * Artist names this account has already used (release primary /
+     * featuring artists, track artists and its artist profiles), so the
+     * form can suggest them while typing ("ar" -> Arijit Singh, Arun ...).
+     * Only names from releases the user may see: own artist for an artist
+     * login, the selectable labels for a label / manager, everything for a
+     * Super Admin.
+     */
+    private function artistNameSuggestions(string $role, $artist, $label, $availableLabels): array
+    {
+        $labelIds = collect($availableLabels)->pluck('id')->push($label?->id)->filter()->map(fn ($id) => (int) $id)->unique()->values();
+
+        $releases = Release::query()->whereNull('deleted_at');
+        if ($role === 'super_admin') {
+            // all releases
+        } elseif ($role === 'artist') {
+            $artist ? $releases->where('artist_id', $artist->id) : $releases->whereRaw('1 = 0');
+        } elseif ($labelIds->isNotEmpty()) {
+            $releases->whereIn('label_id', $labelIds);
+        } else {
+            $releases->whereRaw('1 = 0');
+        }
+
+        $rows = $releases->latest('id')->limit(3000)->get(['id', 'primary_artist_name', 'featuring_artist_name']);
+        $names = collect();
+        foreach ($rows as $row) {
+            $names->push($row->primary_artist_name, $row->featuring_artist_name);
+        }
+
+        if ($rows->isNotEmpty()) {
+            \App\Models\Distribution\Track::query()
+                ->whereIn('release_id', $rows->pluck('id'))
+                ->get(['primary_artist_name', 'featuring_artist_name'])
+                ->each(fn ($t) => $names->push($t->primary_artist_name, $t->featuring_artist_name));
+        }
+
+        $artists = Artist::query()->whereNull('deleted_at');
+        if ($role === 'artist') {
+            $artist ? $artists->where('id', $artist->id) : $artists->whereRaw('1 = 0');
+        } elseif ($role !== 'super_admin') {
+            $labelIds->isNotEmpty() ? $artists->whereIn('label_id', $labelIds) : $artists->whereRaw('1 = 0');
+        }
+        $artists->limit(3000)->pluck('stage_name')->each(fn ($n) => $names->push($n));
+
+        return $names
+            ->filter()
+            ->flatMap(fn ($v) => preg_split('/\s*,\s*/', (string) $v))
+            ->map(fn ($n) => trim(preg_replace('/\s+/', ' ', $n)))
+            ->filter(fn ($n) => $n !== '' && mb_strlen($n) <= 120)
+            ->unique(fn ($n) => mb_strtolower($n))
+            ->sort(SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->take(5000)
+            ->all();
+    }
+
     private function generateCatalogNumber(): string
     {
         $latestId = (int) (
