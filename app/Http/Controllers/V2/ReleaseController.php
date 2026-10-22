@@ -2159,11 +2159,38 @@ class ReleaseController extends Controller
                 }
             }
 
-            abort_unless(
-                $artistId,
-                422,
-                'Select an artist for this catalogue level.'
-            );
+            /*
+             * W83 MIXXTUNE_NO_ACCOUNT_ARTIST_FIELD: the form no longer asks
+             * for an "Account Artist". It is linked in the background: the
+             * only artist account of the level, or the artist account whose
+             * name matches the primary artist; otherwise none (the release
+             * belongs to the label, like releases made by the team).
+             */
+            if (! $artistId) {
+                $primaryName = mb_strtolower(trim((string) (
+                    $validated['primary_artist_name']
+                    ?? data_get($validated, 'primary_artists.0.name')
+                    ?? $release?->primary_artist_name
+                    ?? ''
+                )));
+
+                if ($primaryName !== '') {
+                    $artistId = Artist::query()
+                        ->where('label_id', $label->id)
+                        ->whereNull('deleted_at')
+                        ->where('account_status', 'active')
+                        ->where('can_create_releases', true)
+                        ->get(['id', 'stage_name', 'legal_name'])
+                        ->first(fn ($a) => in_array($primaryName, [
+                            mb_strtolower(trim((string) $a->stage_name)),
+                            mb_strtolower(trim((string) $a->legal_name)),
+                        ], true))?->id;
+                }
+            }
+
+            if (! $artistId) {
+                return [null, $label];
+            }
 
             $artist = Artist::query()
                 ->where(

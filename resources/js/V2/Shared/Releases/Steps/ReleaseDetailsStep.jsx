@@ -517,42 +517,7 @@ export default function ReleaseDetailsStep({
                             </select>
                         </Field>
 
-                        <Field
-                            label="Account Artist"
-                            error={errors.artist_id}
-                        >
-                            <select
-                                className={selectClass}
-                                value={data.artist_id ?? ''}
-                                onChange={(event) =>
-                                    setData(
-                                        'artist_id',
-                                        event.target.value
-                                    )
-                                }
-                            >
-                                <option value="">
-                                    No artist account
-                                </option>
-
-                                {accountArtists.map(
-                                    (item) => (
-                                        <option
-                                            key={item.id}
-                                            value={item.id}
-                                        >
-                                            {item.stage_name
-                                                || item.legal_name
-                                                || `Artist #${item.id}`}
-                                        </option>
-                                    )
-                                )}
-                            </select>
-
-                            <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
-                                Optional. Select only when this release should belong to an existing artist account.
-                            </p>
-                        </Field>
+                        {/* W83: "Account Artist" removed - linked in the background */}
                     </div>
                 </div>
             )}
@@ -793,52 +758,7 @@ export default function ReleaseDetailsStep({
                     </Field>
                 )}
 
-                {!isOperator && (
-                    <Field
-                        label="Account Artist"
-                        required
-                        error={errors.artist_id}
-                    >
-                        <select
-                            className={selectClass}
-                            value={
-                                data.artist_id
-                                ?? ''
-                            }
-                            onChange={(event) =>
-                                setData(
-                                    'artist_id',
-                                    event.target.value
-                                )
-                            }
-                        >
-                            <option value="">
-                                Select artist account
-                            </option>
-
-                            {accountArtists.map(
-                                (item) => (
-                                    <option
-                                        key={item.id}
-                                        value={item.id}
-                                    >
-                                        {item.stage_name
-                                            || item.legal_name
-                                            || `Artist #${item.id}`}
-                                    </option>
-                                )
-                            )}
-                        </select>
-
-                        {data.label_id
-                            && accountArtists.length === 0
-                            && (
-                                <p className="mt-1.5 text-[11px] leading-4 text-amber-600">
-                                    No active release-enabled artist exists on this catalogue level.
-                                </p>
-                            )}
-                    </Field>
-                )}
+                {/* W83: "Account Artist" removed from the form - the server links the artist account in the background */}
 
                 <Field
                     label="Genre"
