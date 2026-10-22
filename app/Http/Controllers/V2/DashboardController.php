@@ -385,6 +385,8 @@ class DashboardController extends Controller
             'permissions' =>
                 $permissionService->permissions($user),
             'panelName' => $panelName,
+            /* W78: "Welcome, <name given when the account was created>" instead of "Welcome, Label" */
+            'accountName' => trim((string) $user->name) !== '' ? trim((string) $user->name) : null,
             'stats' => [
                 'totalReleases' => $totalReleases,
                 'submittedReleases' => $submittedReleases,

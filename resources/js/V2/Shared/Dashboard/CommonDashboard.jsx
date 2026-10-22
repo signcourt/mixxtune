@@ -20,6 +20,7 @@ const number = (value) =>
 export default function CommonDashboard({
     role = 'artist',
     panelName = 'Artist',
+    accountName = null,
     stats = {},
     recentReleases = [],
     recentTransactions = [],
@@ -119,14 +120,14 @@ export default function CommonDashboard({
         <PanelLayout
             role={role}
             title={`${panelName} Dashboard`}
-            subtitle={`Welcome to ${panelName}`}
+            subtitle={accountName ? `Welcome back, ${accountName}` : `Welcome to ${panelName}`}
         >
             <Head
                 title={`${panelName} Dashboard`}
             />
 
             <DashboardHero
-                name={panelName}
+                name={accountName || panelName}
                 eyebrow={`${String(
                     panelName
                 ).toUpperCase()} OVERVIEW`}
