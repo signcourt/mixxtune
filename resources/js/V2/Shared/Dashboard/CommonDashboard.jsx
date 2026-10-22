@@ -133,25 +133,12 @@ export default function CommonDashboard({
                 ).toUpperCase()} OVERVIEW`}
                 /* W88: the line under "Welcome, ..." is removed */
                 description=""
+                /* W89: one click opens the create-release form; the second button is removed */
                 primaryAction={{
                     label: 'Create Release',
-                    href:
-                        role === 'label'
-                            ? '/label/releases'
-                            : role === 'artist'
-                              ? '/artist/releases/create'
-                              : '/v2/releases/create',
+                    href: '/v2/releases/create',
                 }}
-                secondaryAction={{
-                    label: isLabel
-                        ? 'View Artists'
-                        : 'View Releases',
-                    href: isLabel
-                        ? '/label/artists'
-                        : role === 'artist'
-                          ? '/artist/releases'
-                          : '/v2/releases',
-                }}
+                secondaryAction={null}
             />
 
             <DashboardKpiGrid
