@@ -100,7 +100,7 @@ class AccountFormV2Test extends TestCase
         ]);
 
         /* giving existing labels an owner needs the e-mailed code; nothing is saved before */
-        $this->viaActionOtp($super, fn () => $this->actingAs($super)->post('/v2/admin/users', $payload))
+        $this->viaActionOtp($super, fn () => $this->actingAs($super)->post('/admin/users', $payload))
             ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(1, User::query()->where('name', 'Sanatan Records')->count());
 
@@ -120,14 +120,14 @@ class AccountFormV2Test extends TestCase
     public function test_edit_shows_full_name_and_new_label_gets_its_own_rate(): void
     {
         $super = $this->super();
-        $this->actingAs($super)->post('/v2/admin/users', $this->payload(['new_labels' => ['Edit Base Label'], 'new_label_rates' => [80]]))->assertSessionHasNoErrors();
+        $this->actingAs($super)->post('/admin/users', $this->payload(['new_labels' => ['Edit Base Label'], 'new_label_rates' => [80]]))->assertSessionHasNoErrors();
         $user = User::query()->where('name', 'Sanatan Records')->firstOrFail();
         $base = Label::query()->where('user_id', $user->id)->firstOrFail();
 
-        $this->actingAs($super)->get('/v2/admin/users/'.$user->id.'/edit')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/users/'.$user->id.'/edit')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('managedUser.full_name', 'Ramesh Kumar'));
 
-        $resp = $this->actingAs($super)->patch('/v2/admin/users/'.$user->id, [
+        $resp = $this->actingAs($super)->patch('/admin/users/'.$user->id, [
             'name' => 'Sanatan Records',
             'full_name' => 'Ramesh K. Sharma',
             'email' => $user->email,
@@ -153,7 +153,7 @@ class AccountFormV2Test extends TestCase
         $owner = User::factory()->create(['role' => 'label']);
         Label::factory()->create(['name' => 'Taken Label', 'user_id' => $owner->id]);
 
-        $this->actingAs($super)->get('/v2/admin/users/create')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/users/create')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('labels', fn ($labels) => collect($labels)->firstWhere('name', 'Taken Label')['user_id'] === $owner->id));
     }
 }

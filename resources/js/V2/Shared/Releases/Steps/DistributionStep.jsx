@@ -3,9 +3,9 @@ import { useMemo, useState } from 'react';
 
 const RELEASES_BASE_PATH =
     typeof window !== 'undefined'
-    && window.location.pathname.startsWith('/artist')
+    && /^\/artist(\/|$)/.test(window.location.pathname)
         ? '/artist/releases'
-        : '/v2/releases';
+        : '/releases';
 
 const countries = [
     ['IN', 'India'],

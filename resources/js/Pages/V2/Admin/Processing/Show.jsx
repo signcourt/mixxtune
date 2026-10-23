@@ -88,7 +88,7 @@ export default function Show({
             <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <Link
-                        href="/v2/admin/processing"
+                        href="/admin/processing"
                         className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
                     >
                         ← Processing Queue
@@ -302,7 +302,7 @@ export default function Show({
                                     onClick={() =>
                                         runAction(
                                             'identifiers',
-                                            `/v2/admin/processing/${release.id}/generate-identifiers`
+                                            `/admin/processing/${release.id}/generate-identifiers`
                                         )
                                     }
                                 />
@@ -316,7 +316,7 @@ export default function Show({
                                     onClick={() =>
                                         runAction(
                                             'audio',
-                                            `/v2/admin/processing/${release.id}/validate-audio`
+                                            `/admin/processing/${release.id}/validate-audio`
                                         )
                                     }
                                 />
@@ -337,14 +337,14 @@ export default function Show({
                                             checks.delivery_initialised
                                         ) {
                                             window.location.href =
-                                                `/v2/admin/distribution/${release.id}`;
+                                                `/admin/distribution/${release.id}`;
 
                                             return;
                                         }
 
                                         runAction(
                                             'delivery',
-                                            `/v2/admin/processing/${release.id}/initialise-delivery`
+                                            `/admin/processing/${release.id}/initialise-delivery`
                                         );
                                     }}
                                 />

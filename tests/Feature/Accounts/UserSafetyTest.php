@@ -52,7 +52,7 @@ class UserSafetyTest extends TestCase
         $this->post('/login', ['login' => $u->email, 'password' => 'Secret-123!'])->assertSessionHasErrors('login');
         $this->assertGuest();
 
-        $this->actingAs($u)->get('/v2/wallet')->assertRedirect('/login');
+        $this->actingAs($u)->get('/wallet')->assertRedirect('/login');
         $this->assertGuest();
     }
 
@@ -61,7 +61,7 @@ class UserSafetyTest extends TestCase
         $super = $this->user('super_admin');
         $target = $this->user('label');
 
-        $send = fn () => $this->actingAs($super)->from('/v2/admin/users/'.$target->id.'/edit')->post('/v2/admin/users/'.$target->id.'/reset-password');
+        $send = fn () => $this->actingAs($super)->from('/admin/users/'.$target->id.'/edit')->post('/admin/users/'.$target->id.'/reset-password');
 
         $this->viaActionOtp($super, $send)->assertSessionHas('temporary_password');
         $this->assertFalse(Hash::check('Secret-123!', $target->fresh()->password));
@@ -73,9 +73,9 @@ class UserSafetyTest extends TestCase
         $other = $this->user('super_admin');
         $label = $this->user('label');
 
-        $this->actingAs($super)->patch('/v2/admin/users/'.$other->id.'/quick-update', ['name' => 'X', 'email' => $other->email, 'account_status' => 'active'])->assertStatus(422);
+        $this->actingAs($super)->patch('/admin/users/'.$other->id.'/quick-update', ['name' => 'X', 'email' => $other->email, 'account_status' => 'active'])->assertStatus(422);
 
-        $this->actingAs($super)->patch('/v2/admin/users/'.$label->id.'/quick-update', [
+        $this->actingAs($super)->patch('/admin/users/'.$label->id.'/quick-update', [
             'name' => 'New Name', 'email' => $label->email, 'account_status' => 'active', 'kyc_status' => 'submitted',
             'permissions' => ['can_view_catalogue' => false],
         ])->assertSessionHasNoErrors();
@@ -91,7 +91,7 @@ class UserSafetyTest extends TestCase
     {
         $super = $this->user('super_admin');
 
-        $this->actingAs($super)->patch('/v2/admin/users/'.$super->id, [
+        $this->actingAs($super)->patch('/admin/users/'.$super->id, [
             'name' => $super->name, 'email' => $super->email, 'role' => 'super_admin', 'account_status' => 'suspended',
         ])->assertSessionHasErrors('account_status');
 
@@ -103,7 +103,7 @@ class UserSafetyTest extends TestCase
         $owner = $this->user('label');
 
         $this->actingAs($owner)->withSession(['impersonator_user_id' => 999])
-            ->post('/v2/withdrawals', ['amount' => 100, 'payment_method' => 'bank'])
+            ->post('/withdrawals', ['amount' => 100, 'payment_method' => 'bank'])
             ->assertSessionHasErrors('amount');
     }
 }

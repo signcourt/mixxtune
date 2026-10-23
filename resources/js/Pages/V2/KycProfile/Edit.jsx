@@ -102,7 +102,7 @@ export default function Edit({ role, profile, editState = { can_edit: false, sta
             return;
         }
         form.transform((d) => ({ ...d, submit }));
-        form.post('/v2/kyc-profile', { preserveScroll: true });
+        form.post('/kyc-profile', { preserveScroll: true });
     };
 
     const fullAddress = [profile?.address_line_1, profile?.address_line_2, profile?.city, profile?.state, profile?.postal_code, profile?.country_code].filter(Boolean).join(', ');
@@ -236,7 +236,7 @@ export default function Edit({ role, profile, editState = { can_edit: false, sta
                                     </span>
                                 </div>
                                 <Link
-                                    href={`/v2/support/create?category=kyc`}
+                                    href={`/support/create?category=kyc`}
                                     className="shrink-0 rounded-lg bg-violet-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-violet-700"
                                 >
                                     Request a change

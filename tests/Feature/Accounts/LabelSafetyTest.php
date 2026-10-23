@@ -38,7 +38,7 @@ class LabelSafetyTest extends TestCase
         Label::factory()->create(['name' => '!!!']);
         Label::factory()->create(['name' => '???']);
 
-        $this->actingAs($super)->get('/v2/admin/labels')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/labels')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('labels.total', 3));
     }
 
@@ -49,7 +49,7 @@ class LabelSafetyTest extends TestCase
         $a = Label::factory()->create(['revenue_share_percentage' => null]);
         $b = Label::factory()->create(['revenue_share_percentage' => null]);
 
-        $send = fn () => $this->actingAs($super)->post('/v2/admin/labels/bulk-action', [
+        $send = fn () => $this->actingAs($super)->post('/admin/labels/bulk-action', [
             'label_ids' => [$a->id, $b->id], 'action' => 'set_rate', 'revenue_share_percentage' => 70,
         ]);
 
@@ -89,7 +89,7 @@ class LabelSafetyTest extends TestCase
         $import = DB::table('report_imports')->insertGetId(['public_id' => (string) Str::ulid(), 'original_filename' => 'x.csv', 'stored_path' => 'x', 'status' => 'completed', 'financial_status' => 'published', 'reporting_month' => '2026-07', 'created_at' => now(), 'updated_at' => now()]);
         DB::table('report_rows')->insert(['report_import_id' => $import, 'row_hash' => 'h1', 'track_title' => 'S', 'track_artist' => 'A', 'isrc' => 'INAAA2600001', 'platform' => 'Spotify', 'currency' => 'INR', 'sale_type' => 'Stream', 'sale_month' => '2026-07', 'streams' => 1, 'sale_units' => 1, 'collected_revenue' => 1, 'label_rate' => 1, 'earnings' => 1, 'artist_id' => $artist->id, 'mapping_status' => 'mapped', 'created_at' => now(), 'updated_at' => now()]);
 
-        $this->actingAs($super)->delete('/v2/admin/artists/'.$artist->id)->assertSessionHasErrors('artist');
+        $this->actingAs($super)->delete('/admin/artists/'.$artist->id)->assertSessionHasErrors('artist');
         $this->assertNotSoftDeleted($artist);
     }
 }

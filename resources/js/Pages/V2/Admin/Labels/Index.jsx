@@ -64,7 +64,7 @@ export default function Index({
         };
 
         router.get(
-            '/v2/admin/labels',
+            '/admin/labels',
             Object.fromEntries(
                 Object.entries(values).filter(
                     ([, value]) =>
@@ -209,7 +209,7 @@ export default function Index({
         setBulkSaving(true);
 
         router.post(
-            '/v2/admin/labels/bulk-action',
+            '/admin/labels/bulk-action',
             payload,
             {
                 preserveScroll: true,
@@ -245,7 +245,7 @@ export default function Index({
         setSearchValue('');
 
         router.get(
-            '/v2/admin/labels',
+            '/admin/labels',
             {},
             {
                 preserveState: true,
@@ -788,7 +788,7 @@ export default function Index({
 
                                         <Cell>
                                             <a
-                                                href={`/v2/admin/artists?label_id=${label.id}`}
+                                                href={`/admin/artists?label_id=${label.id}`}
                                                 className="font-semibold text-violet-600 hover:text-violet-800 hover:underline"
                                                 title={`View artists for ${label.name}`}
                                             >
@@ -800,7 +800,7 @@ export default function Index({
 
                                         <Cell>
                                             <a
-                                                href={`/v2/releases?label_id=${label.id}`}
+                                                href={`/releases?label_id=${label.id}`}
                                                 className="font-semibold text-violet-600 hover:text-violet-800 hover:underline"
                                                 title={`View releases for ${label.name}`}
                                             >
@@ -868,7 +868,7 @@ export default function Index({
                                                             return;
                                                         }
                                                         router.patch(
-                                                            `/v2/admin/labels/${label.id}/withdrawal-status`,
+                                                            `/admin/labels/${label.id}/withdrawal-status`,
                                                             {
                                                                 can_withdraw:
                                                                     event.target.value ===
@@ -904,7 +904,7 @@ export default function Index({
                                                     }
                                                     onChange={(event) => {
                                                         router.patch(
-                                                            `/v2/admin/labels/${label.id}/admin`,
+                                                            `/admin/labels/${label.id}/admin`,
                                                             {
                                                                 admin_id:
                                                                     event.target.value || null,
@@ -1039,7 +1039,7 @@ function LabelRateEditor({ label }) {
         setSaving(true);
 
         router.patch(
-            `/v2/admin/labels/${label.id}/revenue-rate`,
+            `/admin/labels/${label.id}/revenue-rate`,
             {
                 revenue_share_percentage: rate,
             },

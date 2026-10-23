@@ -121,7 +121,7 @@ class OwnerStatementTest extends TestCase
         $statement = $this->makeStatement($label);
 
         foreach ([$owner, $this->makeUser('super_admin')] as $user) {
-            $response = $this->actingAs($user)->get("/v2/statements/{$statement}/download");
+            $response = $this->actingAs($user)->get("/statements/{$statement}/download");
             $response->assertOk();
             $this->assertStringStartsWith('application/pdf', (string) $response->headers->get('Content-Type'));
             $this->assertStringStartsWith('%PDF', (string) $response->getContent());
@@ -130,7 +130,7 @@ class OwnerStatementTest extends TestCase
 
         $other = $this->makeUser('label');
         $this->makeLabel($other->id, 'Other Label');
-        $this->actingAs($other)->get("/v2/statements/{$statement}/download")->assertForbidden();
+        $this->actingAs($other)->get("/statements/{$statement}/download")->assertForbidden();
     }
 
     public function test_statement_data_is_summed_from_report_lines(): void
@@ -169,7 +169,7 @@ class OwnerStatementTest extends TestCase
             'label_rate' => 0.8, 'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $url = "/v2/admin/statement-emails/preview?label_id={$label}&import_id={$importId}";
+        $url = "/admin/statement-emails/preview?label_id={$label}&import_id={$importId}";
         $this->actingAs($owner)->get($url)->assertForbidden();
 
         $super = $this->makeUser('super_admin');
@@ -177,15 +177,15 @@ class OwnerStatementTest extends TestCase
         $this->assertStringStartsWith('%PDF', (string) $response->getContent());
         $this->assertSame(0, DB::table('royalty_statements')->count());
 
-        $this->actingAs($super)->getJson('/v2/admin/statement-emails')
+        $this->actingAs($super)->getJson('/admin/statement-emails')
             ->assertOk()->assertJsonPath('pending_imports.0.id', $importId)->assertJsonPath('months', []);
     }
 
     public function test_only_super_admin_sees_and_sends(): void
     {
         $admin = $this->makeUser('admin');
-        $this->actingAs($admin)->getJson('/v2/admin/statement-emails')->assertForbidden();
-        $this->actingAs($admin)->postJson('/v2/admin/statement-emails/send', ['month' => '2026-07'])->assertForbidden();
+        $this->actingAs($admin)->getJson('/admin/statement-emails')->assertForbidden();
+        $this->actingAs($admin)->postJson('/admin/statement-emails/send', ['month' => '2026-07'])->assertForbidden();
     }
 
     public function test_send_once_with_pdf_then_skip_unless_resend(): void
@@ -196,13 +196,13 @@ class OwnerStatementTest extends TestCase
         $withOwner = $this->makeStatement($this->makeLabel($owner->id, 'Statement Label C'), 500);
         $noOwner = $this->makeStatement($this->makeLabel(null, 'Statement Label D'), 50);
 
-        $this->actingAs($super)->getJson('/v2/admin/statement-emails?month=2026-07')
+        $this->actingAs($super)->getJson('/admin/statement-emails?month=2026-07')
             ->assertOk()
             ->assertJsonPath('counts.total', 2)
             ->assertJsonPath('counts.with_email', 1)
             ->assertJsonPath('counts.to_send', 1);
 
-        $first = $this->actingAs($super)->postJson('/v2/admin/statement-emails/send', ['month' => '2026-07'])->assertOk();
+        $first = $this->actingAs($super)->postJson('/admin/statement-emails/send', ['month' => '2026-07'])->assertOk();
         $first->assertJsonPath('remaining', 0);
         $byId = collect($first->json('results'))->keyBy('id');
         $this->assertSame('sent', $byId[$withOwner]['status']);
@@ -216,14 +216,14 @@ class OwnerStatementTest extends TestCase
         Mail::assertSent(OwnerStatementMail::class, 1);
 
         /* Second run: nothing new to send. */
-        $this->actingAs($super)->postJson('/v2/admin/statement-emails/send', ['month' => '2026-07'])->assertOk();
+        $this->actingAs($super)->postJson('/admin/statement-emails/send', ['month' => '2026-07'])->assertOk();
         Mail::assertSent(OwnerStatementMail::class, 1);
 
-        $this->actingAs($super)->getJson('/v2/admin/statement-emails?month=2026-07')->assertJsonPath('counts.sent', 1);
+        $this->actingAs($super)->getJson('/admin/statement-emails?month=2026-07')->assertJsonPath('counts.sent', 1);
 
         /* Re-send needs explicit statement ids. */
-        $this->actingAs($super)->postJson('/v2/admin/statement-emails/send', ['month' => '2026-07', 'force' => true])->assertStatus(422);
-        $this->actingAs($super)->postJson('/v2/admin/statement-emails/send', ['month' => '2026-07', 'statement_ids' => [$withOwner], 'force' => true])
+        $this->actingAs($super)->postJson('/admin/statement-emails/send', ['month' => '2026-07', 'force' => true])->assertStatus(422);
+        $this->actingAs($super)->postJson('/admin/statement-emails/send', ['month' => '2026-07', 'statement_ids' => [$withOwner], 'force' => true])
             ->assertOk()->assertJsonPath('results.0.status', 'sent');
         Mail::assertSent(OwnerStatementMail::class, 2);
 

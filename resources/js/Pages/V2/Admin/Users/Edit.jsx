@@ -210,7 +210,7 @@ export default function Edit({
         setQuickEditFields(next);
 
         router.patch(
-            `/v2/admin/users/${managedUser.id}/quick-edit-fields`,
+            `/admin/users/${managedUser.id}/quick-edit-fields`,
             {
                 fields: next,
             },
@@ -286,7 +286,7 @@ export default function Edit({
             new_label_rates: named.map(([, rate]) => rate),
         }));
 
-        patch(`/v2/admin/users/${managedUser.id}`, {
+        patch(`/admin/users/${managedUser.id}`, {
             preserveScroll: true,
         });
     };
@@ -301,7 +301,7 @@ export default function Edit({
         }
 
         router.post(
-            `/v2/admin/users/${managedUser.id}/reset-password`,
+            `/admin/users/${managedUser.id}/reset-password`,
             {},
             {
                 preserveScroll: true,
@@ -319,7 +319,7 @@ export default function Edit({
 
     const getInvitationLink = () => {
         router.post(
-            `/v2/admin/users/${managedUser.id}/invitation-link`,
+            `/admin/users/${managedUser.id}/invitation-link`,
             {},
             {
                 preserveScroll: true,
@@ -345,7 +345,7 @@ export default function Edit({
         }
 
         router.post(
-            `/v2/admin/users/${managedUser.id}/resend-invitation`,
+            `/admin/users/${managedUser.id}/resend-invitation`,
             {},
             {
                 preserveScroll: true,
@@ -391,7 +391,7 @@ export default function Edit({
                         </div>
 
                         <Link
-                            href="/v2/admin/users"
+                            href="/admin/users"
                             className="rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 px-4 py-2 text-sm font-semibold text-slate-700"
                         >
                             Back to Users
@@ -1065,7 +1065,7 @@ export default function Edit({
 
                 <div className="sticky bottom-4 z-20 flex justify-end gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
                     <Link
-                        href="/v2/admin/users"
+                        href="/admin/users"
                         className="rounded-xl border border-slate-200 bg-white shadow-sm transition focus:border-violet-400 focus:ring-violet-200 px-6 py-3 text-sm font-semibold text-slate-700"
                     >
                         Cancel
@@ -1446,7 +1446,7 @@ function KycLockPanel({ userId, lock }) {
 
     const send = (event) => {
         event.preventDefault();
-        form.post(`/v2/admin/users/${userId}/kyc-unlock`, {
+        form.post(`/admin/users/${userId}/kyc-unlock`, {
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -1458,7 +1458,7 @@ function KycLockPanel({ userId, lock }) {
 
     const lockAgain = () => {
         if (!window.confirm("Lock KYC again? The owner will not be able to change it.")) return;
-        router.post(`/v2/admin/users/${userId}/kyc-unlock/revoke`, {}, { preserveScroll: true });
+        router.post(`/admin/users/${userId}/kyc-unlock/revoke`, {}, { preserveScroll: true });
     };
 
     return (
@@ -1519,7 +1519,7 @@ function KycLockPanel({ userId, lock }) {
                                         {item.active ? `open until ${item.expires}` : item.used ? `used ${item.used}` : item.revoked ? `locked again ${item.revoked}` : `ended ${item.expires}`}
                                     </span>
                                 </span>
-                                <a href={`/v2/admin/kyc-unlocks/${item.id}/document`} className="shrink-0 font-semibold text-violet-700 hover:text-violet-900">
+                                <a href={`/admin/kyc-unlocks/${item.id}/document`} className="shrink-0 font-semibold text-violet-700 hover:text-violet-900">
                                     Signed form ↓
                                 </a>
                             </li>
@@ -1544,7 +1544,7 @@ function PanelAccessCard({ tabs, choices = {}, onChoose, accountRole, formRole }
                     Allow / Block is only for this account.
                 </p>
             </div>
-            <Link href="/v2/admin/panel-access" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-300">
+            <Link href="/admin/panel-access" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-300">
                 Role defaults →
             </Link>
         </div>

@@ -37,14 +37,14 @@ export default function Show({
 
                         <div className="flex gap-3">
                             <Link
-                                href="/v2/admin/artists"
+                                href="/admin/artists"
                                 className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold"
                             >
                                 Back
                             </Link>
 
                             <Link
-                                href={`/v2/admin/artists/${artist.id}/edit`}
+                                href={`/admin/artists/${artist.id}/edit`}
                                 className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white"
                             >
                                 Edit Artist

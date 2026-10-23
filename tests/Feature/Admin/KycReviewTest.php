@@ -78,12 +78,12 @@ class KycReviewTest extends TestCase
         $this->profile($copy, ['bank_account_number' => '001112223334', 'kyc_status' => 'rejected']);
         $this->profile($pending, ['kyc_status' => 'pending']);
 
-        $this->actingAs($super)->get('/v2/admin/kyc')->assertOk()
+        $this->actingAs($super)->get('/admin/kyc')->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('counts.submitted', 2)->where('counts.pending', 1)->where('counts.missing', 1)->where('counts.rejected', 1)
                 ->has('profiles.data', 2));
 
-        $this->actingAs($super)->get('/v2/admin/kyc?status=missing')
+        $this->actingAs($super)->get('/admin/kyc?status=missing')
             ->assertInertia(fn (Assert $page) => $page->where('missing.data.0.name', 'Gen No Profile'));
 
         // checks: duplicate bank between good and copy, bad formats
@@ -95,35 +95,35 @@ class KycReviewTest extends TestCase
         $this->assertSame(['fail', 'fail', 'warn'], [$bc['pan']['state'], $bc['ifsc']['state'], $bc['holder']['state']]);
 
         // verify with failed checks is refused unless override + reason
-        $this->actingAs($super)->post('/v2/admin/kyc/'.$p->id.'/verify', ['status' => 'verified'])->assertSessionHasErrors('kyc_notes');
+        $this->actingAs($super)->post('/admin/kyc/'.$p->id.'/verify', ['status' => 'verified'])->assertSessionHasErrors('kyc_notes');
         $this->assertSame('submitted', $p->fresh()->kyc_status);
 
-        $this->actingAs($super)->post('/v2/admin/kyc/'.$p->id.'/verify', ['status' => 'verified', 'override' => true, 'kyc_notes' => 'Gen same family account, checked'])
+        $this->actingAs($super)->post('/admin/kyc/'.$p->id.'/verify', ['status' => 'verified', 'override' => true, 'kyc_notes' => 'Gen same family account, checked'])
             ->assertSessionHasNoErrors();
         $this->assertSame('verified', $p->fresh()->kyc_status);
         $this->assertSame('verified', $good->fresh()->kyc_status);
         $this->assertSame(1, $this->notices($good, 'kyc.verified'));
 
         // reject needs a reason; owner sees it on the KYC page
-        $this->actingAs($super)->post('/v2/admin/kyc/'.$b->id.'/verify', ['status' => 'rejected'])->assertSessionHasErrors('kyc_notes');
-        $this->actingAs($super)->post('/v2/admin/kyc/'.$b->id.'/verify', ['status' => 'rejected', 'kyc_notes' => 'Gen IFSC wrong'])->assertSessionHasNoErrors();
+        $this->actingAs($super)->post('/admin/kyc/'.$b->id.'/verify', ['status' => 'rejected'])->assertSessionHasErrors('kyc_notes');
+        $this->actingAs($super)->post('/admin/kyc/'.$b->id.'/verify', ['status' => 'rejected', 'kyc_notes' => 'Gen IFSC wrong'])->assertSessionHasNoErrors();
         $this->assertSame(1, $this->notices($bad, 'kyc.rejected'));
-        $this->actingAs($bad)->get('/v2/kyc-profile')->assertInertia(fn (Assert $page) => $page->where('profile.kyc_notes', 'Gen IFSC wrong'));
+        $this->actingAs($bad)->get('/kyc-profile')->assertInertia(fn (Assert $page) => $page->where('profile.kyc_notes', 'Gen IFSC wrong'));
 
         // reveal: super admin only, audited
-        $this->actingAs($super)->postJson('/v2/admin/kyc/'.$p->id.'/reveal')->assertOk()->assertJsonPath('pan', 'ABCPK1234L');
+        $this->actingAs($super)->postJson('/admin/kyc/'.$p->id.'/reveal')->assertOk()->assertJsonPath('pan', 'ABCPK1234L');
         $this->assertSame(1, DB::table('audit_logs')->where('action', 'kyc.revealed')->count());
         $manager = $this->user('admin');
-        $this->actingAs($manager)->postJson('/v2/admin/kyc/'.$p->id.'/reveal')->assertForbidden();
+        $this->actingAs($manager)->postJson('/admin/kyc/'.$p->id.'/reveal')->assertForbidden();
 
         // history
-        $this->actingAs($super)->getJson('/v2/admin/kyc/'.$p->id.'/history')->assertOk()->assertJsonCount(2, 'items');
+        $this->actingAs($super)->getJson('/admin/kyc/'.$p->id.'/history')->assertOk()->assertJsonCount(2, 'items');
 
         // reminders: not verified owners only
-        $this->actingAs($super)->post('/v2/admin/kyc/remind', ['user_ids' => [$pending->id, $none->id, $good->id]])->assertSessionHasNoErrors();
+        $this->actingAs($super)->post('/admin/kyc/remind', ['user_ids' => [$pending->id, $none->id, $good->id]])->assertSessionHasNoErrors();
         $this->assertSame([1, 1, 0], [$this->notices($pending, 'kyc.reminder'), $this->notices($none, 'kyc.reminder'), $this->notices($good, 'kyc.reminder')]);
 
         // owners cannot use any of it
-        $this->actingAs($good)->get('/v2/admin/kyc')->assertForbidden();
+        $this->actingAs($good)->get('/admin/kyc')->assertForbidden();
     }
 }

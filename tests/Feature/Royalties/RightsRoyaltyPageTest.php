@@ -44,7 +44,7 @@ class RightsRoyaltyPageTest extends TestCase
         $this->import($super, 'published', 'old.csv');
         $this->import($super, 'review_required', 'new.csv');
 
-        $this->actingAs($super)->get('/v2/admin/royalties')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/royalties')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Royalties/Index')
             ->has('rightsImports', 2)
             ->where('rightsImports.0.file', 'new.csv')
@@ -60,19 +60,19 @@ class RightsRoyaltyPageTest extends TestCase
         $super = $this->user('super_admin');
         $import = $this->import($super, 'review_required');
 
-        $this->actingAs($super)->postJson('/v2/admin/royalties/rights/imports/'.$import->public_id.'/approve')
+        $this->actingAs($super)->postJson('/admin/royalties/rights/imports/'.$import->public_id.'/approve')
             ->assertStatus(422)->assertJsonValidationErrors('action_otp');
         Mail::assertSent(ActionOtpMail::class);
         $this->assertSame('review_required', $import->fresh()->status);
 
         /* publish before approval: plain message, no code */
         Mail::fake();
-        $this->actingAs($super)->postJson('/v2/admin/royalties/rights/imports/'.$import->public_id.'/publish')
+        $this->actingAs($super)->postJson('/admin/royalties/rights/imports/'.$import->public_id.'/publish')
             ->assertStatus(422)->assertJsonPath('message', 'Approve the report first, then publish it.');
         Mail::assertNothingSent();
 
         $done = $this->import($super, 'published');
-        $this->actingAs($super)->postJson('/v2/admin/royalties/rights/imports/'.$done->public_id.'/approve')
+        $this->actingAs($super)->postJson('/admin/royalties/rights/imports/'.$done->public_id.'/approve')
             ->assertStatus(422)->assertJsonPath('message', 'This report is already published.');
         Mail::assertNothingSent();
     }
@@ -81,7 +81,7 @@ class RightsRoyaltyPageTest extends TestCase
     {
         $super = $this->user('super_admin');
         DB::enableQueryLog();
-        $this->actingAs($super)->get('/v2/admin/royalties')->assertOk();
+        $this->actingAs($super)->get('/admin/royalties')->assertOk();
         $statementQueries = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'royalty_statements'));
         $this->assertCount(0, $statementQueries);
     }

@@ -74,7 +74,7 @@ class InvoicesReviewTest extends TestCase
         $label = Label::factory()->create(['user_id' => $owner->id, 'name' => 'Sigma Records']);
         $this->statement($label, ['status' => 'pending']);
 
-        $this->actingAs($super)->get('/v2/admin/invoices')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/invoices')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Admin/Invoices/Index')
             ->where('counts.missing', 0)
             ->where('counts.waiting_approval', 1)
@@ -88,7 +88,7 @@ class InvoicesReviewTest extends TestCase
         $label = Label::factory()->create(['user_id' => $owner->id, 'name' => 'Sigma Records']);
         $this->statement($label);
 
-        $this->actingAs($super)->get('/v2/admin/invoices')->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/invoices')->assertInertia(fn (Assert $p) => $p
             ->where('counts.missing', 1)
             ->where('statements.data.0.owner', 'Sigma Records')
             ->where('statements.data.0.month_label', 'July 2026')
@@ -102,7 +102,7 @@ class InvoicesReviewTest extends TestCase
         $label = Label::factory()->create(['user_id' => $owner->id]);
         $s = $this->statement($label, ['tax_amount' => 100, 'net_payable' => 800]);
 
-        $this->actingAs($super)->post('/v2/admin/invoices/statements/'.$s->id.'/generate')->assertSessionHasNoErrors();
+        $this->actingAs($super)->post('/admin/invoices/statements/'.$s->id.'/generate')->assertSessionHasNoErrors();
 
         $inv = Invoice::query()->firstOrFail();
         $this->assertEquals(900, (float) $inv->subtotal);
@@ -112,7 +112,7 @@ class InvoicesReviewTest extends TestCase
         $this->assertSame($label->id, (int) $inv->getAttribute('label_id'));
         $this->assertSame(1, PanelNotification::query()->where('user_id', $owner->id)->count());
 
-        $this->actingAs($owner)->get('/v2/invoices/'.$inv->id.'/download')->assertOk();
+        $this->actingAs($owner)->get('/invoices/'.$inv->id.'/download')->assertOk();
     }
 
     public function test_number_continues_after_the_highest_used_number(): void
@@ -130,7 +130,7 @@ class InvoicesReviewTest extends TestCase
         ]);
 
         $s = $this->statement($label);
-        $this->actingAs($super)->post('/v2/admin/invoices/statements/'.$s->id.'/generate');
+        $this->actingAs($super)->post('/admin/invoices/statements/'.$s->id.'/generate');
 
         $this->assertSame("{$prefix}-{$year}-000042", Invoice::query()->where('royalty_statement_id', $s->id)->value('invoice_number'));
     }
@@ -141,13 +141,13 @@ class InvoicesReviewTest extends TestCase
         $orphan = Label::factory()->create(['user_id' => null]);
         $s = $this->statement($orphan);
 
-        $this->actingAs($super)->from('/v2/admin/invoices')->post('/v2/admin/invoices/statements/'.$s->id.'/generate')
-            ->assertRedirect('/v2/admin/invoices')
+        $this->actingAs($super)->from('/admin/invoices')->post('/admin/invoices/statements/'.$s->id.'/generate')
+            ->assertRedirect('/admin/invoices')
             ->assertSessionHasErrors('invoice');
 
         $owner = $this->user('label');
         $pending = $this->statement(Label::factory()->create(['user_id' => $owner->id]), ['status' => 'pending']);
-        $this->actingAs($super)->post('/v2/admin/invoices/statements/'.$pending->id.'/generate')->assertSessionHasErrors('invoice');
+        $this->actingAs($super)->post('/admin/invoices/statements/'.$pending->id.'/generate')->assertSessionHasErrors('invoice');
 
         $this->assertSame(0, Invoice::query()->count());
     }
@@ -160,14 +160,14 @@ class InvoicesReviewTest extends TestCase
             $this->statement(Label::factory()->create(['user_id' => $o->id]));
         }
 
-        $this->actingAs($super)->post('/v2/admin/invoices/generate-missing')->assertSessionHas('success');
+        $this->actingAs($super)->post('/admin/invoices/generate-missing')->assertSessionHas('success');
         $this->assertSame(3, Invoice::query()->count());
 
-        $this->actingAs($super)->post('/v2/admin/invoices/generate-missing');
+        $this->actingAs($super)->post('/admin/invoices/generate-missing');
         $this->assertSame(3, Invoice::query()->count());
         $this->assertSame(3, Invoice::query()->distinct()->count('invoice_number'));
 
-        $this->actingAs($super)->get('/v2/admin/invoices?tab=invoices')->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/invoices?tab=invoices')->assertInertia(fn (Assert $p) => $p
             ->has('invoices.data', 3)
             ->where('invoices.data.0.kind', 'Monthly royalty')
             ->where('invoices.data.0.net', 900));
@@ -180,9 +180,9 @@ class InvoicesReviewTest extends TestCase
         $b = $this->user('label');
         $this->statement(Label::factory()->create(['user_id' => $a->id]));
         $this->statement(Label::factory()->create(['user_id' => $b->id]));
-        $this->actingAs($super)->post('/v2/admin/invoices/generate-missing');
+        $this->actingAs($super)->post('/admin/invoices/generate-missing');
 
-        $this->actingAs($a)->get('/v2/invoices')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($a)->get('/invoices')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->has('invoices.data', 1)
             ->where('invoices.data.0.net', 900)
             ->where('invoices.data.0.month_label', 'July 2026'));

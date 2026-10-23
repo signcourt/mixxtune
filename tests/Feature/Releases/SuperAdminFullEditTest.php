@@ -220,10 +220,10 @@ class SuperAdminFullEditTest extends TestCase
     {
         [$super, $owner] = $this->context('live');
 
-        $this->actingAs($super)->get('/v2/catalogue')->assertOk()
+        $this->actingAs($super)->get('/catalogue')->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('role', 'super_admin')->has('catalogue.data.0.release_id'));
 
-        $this->actingAs($owner)->get('/v2/catalogue')->assertOk()
+        $this->actingAs($owner)->get('/catalogue')->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('role', 'label'));
     }
 }

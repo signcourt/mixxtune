@@ -19,7 +19,7 @@ class DashboardWelcomeNameTest extends TestCase
         foreach (['label' => 'Sanatan Records', 'artist' => 'Asha Rani'] as $role => $name) {
             $user = User::factory()->create(['role' => $role, 'name' => $name, 'account_status' => 'active', 'email_verified_at' => now()]);
 
-            $this->actingAs($user)->get('/v2/dashboard')->assertOk()->assertInertia(fn (Assert $p) => $p
+            $this->actingAs($user)->followingRedirects()->get('/dashboard')->assertOk()->assertInertia(fn (Assert $p) => $p
                 ->component('V2/Dashboard')
                 ->where('accountName', $name));
         }

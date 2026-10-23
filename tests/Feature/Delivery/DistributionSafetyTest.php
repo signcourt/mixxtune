@@ -80,12 +80,12 @@ class DistributionSafetyTest extends TestCase
         $this->store();
         $release = $this->release($super, ['artwork_path' => null, 'upc' => null]);
 
-        $this->actingAs($super)->get('/v2/admin/distribution/'.$release->id)->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/distribution/'.$release->id)->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Admin/Delivery/Show')
             ->where('readiness.blocking.0', 'The release has no tracks.')
             ->where('canStart', true));
 
-        $this->actingAs($super)->post('/v2/admin/distribution/'.$release->id.'/initialise')->assertSessionHasErrors('delivery');
+        $this->actingAs($super)->post('/admin/distribution/'.$release->id.'/initialise')->assertSessionHasErrors('delivery');
         $this->assertNull($release->fresh()->upc);
         $this->assertSame(0, ReleaseStoreDelivery::query()->count());
     }
@@ -97,10 +97,10 @@ class DistributionSafetyTest extends TestCase
         $release = $this->release($super, ['catalog_number' => 'WP-123', 'upc' => null, 'artwork_path' => 'a.jpg']);
         Track::factory()->withAudio()->create(['release_id' => $release->id, 'isrc' => 'INAAA2600001', 'created_by' => $super->id, 'updated_by' => $super->id]);
 
-        $this->actingAs($super)->post('/v2/admin/distribution/'.$release->id.'/initialise')->assertSessionHasErrors('delivery');
+        $this->actingAs($super)->post('/admin/distribution/'.$release->id.'/initialise')->assertSessionHasErrors('delivery');
         $this->assertNull($release->fresh()->upc);
 
-        $this->actingAs($super)->postJson('/v2/admin/releases/'.$release->id.'/upc/generate')->assertStatus(422);
+        $this->actingAs($super)->postJson('/admin/releases/'.$release->id.'/upc/generate')->assertStatus(422);
         $this->assertNull($release->fresh()->upc);
     }
 
@@ -111,12 +111,12 @@ class DistributionSafetyTest extends TestCase
         $release = $this->release($super, ['status' => 'processing']);
         $d = $this->delivery($release, $store, 'delivered', $super);
 
-        $send = fn () => $this->actingAs($super)->patch('/v2/admin/distribution/deliveries/'.$d->id, ['status' => 'live', 'external_reference' => 'SPOT-1']);
+        $send = fn () => $this->actingAs($super)->patch('/admin/distribution/deliveries/'.$d->id, ['status' => 'live', 'external_reference' => 'SPOT-1']);
 
         $this->viaActionOtp($super, $send)->assertSessionHasNoErrors();
         $this->assertSame('live', $d->fresh()->status);
 
-        $this->actingAs($super)->get('/v2/admin/distribution/'.$release->id)->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/distribution/'.$release->id)->assertInertia(fn (Assert $p) => $p
             ->has('history', 1)
             ->where('history.0.from', 'delivered')
             ->where('history.0.to', 'live'));
@@ -129,7 +129,7 @@ class DistributionSafetyTest extends TestCase
         $a = $this->delivery($release, $this->store(), 'processing', $super);
         $b = $this->delivery($release, $this->store(), 'live', $super);
 
-        $this->actingAs($super)->patch('/v2/admin/distribution/'.$release->id.'/bulk', [
+        $this->actingAs($super)->patch('/admin/distribution/'.$release->id.'/bulk', [
             'delivery_ids' => [$a->id, $b->id], 'status' => 'delivered',
         ])->assertSessionHasErrors('status');
 
@@ -143,13 +143,13 @@ class DistributionSafetyTest extends TestCase
         $this->delivery($release, $this->store(), 'failed', $super);
         $this->release($super);
 
-        $this->actingAs($super)->get('/v2/admin/distribution?status=store_failed')->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/distribution?status=store_failed')->assertInertia(fn (Assert $p) => $p
             ->where('counts.approved', 1)
             ->where('counts.store_failed', 1)
             ->has('releases.data', 1)
             ->where('releases.data.0.stores_failed', 1));
 
-        $this->actingAs($super)->get('/v2/admin/distribution?status=all')->assertInertia(fn (Assert $p) => $p->has('releases.data', 2));
+        $this->actingAs($super)->get('/admin/distribution?status=all')->assertInertia(fn (Assert $p) => $p->has('releases.data', 2));
     }
 
     public function test_used_store_cannot_be_deleted_and_admin_cannot_change_stores(): void
@@ -158,10 +158,10 @@ class DistributionSafetyTest extends TestCase
         $store = $this->store();
         $this->delivery($this->release($super), $store, 'live', $super);
 
-        $this->actingAs($super)->delete('/v2/admin/stores/'.$store->id)->assertSessionHasErrors('store');
+        $this->actingAs($super)->delete('/admin/stores/'.$store->id)->assertSessionHasErrors('store');
         $this->assertNotNull($store->fresh());
 
-        $this->actingAs($this->user('admin'))->post('/v2/admin/stores/'.$store->id.'/toggle')->assertForbidden();
+        $this->actingAs($this->user('admin'))->post('/admin/stores/'.$store->id.'/toggle')->assertForbidden();
     }
 
     public function test_isrc_with_and_without_dashes_is_one_code(): void
@@ -171,11 +171,11 @@ class DistributionSafetyTest extends TestCase
         Track::factory()->create(['release_id' => $release->id, 'track_number' => 1, 'isrc' => 'INMXT2600001', 'created_by' => $super->id, 'updated_by' => $super->id]);
         $other = Track::factory()->create(['release_id' => $release->id, 'track_number' => 2, 'isrc' => null, 'created_by' => $super->id, 'updated_by' => $super->id]);
 
-        $this->actingAs($super)->postJson('/v2/admin/tracks/'.$other->id.'/isrc/assign', ['isrc' => 'IN-MXT-26-00001'])
+        $this->actingAs($super)->postJson('/admin/tracks/'.$other->id.'/isrc/assign', ['isrc' => 'IN-MXT-26-00001'])
             ->assertStatus(422);
 
         /* generated code skips the number already used without dashes */
-        $this->actingAs($super)->postJson('/v2/admin/tracks/'.$other->id.'/isrc/generate', ['reference_year' => 2026])->assertOk();
+        $this->actingAs($super)->postJson('/admin/tracks/'.$other->id.'/isrc/generate', ['reference_year' => 2026])->assertOk();
         $this->assertNotSame('INMXT2600001', str_replace('-', '', (string) $other->fresh()->isrc));
     }
 }

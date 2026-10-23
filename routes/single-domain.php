@@ -249,27 +249,27 @@ Route::middleware([
 ])->prefix('artist')->group(function () {
     Route::redirect(
         '/wallet',
-        '/v2/wallet'
+        '/wallet'
     )->name('single.artist.wallet.redirect');
 
     Route::redirect(
         '/catalogue',
-        '/v2/catalogue'
+        '/catalogue'
     )->name('single.artist.catalogue.redirect');
 
     Route::redirect(
         '/royalties',
-        '/v2/royalties'
+        '/royalties'
     )->name('single.artist.royalties.redirect');
 
     Route::redirect(
         '/withdrawals',
-        '/v2/withdrawals'
+        '/withdrawals'
     )->name('single.artist.withdrawals.redirect');
 
     Route::redirect(
         '/kyc',
-        '/v2/kyc-profile'
+        '/kyc-profile'
     )->name('single.artist.kyc.redirect');
 });
 
@@ -283,7 +283,7 @@ Route::middleware([
     'auth',
 ])->group(function () {
     Route::get(
-        '/v2/label/artists',
+        '/label/artists',
         [
             \App\Http\Controllers\V2\Label\ArtistManagementController::class,
             'index',
@@ -295,7 +295,7 @@ Route::middleware([
     'auth',
 ])->group(function () {
     Route::get(
-        '/v2/label/artists/create',
+        '/label/artists/create',
         [
             \App\Http\Controllers\V2\Label\ArtistManagementController::class,
             'create',
@@ -303,7 +303,7 @@ Route::middleware([
     )->name('v2.label.artists.create');
 
     Route::post(
-        '/v2/label/artists',
+        '/label/artists',
         [
             \App\Http\Controllers\V2\Label\ArtistManagementController::class,
             'store',
@@ -315,7 +315,7 @@ Route::middleware([
     'auth',
 ])->group(function () {
     Route::get(
-        '/v2/label/artists/{artist}/edit',
+        '/label/artists/{artist}/edit',
         [
             \App\Http\Controllers\V2\Label\ArtistManagementController::class,
             'edit',
@@ -323,7 +323,7 @@ Route::middleware([
     )->name('v2.label.artists.edit');
 
     Route::patch(
-        '/v2/label/artists/{artist}',
+        '/label/artists/{artist}',
         [
             \App\Http\Controllers\V2\Label\ArtistManagementController::class,
             'update',
@@ -331,7 +331,7 @@ Route::middleware([
     )->name('v2.label.artists.update');
 
     Route::post(
-        '/v2/label/artists/{artist}/toggle-status',
+        '/label/artists/{artist}/toggle-status',
         [
             \App\Http\Controllers\V2\Label\ArtistManagementController::class,
             'toggleStatus',
@@ -339,7 +339,7 @@ Route::middleware([
     )->name('v2.label.artists.toggle-status');
 
     Route::post(
-        '/v2/label/artists/{artist}/resend-invitation',
+        '/label/artists/{artist}/resend-invitation',
         [
             \App\Http\Controllers\V2\Label\ArtistManagementController::class,
             'resendInvitation',
@@ -347,7 +347,7 @@ Route::middleware([
     )->name('v2.label.artists.resend-invitation');
 
     Route::post(
-        '/v2/label/artists/{artist}/reset-password',
+        '/label/artists/{artist}/reset-password',
         [
             \App\Http\Controllers\V2\Label\ArtistManagementController::class,
             'resetPassword',
@@ -359,7 +359,7 @@ Route::middleware([
     'auth',
 ])->group(function () {
     Route::get(
-        '/v2/label/artists/{artist}',
+        '/label/artists/{artist}',
         [
             \App\Http\Controllers\V2\Label\ArtistManagementController::class,
             'show',
@@ -390,7 +390,7 @@ Route::middleware([
     'role:label',
 ])->group(function () {
     \Illuminate\Support\Facades\Route::get(
-        '/v2/label/revenue-sharing',
+        '/label/revenue-sharing',
         [
             \App\Http\Controllers\V2\Label\RevenueSharingController::class,
             'index',
@@ -400,7 +400,7 @@ Route::middleware([
     );
 
     \Illuminate\Support\Facades\Route::get(
-        '/v2/label/revenue-sharing/export',
+        '/label/revenue-sharing/export',
         [
             \App\Http\Controllers\V2\Label\RevenueSharingController::class,
             'export',
@@ -410,7 +410,7 @@ Route::middleware([
     );
 
     \Illuminate\Support\Facades\Route::get(
-        '/v2/label/revenue-sharing/{type}/{id}/export',
+        '/label/revenue-sharing/{type}/{id}/export',
         [
             \App\Http\Controllers\V2\Label\RevenueSharingController::class,
             'export',
@@ -429,7 +429,7 @@ Route::middleware([
         );
 
     \Illuminate\Support\Facades\Route::patch(
-        '/v2/label/revenue-sharing/{type}/{id}',
+        '/label/revenue-sharing/{type}/{id}',
         [
             \App\Http\Controllers\V2\Label\RevenueSharingController::class,
             'update',
@@ -448,7 +448,7 @@ Route::middleware([
         );
 
     \Illuminate\Support\Facades\Route::delete(
-        '/v2/label/revenue-sharing/{share}',
+        '/label/revenue-sharing/{share}',
         [
             \App\Http\Controllers\V2\Label\RevenueSharingController::class,
             'destroy',
@@ -460,7 +460,7 @@ Route::middleware([
         );
 
     \Illuminate\Support\Facades\Route::patch(
-        '/v2/label/revenue-sharing/{share}/toggle',
+        '/label/revenue-sharing/{share}/toggle',
         [
             \App\Http\Controllers\V2\Label\RevenueSharingController::class,
             'toggle',

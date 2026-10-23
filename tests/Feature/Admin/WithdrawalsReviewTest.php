@@ -121,35 +121,35 @@ class WithdrawalsReviewTest extends TestCase
         // KYC removed after the request was made
         PayoutProfile::query()->where('user_id', $notVerified->id)->update(['kyc_status' => 'rejected']);
 
-        $this->actingAs($super)->get('/v2/admin/withdrawals')->assertOk()
+        $this->actingAs($super)->get('/admin/withdrawals')->assertOk()
             ->assertInertia(fn (Assert $p) => $p
                 ->where('counts.pending', 2)->where('totals.pending', 5000)
                 ->where('withdrawals.data.1.ready', true)
                 ->where('withdrawals.data.0.problems.0', 'KYC rejected'));
 
-        $this->actingAs($super)->get('/v2/admin/withdrawals?status=all&search='.urlencode($ok->email))
+        $this->actingAs($super)->get('/admin/withdrawals?status=all&search='.urlencode($ok->email))
             ->assertInertia(fn (Assert $p) => $p->where('withdrawals.total', 1));
 
         // approve refused while KYC is not verified
-        $this->actingAs($super)->post('/v2/admin/withdrawals/'.$w2->id.'/approve')->assertSessionHasErrors('withdrawal');
+        $this->actingAs($super)->post('/admin/withdrawals/'.$w2->id.'/approve')->assertSessionHasErrors('withdrawal');
         $this->assertSame('pending', $w2->fresh()->status);
 
         // approve -> owner told
-        $this->actingAs($super)->post('/v2/admin/withdrawals/'.$w1->id.'/approve')->assertSessionHasNoErrors();
+        $this->actingAs($super)->post('/admin/withdrawals/'.$w1->id.'/approve')->assertSessionHasNoErrors();
         $this->assertSame('approved', $w1->fresh()->status);
         $this->assertSame(1, $this->notices($ok, 'withdrawal.approved'));
 
         // mark paid (e-mailed code) -> owner told with UTR
-        $this->viaActionOtp($super, fn () => $this->actingAs($super)->post('/v2/admin/withdrawals/'.$w1->id.'/paid', ['payment_reference' => 'UTRGEN123']))
+        $this->viaActionOtp($super, fn () => $this->actingAs($super)->post('/admin/withdrawals/'.$w1->id.'/paid', ['payment_reference' => 'UTRGEN123']))
             ->assertSessionHasNoErrors();
         $this->assertSame('paid', $w1->fresh()->status);
         $this->assertSame(1, $this->notices($ok, 'withdrawal.paid'));
 
         // a paid request can never be rejected (money would be returned twice)
-        $this->actingAs($super)->post('/v2/admin/withdrawals/'.$w1->id.'/reject', ['rejection_reason' => 'Gen too late'])->assertStatus(422);
+        $this->actingAs($super)->post('/admin/withdrawals/'.$w1->id.'/reject', ['rejection_reason' => 'Gen too late'])->assertStatus(422);
 
         // reject -> money back + owner told
-        $this->actingAs($super)->post('/v2/admin/withdrawals/'.$w2->id.'/reject', ['rejection_reason' => 'Gen KYC rejected'])->assertSessionHasNoErrors();
+        $this->actingAs($super)->post('/admin/withdrawals/'.$w2->id.'/reject', ['rejection_reason' => 'Gen KYC rejected'])->assertSessionHasNoErrors();
         $this->assertSame(1, $this->notices($notVerified, 'withdrawal.rejected'));
         $this->assertEquals(8000.0, (float) DB::table('wallets')->where('user_id', $notVerified->id)->value('available_balance'));
     }
@@ -164,7 +164,7 @@ class WithdrawalsReviewTest extends TestCase
         $first = $service->create($a, 1000, 'bank');
         $second = $service->create($b, 1000, 'bank');
 
-        $this->actingAs($super)->delete('/v2/admin/withdrawals/'.$first->id)->assertSessionHasNoErrors();
+        $this->actingAs($super)->delete('/admin/withdrawals/'.$first->id)->assertSessionHasNoErrors();
         $this->assertSame(1, $this->notices($a, 'withdrawal.deleted'));
 
         $third = $service->create($a, 1500, 'bank');

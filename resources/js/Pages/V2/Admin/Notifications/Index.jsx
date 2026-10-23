@@ -40,25 +40,25 @@ const TEMPLATES = [
         category: "primary", severity: "warning", highlight: true, target: { type: "role", value: "label" },
         title: "Complete your KYC to receive payouts",
         message: "Your payout KYC is not complete yet. Please add your PAN and bank details so we can send your earnings without delay.",
-        action_url: "/v2/kyc-profile",
+        action_url: "/kyc-profile",
     },
     {
         category: "primary", severity: "success", highlight: true, target: { type: "all" },
         title: "Your royalty statement is ready",
         message: "The latest royalty statement is now available. Open Statements to view and download your PDF.",
-        action_url: "/v2/statements",
+        action_url: "/statements",
     },
     {
         category: "primary", severity: "info", highlight: false, target: { type: "all" },
         title: "Payout window is open",
         message: "You can now request a withdrawal from your wallet. Payouts are sent to your verified bank account.",
-        action_url: "/v2/withdrawals",
+        action_url: "/withdrawals",
     },
     {
         category: "primary", severity: "warning", highlight: true, target: { type: "role", value: "label" },
         title: "Please check your bank details",
         message: "Make sure your bank account number, IFSC and account holder name are correct. Wrong details can delay your payout.",
-        action_url: "/v2/kyc-profile",
+        action_url: "/kyc-profile",
     },
     {
         category: "primary", severity: "danger", highlight: true, target: { type: "all" },
@@ -76,13 +76,13 @@ const TEMPLATES = [
         category: "announcement", severity: "warning", highlight: true, target: { type: "all" },
         title: "Festival release deadline",
         message: "Planning a festival release? Submit it at least 10 days before the release date so it goes live on time in every store.",
-        action_url: "/v2/releases/create",
+        action_url: "/releases/create",
     },
     {
         category: "announcement", severity: "info", highlight: false, target: { type: "all" },
         title: "Office holiday notice",
         message: "Our office will be closed for the holiday. Support replies and payouts may take one extra working day.",
-        action_url: "/v2/support",
+        action_url: "/support",
     },
     {
         category: "announcement", severity: "info", highlight: false, target: { type: "all" },
@@ -100,31 +100,31 @@ const TEMPLATES = [
         category: "promotion", severity: "success", highlight: true, target: { type: "all" },
         title: "Playlist pitching is open",
         message: "Have a new song coming? Send it for editorial playlist pitching at least 7 days before release to get a better chance.",
-        action_url: "/v2/support",
+        action_url: "/support",
     },
     {
         category: "promotion", severity: "info", highlight: false, target: { type: "role", value: "artist" },
         title: "Get your verified artist profile",
         message: "Ask us to set up verified artist profiles on Spotify, YouTube Music and Instagram so fans can find you easily.",
-        action_url: "/v2/support",
+        action_url: "/support",
     },
     {
         category: "promotion", severity: "info", highlight: false, target: { type: "role", value: "label" },
         title: "Earn more with YouTube Content ID",
         message: "Turn on Content ID for your catalogue and earn from every video that uses your songs.",
-        action_url: "/v2/support",
+        action_url: "/support",
     },
     {
         category: "promotion", severity: "success", highlight: true, target: { type: "all" },
         title: "Festive release offer",
         message: "Release this festive season with Mixx Tune and get free promotion support for your new songs. Limited time.",
-        action_url: "/v2/releases/create",
+        action_url: "/releases/create",
     },
     {
         category: "promotion", severity: "info", highlight: false, target: { type: "all" },
         title: "Pre-save campaign for your next song",
         message: "Build hype before release day: we can make a pre-save link for your next song. Contact support to start.",
-        action_url: "/v2/support",
+        action_url: "/support",
     },
 ];
 
@@ -218,7 +218,7 @@ export default function Index({ countries = [], states = [], roleCounts = {}, re
         let cancel = false;
         setPreviewBusy(true);
         axios
-            .post("/v2/admin/notification-management/preview", {
+            .post("/admin/notification-management/preview", {
                 target_type: data.target_type,
                 target_value: data.target_value,
                 target_users: data.target_users,
@@ -239,7 +239,7 @@ export default function Index({ countries = [], states = [], roleCounts = {}, re
         if (!window.confirm(`Send "${data.title || "this notification"}" to ${count} ${count === 1 ? "person" : "people"} (${preview?.label || data.target_type})?`)) {
             return;
         }
-        post("/v2/admin/notification-management", {
+        post("/admin/notification-management", {
             preserveScroll: true,
             onSuccess: () => {
                 reset("title", "message", "action_url");
@@ -406,7 +406,7 @@ export default function Index({ countries = [], states = [], roleCounts = {}, re
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <Input
                                     label="Button link (optional)"
-                                    placeholder="/v2/statements or https://…"
+                                    placeholder="/statements or https://…"
                                     error={errors.action_url}
                                     value={data.action_url}
                                     onChange={(v) => set({ action_url: v.trim() })}
@@ -566,7 +566,7 @@ function useSearch(url, key) {
 }
 
 function PeoplePicker({ chosen, setChosen }) {
-    const { q, setQ, items, busy } = useSearch("/v2/admin/notification-management/search-users", "users");
+    const { q, setQ, items, busy } = useSearch("/admin/notification-management/search-users", "users");
     const chosenIds = useMemo(() => new Set(chosen.map((u) => u.id)), [chosen]);
 
     return (
@@ -621,7 +621,7 @@ function PeoplePicker({ chosen, setChosen }) {
 }
 
 function LabelPicker({ chosen, onPick, includeArtists, setIncludeArtists }) {
-    const { q, setQ, items, busy } = useSearch("/v2/admin/notification-management/search-labels", "labels");
+    const { q, setQ, items, busy } = useSearch("/admin/notification-management/search-labels", "labels");
 
     return (
         <div>
@@ -681,7 +681,7 @@ function History({ items = [] }) {
         setOpen(id);
         setBusy(true);
         axios
-            .get(`/v2/admin/notification-management/${id}/recipients`)
+            .get(`/admin/notification-management/${id}/recipients`)
             .then(({ data }) => setList(data.recipients || []))
             .catch(() => setList([]))
             .finally(() => setBusy(false));

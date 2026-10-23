@@ -42,7 +42,7 @@ class ManagersPageTest extends TestCase
         Label::factory()->create();
         $this->assign($kapil, $a);
 
-        $this->actingAs($super)->get('/v2/admin/admins?q=kapil')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/admins?q=kapil')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Admin/Admins/Index')
             ->has('admins.data', 1)
             ->where('admins.data.0.assigned_labels_count', 1)
@@ -60,11 +60,11 @@ class ManagersPageTest extends TestCase
         $this->assign($m1, $a, false);
         $this->assign($m2, $b);
 
-        $this->actingAs($super)->get('/v2/admin/admins/'.$m1->id)->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/admins/'.$m1->id)->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('assignedLabelIds', [$a->id])
             ->where('labels', fn ($rows) => collect($rows)->firstWhere('id', $b->id)['others'][0] === 'Other One'));
 
-        $this->actingAs($super)->patch('/v2/admin/admins/'.$m1->id.'/assignments', ['label_ids' => [$a->id, $b->id], 'artist_ids' => []])
+        $this->actingAs($super)->patch('/admin/admins/'.$m1->id.'/assignments', ['label_ids' => [$a->id, $b->id], 'artist_ids' => []])
             ->assertSessionHasNoErrors()
             ->assertSessionHas('success', fn ($m) => str_contains($m, 'labels +1 / -0'));
 

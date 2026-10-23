@@ -175,7 +175,7 @@ function ReportTable({
                                                         report.status ===
                                                         'completed' &&
                                                     !report.stale
-                                                            ? `/v2/generated-reports/${report.id}/download`
+                                                            ? `/generated-reports/${report.id}/download`
                                                             : undefined
                                                     }
                                                     title="Download Excel"
@@ -213,7 +213,7 @@ function ReportTable({
                                                         report.status ===
                                                         'completed' &&
                                                     !report.stale
-                                                            ? `/v2/generated-reports/${report.id}/pdf`
+                                                            ? `/generated-reports/${report.id}/pdf`
                                                             : undefined
                                                     }
                                                     title="Download PDF"
@@ -300,7 +300,7 @@ function ReportTable({
                                                     ) : (
                                                         <>
                                                             <a
-                                                                href={`/v2/reports/automatic/${report.month ?? periodToMonth(
+                                                                href={`/reports/automatic/${report.month ?? periodToMonth(
                                                                     report.period
                                                                 )}/download`}
                                                                 title="Download Excel"
@@ -313,7 +313,7 @@ function ReportTable({
 
                                                             {!hidePdf && (
                                                             <a
-                                                                href={`/v2/reports/automatic/${report.month ?? periodToMonth(
+                                                                href={`/reports/automatic/${report.month ?? periodToMonth(
                                                                     report.period
                                                                 )}/pdf`}
                                                                 title="Download PDF"
@@ -921,7 +921,7 @@ export default function ReportsIndex({
 
                 const response =
                     await window.axios.get(
-                        '/v2/generated-reports'
+                        '/generated-reports'
                     );
 
                 setRequestedReports(
@@ -963,7 +963,7 @@ export default function ReportsIndex({
             try {
                 const response =
                     await window.axios.post(
-                        '/v2/generated-reports',
+                        '/generated-reports',
                         {
                             from_month:
                                 fromPeriod,
@@ -1069,7 +1069,7 @@ export default function ReportsIndex({
 
             try {
                 await window.axios.delete(
-                    `/v2/generated-reports/${report.id}`
+                    `/generated-reports/${report.id}`
                 );
 
                 setRequestedReports(
@@ -1108,7 +1108,7 @@ export default function ReportsIndex({
                     <section className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <span>Reports here use only <b>published</b> months. Not published yet:</span>
-                            <a href="/v2/admin/reports/imports" className="inline-flex h-9 shrink-0 items-center rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white">Open Revenue Imports</a>
+                            <a href="/admin/reports/imports" className="inline-flex h-9 shrink-0 items-center rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white">Open Revenue Imports</a>
                         </div>
                         <ul className="mt-1.5 space-y-0.5 text-xs text-violet-800">
                             {unpublished.map((u) => (

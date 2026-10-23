@@ -1,6 +1,6 @@
 export const PANEL_ROUTES = {
     common: {
-        notifications: "/v2/notifications",
+        notifications: "/notifications",
     },
 
     artist: {
@@ -25,13 +25,13 @@ export const PANEL_ROUTES = {
         withdrawals: "/artist/withdrawals",
 
         reports: "/artist/reports",
-        analytics: "/v2/analytics",
+        analytics: "/analytics",
 
         kyc: "/artist/kyc",
 
         support: "/artist/support",
 
-        notifications: "/v2/notifications",
+        notifications: "/notifications",
 
         settings: "/artist/settings",
 
@@ -43,38 +43,38 @@ export const PANEL_ROUTES = {
     label: {
         dashboard: "/label/dashboard",
 
-        artists: "/v2/label/artists",
+        artists: "/label/artists",
 
-        revenueSharing: "/v2/label/revenue-sharing",
+        revenueSharing: "/label/revenue-sharing",
 
-        userAccess: "/v2/label/user-access",
+        userAccess: "/label/user-access",
 
-        releases: "/v2/releases",
-        releasesAll: "/v2/releases",
-        releasesLive: "/v2/releases?status=live",
-        releasesReview: "/v2/releases?status=submitted",
-        releasesDraft: "/v2/releases?status=draft",
-        releasesRejected: "/v2/releases?status=rejected",
-        releasesChanges: "/v2/releases?status=changes_requested",
+        releases: "/releases",
+        releasesAll: "/releases",
+        releasesLive: "/releases?status=live",
+        releasesReview: "/releases?status=submitted",
+        releasesDraft: "/releases?status=draft",
+        releasesRejected: "/releases?status=rejected",
+        releasesChanges: "/releases?status=changes_requested",
 
-        createRelease: "/v2/releases/create",
+        createRelease: "/releases/create",
 
-        catalogue: "/v2/catalogue",
+        catalogue: "/catalogue",
 
-        royalties: "/v2/royalties",
+        royalties: "/royalties",
 
-        wallet: "/v2/wallet",
+        wallet: "/wallet",
 
-        withdrawals: "/v2/withdrawals",
+        withdrawals: "/withdrawals",
 
-        reports: "/v2/reports",
-        analytics: "/v2/analytics",
+        reports: "/reports",
+        analytics: "/analytics",
 
-        kyc: "/v2/kyc-profile",
+        kyc: "/kyc-profile",
 
-        support: "/v2/support",
+        support: "/support",
 
-        notifications: "/v2/notifications",
+        notifications: "/notifications",
 
         settings: "/label/settings",
     },
@@ -82,123 +82,123 @@ export const PANEL_ROUTES = {
     admin: {
         dashboard: "/admin/dashboard",
 
-        artists: "/v2/admin/artists",
+        artists: "/admin/artists",
 
-        labels: "/v2/admin/labels",
+        labels: "/admin/labels",
         labelHierarchy: "/super-admin/label-hierarchy",
 
-        releases: "/v2/releases",
+        releases: "/releases",
 
-        releasesAll: "/v2/releases",
+        releasesAll: "/releases",
 
-        releasesReview: "/v2/admin/release-reviews?status=submitted",
+        releasesReview: "/admin/release-reviews?status=submitted",
 
-        releasesApproved: "/v2/admin/release-reviews?status=approved",
+        releasesApproved: "/admin/release-reviews?status=approved",
 
-        releasesRejected: "/v2/admin/release-reviews?status=rejected",
+        releasesRejected: "/admin/release-reviews?status=rejected",
 
-        releasesChanges: "/v2/admin/release-reviews?status=changes_requested",
+        releasesChanges: "/admin/release-reviews?status=changes_requested",
 
-        releasesProcessing: "/v2/admin/release-reviews?status=processing",
+        releasesProcessing: "/admin/release-reviews?status=processing",
 
-        releasesDraft: "/v2/releases?status=draft",
+        releasesDraft: "/releases?status=draft",
 
-        createRelease: "/v2/releases/create",
+        createRelease: "/releases/create",
 
-        distribution: "/v2/admin/distribution",
+        distribution: "/admin/distribution",
 
-        identifiers: "/v2/admin/identifiers/pending",
+        identifiers: "/admin/identifiers/pending",
 
-        catalogue: "/v2/catalogue",
+        catalogue: "/catalogue",
 
-        stores: "/v2/admin/stores",
+        stores: "/admin/stores",
 
-        royalties: "/v2/admin/royalties",
+        royalties: "/admin/royalties",
 
-        reports: "/v2/admin/reports",
-        analytics: "/v2/analytics",
+        reports: "/admin/reports",
+        analytics: "/analytics",
         unmappedRevenue: "/super-admin/unmapped-revenue",
 
-        wallet: "/v2/admin/wallet",
+        wallet: "/admin/wallet",
 
-        withdrawals: "/v2/admin/withdrawals",
+        withdrawals: "/admin/withdrawals",
 
-        kycReviews: "/v2/admin/kyc",
+        kycReviews: "/admin/kyc",
 
-        support: "/v2/admin/support",
+        support: "/admin/support",
 
-        notifications: "/v2/notifications",
+        notifications: "/notifications",
 
-        settings: "/v2/admin/settings",
+        settings: "/admin/settings",
     },
 
     super_admin: {
         dashboard: "/super-admin/dashboard",
 
-        users: "/v2/admin/users",
+        users: "/admin/users",
 
-        admins: "/v2/admin/admins",
+        admins: "/admin/admins",
 
-        labels: "/v2/admin/labels",
+        labels: "/admin/labels",
         labelHierarchy: "/super-admin/label-hierarchy",
 
-        artists: "/v2/admin/artists",
+        artists: "/admin/artists",
 
-        releases: "/v2/admin/release-reviews",
+        releases: "/admin/release-reviews",
 
         /* MIXXTUNE_NAV_RELEASES_CATALOGUE: "All Releases" = every stage (was the review queue, which only showed In Review) */
-        releasesAll: "/v2/releases",
+        releasesAll: "/releases",
 
-        releasesReview: "/v2/admin/release-reviews?status=submitted",
+        releasesReview: "/admin/release-reviews?status=submitted",
 
-        releasesApproved: "/v2/admin/release-reviews?status=approved",
+        releasesApproved: "/admin/release-reviews?status=approved",
 
-        releasesRejected: "/v2/admin/release-reviews?status=rejected",
+        releasesRejected: "/admin/release-reviews?status=rejected",
 
-        releasesChanges: "/v2/admin/release-reviews?status=changes_requested",
+        releasesChanges: "/admin/release-reviews?status=changes_requested",
 
-        releasesProcessing: "/v2/admin/release-reviews?status=processing",
+        releasesProcessing: "/admin/release-reviews?status=processing",
 
-        releasesDraft: "/v2/releases?status=draft",
+        releasesDraft: "/releases?status=draft",
 
-        createRelease: "/v2/releases/create",
+        createRelease: "/releases/create",
 
-        distribution: "/v2/admin/distribution",
+        distribution: "/admin/distribution",
 
-        identifiers: "/v2/admin/identifiers/pending",
+        identifiers: "/admin/identifiers/pending",
 
-        stores: "/v2/admin/stores",
+        stores: "/admin/stores",
 
-        catalogue: "/v2/catalogue",
+        catalogue: "/catalogue",
         legacyCatalogueImports: "/super-admin/legacy-catalogue-imports",
 
-        royalties: "/v2/admin/royalties",
+        royalties: "/admin/royalties",
 
-        reports: "/v2/admin/reports",
-        analytics: "/v2/analytics",
+        reports: "/admin/reports",
+        analytics: "/analytics",
         unmappedRevenue: "/super-admin/unmapped-revenue",
 
-        finance: "/v2/admin/finance",
+        finance: "/admin/finance",
 
-        invoices: "/v2/admin/invoices",
+        invoices: "/admin/invoices",
 
-        statements: "/v2/admin/statements",
+        statements: "/admin/statements",
 
-        wallet: "/v2/admin/wallet",
+        wallet: "/admin/wallet",
 
-        withdrawals: "/v2/admin/withdrawals",
+        withdrawals: "/admin/withdrawals",
 
-        kycReviews: "/v2/admin/kyc",
+        kycReviews: "/admin/kyc",
 
-        support: "/v2/admin/support",
+        support: "/admin/support",
 
-        logs: "/v2/admin/audit-logs",
+        logs: "/admin/audit-logs",
 
-        activity: "/v2/admin/audit-logs",
+        activity: "/admin/audit-logs",
 
-        notifications: "/v2/notifications",
+        notifications: "/notifications",
 
-        settings: "/v2/admin/settings",
+        settings: "/admin/settings",
     },
 };
 

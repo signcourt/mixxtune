@@ -858,7 +858,7 @@ export default function Index({
                                 </span>
 
                                 <a
-                                    href="/v2/admin/reports/imports"
+                                    href="/admin/reports/imports"
                                     className="ml-1 font-semibold text-violet-700 hover:underline"
                                 >
                                     Back to Reports
@@ -2641,7 +2641,7 @@ function ReportScope({ imports = [], scope, counts = {}, current }) {
             {scope === 'locked' && (
                 <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
                     These rows belong to reports that are already approved or published. Mapping can no longer change them; their money is kept as held revenue.
-                    Link the label / artist to its owner, then release the held money in <a href="/v2/admin/finance" className="font-semibold underline">Finance &amp; Royalties</a>. Saved rules will still map these ISRCs in future reports.
+                    Link the label / artist to its owner, then release the held money in <a href="/admin/finance" className="font-semibold underline">Finance &amp; Royalties</a>. Saved rules will still map these ISRCs in future reports.
                 </p>
             )}
         </section>

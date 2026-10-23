@@ -39,7 +39,7 @@ export default function Index({ role = "admin", withdrawals = {}, counts = {}, t
     const first = useRef(true);
 
     const go = (patch) =>
-        router.get("/v2/admin/withdrawals", { status, month: filters.month || "", search: filters.search || "", ...patch }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get("/admin/withdrawals", { status, month: filters.month || "", search: filters.search || "", ...patch }, { preserveState: true, preserveScroll: true, replace: true });
 
     useEffect(() => {
         if (first.current) {
@@ -51,7 +51,7 @@ export default function Index({ role = "admin", withdrawals = {}, counts = {}, t
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
-    const exportUrl = `/v2/admin/withdrawals/export?status=${encodeURIComponent(status === "all" ? "pending" : status)}&month=${encodeURIComponent(filters.month || "")}`;
+    const exportUrl = `/admin/withdrawals/export?status=${encodeURIComponent(status === "all" ? "pending" : status)}&month=${encodeURIComponent(filters.month || "")}`;
     const readyToPay = status === "approved" ? rows.filter((r) => r.ready).length : 0;
 
     return (
@@ -101,9 +101,9 @@ export default function Index({ role = "admin", withdrawals = {}, counts = {}, t
                         <a href={exportUrl} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white"><Download className="h-4 w-4" /> Finance Excel</a>
                         {payoutTools.can_download && (
                             <>
-                                <a href="/v2/admin/payouts/axis-file" className="inline-flex h-10 items-center rounded-xl bg-rose-700 px-4 text-sm font-semibold text-white" title="All APPROVED requests that are ready, net after TDS">Axis Bank Payout File</a>
-                                <a href="/v2/admin/payouts/axis-file?format=csv" className="inline-flex h-10 items-center rounded-xl border border-rose-300 px-3 text-sm font-semibold text-rose-700">Axis CSV</a>
-                                <a href={`/v2/admin/payouts/tds-report?fy=${encodeURIComponent(payoutTools.financial_year ?? "")}`} className="inline-flex h-10 items-center rounded-xl bg-slate-800 px-4 text-sm font-semibold text-white">TDS Report FY {payoutTools.financial_year}</a>
+                                <a href="/admin/payouts/axis-file" className="inline-flex h-10 items-center rounded-xl bg-rose-700 px-4 text-sm font-semibold text-white" title="All APPROVED requests that are ready, net after TDS">Axis Bank Payout File</a>
+                                <a href="/admin/payouts/axis-file?format=csv" className="inline-flex h-10 items-center rounded-xl border border-rose-300 px-3 text-sm font-semibold text-rose-700">Axis CSV</a>
+                                <a href={`/admin/payouts/tds-report?fy=${encodeURIComponent(payoutTools.financial_year ?? "")}`} className="inline-flex h-10 items-center rounded-xl bg-slate-800 px-4 text-sm font-semibold text-white">TDS Report FY {payoutTools.financial_year}</a>
                             </>
                         )}
                     </div>
@@ -248,7 +248,7 @@ function WithdrawalCard({ w }) {
 
             <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3">
                 {w.invoice?.id && (
-                    <a href={`/v2/invoices/${w.invoice.id}/download`} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700">
+                    <a href={`/invoices/${w.invoice.id}/download`} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700">
                         <FileText className="h-3.5 w-3.5" /> Payout document {w.invoice.invoice_number}
                     </a>
                 )}
@@ -279,7 +279,7 @@ function WithdrawalCard({ w }) {
 
                     <div className="flex flex-wrap gap-2">
                         {w.status === "pending" && (
-                            <button type="button" disabled={busy} onClick={() => send("post", `/v2/admin/withdrawals/${w.id}/approve`, { admin_note: note })} className="h-10 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+                            <button type="button" disabled={busy} onClick={() => send("post", `/admin/withdrawals/${w.id}/approve`, { admin_note: note })} className="h-10 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
                                 Approve
                             </button>
                         )}
@@ -287,7 +287,7 @@ function WithdrawalCard({ w }) {
                             <button
                                 type="button"
                                 disabled={busy || utr.length < 3}
-                                onClick={() => send("post", `/v2/admin/withdrawals/${w.id}/paid`, { payment_reference: utr, admin_note: note }, `Mark ${w.request_number} (${inr(d?.net ?? w.amount)}) as PAID with UTR ${utr}?\n\nOnly do this after the money has left the bank.`)}
+                                onClick={() => send("post", `/admin/withdrawals/${w.id}/paid`, { payment_reference: utr, admin_note: note }, `Mark ${w.request_number} (${inr(d?.net ?? w.amount)}) as PAID with UTR ${utr}?\n\nOnly do this after the money has left the bank.`)}
                                 className="h-10 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white disabled:opacity-40"
                             >
                                 Mark Paid
@@ -296,7 +296,7 @@ function WithdrawalCard({ w }) {
                         <button
                             type="button"
                             disabled={busy || note.trim().length < 3}
-                            onClick={() => send("post", `/v2/admin/withdrawals/${w.id}/reject`, { rejection_reason: note }, `Reject ${w.request_number}? ${inr(w.amount)} goes back to the owner's wallet.`)}
+                            onClick={() => send("post", `/admin/withdrawals/${w.id}/reject`, { rejection_reason: note }, `Reject ${w.request_number}? ${inr(w.amount)} goes back to the owner's wallet.`)}
                             className="h-10 rounded-xl border border-red-300 bg-white px-4 text-sm font-semibold text-red-700 disabled:opacity-40"
                         >
                             Reject
@@ -304,7 +304,7 @@ function WithdrawalCard({ w }) {
                         <button
                             type="button"
                             disabled={busy}
-                            onClick={() => send("delete", `/v2/admin/withdrawals/${w.id}`, {}, `Delete ${w.request_number}? Use only for a request made by mistake. ${inr(w.amount)} goes back to the wallet.`)}
+                            onClick={() => send("delete", `/admin/withdrawals/${w.id}`, {}, `Delete ${w.request_number}? Use only for a request made by mistake. ${inr(w.amount)} goes back to the wallet.`)}
                             className="h-10 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-600 disabled:opacity-50"
                         >
                             Delete

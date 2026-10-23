@@ -520,7 +520,7 @@ export default function Index({
                         {/* MIXXTUNE_FINANCE_CLEANUP_V1: CSV of the rows behind this view (same filters, same access) */}
                         <div className="flex shrink-0 justify-end">
                             <a
-                                href={`/v2/analytics/export?${(() => { const q = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : ''); if (preview) q.set('preview', '1'); return q.toString(); })()}`}
+                                href={`/analytics/export?${(() => { const q = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : ''); if (preview) q.set('preview', '1'); return q.toString(); })()}`}
                                 className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
                             >
                                 Export CSV
@@ -1285,7 +1285,7 @@ function PublishBanner({ role, preview, autoPreview = false, unpublished = [], h
                         <button type="button" onClick={() => onPreview(true)} className="h-9 rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white">
                             Preview them here
                         </button>
-                        <a href="/v2/admin/reports/imports" className="inline-flex h-9 items-center rounded-lg border border-violet-200 bg-white px-3 text-xs font-semibold">
+                        <a href="/admin/reports/imports" className="inline-flex h-9 items-center rounded-lg border border-violet-200 bg-white px-3 text-xs font-semibold">
                             Open Revenue Imports
                         </a>
                     </div>

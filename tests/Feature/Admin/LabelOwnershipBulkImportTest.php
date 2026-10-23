@@ -104,13 +104,13 @@ class LabelOwnershipBulkImportTest extends TestCase
     {
         $file = UploadedFile::fake()->createWithContent('owners.csv', $csv);
 
-        return $this->actingAs($admin)->post('/v2/admin/labels/ownership/bulk/preview', ['csv' => $file], ['Accept' => 'application/json']);
+        return $this->actingAs($admin)->post('/admin/labels/ownership/bulk/preview', ['csv' => $file], ['Accept' => 'application/json']);
     }
 
     private function otpFor(User $admin, string $token): string
     {
         Mail::fake();
-        $this->actingAs($admin)->postJson('/v2/admin/labels/ownership/bulk/otp', ['token' => $token])->assertOk();
+        $this->actingAs($admin)->postJson('/admin/labels/ownership/bulk/otp', ['token' => $token])->assertOk();
 
         $otp = null;
         Mail::assertSent(LabelOwnershipOtpMail::class, function (LabelOwnershipOtpMail $mail) use (&$otp) {
@@ -134,9 +134,9 @@ class LabelOwnershipBulkImportTest extends TestCase
         $owner = $this->makeLabel(null, 'Bulk Free Label', 90);
         $this->makeLabel($this->makeUser('label')->id, 'Bulk Owned Label');
 
-        $this->actingAs($admin)->get('/v2/admin/labels/ownership/bulk/template')->assertForbidden();
+        $this->actingAs($admin)->get('/admin/labels/ownership/bulk/template')->assertForbidden();
 
-        $csv = (string) $this->actingAs($super)->get('/v2/admin/labels/ownership/bulk/template')->assertOk()->getContent();
+        $csv = (string) $this->actingAs($super)->get('/admin/labels/ownership/bulk/template')->assertOk()->getContent();
 
         $this->assertStringContainsString('label_id,label_name', $csv);
         $this->assertStringContainsString("\n{$owner},", $csv);
@@ -211,15 +211,15 @@ class LabelOwnershipBulkImportTest extends TestCase
         $token = (string) $preview->json('token');
         $this->assertSame(40, strlen($token));
 
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/bulk/run', ['token' => $token])->assertStatus(422);
+        $this->actingAs($super)->postJson('/admin/labels/ownership/bulk/run', ['token' => $token])->assertStatus(422);
 
         $otp = $this->otpFor($super, $token);
         $wrong = $otp === '000000' ? '111111' : '000000';
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/bulk/confirm', ['token' => $token, 'otp' => $wrong])->assertStatus(422);
+        $this->actingAs($super)->postJson('/admin/labels/ownership/bulk/confirm', ['token' => $token, 'otp' => $wrong])->assertStatus(422);
         $this->assertNull(DB::table('labels')->where('id', $free)->value('user_id'));
 
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/bulk/confirm', ['token' => $token, 'otp' => $otp])->assertOk();
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/bulk/run', ['token' => $token])
+        $this->actingAs($super)->postJson('/admin/labels/ownership/bulk/confirm', ['token' => $token, 'otp' => $otp])->assertOk();
+        $this->actingAs($super)->postJson('/admin/labels/ownership/bulk/run', ['token' => $token])
             ->assertOk()->assertJsonPath('done', true)->assertJsonPath('succeeded', 1)->assertJsonPath('failed', 0)
             ->assertJsonPath('results.0.assigned', 1)->assertJsonPath('results.0.transferred', 1);
 
@@ -233,7 +233,7 @@ class LabelOwnershipBulkImportTest extends TestCase
         }
 
         /* Running again does nothing more. */
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/bulk/run', ['token' => $token])
+        $this->actingAs($super)->postJson('/admin/labels/ownership/bulk/run', ['token' => $token])
             ->assertOk()->assertJsonPath('done', true)->assertJsonPath('processed', 1);
     }
 
@@ -253,8 +253,8 @@ class LabelOwnershipBulkImportTest extends TestCase
         $token = (string) $preview->json('token');
 
         $otp = $this->otpFor($super, $token);
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/bulk/confirm', ['token' => $token, 'otp' => $otp])->assertOk();
-        $run = $this->actingAs($super)->postJson('/v2/admin/labels/ownership/bulk/run', ['token' => $token])->assertOk();
+        $this->actingAs($super)->postJson('/admin/labels/ownership/bulk/confirm', ['token' => $token, 'otp' => $otp])->assertOk();
+        $run = $this->actingAs($super)->postJson('/admin/labels/ownership/bulk/run', ['token' => $token])->assertOk();
 
         if ($run->json('results.0.status') !== 'done' && str_contains((string) $run->json('results.0.message'), 'no such table')) {
             $this->markTestSkipped('Users module needs a table missing in the SQLite test schema: '.$run->json('results.0.message'));

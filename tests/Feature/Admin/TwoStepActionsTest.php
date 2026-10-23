@@ -107,7 +107,7 @@ class TwoStepActionsTest extends TestCase
 
     private function unlock(User $actor): void
     {
-        $this->actingAs($actor)->postJson('/v2/admin/action-otp/unlock', ['otp' => $this->lastCode()])->assertOk();
+        $this->actingAs($actor)->postJson('/admin/action-otp/unlock', ['otp' => $this->lastCode()])->assertOk();
     }
 
     private function readyImport(int $labelId): int
@@ -139,14 +139,14 @@ class TwoStepActionsTest extends TestCase
         $importId = $this->readyImport($this->makeLabel($owner->id, 'Two Step Label', 80));
         $payload = ['publish_at' => now()->addDay()->toDateString()];
 
-        $this->actingAs($super)->post("/v2/admin/reports/imports/{$importId}/approve-and-schedule", $payload)
+        $this->actingAs($super)->post("/admin/reports/imports/{$importId}/approve-and-schedule", $payload)
             ->assertSessionHasErrors('action_otp');
         $this->assertSame('review_pending', DB::table('report_imports')->where('id', $importId)->value('financial_status'));
 
-        $this->actingAs($super)->postJson('/v2/admin/action-otp/unlock', ['otp' => '000000'])->assertStatus(422);
+        $this->actingAs($super)->postJson('/admin/action-otp/unlock', ['otp' => '000000'])->assertStatus(422);
         $this->unlock($super);
 
-        $this->actingAs($super)->post("/v2/admin/reports/imports/{$importId}/approve-and-schedule", $payload)
+        $this->actingAs($super)->post("/admin/reports/imports/{$importId}/approve-and-schedule", $payload)
             ->assertSessionHasNoErrors();
         $this->assertSame('approved_scheduled', DB::table('report_imports')->where('id', $importId)->value('financial_status'));
     }
@@ -157,22 +157,22 @@ class TwoStepActionsTest extends TestCase
         $empty = $this->makeLabel(null, 'No Rate Yet', null);
         $set = $this->makeLabel(null, 'Has Rate', 80);
 
-        $this->actingAs($super)->patch("/v2/admin/labels/{$empty}/revenue-rate", ['revenue_share_percentage' => 75])
+        $this->actingAs($super)->patch("/admin/labels/{$empty}/revenue-rate", ['revenue_share_percentage' => 75])
             ->assertSessionHasNoErrors();
         $this->assertEquals(75, DB::table('labels')->where('id', $empty)->value('revenue_share_percentage'));
         Mail::assertNotSent(ActionOtpMail::class);
 
-        $this->actingAs($super)->patch("/v2/admin/labels/{$set}/revenue-rate", ['revenue_share_percentage' => 70])
+        $this->actingAs($super)->patch("/admin/labels/{$set}/revenue-rate", ['revenue_share_percentage' => 70])
             ->assertSessionHasErrors('action_otp');
         $this->assertEquals(80, DB::table('labels')->where('id', $set)->value('revenue_share_percentage'));
 
         $this->unlock($super);
-        $this->actingAs($super)->patch("/v2/admin/labels/{$set}/revenue-rate", ['revenue_share_percentage' => 70])
+        $this->actingAs($super)->patch("/admin/labels/{$set}/revenue-rate", ['revenue_share_percentage' => 70])
             ->assertSessionHasNoErrors();
         $this->assertEquals(70, DB::table('labels')->where('id', $set)->value('revenue_share_percentage'));
 
         // the unlock was used by that save
-        $this->actingAs($super)->patch("/v2/admin/labels/{$set}/revenue-rate", ['revenue_share_percentage' => 65])
+        $this->actingAs($super)->patch("/admin/labels/{$set}/revenue-rate", ['revenue_share_percentage' => 65])
             ->assertSessionHasErrors('action_otp');
         $this->assertEquals(70, DB::table('labels')->where('id', $set)->value('revenue_share_percentage'));
     }
@@ -200,18 +200,18 @@ class TwoStepActionsTest extends TestCase
 
         [$first, $second] = $withdrawals;
 
-        $this->actingAs($super)->post("/v2/admin/withdrawals/{$first->id}/paid", ['payment_reference' => 'UTR-1'])
+        $this->actingAs($super)->post("/admin/withdrawals/{$first->id}/paid", ['payment_reference' => 'UTR-1'])
             ->assertSessionHasErrors('action_otp');
         $this->assertSame('approved', $first->fresh()->status);
 
         $this->unlock($super);
 
         // the code was for withdrawal #1, not #2
-        $this->actingAs($super)->post("/v2/admin/withdrawals/{$second->id}/paid", ['payment_reference' => 'UTR-2'])
+        $this->actingAs($super)->post("/admin/withdrawals/{$second->id}/paid", ['payment_reference' => 'UTR-2'])
             ->assertSessionHasErrors('action_otp');
         $this->assertSame('approved', $second->fresh()->status);
 
-        $this->actingAs($super)->post("/v2/admin/withdrawals/{$first->id}/paid", ['payment_reference' => 'UTR-1'])
+        $this->actingAs($super)->post("/admin/withdrawals/{$first->id}/paid", ['payment_reference' => 'UTR-1'])
             ->assertSessionHasNoErrors();
         $this->assertSame('paid', $first->fresh()->status);
     }

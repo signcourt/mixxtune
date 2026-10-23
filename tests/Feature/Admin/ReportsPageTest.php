@@ -52,7 +52,7 @@ class ReportsPageTest extends TestCase
         $this->row($this->import('published', 'june.csv', '2026-07-05 06:30:00'), '2026-06');
         $this->row($this->import('review_pending', 'july.csv'), '2026-07');
 
-        $this->actingAs($super)->get('/v2/admin/reports')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/reports')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Reports/Index')
             ->has('automaticReports', 1)
             ->where('automaticReports.0.month', '2026-06')
@@ -70,7 +70,7 @@ class ReportsPageTest extends TestCase
     {
         $this->row($this->import('review_pending', 'july.csv'), '2026-07');
 
-        $this->actingAs($this->user('artist'))->get('/v2/reports')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($this->user('artist'))->get('/reports')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('unpublished', [])
             ->has('automaticReports', 0));
     }

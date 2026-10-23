@@ -26,10 +26,12 @@ class EnforcePanelPermission
          * Authentication middleware will handle guests.
          * Only V2 panel URLs are checked here.
          */
-        if (
-            !$user
-            || !$request->is('v2/*')
-        ) {
+        /*
+         * W92: panel pages no longer start with /v2. The rules below are
+         * written for the panel addresses; the role areas (/super-admin,
+         * /artist, /label, /admin/dashboard ...) keep their own role checks.
+         */
+        if (!$user) {
             return $next($request);
         }
 
@@ -74,7 +76,7 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/admin/users*'
+                'admin/users*'
             )
         ) {
             return in_array(
@@ -91,7 +93,7 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/admin/settings*'
+                'admin/settings*'
             )
         ) {
             return in_array(
@@ -105,7 +107,7 @@ class EnforcePanelPermission
 
         if (
             $request->is(
-                'v2/admin/audit-logs*'
+                'admin/audit-logs*'
             )
         ) {
             return 'audit_logs.view';
@@ -116,10 +118,10 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/catalogue*'
+                'catalogue*'
             )
             || $request->is(
-                'v2/admin/catalogue*'
+                'admin/catalogue*'
             )
         ) {
             return in_array(
@@ -136,10 +138,10 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/reports*'
+                'reports*'
             )
             || $request->is(
-                'v2/admin/reports*'
+                'admin/reports*'
             )
         ) {
             return 'reports.view';
@@ -150,10 +152,10 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/royalties*'
+                'royalties*'
             )
             || $request->is(
-                'v2/admin/royalties*'
+                'admin/royalties*'
             )
         ) {
             return 'royalties.view';
@@ -164,10 +166,10 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/wallet*'
+                'wallet*'
             )
             || $request->is(
-                'v2/admin/wallet*'
+                'admin/wallet*'
             )
         ) {
             return in_array(
@@ -184,7 +186,7 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/admin/withdrawals*'
+                'admin/withdrawals*'
             )
         ) {
             return in_array(
@@ -198,7 +200,7 @@ class EnforcePanelPermission
 
         if (
             $request->is(
-                'v2/withdrawals*'
+                'withdrawals*'
             )
         ) {
             return in_array(
@@ -215,7 +217,7 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/legal-operations*'
+                'legal-operations*'
             )
         ) {
             return 'legal.operations.view';
@@ -226,7 +228,7 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/admin/support*'
+                'admin/support*'
             )
         ) {
             return 'support.manage';
@@ -234,7 +236,7 @@ class EnforcePanelPermission
 
         if (
             $request->is(
-                'v2/support*'
+                'support*'
             )
         ) {
             return in_array(
@@ -251,10 +253,10 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/admin/distribution*'
+                'admin/distribution*'
             )
             || $request->is(
-                'v2/admin/delivery*'
+                'admin/delivery*'
             )
         ) {
             return in_array(
@@ -271,7 +273,7 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/admin/identifiers*'
+                'admin/identifiers*'
             )
         ) {
             return in_array(
@@ -289,7 +291,7 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/releases/create'
+                'releases/create'
             )
         ) {
             return 'releases.create';
@@ -297,7 +299,7 @@ class EnforcePanelPermission
 
         if (
             $request->is(
-                'v2/releases*'
+                'releases*'
             )
         ) {
             if (
@@ -318,7 +320,7 @@ class EnforcePanelPermission
          */
         if (
             $request->is(
-                'v2/admin/release-reviews*'
+                'admin/release-reviews*'
             )
         ) {
             return in_array(

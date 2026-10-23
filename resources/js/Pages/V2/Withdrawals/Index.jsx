@@ -96,7 +96,7 @@ export default function Index({
             return;
         }
 
-        post('/v2/withdrawals', {
+        post('/withdrawals', {
             preserveScroll: true,
             onSuccess: () => reset(),
         });
@@ -319,7 +319,7 @@ export default function Index({
                                                     </div>
 
                                                     <a
-                                                        href={`/v2/invoices/${item.invoice.id}/download`}
+                                                        href={`/invoices/${item.invoice.id}/download`}
                                                         className="inline-flex items-center rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100"
                                                     >
                                                         Download PDF

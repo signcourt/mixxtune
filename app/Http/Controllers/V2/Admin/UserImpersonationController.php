@@ -170,7 +170,7 @@ class UserImpersonationController extends Controller
         $request->session()->regenerate();
 
         return redirect(
-            '/v2/admin/users'
+            '/admin/users'
         )->with(
             'success',
             'Returned to Super Admin account.'

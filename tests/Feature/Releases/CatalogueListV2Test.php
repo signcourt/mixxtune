@@ -42,7 +42,7 @@ class CatalogueListV2Test extends TestCase
             'artwork_path' => 'artwork/gen-one.jpg', 'delivery_summary' => json_encode(['total' => 3, 'live' => 2])]);
         $this->item($super, $b, ['title' => 'Gen Two', 'release_type' => 'album', 'digital_release_date' => '2026-08-02', 'release_status' => 'approved']);
 
-        $this->actingAs($super)->get('/v2/catalogue')
+        $this->actingAs($super)->get('/catalogue')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('V2/Catalogue/Index')
@@ -50,7 +50,7 @@ class CatalogueListV2Test extends TestCase
                 ->where('labelOptions', ['Alpha Gen Records', 'Beta Gen Music']));
 
         $titles = fn (string $query) => collect(
-            $this->actingAs($super)->get('/v2/catalogue?'.$query)->viewData('page')['props']['catalogue']['data']
+            $this->actingAs($super)->get('/catalogue?'.$query)->viewData('page')['props']['catalogue']['data']
         )->pluck('title')->sort()->values()->all();
 
         $this->assertSame(['Gen Two'], $titles('product_type=album'));

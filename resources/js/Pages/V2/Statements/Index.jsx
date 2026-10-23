@@ -67,7 +67,7 @@ export default function Index({ role = "artist", statements = {}, filters = {}, 
             : `Make ${money(s.net_payable, s.currency)} of ${s.owner_name} AVAILABLE to withdraw?\nAn e-mailed code is needed next.`;
         if (!window.confirm(text)) return;
         setBusy(`${kind}${s.id}`);
-        router.post(`/v2/admin/finance/statements/${s.id}/${kind}`, {}, { preserveScroll: true, onFinish: () => setBusy(null) });
+        router.post(`/admin/finance/statements/${s.id}/${kind}`, {}, { preserveScroll: true, onFinish: () => setBusy(null) });
     };
 
     const filtered = !!(filters.search || filters.status || filters.month);
@@ -94,7 +94,7 @@ export default function Index({ role = "artist", statements = {}, filters = {}, 
                 {staff ? (
                     <Stat label="Waiting for approval" value={`${summary.pending_count ?? 0}`} tone={summary.pending_count ? "text-amber-700" : "text-slate-900"} hint={summary.pending_count ? `${money(summary.pending_net)} not in wallets yet` : "nothing waiting"} />
                 ) : (
-                    <Stat label="Wallet available" value={money(summary.wallet)} tone="text-emerald-700" hint={<Link href="/v2/wallet" className="font-semibold text-violet-700">Open wallet →</Link>} />
+                    <Stat label="Wallet available" value={money(summary.wallet)} tone="text-emerald-700" hint={<Link href="/wallet" className="font-semibold text-violet-700">Open wallet →</Link>} />
                 )}
             </div>
 
@@ -145,7 +145,7 @@ export default function Index({ role = "artist", statements = {}, filters = {}, 
                                   : "Your statement appears here after the monthly store report is processed and approved."}
                         </div>
                         {!filtered && staff && (
-                            <Link href="/v2/admin/reports/imports" className="mt-3 inline-flex h-9 items-center rounded-lg bg-violet-600 px-4 text-xs font-semibold text-white">Open Revenue Imports</Link>
+                            <Link href="/admin/reports/imports" className="mt-3 inline-flex h-9 items-center rounded-lg bg-violet-600 px-4 text-xs font-semibold text-white">Open Revenue Imports</Link>
                         )}
                     </div>
                 ) : (
@@ -177,11 +177,11 @@ export default function Index({ role = "artist", statements = {}, filters = {}, 
                                             <div className="text-xs text-slate-500">net payable</div>
                                         </div>
                                         <div className="flex flex-wrap gap-1.5">
-                                            <a href={`/v2/statements/${s.id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                            <a href={`/statements/${s.id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                                                 <Download className="h-3.5 w-3.5" /> PDF
                                             </a>
                                             {staff && s.invoice_id && (
-                                                <a href={`/v2/invoices/${s.invoice_id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700">
+                                                <a href={`/invoices/${s.invoice_id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700">
                                                     <FileText className="h-3.5 w-3.5" /> Invoice
                                                 </a>
                                             )}

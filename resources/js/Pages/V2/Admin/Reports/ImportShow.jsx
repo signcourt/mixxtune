@@ -112,7 +112,7 @@ export default function ImportShow({
         event.preventDefault();
 
         router.get(
-            `/v2/admin/reports/imports/${reportImport.id}/view`,
+            `/admin/reports/imports/${reportImport.id}/view`,
             {
                 search:
                     search.trim() || undefined,
@@ -132,7 +132,7 @@ export default function ImportShow({
         setMappingStatus('');
 
         router.get(
-            `/v2/admin/reports/imports/${reportImport.id}/view`,
+            `/admin/reports/imports/${reportImport.id}/view`,
             {},
             {
                 preserveState: true,
@@ -184,7 +184,7 @@ export default function ImportShow({
         setRateError('');
 
         router.post(
-            `/v2/admin/reports/imports/${reportImport.id}/missing-revenue-rates`,
+            `/admin/reports/imports/${reportImport.id}/missing-revenue-rates`,
             { rates },
             {
                 preserveScroll: true,
@@ -226,7 +226,7 @@ export default function ImportShow({
         setApprovalProcessing(true);
 
         router.post(
-            `/v2/admin/reports/imports/${reportImport.id}/approve-and-schedule`,
+            `/admin/reports/imports/${reportImport.id}/approve-and-schedule`,
             {
                 publish_at: publishAt,
                 review_note:
@@ -277,7 +277,7 @@ export default function ImportShow({
             <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <a
-                        href="/v2/admin/reports/imports"
+                        href="/admin/reports/imports"
                         className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
                         <ArrowLeft size={16} />
@@ -285,7 +285,7 @@ export default function ImportShow({
                     </a>
 
                     <a
-                        href={`/v2/admin/reports/imports/${reportImport.id}/download`}
+                        href={`/admin/reports/imports/${reportImport.id}/download`}
                         className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
                     >
                         <Download size={16} />
@@ -650,7 +650,7 @@ export default function ImportShow({
                                                         <td className="whitespace-nowrap px-4 py-3">
                                                             {item.user_id ? (
                                                                 <a
-                                                                    href={`/v2/admin/users/${item.user_id}/edit`}
+                                                                    href={`/admin/users/${item.user_id}/edit`}
                                                                     target="_blank"
                                                                     rel="noreferrer"
                                                                     className="inline-flex rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"

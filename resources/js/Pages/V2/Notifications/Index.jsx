@@ -64,7 +64,7 @@ export default function Index({
 
     const changeCategory = (category) => {
         router.get(
-            "/v2/notifications",
+            "/notifications",
             {
                 category,
             },
@@ -78,7 +78,7 @@ export default function Index({
 
     const openNotification = (item) => {
         router.patch(
-            `/v2/notifications/${item.id}/read`,
+            `/notifications/${item.id}/read`,
             {},
             {
                 preserveScroll: true,
@@ -90,7 +90,7 @@ export default function Index({
         event.stopPropagation();
 
         router.patch(
-            `/v2/notifications/${item.id}/star`,
+            `/notifications/${item.id}/star`,
             {},
             {
                 preserveScroll: true,
@@ -101,7 +101,7 @@ export default function Index({
     const removeNotification = (event, item) => {
         event.stopPropagation();
 
-        router.delete(`/v2/notifications/${item.id}`, {
+        router.delete(`/notifications/${item.id}`, {
             preserveScroll: true,
         });
     };
@@ -121,7 +121,7 @@ export default function Index({
                         This is your own inbox. To send a notice to labels, artists, managers or chosen people:
                     </span>
                     <a
-                        href="/v2/admin/notification-management"
+                        href="/admin/notification-management"
                         className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700"
                     >
                         Send Notification
@@ -182,7 +182,7 @@ export default function Index({
                             type="button"
                             onClick={() =>
                                 router.patch(
-                                    "/v2/notifications/read-all",
+                                    "/notifications/read-all",
                                     {},
                                     {
                                         preserveScroll: true,

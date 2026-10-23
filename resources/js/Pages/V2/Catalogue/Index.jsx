@@ -163,7 +163,7 @@ export default function Index({
         );
 
         router.get(
-            '/v2/catalogue',
+            '/catalogue',
             nextFilters,
             {
                 preserveState: true,
@@ -177,7 +177,7 @@ export default function Index({
         setSearchValue('');
 
         router.get(
-            '/v2/catalogue',
+            '/catalogue',
             {},
             {
                 preserveState: true,
@@ -266,7 +266,7 @@ export default function Index({
                     </div>
 
                     <Link
-                        href="/v2/releases/create"
+                        href="/releases/create"
                         className="inline-flex h-11 items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-bold text-white transition hover:bg-violet-700"
                     >
                         <span className="text-lg leading-none">
@@ -282,7 +282,7 @@ export default function Index({
                         {[
                             ['/super-admin/catalogue-health', 'Missing Details', 'Poster, UPC, ISRC, label % or owner missing'],
                             ['/super-admin/posters', 'Bulk Posters', 'Upload many posters by UPC / catalogue no.'],
-                            ['/v2/admin/ownership?section=history', 'Transfer History', 'Who moved which release / label, and why'],
+                            ['/admin/ownership?section=history', 'Transfer History', 'Who moved which release / label, and why'],
                             ['/super-admin/legacy-catalogue-imports', 'Legacy Import', 'Old catalogue from a CSV / Excel file'],
                         ].map(([href, label, note]) => (
                             <Link
@@ -613,7 +613,7 @@ function CatalogueRow({
         storesTotal
     );
 
-    const viewPath = `/v2/catalogue/${item.id}`;
+    const viewPath = `/catalogue/${item.id}`;
 
     if (variant === 'card') {
         return (
@@ -659,7 +659,7 @@ function CatalogueRow({
 
                         {canEdit && item.release_id && (
                             <Link
-                                href={`/v2/releases/${item.release_id}/edit`}
+                                href={`/releases/${item.release_id}/edit`}
                                 aria-label="Edit release"
                                 className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-xs font-semibold text-amber-700"
                             >
@@ -770,7 +770,7 @@ function CatalogueRow({
                     {/* MIXXTUNE_SUPER_ADMIN_FULL_EDIT */}
                     {canEdit && item.release_id && (
                         <Link
-                            href={`/v2/releases/${item.release_id}/edit`}
+                            href={`/releases/${item.release_id}/edit`}
                             title="Edit release (Super Admin): poster, details, tracks, audio"
                             aria-label="Edit release"
                             className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 transition hover:border-amber-300 hover:bg-amber-100"
@@ -1001,7 +1001,7 @@ function CatalogueCard({
     return (
         <article className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-xl">
             <Link
-                href={`/v2/catalogue/${item.id}`}
+                href={`/catalogue/${item.id}`}
                 className="relative block aspect-square overflow-hidden bg-slate-100"
             >
                 {artwork ? (
@@ -1030,7 +1030,7 @@ function CatalogueCard({
 
             <div className="p-5">
                 <Link
-                    href={`/v2/catalogue/${item.id}`}
+                    href={`/catalogue/${item.id}`}
                     className="block truncate text-base font-bold text-slate-900 transition hover:text-violet-700"
                 >
                     {item.title ??
@@ -1109,7 +1109,7 @@ function CatalogueCard({
                     </span>
 
                     <Link
-                        href={`/v2/catalogue/${item.id}`}
+                        href={`/catalogue/${item.id}`}
                         className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-violet-700"
                     >
                         View

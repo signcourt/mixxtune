@@ -283,7 +283,7 @@ class InvoiceManagementController extends Controller
                 'Invoice '.$invoice->invoice_number.' is ready',
                 'Your royalty invoice for '.$service->monthLabel($invoice->statement?->statement_month)
                     .' ('.($invoice->currency ?: 'INR').' '.number_format((float) ($invoice->net_payable ?? $invoice->total_amount), 2).') can be downloaded from Invoices.',
-                '/v2/invoices'
+                '/invoices'
             );
         } catch (\Throwable $e) {
             report($e);

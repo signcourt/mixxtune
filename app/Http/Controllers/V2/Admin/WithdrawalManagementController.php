@@ -165,7 +165,7 @@ class WithdrawalManagementController extends Controller
         try {
             $owner = $withdrawal->user ?? \App\Models\User::query()->find($withdrawal->user_id);
             if ($owner) {
-                app(\App\Services\V2\PanelNotificationService::class)->send($owner, $type, $title, $message, '/v2/withdrawals');
+                app(\App\Services\V2\PanelNotificationService::class)->send($owner, $type, $title, $message, '/withdrawals');
             }
         } catch (\Throwable $e) {
             report($e);

@@ -61,14 +61,14 @@ class FinancePageTest extends TestCase
         $this->importPaid($paid, $label->id);
         $this->statement(['label_id' => $label->id, 'statement_month' => '2026-08']);
 
-        $this->actingAs($super)->get('/v2/admin/finance?status=pending')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/finance?status=pending')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Admin/Finance/Index')
             ->where('statements.total', 1)
             ->where('statements.data.0.statement_month', '2026-08')
             ->where('statements.data.0.owner_type', 'label')
             ->where('statements.data.0.label_name', 'Omega Records'));
 
-        $this->actingAs($super)->get('/v2/admin/finance?status=import_paid')->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/finance?status=import_paid')->assertInertia(fn (Assert $p) => $p
             ->where('statements.total', 1)
             ->where('statements.data.0.statement_month', '2026-07'));
     }
@@ -77,9 +77,9 @@ class FinancePageTest extends TestCase
     {
         $super = $this->user('super_admin');
 
-        $this->actingAs($super)->from('/v2/admin/finance')
-            ->post('/v2/admin/finance/statements/generate', ['month' => '2026-08', 'commission_percent' => 0])
-            ->assertRedirect('/v2/admin/finance')
+        $this->actingAs($super)->from('/admin/finance')
+            ->post('/admin/finance/statements/generate', ['month' => '2026-08', 'commission_percent' => 0])
+            ->assertRedirect('/admin/finance')
             ->assertSessionHas('success', 'Nothing to generate for 2026-08: no published report has revenue for that month yet.');
     }
 }

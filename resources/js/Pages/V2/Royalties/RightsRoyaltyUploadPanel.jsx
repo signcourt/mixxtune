@@ -201,7 +201,7 @@ export default function RightsRoyaltyUploadPanel({ role = "label", imports = [] 
             body.append("report_file", file);
 
             const response = await fetch(
-                "/v2/admin/royalties/rights/inspect",
+                "/admin/royalties/rights/inspect",
                 {
                     method: "POST",
                     headers: {
@@ -313,7 +313,7 @@ export default function RightsRoyaltyUploadPanel({ role = "label", imports = [] 
             );
 
             const response = await fetch(
-                "/v2/admin/royalties/rights/imports",
+                "/admin/royalties/rights/imports",
                 {
                     method: "POST",
                     headers: {
@@ -357,7 +357,7 @@ export default function RightsRoyaltyUploadPanel({ role = "label", imports = [] 
         page = 1
     ) => {
         const response = await fetch(
-            `/v2/admin/royalties/rights/imports/${encodeURIComponent(
+            `/admin/royalties/rights/imports/${encodeURIComponent(
                 publicId
             )}?page=${page}`,
             {
@@ -403,7 +403,7 @@ export default function RightsRoyaltyUploadPanel({ role = "label", imports = [] 
 
         try {
             const response = await fetch(
-                `/v2/admin/royalties/rights/imports/${encodeURIComponent(
+                `/admin/royalties/rights/imports/${encodeURIComponent(
                     result.public_id
                 )}/${action}`,
                 {
@@ -476,7 +476,7 @@ export default function RightsRoyaltyUploadPanel({ role = "label", imports = [] 
         setBusy(true);
         let ok = false;
         try {
-            const response = await fetch("/v2/admin/action-otp/unlock", {
+            const response = await fetch("/admin/action-otp/unlock", {
                 method: "POST",
                 headers: {
                     "X-CSRF-TOKEN": csrfToken(),
@@ -507,7 +507,7 @@ export default function RightsRoyaltyUploadPanel({ role = "label", imports = [] 
         if (busy) return;
         setOtpInfo("");
         try {
-            const response = await fetch("/v2/admin/action-otp/resend", {
+            const response = await fetch("/admin/action-otp/resend", {
                 method: "POST",
                 headers: { "X-CSRF-TOKEN": csrfToken(), Accept: "application/json" },
                 credentials: "same-origin",

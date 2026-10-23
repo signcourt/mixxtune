@@ -26,7 +26,7 @@ class WalletController extends Controller
         /*
          * FF165_ADMIN_ALIAS_GUARD_WALLET
          * The shared controller serves both normal account
-         * routes and /v2/admin aliases.
+         * routes and /admin aliases.
          *
          * Only the admin alias requires admin/super_admin.
          */

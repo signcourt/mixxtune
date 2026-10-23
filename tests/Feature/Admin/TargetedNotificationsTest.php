@@ -51,7 +51,7 @@ class TargetedNotificationsTest extends TestCase
 
     private function send(User $super, array $payload)
     {
-        return $this->actingAs($super)->post('/v2/admin/notification-management', array_merge([
+        return $this->actingAs($super)->post('/admin/notification-management', array_merge([
             'title' => 'Gen notice', 'message' => 'Gen body', 'category' => 'announcement', 'severity' => 'info',
         ], $payload));
     }
@@ -79,11 +79,11 @@ class TargetedNotificationsTest extends TestCase
         ]);
         Artist::factory()->create(['label_id' => $label->id, 'created_by' => $super->id, 'user_id' => $artistUser->id]);
 
-        $this->actingAs($super)->get('/v2/admin/notification-management')->assertOk()
+        $this->actingAs($super)->get('/admin/notification-management')->assertOk()
             ->assertInertia(fn (Assert $p) => $p->component('V2/Admin/Notifications/Index')->where('roleCounts.admin', 1));
 
         // one label: owner + team only
-        $this->actingAs($super)->postJson('/v2/admin/notification-management/preview', ['target_type' => 'label', 'target_value' => (string) $label->id])
+        $this->actingAs($super)->postJson('/admin/notification-management/preview', ['target_type' => 'label', 'target_value' => (string) $label->id])
             ->assertOk()->assertJsonPath('count', 2);
         $this->send($super, ['target_type' => 'label', 'target_value' => (string) $label->id, 'highlight' => true])->assertSessionHasNoErrors();
         $this->assertSame([1, 1, 0, 0], [$this->inbox($owner), $this->inbox($team), $this->inbox($otherOwner), $this->inbox($artistUser)]);
@@ -109,16 +109,16 @@ class TargetedNotificationsTest extends TestCase
         // history + who opened
         $this->assertSame(4, DB::table('audit_logs')->where('action', 'notification.broadcast_sent')->count());
         $broadcast = json_decode(DB::table('panel_notifications')->where('user_id', $owner->id)->orderBy('id')->value('data'), true)['broadcast_id'];
-        $this->actingAs($super)->getJson('/v2/admin/notification-management/'.$broadcast.'/recipients')
+        $this->actingAs($super)->getJson('/admin/notification-management/'.$broadcast.'/recipients')
             ->assertOk()->assertJsonCount(2, 'recipients');
 
         // search
-        $this->actingAs($super)->getJson('/v2/admin/notification-management/search-users?q=Gen Own')->assertJsonPath('users.0.id', $owner->id);
-        $this->actingAs($super)->getJson('/v2/admin/notification-management/search-labels?q=Target')->assertJsonPath('labels.0.id', $label->id);
+        $this->actingAs($super)->getJson('/admin/notification-management/search-users?q=Gen Own')->assertJsonPath('users.0.id', $owner->id);
+        $this->actingAs($super)->getJson('/admin/notification-management/search-labels?q=Target')->assertJsonPath('labels.0.id', $label->id);
 
         // only super admin
-        $this->actingAs($manager)->postJson('/v2/admin/notification-management/preview', ['target_type' => 'all'])->assertForbidden();
-        $this->actingAs($manager)->getJson('/v2/admin/notification-management/search-users?q=Gen')->assertForbidden();
+        $this->actingAs($manager)->postJson('/admin/notification-management/preview', ['target_type' => 'all'])->assertForbidden();
+        $this->actingAs($manager)->getJson('/admin/notification-management/search-users?q=Gen')->assertForbidden();
     }
 
     public function test_highlighted_notice_shows_as_banner_until_opened_or_hidden(): void
@@ -126,19 +126,19 @@ class TargetedNotificationsTest extends TestCase
         $super = $this->user('super_admin');
         $owner = $this->user('label');
 
-        $this->send($super, ['target_type' => 'users', 'target_users' => [$owner->id], 'highlight' => true, 'action_url' => '/v2/statements', 'title' => 'Gen banner'])
+        $this->send($super, ['target_type' => 'users', 'target_users' => [$owner->id], 'highlight' => true, 'action_url' => '/statements', 'title' => 'Gen banner'])
             ->assertSessionHasNoErrors();
 
         $id = DB::table('panel_notifications')->where('user_id', $owner->id)->value('id');
 
-        $this->actingAs($owner)->get('/v2/notifications')
+        $this->actingAs($owner)->get('/notifications')
             ->assertInertia(fn (Assert $p) => $p->where('highlightNotice.title', 'Gen banner'));
 
         // Hide: marked read, stays on the page
-        $this->actingAs($owner)->patch('/v2/notifications/'.$id.'/read?stay=1')->assertRedirect();
+        $this->actingAs($owner)->patch('/notifications/'.$id.'/read?stay=1')->assertRedirect();
         $this->assertNotNull(DB::table('panel_notifications')->where('id', $id)->value('read_at'));
 
-        $this->actingAs($owner)->get('/v2/notifications')
+        $this->actingAs($owner)->get('/notifications')
             ->assertInertia(fn (Assert $p) => $p->where('highlightNotice', null));
     }
 }

@@ -64,7 +64,7 @@ class LabelOwnershipTransferTest extends TestCase
     private function requestOtp(User $admin, array $payload): string
     {
         Mail::fake();
-        $this->actingAs($admin)->postJson('/v2/admin/labels/ownership/otp', $payload)->assertOk();
+        $this->actingAs($admin)->postJson('/admin/labels/ownership/otp', $payload)->assertOk();
 
         $otp = null;
         Mail::assertSent(LabelOwnershipOtpMail::class, function (LabelOwnershipOtpMail $mail) use (&$otp, $admin) {
@@ -84,8 +84,8 @@ class LabelOwnershipTransferTest extends TestCase
         $owner = $this->makeUser('label');
         $label = $this->makeLabel(null, 'Gen Label A');
 
-        $this->actingAs($admin)->getJson('/v2/admin/labels/ownership/users')->assertForbidden();
-        $this->actingAs($admin)->postJson('/v2/admin/labels/ownership/otp', [
+        $this->actingAs($admin)->getJson('/admin/labels/ownership/users')->assertForbidden();
+        $this->actingAs($admin)->postJson('/admin/labels/ownership/otp', [
             'label_ids' => [$label], 'mode' => 'existing', 'target_user_id' => $owner->id,
         ])->assertForbidden();
         $this->assertNull(DB::table('labels')->where('id', $label)->value('user_id'));
@@ -102,10 +102,10 @@ class LabelOwnershipTransferTest extends TestCase
         $otp = $this->requestOtp($super, $payload);
         $wrong = $otp === '000000' ? '111111' : '000000';
 
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/apply', $payload + ['otp' => $wrong])->assertStatus(422);
+        $this->actingAs($super)->postJson('/admin/labels/ownership/apply', $payload + ['otp' => $wrong])->assertStatus(422);
         $this->assertSame($oldOwner->id, (int) DB::table('labels')->where('id', $label)->value('user_id'));
 
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/apply', $payload + ['otp' => $otp])
+        $this->actingAs($super)->postJson('/admin/labels/ownership/apply', $payload + ['otp' => $otp])
             ->assertOk()->assertJsonPath('changes.0.status', 'transferred');
         $this->assertSame($newOwner->id, (int) DB::table('labels')->where('id', $label)->value('user_id'));
 
@@ -113,7 +113,7 @@ class LabelOwnershipTransferTest extends TestCase
             $this->assertTrue(DB::table('audit_logs')->where('action', 'label.owner_transferred')->exists());
         }
 
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/apply', $payload + ['otp' => $otp])->assertStatus(422);
+        $this->actingAs($super)->postJson('/admin/labels/ownership/apply', $payload + ['otp' => $otp])->assertStatus(422);
     }
 
     public function test_otp_is_bound_to_the_exact_change(): void
@@ -125,7 +125,7 @@ class LabelOwnershipTransferTest extends TestCase
 
         $otp = $this->requestOtp($super, ['label_ids' => [$labelX], 'mode' => 'existing', 'target_user_id' => $owner->id]);
 
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/apply', [
+        $this->actingAs($super)->postJson('/admin/labels/ownership/apply', [
             'label_ids' => [$labelY], 'mode' => 'existing', 'target_user_id' => $owner->id, 'otp' => $otp,
         ])->assertStatus(422);
 
@@ -139,7 +139,7 @@ class LabelOwnershipTransferTest extends TestCase
         $label = $this->makeLabel(null, 'Gen Label V');
 
         Mail::fake();
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/otp', [
+        $this->actingAs($super)->postJson('/admin/labels/ownership/otp', [
             'label_ids' => [$label], 'mode' => 'new', 'new_user' => ['name' => 'Only Name', 'email' => 'only.name@example.test'],
         ])->assertStatus(422)->assertJsonValidationErrors([
             'new_user.pan_number', 'new_user.bank_account_number', 'new_user.ifsc_code', 'new_user.state_code', 'new_user.revenue_share_percentage',
@@ -158,7 +158,7 @@ class LabelOwnershipTransferTest extends TestCase
         $payload = ['label_ids' => [$label1, $label2], 'mode' => 'new', 'new_user' => $this->fullNewUser('generated.owner@example.test')];
         $otp = $this->requestOtp($super, $payload);
 
-        $response = $this->actingAs($super)->postJson('/v2/admin/labels/ownership/apply', $payload + ['otp' => $otp]);
+        $response = $this->actingAs($super)->postJson('/admin/labels/ownership/apply', $payload + ['otp' => $otp]);
 
         if ($response->status() === 500 && $response->exception && str_contains($response->exception->getMessage(), 'no such table')) {
             $this->markTestSkipped('Users module needs a table that is missing in the SQLite test schema: '.$response->exception->getMessage());
@@ -181,12 +181,12 @@ class LabelOwnershipTransferTest extends TestCase
         $free = $this->makeLabel(null, 'Zebra Search Free');
         $this->makeLabel($owner->id, 'Zebra Search Owned');
 
-        $this->actingAs($admin)->getJson('/v2/admin/labels/ownership/labels?q=Zebra')->assertForbidden();
+        $this->actingAs($admin)->getJson('/admin/labels/ownership/labels?q=Zebra')->assertForbidden();
 
-        $all = $this->actingAs($super)->getJson('/v2/admin/labels/ownership/labels?q=Zebra')->assertOk()->json('labels');
+        $all = $this->actingAs($super)->getJson('/admin/labels/ownership/labels?q=Zebra')->assertOk()->json('labels');
         $this->assertCount(2, $all);
 
-        $unowned = $this->actingAs($super)->getJson('/v2/admin/labels/ownership/labels?q=Zebra&unowned=1')->assertOk()->json('labels');
+        $unowned = $this->actingAs($super)->getJson('/admin/labels/ownership/labels?q=Zebra&unowned=1')->assertOk()->json('labels');
         $this->assertSame([$free], array_column($unowned, 'id'));
     }
 
@@ -198,12 +198,12 @@ class LabelOwnershipTransferTest extends TestCase
         $label = $this->makeLabel(null, 'Gen Label T');
 
         Mail::fake();
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/otp', [
+        $this->actingAs($super)->postJson('/admin/labels/ownership/otp', [
             'label_ids' => [$label], 'mode' => 'existing', 'target_user_id' => $admin->id,
         ])->assertStatus(422);
 
         $payload = ['label_ids' => [$label], 'mode' => 'existing', 'target_user_id' => $owner->id];
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/otp', $payload)->assertOk();
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/otp', $payload)->assertStatus(422);
+        $this->actingAs($super)->postJson('/admin/labels/ownership/otp', $payload)->assertOk();
+        $this->actingAs($super)->postJson('/admin/labels/ownership/otp', $payload)->assertStatus(422);
     }
 }

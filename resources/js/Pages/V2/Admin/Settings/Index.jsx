@@ -196,7 +196,7 @@ export default function Index({
                 ?.getAttribute("content");
 
             const response = await fetch(
-                "/v2/admin/settings/branding/upload",
+                "/admin/settings/branding/upload",
                 {
                     method: "POST",
                     headers: {
@@ -256,7 +256,7 @@ export default function Index({
     const submit = (event) => {
         event.preventDefault();
 
-        patch("/v2/admin/settings", {
+        patch("/admin/settings", {
             preserveScroll: true,
             /* saved values become the new "clean" state */
             onSuccess: () => setSavedSnapshot(JSON.stringify(latestData.current)),

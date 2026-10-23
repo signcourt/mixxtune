@@ -200,7 +200,7 @@ class StatementController extends Controller
                     'earnings' => isset($r->review_earnings) ? round((float) $r->review_earnings, 2) : null,
                     'step' => $step,
                     'todo' => $todo,
-                    'url' => '/v2/admin/reports/imports/'.$r->id.'/view',
+                    'url' => '/admin/reports/imports/'.$r->id.'/view',
                 ];
             })
             ->values()

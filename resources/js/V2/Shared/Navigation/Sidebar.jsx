@@ -307,7 +307,7 @@ export default function Sidebar({
                 .querySelector('meta[name="csrf-token"]')
                 ?.getAttribute("content") ?? "";
 
-        fetch("/v2/sidebar/navigation-order", {
+        fetch("/sidebar/navigation-order", {
             method: "PUT",
             credentials: "same-origin",
             headers: {

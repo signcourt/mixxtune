@@ -58,8 +58,8 @@ class OwnershipTransferTest extends TestCase
 
     public function test_only_super_admin_reaches_the_page_and_search(): void
     {
-        $this->actingAs($this->user('artist'))->get('/v2/admin/ownership')->assertForbidden();
-        $this->actingAs($this->user('label'))->getJson('/v2/admin/ownership/search?type=release&q=a')->assertForbidden();
+        $this->actingAs($this->user('artist'))->get('/admin/ownership')->assertForbidden();
+        $this->actingAs($this->user('label'))->getJson('/admin/ownership/search?type=release&q=a')->assertForbidden();
     }
 
     public function test_search_covers_the_whole_catalogue(): void
@@ -69,10 +69,10 @@ class OwnershipTransferTest extends TestCase
         $label = Label::factory()->create(['user_id' => $owner->id, 'name' => 'Omega Records']);
         Release::factory()->create(['label_id' => $label->id, 'title' => 'Very Old Song', 'created_by' => $super->id, 'updated_by' => $super->id]);
 
-        $this->actingAs($super)->getJson('/v2/admin/ownership/search?type=release&q=very%20old')
+        $this->actingAs($super)->getJson('/admin/ownership/search?type=release&q=very%20old')
             ->assertOk()->assertJsonPath('results.0.title', 'Very Old Song');
 
-        $this->actingAs($super)->get('/v2/admin/ownership')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/ownership')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Admin/Ownership/Index')->missing('releases')->missing('users')->has('history.data', 0));
     }
 
@@ -85,7 +85,7 @@ class OwnershipTransferTest extends TestCase
         $suspended = $this->user('label', 'suspended');
         $new = $this->user('label');
 
-        $post = fn (int $userId) => $this->actingAs($super)->post('/v2/admin/ownership/label-user', [
+        $post = fn (int $userId) => $this->actingAs($super)->post('/admin/ownership/label-user', [
             'label_id' => $label->id, 'user_id' => $userId, 'reason' => 'Catalogue sold to new owner',
         ]);
 
@@ -98,7 +98,7 @@ class OwnershipTransferTest extends TestCase
         $this->viaActionOtp($super, fn () => $post($new->id))->assertSessionHasNoErrors();
         $this->assertSame($new->id, (int) $label->fresh()->user_id);
 
-        $this->actingAs($super)->get('/v2/admin/ownership?section=history')->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/ownership?section=history')->assertInertia(fn (Assert $p) => $p
             ->has('history.data', 1)
             ->where('history.data.0.from', $old->email)
             ->where('history.data.0.to', $new->email)
@@ -112,22 +112,22 @@ class OwnershipTransferTest extends TestCase
         $b = Label::factory()->create(['user_id' => $this->user('label')->id, 'name' => 'B Music']);
         $release = Release::factory()->create(['label_id' => $a->id, 'created_by' => $super->id, 'updated_by' => $super->id]);
 
-        $this->actingAs($super)->post('/v2/admin/ownership/release', [
+        $this->actingAs($super)->post('/admin/ownership/release', [
             'release_id' => $release->id, 'owner_type' => 'label', 'owner_id' => $b->id, 'scope' => 'future_only', 'reason' => '',
         ])->assertSessionHasErrors('reason');
 
         $this->unlockActionOtp($super, 'ownership.release:'.$release->id.':label:'.$a->id);
-        $this->actingAs($super)->post('/v2/admin/ownership/release', [
+        $this->actingAs($super)->post('/admin/ownership/release', [
             'release_id' => $release->id, 'owner_type' => 'label', 'owner_id' => $a->id, 'scope' => 'future_only', 'reason' => 'Same owner test',
         ])->assertSessionHasErrors('owner_id');
 
         $this->unlockActionOtp($super, 'ownership.release:'.$release->id.':label:'.$b->id);
-        $this->actingAs($super)->post('/v2/admin/ownership/release', [
+        $this->actingAs($super)->post('/admin/ownership/release', [
             'release_id' => $release->id, 'owner_type' => 'label', 'owner_id' => $b->id, 'scope' => 'future_only', 'reason' => 'Label B bought it',
         ])->assertSessionHasNoErrors();
         $this->assertSame($b->id, (int) $release->fresh()->label_id);
 
-        $this->actingAs($super)->get('/v2/admin/ownership?section=history')->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/ownership?section=history')->assertInertia(fn (Assert $p) => $p
             ->where('history.data.0.from', 'Label: A Music')
             ->where('history.data.0.to', 'Label: B Music'));
     }
@@ -141,11 +141,11 @@ class OwnershipTransferTest extends TestCase
         $moving = Track::factory()->create(['release_id' => $one->id, 'track_number' => 1, 'created_by' => $super->id, 'updated_by' => $super->id]);
         Track::factory()->create(['release_id' => $two->id, 'track_number' => 1, 'created_by' => $super->id, 'updated_by' => $super->id]);
 
-        $this->actingAs($super)->getJson('/v2/admin/ownership/preview?kind=track&track_id='.$moving->id.'&release_id='.$two->id)
+        $this->actingAs($super)->getJson('/admin/ownership/preview?kind=track&track_id='.$moving->id.'&release_id='.$two->id)
             ->assertOk()->assertJsonPath('ok', true);
 
         $this->unlockActionOtp($super, 'ownership.track:'.$moving->id.':'.$two->id);
-        $this->actingAs($super)->post('/v2/admin/ownership/track', [
+        $this->actingAs($super)->post('/admin/ownership/track', [
             'track_id' => $moving->id, 'release_id' => $two->id, 'scope' => 'future_only', 'reason' => 'Wrong album fixed',
         ])->assertSessionHasNoErrors();
 
@@ -179,7 +179,7 @@ class OwnershipTransferTest extends TestCase
         $published = $row('published');
 
         $this->unlockActionOtp($super, 'ownership.release:'.$release->id.':label:'.$b->id);
-        $this->actingAs($super)->post('/v2/admin/ownership/release', [
+        $this->actingAs($super)->post('/admin/ownership/release', [
             'release_id' => $release->id, 'owner_type' => 'label', 'owner_id' => $b->id, 'scope' => 'pending_and_future', 'reason' => 'Moved with July review rows',
         ])->assertSessionHasNoErrors();
 

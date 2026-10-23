@@ -16,15 +16,15 @@ import NameSuggestInput from '@/V2/Shared/Releases/NameSuggestInput';
 
 const ARTIST_CONTEXT =
     typeof window !== 'undefined'
-    && window.location.pathname.startsWith('/artist');
+    && /^\/artist(\/|$)/.test(window.location.pathname);
 
 const RELEASES_BASE_PATH = ARTIST_CONTEXT
     ? '/artist/releases'
-    : '/v2/releases';
+    : '/releases';
 
 const TRACKS_BASE_PATH = ARTIST_CONTEXT
     ? '/artist/tracks'
-    : '/v2/tracks';
+    : '/tracks';
 
 /* W67: compact fields (were 46px tall with large text) */
 const inputClass =

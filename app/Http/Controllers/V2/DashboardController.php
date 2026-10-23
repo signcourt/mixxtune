@@ -342,7 +342,7 @@ class DashboardController extends Controller
         $quickActions = match ($role) {
             'super_admin', 'admin' => [
                 ['label' => 'Review Releases', 'href' => '/release-reviews'],
-                ['label' => 'Create Release', 'href' => '/v2/releases/create'],
+                ['label' => 'Create Release', 'href' => '/releases/create'],
             ],
             'label' => [
                 [

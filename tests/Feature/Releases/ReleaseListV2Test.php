@@ -62,7 +62,7 @@ class ReleaseListV2Test extends TestCase
             ]);
         }
 
-        $this->actingAs($super)->get('/v2/releases')
+        $this->actingAs($super)->get('/releases')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('V2/Releases/Index')
@@ -72,7 +72,7 @@ class ReleaseListV2Test extends TestCase
                     && collect($rows)->firstWhere('id', $single->id)['stores_live'] == 2));
 
         $titles = fn (string $query) => collect(
-            $this->actingAs($super)->get('/v2/releases?'.$query)->viewData('page')['props']['releases']['data']
+            $this->actingAs($super)->get('/releases?'.$query)->viewData('page')['props']['releases']['data']
         )->pluck('title')->all();
 
         $this->assertSame(['Gen Album Two'], $titles('release_type=album'));
@@ -84,7 +84,7 @@ class ReleaseListV2Test extends TestCase
         $this->assertSame([], $titles('release_type=ep'));
 
         // a bad value is ignored, not an error
-        $this->actingAs($super)->get('/v2/releases?release_type=zzz&month=bad')->assertOk();
+        $this->actingAs($super)->get('/releases?release_type=zzz&month=bad')->assertOk();
     }
 
     private function trackDefaults(Release $release): array

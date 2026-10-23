@@ -44,7 +44,7 @@ export default function Index({
     /* W58: new releases vs old catalogue (codes only typed in), search */
     const isOld = scope === 'old';
     const [search, setSearch] = useState(q);
-    const go = (extra) => router.get('/v2/admin/identifiers/pending', { scope, q: search, ...extra }, { preserveState: true, replace: true });
+    const go = (extra) => router.get('/admin/identifiers/pending', { scope, q: search, ...extra }, { preserveState: true, replace: true });
     const [selectedTracks, setSelectedTracks] =
         useState([]);
 
@@ -170,8 +170,8 @@ export default function Index({
             manualIdentifier.type === 'isrc';
 
         const url = isIsrc
-            ? `/v2/admin/tracks/${manualIdentifier.id}/isrc/assign`
-            : `/v2/admin/releases/${manualIdentifier.id}/upc/assign`;
+            ? `/admin/tracks/${manualIdentifier.id}/isrc/assign`
+            : `/admin/releases/${manualIdentifier.id}/upc/assign`;
 
         const payload = isIsrc
             ? { isrc: value }
@@ -284,7 +284,7 @@ export default function Index({
                                 window.confirm(`Generate ISRC for ${selectedTracks.length} selected item(s)? A code is permanent once given.`) &&
                                 
                                 runAction(
-                                    '/v2/admin/identifiers/isrc/bulk-generate',
+                                    '/admin/identifiers/isrc/bulk-generate',
                                     {
                                         track_ids:
                                             selectedTracks,
@@ -419,7 +419,7 @@ export default function Index({
                                                             disabled={busy || isOld}
                                                             onClick={() =>
                                                                 runAction(
-                                                                    `/v2/admin/tracks/${track.id}/isrc/generate`
+                                                                    `/admin/tracks/${track.id}/isrc/generate`
                                                                 )
                                                             }
                                                             className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-40"

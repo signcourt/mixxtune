@@ -7,7 +7,7 @@ import { useRef, useState } from 'react';
  * 1 Download template → 2 Upload & preview (nothing saved) →
  * 3 E-mail code → 4 Confirm → runs in small batches with progress.
  */
-const BASE = '/v2/admin/labels/ownership/bulk';
+const BASE = '/admin/labels/ownership/bulk';
 
 const errorText = (exception, fallback) => {
     const data = exception?.response?.data;

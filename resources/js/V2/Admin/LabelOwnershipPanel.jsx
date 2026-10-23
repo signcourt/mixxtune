@@ -100,7 +100,7 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
         setLabelsLoading(true);
         const timer = setTimeout(() => {
             axios
-                .get('/v2/admin/labels/ownership/labels', { params: { q: labelQuery, unowned: onlyUnowned ? 1 : 0 } })
+                .get('/admin/labels/ownership/labels', { params: { q: labelQuery, unowned: onlyUnowned ? 1 : 0 } })
                 .then((response) => setLabelResults(response.data.labels ?? []))
                 .catch(() => setLabelResults([]))
                 .finally(() => setLabelsLoading(false));
@@ -116,7 +116,7 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
 
         const timer = setTimeout(() => {
             axios
-                .get('/v2/admin/labels/ownership/users', { params: { q: query } })
+                .get('/admin/labels/ownership/users', { params: { q: query } })
                 .then((response) => setUsers(response.data.users ?? []))
                 .catch(() => setUsers([]));
         }, 300);
@@ -206,7 +206,7 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
 
         setBusy(true);
         axios
-            .post('/v2/admin/labels/ownership/otp', payload())
+            .post('/admin/labels/ownership/otp', payload())
             .then((response) => {
                 setPreview(response.data);
                 setOtp('');
@@ -226,7 +226,7 @@ export default function LabelOwnershipPanel({ selectedLabelIds = [], pageLabels 
 
         setBusy(true);
         axios
-            .post('/v2/admin/labels/ownership/apply', { ...payload(), otp })
+            .post('/admin/labels/ownership/apply', { ...payload(), otp })
             .then((response) => {
                 setResult(response.data);
                 setStep('done');

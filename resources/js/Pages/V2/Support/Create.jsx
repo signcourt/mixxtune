@@ -236,7 +236,7 @@ export default function Create({
             message: legalSection ? [...lines, '', 'Details:', d.message].join('\n') : d.message,
         }));
 
-        post('/v2/support', { forceFormData: true, preserveScroll: true });
+        post('/support', { forceFormData: true, preserveScroll: true });
     };
 
     return (
@@ -251,7 +251,7 @@ export default function Create({
                             <div className="mt-0.5 text-base font-semibold text-violet-900">{config.title}</div>
                             <div className="mt-0.5 text-sm text-violet-700">{config.subtitle}</div>
                         </div>
-                        <Link href="/v2/legal-operations" className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:text-violet-900">
+                        <Link href="/legal-operations" className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:text-violet-900">
                             <ArrowLeft size={14} /> All legal topics
                         </Link>
                     </div>
@@ -397,7 +397,7 @@ export default function Create({
                 )}
 
                 <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                    <Link href={legalSection ? '/v2/legal-operations' : '/v2/support'} className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    <Link href={legalSection ? '/legal-operations' : '/support'} className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                         Cancel
                     </Link>
                     <button type="submit" disabled={processing} className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50">

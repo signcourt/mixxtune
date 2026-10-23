@@ -21,18 +21,18 @@ export default function Index({ role = 'super_admin', admins = {}, filters = {},
     const rows = admins.data ?? [];
 
     const go = (extra = {}) =>
-        router.get('/v2/admin/admins', { q, status: filters.status || '', ...extra }, { preserveState: true, replace: true, preserveScroll: true });
+        router.get('/admin/admins', { q, status: filters.status || '', ...extra }, { preserveState: true, replace: true, preserveScroll: true });
 
     const toggle = (a) => {
         const next = a.account_status === 'active' ? 'suspend' : 'activate';
         if (!window.confirm(`${next === 'suspend' ? 'Suspend' : 'Activate'} ${a.name}? ${next === 'suspend' ? 'They are logged out at once and lose access to their labels.' : ''}`)) return;
         setBusy(a.id);
-        router.post(`/v2/admin/users/${a.id}/toggle-status`, {}, { preserveScroll: true, onFinish: () => setBusy(null) });
+        router.post(`/admin/users/${a.id}/toggle-status`, {}, { preserveScroll: true, onFinish: () => setBusy(null) });
     };
 
     const loginAs = (a) => {
         if (!window.confirm(`Open the panel as ${a.name}? Everything you do is logged under your name.`)) return;
-        router.post(`/v2/admin/users/${a.id}/impersonate`);
+        router.post(`/admin/users/${a.id}/impersonate`);
     };
 
     return (
@@ -58,7 +58,7 @@ export default function Index({ role = 'super_admin', admins = {}, filters = {},
                         </select>
                         <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Search</button>
                     </form>
-                    <Link href="/v2/admin/users/create?type=manager" className="rounded-xl bg-violet-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-violet-700">
+                    <Link href="/admin/users/create?type=manager" className="rounded-xl bg-violet-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-violet-700">
                         + Create Manager
                     </Link>
                 </div>
@@ -86,8 +86,8 @@ export default function Index({ role = 'super_admin', admins = {}, filters = {},
                                     </div>
                                     <div className="text-xs text-slate-500">Last login: {a.last_login || 'never'}</div>
                                     <div className="flex flex-wrap gap-2">
-                                        <Link href={`/v2/admin/admins/${a.id}`} className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white">Manage</Link>
-                                        <Link href={`/v2/admin/users/${a.id}/edit`} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Edit</Link>
+                                        <Link href={`/admin/admins/${a.id}`} className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white">Manage</Link>
+                                        <Link href={`/admin/users/${a.id}/edit`} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Edit</Link>
                                         {a.account_status === 'active' && (
                                             <button type="button" onClick={() => loginAs(a)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Login as</button>
                                         )}

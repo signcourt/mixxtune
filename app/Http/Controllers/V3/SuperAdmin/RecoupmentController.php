@@ -540,7 +540,7 @@ class RecoupmentController extends Controller
         }
 
         try {
-            app(\App\Services\V2\PanelNotificationService::class)->send($owner, 'recoupment.changed', $title, $message, '/v2/wallet');
+            app(\App\Services\V2\PanelNotificationService::class)->send($owner, 'recoupment.changed', $title, $message, '/wallet');
         } catch (\Throwable $e) {
             report($e);
         }

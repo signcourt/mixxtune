@@ -303,7 +303,7 @@ class SupportManagementController extends Controller
 
         $this->desk->notifyOwner($ticket->load('user'), 'support.admin_opened', 'Mixx Tune opened a ticket for you');
 
-        return redirect('/v2/admin/support/'.$ticket->id)->with('success', "Ticket {$ticket->ticket_number} opened for the user.");
+        return redirect('/admin/support/'.$ticket->id)->with('success', "Ticket {$ticket->ticket_number} opened for the user.");
     }
 
     public function searchUsers(Request $request, PermissionService $permissions): JsonResponse

@@ -325,8 +325,8 @@ class NotificationService
                         ['release.changes_requested'],
                         true
                     )
-                        ? "/v2/releases/{$release->id}/edit"
-                        : "/v2/releases/{$release->id}",
+                        ? "/releases/{$release->id}/edit"
+                        : "/releases/{$release->id}",
 
                 'related_type' =>
                     Release::class,
@@ -426,7 +426,7 @@ class NotificationService
                     $severity,
 
                 'action_url' =>
-                    "/v2/admin/release-reviews/{$release->id}",
+                    "/admin/release-reviews/{$release->id}",
 
                 'related_type' =>
                     Release::class,

@@ -34,7 +34,7 @@ export default function Show({
             <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <Link
-                        href="/v2/catalogue"
+                        href="/catalogue"
                         className="inline-flex rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
                     >
                         ← Back to Catalogue
@@ -43,7 +43,7 @@ export default function Show({
                     {/* MIXXTUNE_SUPER_ADMIN_FULL_EDIT */}
                     {role === 'super_admin' && catalogueItem.release_id && (
                         <Link
-                            href={`/v2/releases/${catalogueItem.release_id}/edit`}
+                            href={`/releases/${catalogueItem.release_id}/edit`}
                             className="inline-flex rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-600"
                         >
                             Edit (Super Admin)

@@ -38,7 +38,7 @@ class ReleaseFiltersTest extends TestCase
         DB::table('release_store_deliveries')->insert(['public_id' => (string) \Illuminate\Support\Str::ulid(), 'release_id' => $a->id, 'distribution_store_id' => $storeId, 'status' => 'live', 'created_at' => now(), 'updated_at' => now()]);
 
         $titles = fn (string $query) => collect(
-            $this->actingAs($super)->get('/v2/releases'.$query)->assertOk()->viewData('page')['props']['releases']['data']
+            $this->actingAs($super)->get('/releases'.$query)->assertOk()->viewData('page')['props']['releases']['data']
         )->pluck('title')->sort()->values()->all();
 
         $this->assertSame(['Filter A', 'Filter B'], $titles('?month=2026-09'));
@@ -48,7 +48,7 @@ class ReleaseFiltersTest extends TestCase
         /* W77: UPC / artwork / stores filters were removed - old links show everything */
         $this->assertSame(['Filter A', 'Filter B'], $titles('?upc=missing&stores=live&artwork=has'));
 
-        $this->actingAs($super)->get('/v2/releases?sort=release_newest')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/releases?sort=release_newest')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('releases.data.0.title', 'Filter A')
             ->where('filterOptions.artists', ['Asha', 'Bhanu'])
             ->where('filterOptions.languages', ['Hindi', 'Punjabi'])

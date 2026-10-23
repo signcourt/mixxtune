@@ -103,7 +103,7 @@ class FinanceSafetyTest extends TestCase
 
         /* viaActionOtp also checks that the first press is stopped without the code */
         $approve = function () use ($super, $statement) {
-            $response = $this->actingAs($super)->post('/v2/admin/finance/statements/'.$statement->id.'/approve');
+            $response = $this->actingAs($super)->post('/admin/finance/statements/'.$statement->id.'/approve');
 
             return $response;
         };
@@ -120,7 +120,7 @@ class FinanceSafetyTest extends TestCase
         $this->assertSame('approved', $statement->fresh()->status);
         $this->assertSame(1, $this->audits('finance.statement_approved'));
 
-        $this->viaActionOtp($super, fn () => $this->actingAs($super)->post('/v2/admin/finance/statements/'.$statement->id.'/available'))
+        $this->viaActionOtp($super, fn () => $this->actingAs($super)->post('/admin/finance/statements/'.$statement->id.'/available'))
             ->assertSessionHasNoErrors();
         $this->assertSame(1, $this->audits('finance.statement_made_available'));
     }
@@ -164,16 +164,16 @@ class FinanceSafetyTest extends TestCase
             ]);
         }
 
-        $this->actingAs($super)->get('/v2/admin/statements?search=Zeta')
+        $this->actingAs($super)->get('/admin/statements?search=Zeta')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->has('statements.data', 1)->where('filters.search', 'Zeta'));
 
-        $this->actingAs($super)->get('/v2/admin/statements?status=paid')
+        $this->actingAs($super)->get('/admin/statements?status=paid')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('statements.total', 15));
 
         $other = User::factory()->create(['role' => 'guest_viewer', 'account_status' => 'active', 'email_verified_at' => now()]);
-        $this->actingAs($other)->get('/v2/statements')->assertForbidden();
+        $this->actingAs($other)->get('/statements')->assertForbidden();
     }
 
     public function test_admin_wallet_lists_each_owner_and_searches(): void
@@ -189,13 +189,13 @@ class FinanceSafetyTest extends TestCase
             ]);
         }
 
-        $this->actingAs($super)->get('/v2/admin/wallet')
+        $this->actingAs($super)->get('/admin/wallet')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('owners.data', 2)
                 ->where('owners.data.0.owner_name', 'Gen Alpha Owner'));
 
-        $this->actingAs($super)->get('/v2/admin/wallet?owner_search=Beta')
+        $this->actingAs($super)->get('/admin/wallet?owner_search=Beta')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->has('owners.data', 1)->where('owners.data.0.owner_name', 'Gen Beta Owner'));
     }
@@ -204,9 +204,9 @@ class FinanceSafetyTest extends TestCase
     {
         $super = $this->user('super_admin');
 
-        $this->actingAs($super)->from('/v2/admin/finance')
-            ->post('/v2/admin/finance/statements/generate', ['month' => '2026-05'])
-            ->assertRedirect('/v2/admin/finance')
+        $this->actingAs($super)->from('/admin/finance')
+            ->post('/admin/finance/statements/generate', ['month' => '2026-05'])
+            ->assertRedirect('/admin/finance')
             ->assertSessionHasErrors('generate');
     }
 }

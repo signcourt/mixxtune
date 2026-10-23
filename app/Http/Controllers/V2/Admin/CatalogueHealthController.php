@@ -134,8 +134,8 @@ class CatalogueHealthController extends Controller
     private function link(string $kind, object $row): string
     {
         return $kind === 'label'
-            ? '/v2/admin/labels?search='.rawurlencode((string) $row->name)
-            : '/v2/releases/'.$row->id.'/edit';
+            ? '/admin/labels?search='.rawurlencode((string) $row->name)
+            : '/releases/'.$row->id.'/edit';
     }
 
     public function index(Request $request): Response

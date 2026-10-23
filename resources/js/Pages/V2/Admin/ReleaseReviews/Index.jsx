@@ -62,7 +62,7 @@ export default function Index({ role = 'admin', releases = {}, counts = {}, filt
     const [search, setSearch] = useState(filters.search ?? '');
 
     const go = (changes) =>
-        router.get('/v2/admin/release-reviews', { ...filters, ...changes, page: undefined }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get('/admin/release-reviews', { ...filters, ...changes, page: undefined }, { preserveState: true, preserveScroll: true, replace: true });
 
     return (
         <PanelLayout role={role} title={tab[1]} subtitle={tab[2]}>
@@ -126,7 +126,7 @@ export default function Index({ role = 'admin', releases = {}, counts = {}, filt
                         {rows.map((r) => (
                             <div key={r.id} className="space-y-2 p-4">
                                 <div className="flex items-start justify-between gap-3">
-                                    <Link href={`/v2/admin/release-reviews/${r.id}`} className="min-w-0">
+                                    <Link href={`/admin/release-reviews/${r.id}`} className="min-w-0">
                                         <div className="truncate font-semibold text-slate-900">{r.title}</div>
                                         <div className="truncate text-xs text-slate-500">{r.primary_artist_name || '—'} · {r.label_name || 'No label'}</div>
                                     </Link>
@@ -161,7 +161,7 @@ export default function Index({ role = 'admin', releases = {}, counts = {}, filt
                                 {rows.map((r) => (
                                     <tr key={r.id} className="hover:bg-slate-50">
                                         <td className="px-5 py-3">
-                                            <Link href={`/v2/admin/release-reviews/${r.id}`} className="group inline-block">
+                                            <Link href={`/admin/release-reviews/${r.id}`} className="group inline-block">
                                                 <div className="font-semibold text-slate-900 group-hover:text-violet-700">{r.title}</div>
                                                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                                                     <span>{r.catalog_number || 'No catalogue number'}</span>
@@ -217,11 +217,11 @@ function Waiting({ release, status }) {
 function Actions({ release, status }) {
     return (
         <div className="flex flex-wrap gap-2">
-            <Link href={`/v2/admin/release-reviews/${release.id}`} className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700">
+            <Link href={`/admin/release-reviews/${release.id}`} className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700">
                 {status === 'submitted' ? 'Review' : 'Open'}
             </Link>
             {(status === 'approved' || status === 'processing') && (
-                <Link href={`/v2/admin/distribution/${release.id}`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                <Link href={`/admin/distribution/${release.id}`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                     Delivery
                 </Link>
             )}

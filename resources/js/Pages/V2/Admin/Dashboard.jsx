@@ -198,14 +198,14 @@ function KpiCard({ title, value, lines = [], icon: Icon, href, tone }) {
 
 function Pipeline({ stats }) {
     const steps = [
-        { key: 'draft', label: 'Draft', href: '/v2/releases?status=draft', color: 'bg-slate-300' },
-        { key: 'submitted', label: 'In review', href: '/v2/admin/release-reviews?status=submitted', color: 'bg-amber-400' },
-        { key: 'changes_requested', label: 'Changes requested', href: '/v2/admin/release-reviews?status=changes_requested', color: 'bg-orange-400' },
-        { key: 'approved', label: 'Approved', href: '/v2/admin/release-reviews?status=approved', color: 'bg-sky-400' },
-        { key: 'processing', label: 'Processing', href: '/v2/admin/release-reviews?status=processing', color: 'bg-blue-500' },
-        { key: 'delivered', label: 'Delivered', href: '/v2/admin/distribution?status=delivered', color: 'bg-indigo-500' },
-        { key: 'live', label: 'Live', href: '/v2/admin/distribution?status=live', color: 'bg-emerald-500' },
-        { key: 'rejected', label: 'Rejected', href: '/v2/admin/release-reviews?status=rejected', color: 'bg-rose-400' },
+        { key: 'draft', label: 'Draft', href: '/releases?status=draft', color: 'bg-slate-300' },
+        { key: 'submitted', label: 'In review', href: '/admin/release-reviews?status=submitted', color: 'bg-amber-400' },
+        { key: 'changes_requested', label: 'Changes requested', href: '/admin/release-reviews?status=changes_requested', color: 'bg-orange-400' },
+        { key: 'approved', label: 'Approved', href: '/admin/release-reviews?status=approved', color: 'bg-sky-400' },
+        { key: 'processing', label: 'Processing', href: '/admin/release-reviews?status=processing', color: 'bg-blue-500' },
+        { key: 'delivered', label: 'Delivered', href: '/admin/distribution?status=delivered', color: 'bg-indigo-500' },
+        { key: 'live', label: 'Live', href: '/admin/distribution?status=live', color: 'bg-emerald-500' },
+        { key: 'rejected', label: 'Rejected', href: '/admin/release-reviews?status=rejected', color: 'bg-rose-400' },
     ];
     const total = Math.max(1, Number(stats.total_releases || 0));
 
@@ -213,7 +213,7 @@ function Pipeline({ stats }) {
         <Panel
             title="Release pipeline"
             subtitle={`${plural(stats.total_releases, 'release')} · ${plural(stats.tracks, 'track')}`}
-            action={<PanelLink href="/v2/releases">All releases</PanelLink>}
+            action={<PanelLink href="/releases">All releases</PanelLink>}
         >
             <div className="px-5 py-4">
                 <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label="Releases by status">
@@ -247,7 +247,7 @@ function RevenueTrend({ rows = [], isSuperAdmin }) {
         <Panel
             title="Revenue by reporting month"
             subtitle={isSuperAdmin ? 'Collected revenue and the part Mixx Tune keeps' : 'Collected revenue in your scope'}
-            action={<PanelLink href={isSuperAdmin ? '/v2/admin/profit' : '/v2/analytics'}>{isSuperAdmin ? 'Business profit' : 'Analytics'}</PanelLink>}
+            action={<PanelLink href={isSuperAdmin ? '/admin/profit' : '/analytics'}>{isSuperAdmin ? 'Business profit' : 'Analytics'}</PanelLink>}
             className="xl:col-span-2"
         >
             {rows.length === 0 ? (
@@ -284,7 +284,7 @@ function RevenueTrend({ rows = [], isSuperAdmin }) {
 function TopPlatforms({ rows = [] }) {
     const max = Math.max(1, ...rows.map((row) => Number(row.collected_revenue ?? row.earnings ?? 0)));
     return (
-        <Panel title="Top platforms" subtitle="By collected revenue" action={<PanelLink href="/v2/analytics">Analytics</PanelLink>}>
+        <Panel title="Top platforms" subtitle="By collected revenue" action={<PanelLink href="/analytics">Analytics</PanelLink>}>
             {rows.length === 0 ? (
                 <div className="px-5 py-12 text-center text-sm text-slate-500">No platform data yet.</div>
             ) : (
@@ -357,7 +357,7 @@ export default function Dashboard({
             value: stats.submitted,
             hint: waiting !== null && waiting !== undefined ? `Oldest waiting ${waiting} day${waiting === 1 ? '' : 's'}` : 'Open the review queue',
             clear: 'Review queue is empty',
-            href: '/v2/admin/release-reviews?status=submitted',
+            href: '/admin/release-reviews?status=submitted',
             icon: ClipboardCheck,
             danger: Number(waiting || 0) >= 3,
         },
@@ -366,7 +366,7 @@ export default function Dashboard({
             value: stats.approved,
             hint: 'Start processing to deliver',
             clear: 'Nothing waiting to send',
-            href: '/v2/admin/release-reviews?status=approved',
+            href: '/admin/release-reviews?status=approved',
             icon: Send,
         },
         {
@@ -374,7 +374,7 @@ export default function Dashboard({
             value: stats.failed_deliveries,
             hint: 'Retry or fix the release',
             clear: 'No failed deliveries',
-            href: '/v2/admin/distribution?status=store_failed',
+            href: '/admin/distribution?status=store_failed',
             icon: AlertTriangle,
             danger: true,
         },
@@ -383,7 +383,7 @@ export default function Dashboard({
             value: stats.pending_withdrawals,
             hint: `${money(stats.pending_withdrawals_amount)} requested`,
             clear: 'No new payout requests',
-            href: '/v2/admin/withdrawals?status=pending',
+            href: '/admin/withdrawals?status=pending',
             icon: WalletCards,
         },
         {
@@ -391,7 +391,7 @@ export default function Dashboard({
             value: stats.withdrawals_to_pay,
             hint: `${money(stats.withdrawals_to_pay_amount)} to transfer`,
             clear: 'All approved payouts paid',
-            href: '/v2/admin/withdrawals?status=approved',
+            href: '/admin/withdrawals?status=approved',
             icon: Landmark,
         },
         {
@@ -399,7 +399,7 @@ export default function Dashboard({
             value: stats.tickets_need_reply,
             hint: `${number(stats.open_tickets)} open in total`,
             clear: 'Inbox is clear',
-            href: '/v2/admin/support?status=needs_reply',
+            href: '/admin/support?status=needs_reply',
             icon: Headphones,
         },
         ...(isSuperAdmin && setup
@@ -409,7 +409,7 @@ export default function Dashboard({
                       value: setup.kyc_to_review,
                       hint: 'Payout details submitted',
                       clear: 'No KYC waiting',
-                      href: '/v2/admin/kyc?status=submitted',
+                      href: '/admin/kyc?status=submitted',
                       icon: IdCard,
                   },
                   {
@@ -458,7 +458,7 @@ export default function Dashboard({
                       ...(Number(stats.profit_in_review || 0) !== 0 ? [`In review, not counted ${money(stats.profit_in_review)}`] : []),
                   ],
                   icon: BadgeIndianRupee,
-                  href: '/v2/admin/profit',
+                  href: '/admin/profit',
                   tone: 'bg-emerald-100 text-emerald-700',
               }
             : {
@@ -466,7 +466,7 @@ export default function Dashboard({
                   value: money(stats.earnings),
                   lines: [<Growth key="g" value={growth.earnings_percent} label={`vs ${monthLabel(growth.previous_month)}`} />],
                   icon: BadgeIndianRupee,
-                  href: '/v2/analytics',
+                  href: '/analytics',
                   tone: 'bg-emerald-100 text-emerald-700',
               },
         {
@@ -477,7 +477,7 @@ export default function Dashboard({
                 `${plural(stats.reported_tracks, 'track')} · ${plural(stats.active_platforms, 'platform')}`,
             ],
             icon: TrendingUp,
-            href: '/v2/analytics',
+            href: '/analytics',
             tone: 'bg-violet-100 text-violet-700',
         },
         {
@@ -485,7 +485,7 @@ export default function Dashboard({
             value: number(stats.total_releases),
             lines: [`${number(stats.live)} live · ${number(stats.draft)} draft`, plural(stats.tracks, 'track')],
             icon: Disc3,
-            href: '/v2/releases',
+            href: '/releases',
             tone: 'bg-amber-100 text-amber-700',
         },
         {
@@ -493,22 +493,22 @@ export default function Dashboard({
             value: plural(stats.labels, 'label'),
             lines: [`${plural(stats.artists, 'artist')} ${scopeWord}`, plural(stats.report_imports, 'report import')],
             icon: Library,
-            href: '/v2/admin/labels',
+            href: '/admin/labels',
             tone: 'bg-sky-100 text-sky-700',
         },
     ];
 
     const quickActions = [
-        ...(isSuperAdmin ? [{ label: 'Business profit', href: '/v2/admin/profit', icon: Landmark }] : []),
-        { label: 'Review queue', href: '/v2/admin/release-reviews', icon: ShieldCheck },
-        { label: 'Import revenue', href: '/v2/admin/reports/imports', icon: FileUp },
-        { label: 'Distribution', href: '/v2/admin/distribution', icon: Radio },
-        { label: 'Withdrawals', href: '/v2/admin/withdrawals', icon: WalletCards },
+        ...(isSuperAdmin ? [{ label: 'Business profit', href: '/admin/profit', icon: Landmark }] : []),
+        { label: 'Review queue', href: '/admin/release-reviews', icon: ShieldCheck },
+        { label: 'Import revenue', href: '/admin/reports/imports', icon: FileUp },
+        { label: 'Distribution', href: '/admin/distribution', icon: Radio },
+        { label: 'Withdrawals', href: '/admin/withdrawals', icon: WalletCards },
         { label: 'Label management', href: '/super-admin/label-hierarchy', icon: FolderTree },
-        { label: 'Artists', href: '/v2/admin/artists', icon: Music2 },
-        ...(isSuperAdmin ? [{ label: 'Users', href: '/v2/admin/users', icon: Users }] : []),
-        { label: 'Support', href: '/v2/admin/support', icon: Headphones },
-        ...(isSuperAdmin ? [{ label: 'Audit logs', href: '/v2/admin/audit-logs', icon: History }] : []),
+        { label: 'Artists', href: '/admin/artists', icon: Music2 },
+        ...(isSuperAdmin ? [{ label: 'Users', href: '/admin/users', icon: Users }] : []),
+        { label: 'Support', href: '/admin/support', icon: Headphones },
+        ...(isSuperAdmin ? [{ label: 'Audit logs', href: '/admin/audit-logs', icon: History }] : []),
     ];
 
     const releaseItems = recentReleases.map((release) => ({
@@ -516,7 +516,7 @@ export default function Dashboard({
         title: release.title || 'Untitled release',
         subtitle: [release.primary_artist_name, release.label_name, when(release.submitted_at || release.created_at)].filter(Boolean).join(' · '),
         status: release.status,
-        href: `/v2/admin/release-reviews/${release.id}`,
+        href: `/admin/release-reviews/${release.id}`,
     }));
 
     const importItems = recentImports.map((item) => ({
@@ -524,7 +524,7 @@ export default function Dashboard({
         title: item.original_filename || 'Revenue import',
         subtitle: `${number(item.imported_rows)} rows imported${Number(item.failed_rows || 0) > 0 ? ` · ${number(item.failed_rows)} failed` : ''} · ${when(item.created_at)}`,
         status: item.status,
-        href: `/v2/admin/reports/imports/${item.id}/view`,
+        href: `/admin/reports/imports/${item.id}/view`,
     }));
 
     const withdrawalItems = recentWithdrawals.map((item) => ({
@@ -533,7 +533,7 @@ export default function Dashboard({
         subtitle: [item.withdrawal_number, when(item.requested_at || item.created_at)].filter(Boolean).join(' · '),
         amount: money(item.amount, item.currency),
         status: item.status,
-        href: `/v2/admin/withdrawals?status=${['pending', 'approved', 'paid', 'rejected'].includes(item.status) ? item.status : 'all'}`,
+        href: `/admin/withdrawals?status=${['pending', 'approved', 'paid', 'rejected'].includes(item.status) ? item.status : 'all'}`,
     }));
 
     const today = new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
@@ -552,12 +552,12 @@ export default function Dashboard({
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Link href="/v2/admin/release-reviews?status=submitted" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow hover:bg-violet-50">
+                        <Link href="/admin/release-reviews?status=submitted" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow hover:bg-violet-50">
                             <ShieldCheck size={16} />
                             Review queue
                             {Number(stats.submitted || 0) > 0 && <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-black text-slate-950">{number(stats.submitted)}</span>}
                         </Link>
-                        <Link href="/v2/admin/reports/imports" className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-bold text-white hover:bg-white/20">
+                        <Link href="/admin/reports/imports" className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-bold text-white hover:bg-white/20">
                             <FileUp size={16} />
                             Import revenue
                         </Link>
@@ -569,7 +569,7 @@ export default function Dashboard({
                 <div className="mb-2.5 flex items-center justify-between gap-3">
                     <h2 id="attention-title" className="text-[15px] font-bold text-slate-950">Needs your attention</h2>
                     {Number(stats.changes_requested || 0) > 0 && (
-                        <Link href="/v2/admin/release-reviews?status=changes_requested" className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-violet-700">
+                        <Link href="/admin/release-reviews?status=changes_requested" className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-violet-700">
                             <RotateCcw size={13} />
                             {number(stats.changes_requested)} release{Number(stats.changes_requested) === 1 ? '' : 's'} sent back to the owner
                         </Link>
@@ -616,9 +616,9 @@ export default function Dashboard({
             </section>
 
             <section className="mt-5 grid gap-5 xl:grid-cols-3">
-                <ActivityList title="Latest releases" subtitle={`Newest releases ${scopeWord}`} href="/v2/admin/release-reviews" linkText="Review queue" empty="No releases yet." items={releaseItems} />
-                <ActivityList title="Revenue imports" subtitle="Latest DSP reports" href="/v2/admin/reports/imports" linkText="All imports" empty="No report imports yet." items={importItems} />
-                <ActivityList title="Withdrawals" subtitle="Latest payout requests" href="/v2/admin/withdrawals?status=all" linkText="All withdrawals" empty="No withdrawal requests." items={withdrawalItems} />
+                <ActivityList title="Latest releases" subtitle={`Newest releases ${scopeWord}`} href="/admin/release-reviews" linkText="Review queue" empty="No releases yet." items={releaseItems} />
+                <ActivityList title="Revenue imports" subtitle="Latest DSP reports" href="/admin/reports/imports" linkText="All imports" empty="No report imports yet." items={importItems} />
+                <ActivityList title="Withdrawals" subtitle="Latest payout requests" href="/admin/withdrawals?status=all" linkText="All withdrawals" empty="No withdrawal requests." items={withdrawalItems} />
             </section>
 
             <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

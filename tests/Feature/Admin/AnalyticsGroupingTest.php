@@ -46,7 +46,7 @@ class AnalyticsGroupingTest extends TestCase
         $this->row($import, ['label_name' => 'VR Bros HD ', 'track_artist' => 'Singer ', 'platform' => 'spotify', 'album_title' => 'album']);
         $this->row($import, ['label_name' => 'vr bros hd', 'track_artist' => 'SINGER', 'platform' => 'Spotify ']);
 
-        $this->actingAs($super)->get('/v2/analytics')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/analytics')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->has('topLabels', 1)
             ->where('topLabels.0.collected_revenue', 300)
             ->has('topArtists', 1)
@@ -73,7 +73,7 @@ class AnalyticsGroupingTest extends TestCase
         $this->row($import, ['platform' => 'Jio Saavn', 'sale_month' => '2026-07', 'streams' => 10]);
         $this->row($import, ['platform' => 'Spotify', 'sale_month' => '2026-07', 'streams' => 10]);
 
-        $this->actingAs($super)->get('/v2/analytics')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/analytics')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->has('topPlatforms', 2)
             ->where('topPlatforms.0.name', 'JioSaavn')
             ->where('topPlatforms.0.collected_revenue', 300)

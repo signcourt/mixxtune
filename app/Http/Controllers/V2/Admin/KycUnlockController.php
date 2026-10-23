@@ -60,7 +60,7 @@ class KycUnlockController extends Controller
         $audit->record('kyc.edit_unlocked', 'kyc', 'KYC opened for one change by '.($user->name ?: $user->email).' (signed form attached).', [], ['reason' => $unlock->reason, 'expires_at' => $unlock->expires_at->toIso8601String()], $unlock, $request);
 
         try {
-            $notices->send($user, 'kyc.edit_unlocked', 'You can now change your KYC / bank details', 'Open KYC & Payout, make the change and press "Send for verification" within '.KycEditLock::UNLOCK_DAYS.' days.', '/v2/kyc-profile');
+            $notices->send($user, 'kyc.edit_unlocked', 'You can now change your KYC / bank details', 'Open KYC & Payout, make the change and press "Send for verification" within '.KycEditLock::UNLOCK_DAYS.' days.', '/kyc-profile');
         } catch (\Throwable $e) {
             report($e);
         }

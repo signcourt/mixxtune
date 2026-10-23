@@ -28,7 +28,7 @@ class LegalCasesTest extends TestCase
 
     private function legalCase(User $owner, string $section = 'youtube', array $extra = [])
     {
-        return $this->actingAs($owner)->post('/v2/support', array_merge([
+        return $this->actingAs($owner)->post('/support', array_merge([
             'subject' => 'Video blocked',
             'category' => 'general',
             'priority' => 'high',
@@ -60,7 +60,7 @@ class LegalCasesTest extends TestCase
         $this->assertSame(0, SupportTicket::query()->count());
 
         /* a normal ticket still works without any legal fields */
-        $this->actingAs($owner)->post('/v2/support', ['subject' => 'Payout late', 'category' => 'withdrawal', 'priority' => 'normal', 'message' => 'Where is it'])
+        $this->actingAs($owner)->post('/support', ['subject' => 'Payout late', 'category' => 'withdrawal', 'priority' => 'normal', 'message' => 'Where is it'])
             ->assertRedirect();
         $this->assertSame('Payout late', SupportTicket::query()->value('subject'));
     }
@@ -73,7 +73,7 @@ class LegalCasesTest extends TestCase
         $this->legalCase($owner, 'youtube');
         $this->legalCase($owner, 'rights', ['legal_issue_type' => 'Rights Transfer']);
         $this->legalCase($other, 'youtube');
-        $this->actingAs($owner)->post('/v2/support', ['subject' => 'Login issue', 'category' => 'technical', 'priority' => 'normal', 'message' => 'Cannot log in']);
+        $this->actingAs($owner)->post('/support', ['subject' => 'Login issue', 'category' => 'technical', 'priority' => 'normal', 'message' => 'Cannot log in']);
 
         /* an old-style case (before W73) also counts */
         SupportTicket::query()->create([
@@ -82,18 +82,18 @@ class LegalCasesTest extends TestCase
             'status' => 'closed', 'last_reply_at' => now(),
         ]);
 
-        $this->actingAs($owner)->get('/v2/support?legal_section=history&tab=all')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($owner)->get('/support?legal_section=history&tab=all')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Support/Index')
             ->where('legal', true)
             ->where('counts.all', 3)
             ->where('counts.closed', 1)
             ->where('tickets.data', fn ($rows) => collect($rows)->pluck('legal_section')->sort()->values()->all() === ['copyright', 'rights', 'youtube']));
 
-        $this->actingAs($owner)->get('/v2/support?tab=all')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($owner)->get('/support?tab=all')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('legal', false)
             ->where('counts.all', 4));
 
-        $this->actingAs($owner)->get('/v2/legal-operations')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($owner)->get('/legal-operations')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/LegalOperations/Index')
             ->where('counts.open', 2)
             ->where('counts.closed', 1)
@@ -118,11 +118,11 @@ class LegalCasesTest extends TestCase
         \App\Models\Distribution\Release::factory()->create(['artist_id' => $mine, 'title' => 'My Own Song']);
         \App\Models\Distribution\Release::factory()->create(['artist_id' => $theirs, 'title' => 'Not Mine']);
 
-        $this->actingAs($owner)->get('/v2/support/create?legal_section=copyright')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($owner)->get('/support/create?legal_section=copyright')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('legalSection', 'copyright')
             ->where('catalogue', fn ($rows) => collect($rows)->pluck('title')->all() === ['My Own Song']));
 
-        $this->actingAs($owner)->get('/v2/support/create?legal_section=bogus')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($owner)->get('/support/create?legal_section=bogus')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('legalSection', null)
             ->where('catalogue', []));
     }
@@ -132,9 +132,9 @@ class LegalCasesTest extends TestCase
         $owner = $this->user('label');
         $super = $this->user('super_admin');
         $this->legalCase($owner, 'dsp', ['legal_issue_type' => 'Delivery Issue']);
-        $this->actingAs($owner)->post('/v2/support', ['subject' => 'Payout late', 'category' => 'withdrawal', 'priority' => 'normal', 'message' => 'Where is it']);
+        $this->actingAs($owner)->post('/support', ['subject' => 'Payout late', 'category' => 'withdrawal', 'priority' => 'normal', 'message' => 'Where is it']);
 
-        $this->actingAs($super)->get('/v2/admin/support?status=all&category=legal')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/support?status=all&category=legal')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('tickets.total', 1)
             ->where('tickets.data.0.subject', 'Legal · Other DSP Operations: Video blocked'));
     }

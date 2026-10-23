@@ -122,7 +122,7 @@ export default function Create({
        made automatically, labels added row by row with their own %. */
     const isManagerForm = accountType === "manager";
     const initialRole = isManagerForm ? "admin" : "label";
-    const backHref = isManagerForm ? "/v2/admin/admins" : "/v2/admin/users";
+    const backHref = isManagerForm ? "/admin/admins" : "/admin/users";
 
     const { data, setData, post, processing, errors, transform } = useForm({
         name: "",
@@ -237,7 +237,7 @@ export default function Create({
             };
         });
 
-        post("/v2/admin/users", { preserveScroll: true });
+        post("/admin/users", { preserveScroll: true });
     };
 
     const pageTitle = isManagerForm ? "Create Manager" : "Create User";
@@ -526,7 +526,7 @@ export default function Create({
                                 The new account gets the sidebar tabs set for its role. To allow or block a tab for only this account, open Edit User after creating it.
                             </p>
                         </div>
-                        <a href="/v2/admin/panel-access" target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-300">
+                        <a href="/admin/panel-access" target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-300">
                             Role defaults →
                         </a>
                     </div>

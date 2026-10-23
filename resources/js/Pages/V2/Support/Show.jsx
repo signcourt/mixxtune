@@ -16,19 +16,19 @@ export default function Show({ role = "artist", ticket, messages = [] }) {
 
     const submit = (e) => {
         e.preventDefault();
-        post(`/v2/support/${ticket.id}/reply`, { forceFormData: true, preserveScroll: true, onSuccess: () => reset() });
+        post(`/support/${ticket.id}/reply`, { forceFormData: true, preserveScroll: true, onSuccess: () => reset() });
     };
 
     const act = (what) => {
         if (what === "close" && !window.confirm("Close this ticket? Use this when your problem is solved.")) return;
-        router.post(`/v2/support/${ticket.id}/${what}`, {}, { preserveScroll: true });
+        router.post(`/support/${ticket.id}/${what}`, {}, { preserveScroll: true });
     };
 
     return (
         <PanelLayout role={role} title={ticket.ticket_number} subtitle={ticket.subject}>
             <Head title={ticket.subject} />
 
-            <Link href="/v2/support" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-violet-700">
+            <Link href="/support" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-violet-700">
                 <ArrowLeft className="h-4 w-4" /> My tickets
             </Link>
 
@@ -67,7 +67,7 @@ export default function Show({ role = "artist", ticket, messages = [] }) {
                                     Reopen — still not solved
                                 </button>
                             )}
-                            <Link href="/v2/support/create" className="inline-flex h-10 items-center rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700">
+                            <Link href="/support/create" className="inline-flex h-10 items-center rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700">
                                 Open a new ticket
                             </Link>
                         </div>

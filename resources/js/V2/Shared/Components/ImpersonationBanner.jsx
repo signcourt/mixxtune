@@ -23,7 +23,7 @@ export default function ImpersonationBanner() {
         }
 
         router.post(
-            '/v2/impersonation/stop',
+            '/impersonation/stop',
             {},
             {
                 preserveScroll: false,

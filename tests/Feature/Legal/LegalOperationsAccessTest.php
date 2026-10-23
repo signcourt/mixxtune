@@ -22,7 +22,7 @@ class LegalOperationsAccessTest extends TestCase
         $user = $this->user('super_admin');
 
         $this->actingAs($user)
-            ->get('/v2/legal-operations')
+            ->get('/legal-operations')
             ->assertOk();
     }
 
@@ -31,7 +31,7 @@ class LegalOperationsAccessTest extends TestCase
         $user = $this->user('admin');
 
         $this->actingAs($user)
-            ->get('/v2/legal-operations')
+            ->get('/legal-operations')
             ->assertOk();
     }
 
@@ -40,7 +40,7 @@ class LegalOperationsAccessTest extends TestCase
         $user = $this->user('label');
 
         $this->actingAs($user)
-            ->get('/v2/legal-operations')
+            ->get('/legal-operations')
             ->assertOk();
     }
 
@@ -49,13 +49,13 @@ class LegalOperationsAccessTest extends TestCase
         $user = $this->user('artist');
 
         $this->actingAs($user)
-            ->get('/v2/legal-operations')
+            ->get('/legal-operations')
             ->assertOk();
     }
 
     public function test_guest_is_redirected_to_login(): void
     {
-        $this->get('/v2/legal-operations')
+        $this->get('/legal-operations')
             ->assertRedirect('/login');
     }
 }

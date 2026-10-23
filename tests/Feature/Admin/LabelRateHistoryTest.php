@@ -102,7 +102,7 @@ class LabelRateHistoryTest extends TestCase
             return true;
         });
 
-        $this->actingAs($actor)->postJson('/v2/admin/action-otp/unlock', ['otp' => $code])->assertOk();
+        $this->actingAs($actor)->postJson('/admin/action-otp/unlock', ['otp' => $code])->assertOk();
         $send()->assertRedirect()->assertSessionHasNoErrors();
     }
 
@@ -116,8 +116,8 @@ class LabelRateHistoryTest extends TestCase
         $super = $this->makeUser('super_admin');
         $label = $this->makeLabel('History Label A', 80);
 
-        $this->withConfirmationCode($super, fn () => $this->actingAs($super)->patch("/v2/admin/labels/{$label}/revenue-rate", ['revenue_share_percentage' => 85]));
-        $this->actingAs($super)->patch("/v2/admin/labels/{$label}/revenue-rate", ['revenue_share_percentage' => 85])->assertRedirect();
+        $this->withConfirmationCode($super, fn () => $this->actingAs($super)->patch("/admin/labels/{$label}/revenue-rate", ['revenue_share_percentage' => 85]));
+        $this->actingAs($super)->patch("/admin/labels/{$label}/revenue-rate", ['revenue_share_percentage' => 85])->assertRedirect();
 
         $entries = $this->entries($label);
         $this->assertCount(1, $entries);
@@ -134,18 +134,18 @@ class LabelRateHistoryTest extends TestCase
         $admin = $this->makeUser('admin');
         $label = $this->makeLabel('History Label B', null);
 
-        $this->actingAs($super)->patch("/v2/admin/labels/{$label}/revenue-rate", ['revenue_share_percentage' => 90])->assertRedirect();
+        $this->actingAs($super)->patch("/admin/labels/{$label}/revenue-rate", ['revenue_share_percentage' => 90])->assertRedirect();
 
-        $this->actingAs($admin)->getJson('/v2/admin/labels/rate-history?label_id='.$label)->assertForbidden();
+        $this->actingAs($admin)->getJson('/admin/labels/rate-history?label_id='.$label)->assertForbidden();
 
-        $this->actingAs($super)->getJson('/v2/admin/labels/rate-history?label_id='.$label)
+        $this->actingAs($super)->getJson('/admin/labels/rate-history?label_id='.$label)
             ->assertOk()
             ->assertJsonPath('label.current', 90)
             ->assertJsonPath('changes.0.old', null)
             ->assertJsonPath('changes.0.new', 90)
             ->assertJsonPath('changes.0.label_id', $label);
 
-        $this->actingAs($super)->getJson('/v2/admin/labels/rate-history')
+        $this->actingAs($super)->getJson('/admin/labels/rate-history')
             ->assertOk()
             ->assertJsonPath('label', null)
             ->assertJsonPath('changes.0.label_name', 'History Label B');
@@ -157,7 +157,7 @@ class LabelRateHistoryTest extends TestCase
         $a = $this->makeLabel('History Label C', 70);
         $b = $this->makeLabel('History Label D', 75);
 
-        $this->withConfirmationCode($super, fn () => $this->actingAs($super)->post('/v2/admin/labels/bulk-action', [
+        $this->withConfirmationCode($super, fn () => $this->actingAs($super)->post('/admin/labels/bulk-action', [
             'label_ids' => [$a, $b], 'action' => 'set_rate', 'revenue_share_percentage' => 88,
         ]));
 
@@ -185,7 +185,7 @@ class LabelRateHistoryTest extends TestCase
         ];
 
         Mail::fake();
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/otp', $payload)->assertOk();
+        $this->actingAs($super)->postJson('/admin/labels/ownership/otp', $payload)->assertOk();
         $otp = null;
         Mail::assertSent(LabelOwnershipOtpMail::class, function ($mail) use (&$otp) {
             $otp = $mail->otp;
@@ -193,7 +193,7 @@ class LabelRateHistoryTest extends TestCase
             return true;
         });
 
-        $this->actingAs($super)->postJson('/v2/admin/labels/ownership/apply', $payload + ['otp' => $otp])
+        $this->actingAs($super)->postJson('/admin/labels/ownership/apply', $payload + ['otp' => $otp])
             ->assertOk()->assertJsonPath('created', true);
 
         $this->assertEquals(90, (float) DB::table('labels')->where('id', $withRate)->value('revenue_share_percentage'));
@@ -233,7 +233,7 @@ class LabelRateHistoryTest extends TestCase
             ]);
         }
 
-        $response = $this->actingAs($super)->getJson('/v2/admin/labels/rate-history?label_id='.$label)->assertOk();
+        $response = $this->actingAs($super)->getJson('/admin/labels/rate-history?label_id='.$label)->assertOk();
         $response->assertJsonPath('label.pending_import_ids', [$pending]);
 
         $used = collect($response->json('rates_used'))->keyBy('import_id');

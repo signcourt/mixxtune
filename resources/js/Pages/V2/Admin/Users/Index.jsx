@@ -98,7 +98,7 @@ export default function Index({
         setQuickEditErrors({});
 
         router.post(
-            `/v2/admin/users/${quickEditUser.id}/quick-label`,
+            `/admin/users/${quickEditUser.id}/quick-label`,
             {
                 mode:
                     quickLabelMode,
@@ -414,7 +414,7 @@ export default function Index({
         }
 
         router.patch(
-            `/v2/admin/users/${quickEditUser.id}/quick-update`,
+            `/admin/users/${quickEditUser.id}/quick-update`,
             payload,
             {
                 preserveScroll: true,
@@ -451,7 +451,7 @@ export default function Index({
         };
 
         router.get(
-            '/v2/admin/users',
+            '/admin/users',
             nextFilters,
             {
                 preserveState: true,
@@ -496,7 +496,7 @@ export default function Index({
         }
 
         router.post(
-            `/v2/admin/users/${user.id}/toggle-status`,
+            `/admin/users/${user.id}/toggle-status`,
             {},
             {
                 preserveScroll: true,
@@ -514,7 +514,7 @@ export default function Index({
         }
 
         router.post(
-            `/v2/admin/users/${user.id}/resend-invitation`,
+            `/admin/users/${user.id}/resend-invitation`,
             {},
             {
                 preserveScroll: true,
@@ -1348,8 +1348,8 @@ export default function Index({
 {quickFieldEnabled("permissions") && quickEditUser?.id && (
     <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
         <b className="text-slate-800">Panel access</b> is now set per sidebar tab on{" "}
-        <a href={`/v2/admin/users/${quickEditUser.id}/edit`} className="font-semibold text-violet-700 underline">Edit User</a>
-        {" "}(defaults per role on <a href="/v2/admin/panel-access" className="font-semibold text-violet-700 underline">Panel Access</a>).
+        <a href={`/admin/users/${quickEditUser.id}/edit`} className="font-semibold text-violet-700 underline">Edit User</a>
+        {" "}(defaults per role on <a href="/admin/panel-access" className="font-semibold text-violet-700 underline">Panel Access</a>).
     </div>
 )}
 
@@ -2056,7 +2056,7 @@ export default function Index({
                                     )
                                 ) {
                                     router.post(
-                                        '/v2/admin/users/invitation-reminders',
+                                        '/admin/users/invitation-reminders',
                                         {},
                                         { preserveScroll: true }
                                     );
@@ -2155,7 +2155,7 @@ export default function Index({
                         </div>
 
                         <Link
-                            href="/v2/admin/users/create"
+                            href="/admin/users/create"
                             className="rounded-xl bg-violet-600 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-violet-700"
                         >
                             + Create User
@@ -2314,7 +2314,7 @@ export default function Index({
                                                 <div className="flex min-w-[280px] flex-wrap gap-2">
                                                     {/* MIXXTUNE_SEPARATE_QUICK_EDIT_ACTION_V1 */}
                                                     <Link
-                                                        href={`/v2/admin/users/${user.id}/edit`}
+                                                        href={`/admin/users/${user.id}/edit`}
                                                         className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700"
                                                     >
                                                         Edit
@@ -2335,7 +2335,7 @@ export default function Index({
                                                     {user.role ===
                                                         'admin' && (
                                                         <Link
-                                                            href={`/v2/admin/admins/${user.id}`}
+                                                            href={`/admin/admins/${user.id}`}
                                                             className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700"
                                                         >
                                                             Assign
@@ -2355,7 +2355,7 @@ export default function Index({
                                                                     )
                                                                 ) {
                                                                     router.post(
-                                                                        `/v2/admin/users/${user.id}/impersonate`
+                                                                        `/admin/users/${user.id}/impersonate`
                                                                     );
                                                                 }
                                                             }}

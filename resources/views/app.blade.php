@@ -12,7 +12,7 @@
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
         <!-- W90: night mode is set before the page paints (no white flash) -->
-        <script>try{if(localStorage.getItem('mt-theme')==='night'&&location.pathname.indexOf('/v2')===0){document.documentElement.classList.add('mt-night')}}catch(e){}</script>
+        <script>try{if(localStorage.getItem('mt-theme')==='night'){document.documentElement.classList.add('mt-night')}}catch(e){}</script>
 
         <!-- Scripts -->
         @routes

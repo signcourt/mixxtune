@@ -7,7 +7,7 @@ import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 /* MIXXTUNE_INVOICES_V2 */
 
 const money = (v, c = "INR") => new Intl.NumberFormat("en-IN", { style: "currency", currency: c || "INR", maximumFractionDigits: 2 }).format(Number(v || 0));
-const URL = "/v2/admin/invoices";
+const URL = "/admin/invoices";
 
 export default function Index({ role = "admin", tab = "ready", counts = {}, statements = {}, invoices = null, months = [], filters = {} }) {
     const page = usePage().props;
@@ -117,7 +117,7 @@ export default function Index({ role = "admin", tab = "ready", counts = {}, stat
                                         <div className="text-xs text-slate-500">net payable</div>
                                     </div>
                                     {s.invoice_id ? (
-                                        <a href={`/v2/invoices/${s.invoice_id}/download`} className="inline-flex h-9 items-center gap-1 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700">
+                                        <a href={`/invoices/${s.invoice_id}/download`} className="inline-flex h-9 items-center gap-1 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700">
                                             <Download className="h-3.5 w-3.5" /> {s.invoice_number}
                                         </a>
                                     ) : (
@@ -147,7 +147,7 @@ export default function Index({ role = "admin", tab = "ready", counts = {}, stat
                                         <div className="text-base font-black text-slate-900">{money(v.net, v.currency)}</div>
                                         {v.tds > 0 && <div className="text-xs text-slate-500">after TDS {money(v.tds, v.currency)}</div>}
                                     </div>
-                                    <a href={`/v2/invoices/${v.id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700">
+                                    <a href={`/invoices/${v.id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700">
                                         <Download className="h-3.5 w-3.5" /> PDF
                                     </a>
                                 </div>
@@ -202,7 +202,7 @@ function Empty({ tab, counts, filtered }) {
             <div className="mt-3 text-sm font-semibold text-slate-700">{title}</div>
             <div className="mx-auto mt-1 max-w-md text-xs text-slate-500">{text}</div>
             {!filtered && tab === "ready" && (counts.waiting_approval ?? 0) > 0 && (
-                <Link href="/v2/admin/statements" className="mt-3 inline-flex h-9 items-center rounded-lg bg-violet-600 px-4 text-xs font-semibold text-white">Open Statements</Link>
+                <Link href="/admin/statements" className="mt-3 inline-flex h-9 items-center rounded-lg bg-violet-600 px-4 text-xs font-semibold text-white">Open Statements</Link>
             )}
         </div>
     );

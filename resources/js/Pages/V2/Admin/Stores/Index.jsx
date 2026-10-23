@@ -116,8 +116,8 @@ export default function Index({
         event.preventDefault();
 
         const url = editingStore
-            ? `/v2/admin/stores/${editingStore.id}`
-            : '/v2/admin/stores';
+            ? `/admin/stores/${editingStore.id}`
+            : '/admin/stores';
 
         post(url, {
             forceFormData: true,
@@ -136,7 +136,7 @@ export default function Index({
         }
         setBusyId(store.id);
         router.post(
-            `/v2/admin/stores/${store.id}/toggle`,
+            `/admin/stores/${store.id}/toggle`,
             {},
             {
                 preserveScroll: true,
@@ -156,7 +156,7 @@ export default function Index({
 
         setBusyId(store.id);
         router.delete(
-            `/v2/admin/stores/${store.id}`,
+            `/admin/stores/${store.id}`,
             {
                 preserveScroll: true,
                 onFinish: () => setBusyId(null),

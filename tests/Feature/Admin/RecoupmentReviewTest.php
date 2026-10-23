@@ -248,7 +248,7 @@ class RecoupmentReviewTest extends TestCase
         $owner = $this->user('label');
         $this->plan($super, $owner, 1500);
 
-        $this->actingAs($owner)->get('/v2/wallet')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($owner)->get('/wallet')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->has('advances', 1)
             ->where('advances.0.outstanding', 1500)
             ->where('advances.0.recovery', 10));

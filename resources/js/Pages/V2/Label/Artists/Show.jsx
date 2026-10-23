@@ -111,14 +111,14 @@ export default function Show({
 
                         <div className="flex flex-wrap gap-3">
                             <Link
-                                href="/v2/label/artists"
+                                href="/label/artists"
                                 className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                             >
                                 Back
                             </Link>
 
                             <Link
-                                href={`/v2/label/artists/${artist.id}/edit`}
+                                href={`/label/artists/${artist.id}/edit`}
                                 className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
                             >
                                 Edit Artist

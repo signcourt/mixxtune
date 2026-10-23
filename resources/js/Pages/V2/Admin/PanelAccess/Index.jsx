@@ -105,7 +105,7 @@ export default function Index({ role = "super_admin", roles = [], ready = true }
 
     const submit = (event) => {
         event.preventDefault();
-        put("/v2/admin/panel-access", { preserveScroll: true, onSuccess: () => setDefaults() });
+        put("/admin/panel-access", { preserveScroll: true, onSuccess: () => setDefaults() });
     };
 
     return (
@@ -120,7 +120,7 @@ export default function Index({ role = "super_admin", roles = [], ready = true }
                         <p className="text-sm leading-6 text-slate-600">
                             Switch a tab off and every account of that type stops seeing it (the page is also blocked, not only hidden). To allow or block a tab
                             for <b>one</b> account, open that account on{" "}
-                            <Link href="/v2/admin/users" className="font-semibold text-violet-700 underline">
+                            <Link href="/admin/users" className="font-semibold text-violet-700 underline">
                                 Users
                             </Link>{" "}
                             → Edit → Panel access. Super Admin always sees everything.

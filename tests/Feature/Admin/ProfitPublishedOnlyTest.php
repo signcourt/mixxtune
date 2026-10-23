@@ -70,16 +70,16 @@ class ProfitPublishedOnlyTest extends TestCase
             ->where('stats.profit_earnings', $close(20.0))
             ->where('stats.profit_in_review', $close(10.0)));
 
-        $this->actingAs($super)->get('/v2/admin/profit')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/profit')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('filters.stage', 'published')
             ->where('summary.super_admin_profit', $close(20.0))
             ->where('inReview.super_admin_profit', $close(10.0)));
 
-        $this->actingAs($super)->get('/v2/admin/profit?stage=all')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/profit?stage=all')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('summary.super_admin_profit', $close(30.0))
             ->where('inReview', null));
 
-        $this->actingAs($super)->get('/v2/admin/profit?stage=review')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/profit?stage=review')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('summary.super_admin_profit', $close(10.0)));
     }
 }

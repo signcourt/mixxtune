@@ -12,13 +12,13 @@ import { useEffect, useState } from 'react';
 const KINDS = {
     bank_change_otp: {
         title: 'Confirm bank details change',
-        endpoint: '/v2/admin/bank-change',
+        endpoint: '/admin/bank-change',
         after: 'After saving: the owner gets an e-mail, payout KYC must be verified again, and payouts to this owner stay on hold for 48 hours.',
         okText: 'OK, I will press Save again',
     },
     action_otp: {
         title: 'Confirm this action',
-        endpoint: '/v2/admin/action-otp',
+        endpoint: '/admin/action-otp',
         after: null,
         okText: 'OK, I will press the button again',
     },

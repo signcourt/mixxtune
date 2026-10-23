@@ -39,7 +39,7 @@ trait ConfirmsActionOtp
         });
 
         $this->actingAs($actor)
-            ->postJson('/v2/admin/action-otp/unlock', ['otp' => (string) $code])
+            ->postJson('/admin/action-otp/unlock', ['otp' => (string) $code])
             ->assertOk();
 
         return $send();

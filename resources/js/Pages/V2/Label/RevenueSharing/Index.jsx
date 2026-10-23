@@ -70,7 +70,7 @@ function ShareRow({
         setProcessing(true);
 
         router.patch(
-            `/v2/label/revenue-sharing/${item.type}/${item.id}`,
+            `/label/revenue-sharing/${item.type}/${item.id}`,
             {
                 revenue_share_percent:
                     safePercent,
@@ -93,7 +93,7 @@ function ShareRow({
         }
 
         router.patch(
-            `/v2/label/revenue-sharing/${item.share_id}/toggle`,
+            `/label/revenue-sharing/${item.share_id}/toggle`,
             {},
             {
                 preserveScroll: true,
@@ -117,7 +117,7 @@ function ShareRow({
         setProcessing(true);
 
         router.delete(
-            `/v2/label/revenue-sharing/${item.share_id}`,
+            `/label/revenue-sharing/${item.share_id}`,
             {
                 preserveScroll: true,
 
@@ -360,7 +360,7 @@ function AddBeneficiary({
         setProcessing(true);
 
         router.patch(
-            `/v2/label/revenue-sharing/${type}/${beneficiaryId}`,
+            `/label/revenue-sharing/${type}/${beneficiaryId}`,
             {
                 revenue_share_percent:
                     safePercent,
@@ -631,7 +631,7 @@ export default function Index({
                           </div>
 
                           <a
-                              href="/v2/label/revenue-sharing/export"
+                              href="/label/revenue-sharing/export"
                               className="inline-flex w-fit items-center justify-center rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700"
                           >
                               Download Full Report
@@ -767,7 +767,7 @@ export default function Index({
 
                                                   <td className="whitespace-nowrap px-4 py-3">
                                                       <a
-                                                          href={`/v2/label/revenue-sharing/${item.type}/${item.id}/export`}
+                                                          href={`/label/revenue-sharing/${item.type}/${item.id}/export`}
                                                           className="text-sm font-bold text-violet-700 hover:text-violet-900"
                                                       >
                                                           Download CSV

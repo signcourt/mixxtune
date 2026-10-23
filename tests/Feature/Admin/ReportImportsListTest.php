@@ -41,7 +41,7 @@ class ReportImportsListTest extends TestCase
             $this->toMb(ini_get('post_max_size'))
         );
 
-        $this->actingAs($this->super())->get('/v2/admin/reports/imports')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($this->super())->get('/admin/reports/imports')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Admin/Reports/Imports')
             ->where('imports.data.0.financial_status', 'review_pending')
             ->where('imports.data.0.error_short', str_repeat('E', 300))
@@ -63,7 +63,7 @@ class ReportImportsListTest extends TestCase
         $file = UploadedFile::fake()->create('big.csv', ($limit * 1024) + 10, 'text/csv');
 
         $this->actingAs($this->super())
-            ->post('/v2/admin/reports/imports', ['reporting_month' => '2026-07', 'report_file' => $file])
+            ->post('/admin/reports/imports', ['reporting_month' => '2026-07', 'report_file' => $file])
             ->assertSessionHasErrors(['report_file' => 'The file is bigger than '.$limit.' MB, the most this server accepts. Split the report into smaller CSV files (same reporting month) and upload each.']);
     }
 

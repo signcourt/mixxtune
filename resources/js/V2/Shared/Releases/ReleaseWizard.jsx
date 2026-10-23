@@ -23,9 +23,9 @@ import {
 
 const RELEASES_BASE_PATH =
     typeof window !== 'undefined'
-    && window.location.pathname.startsWith('/artist')
+    && /^\/artist(\/|$)/.test(window.location.pathname)
         ? '/artist/releases'
-        : '/v2/releases';
+        : '/releases';
 
 /* W64: 4 steps - the Stores step was removed (all active stores are used) */
 const wizardSteps = [
@@ -335,7 +335,7 @@ export default function ReleaseWizard({
     };
 
     /*
-     * Release Wizard का canonical route अभी /v2/releases है।
+     * Release Wizard का canonical route अभी /releases है।
      * Artist role को /artist/releases पर redirect नहीं करना,
      * क्योंकि edit और wizard routes V2 namespace में registered हैं.
      */
@@ -968,7 +968,7 @@ function WizardTopActions({
 
             {isLastStep && adminEdit ? (
                 <Link
-                    href={`/v2/releases/${releaseId}`}
+                    href={`/releases/${releaseId}`}
                     className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                 >
                     Done

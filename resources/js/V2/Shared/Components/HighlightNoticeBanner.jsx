@@ -19,7 +19,7 @@ export default function HighlightNoticeBanner() {
     const send = (stay) => {
         setBusy(true);
         router.patch(
-            `/v2/notifications/${notice.id}/read${stay ? "?stay=1" : ""}`,
+            `/notifications/${notice.id}/read${stay ? "?stay=1" : ""}`,
             {},
             { preserveScroll: true, onFinish: () => setBusy(false) },
         );

@@ -382,7 +382,7 @@ class ReleaseReviewController extends Controller
                 'nextInQueue' => $this->nextInQueue($request, $release),
 
                 'deliveryUrl' => in_array($release->status, ['approved', 'processing', 'delivered', 'live', 'failed', 'takedown_requested', 'taken_down'], true)
-                    ? '/v2/admin/distribution/'.$release->id
+                    ? '/admin/distribution/'.$release->id
                     : null,
 
                 'canEditMetadata' => in_array($release->status, ['submitted', 'changes_requested', 'approved'], true),
@@ -539,7 +539,7 @@ class ReleaseReviewController extends Controller
             $validated['remarks'] ?? null
         );
 
-        return ($next ? redirect('/v2/admin/release-reviews/'.$next['id']) : redirect()->route('v2.admin.release-reviews.index'))
+        return ($next ? redirect('/admin/release-reviews/'.$next['id']) : redirect()->route('v2.admin.release-reviews.index'))
             ->with(
                 'success',
                 $next ? '"'.$release->title.'" approved. Next in the queue: "'.$next['title'].'".' : 'Release approved successfully.'
@@ -622,7 +622,7 @@ class ReleaseReviewController extends Controller
         );
 
         /* W63: go straight to the delivery page, where stores are started */
-        return redirect('/v2/admin/distribution/'.$release->id)
+        return redirect('/admin/distribution/'.$release->id)
             ->with(
                 'success',
                 'Release processing started.'

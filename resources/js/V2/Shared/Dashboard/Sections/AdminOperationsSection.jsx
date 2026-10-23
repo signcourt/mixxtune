@@ -115,7 +115,7 @@ export default function AdminOperationsSection({
                     subtitle="Latest release activity in your scope."
                     action={
                         <Link
-                            href="/v2/admin/release-reviews"
+                            href="/admin/release-reviews"
                             className="inline-flex items-center gap-2 text-sm font-bold text-violet-700"
                         >
                             Review Queue
@@ -141,7 +141,7 @@ export default function AdminOperationsSection({
                                         release.status ||
                                         'draft'
                                     }
-                                    href="/v2/admin/release-reviews"
+                                    href="/admin/release-reviews"
                                 />
                             ))
                         ) : (
@@ -155,7 +155,7 @@ export default function AdminOperationsSection({
                     subtitle="Latest DSP report import activity."
                     action={
                         <Link
-                            href="/v2/admin/reports/imports"
+                            href="/admin/reports/imports"
                             className="inline-flex items-center gap-2 text-sm font-bold text-violet-700"
                         >
                             Import Revenue
@@ -181,7 +181,7 @@ export default function AdminOperationsSection({
                                         item.status ||
                                         'pending'
                                     }
-                                    href="/v2/admin/reports/imports"
+                                    href="/admin/reports/imports"
                                 />
                             ))
                         ) : (
@@ -197,7 +197,7 @@ export default function AdminOperationsSection({
                     subtitle="Latest artist and label payout requests."
                     action={
                         <Link
-                            href="/v2/admin/withdrawals"
+                            href="/admin/withdrawals"
                             className="inline-flex items-center gap-2 text-sm font-bold text-violet-700"
                         >
                             View Withdrawals
@@ -229,7 +229,7 @@ export default function AdminOperationsSection({
                                         item.status ||
                                         'pending'
                                     }
-                                    href="/v2/admin/withdrawals"
+                                    href="/admin/withdrawals"
                                 />
                             ))
                         ) : (

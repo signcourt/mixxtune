@@ -9,7 +9,7 @@ export default function Index({
 }) {
     const update = (changes) => {
         router.get(
-            '/v2/admin/audit-logs',
+            '/admin/audit-logs',
             {
                 ...filters,
                 ...changes,
@@ -72,7 +72,7 @@ export default function Index({
                             type="button"
                             onClick={() =>
                                 router.get(
-                                    '/v2/admin/audit-logs'
+                                    '/admin/audit-logs'
                                 )
                             }
                             className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"

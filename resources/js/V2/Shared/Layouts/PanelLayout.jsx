@@ -112,7 +112,7 @@ export default function PanelLayout({
 
     const kycHref = isArtist
         ? "/artist/kyc"
-        : "/v2/kyc-profile";
+        : "/kyc-profile";
 
     return (
         <>
@@ -221,7 +221,7 @@ export default function PanelLayout({
                                                     type="button"
                                                     onClick={() => {
                                                         router.patch(
-                                                            "/v2/notifications/read-all",
+                                                            "/notifications/read-all",
                                                             {},
                                                             {
                                                                 preserveScroll: true,
@@ -265,7 +265,7 @@ export default function PanelLayout({
                                                                 );
 
                                                                 router.patch(
-                                                                    `/v2/notifications/${notification.id}/read`,
+                                                                    `/notifications/${notification.id}/read`,
                                                                     {},
                                                                     {
                                                                         preserveScroll: true,
@@ -326,7 +326,7 @@ export default function PanelLayout({
                                         </div>
 
                                         <Link
-                                            href="/v2/notifications"
+                                            href="/notifications"
                                             onClick={() =>
                                                 setNotificationOpen(false)
                                             }
@@ -420,7 +420,7 @@ export default function PanelLayout({
                                             {isLabel && (
                                                 <>
                                                     <Link
-                                                        href="/v2/label/artists"
+                                                        href="/label/artists"
                                                         onClick={() =>
                                                             setProfileOpen(false)
                                                         }
@@ -430,7 +430,7 @@ export default function PanelLayout({
                                                     </Link>
 
                                                     <Link
-                                                        href="/v2/label/user-access"
+                                                        href="/label/user-access"
                                                         onClick={() =>
                                                             setProfileOpen(false)
                                                         }
@@ -440,7 +440,7 @@ export default function PanelLayout({
                                                     </Link>
 
                                                     <Link
-                                                        href="/v2/label/revenue-sharing"
+                                                        href="/label/revenue-sharing"
                                                         onClick={() =>
                                                             setProfileOpen(false)
                                                         }

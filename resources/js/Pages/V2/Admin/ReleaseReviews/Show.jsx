@@ -290,7 +290,7 @@ export default function Show({
             <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <Link
-                        href="/v2/admin/release-reviews"
+                        href="/admin/release-reviews"
                         className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-200 hover:text-violet-700"
                     >
                         <span aria-hidden="true">←</span>
@@ -530,7 +530,7 @@ export default function Show({
                                         disabled={processing || checklistErrors.length > 0}
                                         onClick={() =>
                                             action(
-                                                `/v2/admin/release-reviews/${release.id}/approve`,
+                                                `/admin/release-reviews/${release.id}/approve`,
                                                 { remarks: notes },
                                                 `Approve "${release.title}"?`
                                             )
@@ -545,7 +545,7 @@ export default function Show({
                                         disabled={processing || checklistErrors.length > 0}
                                         onClick={() =>
                                             action(
-                                                `/v2/admin/release-reviews/${release.id}/approve`,
+                                                `/admin/release-reviews/${release.id}/approve`,
                                                 { remarks: notes, next: 1 },
                                                 `Approve "${release.title}" and open "${nextInQueue.title}"?`
                                             )
@@ -563,7 +563,7 @@ export default function Show({
                                         }
                                         onClick={() =>
                                             action(
-                                                `/v2/admin/release-reviews/${release.id}/request-changes`,
+                                                `/admin/release-reviews/${release.id}/request-changes`,
                                                 { notes },
                                                 `Send "${release.title}" back to the owner with these notes?`
                                             )
@@ -581,7 +581,7 @@ export default function Show({
                                         }
                                         onClick={() =>
                                             action(
-                                                `/v2/admin/release-reviews/${release.id}/reject`,
+                                                `/admin/release-reviews/${release.id}/reject`,
                                                 { reason: notes },
                                                 `Reject "${release.title}"? This is final - the owner cannot send it again.`
                                             )
@@ -596,7 +596,7 @@ export default function Show({
                                         disabled={processing}
                                         onClick={() =>
                                             action(
-                                                `/v2/admin/release-reviews/${release.id}/start-processing`,
+                                                `/admin/release-reviews/${release.id}/start-processing`,
                                                 { remarks: notes },
                                                 `Start processing "${release.title}"? You will go to its Delivery page.`
                                             )
@@ -636,7 +636,7 @@ function EditableField({ release, field }) {
         setSaving(true);
 
         router.patch(
-            `/v2/admin/release-reviews/${release.id}/metadata`,
+            `/admin/release-reviews/${release.id}/metadata`,
             {
                 [field.key]:
                     field.type === 'number'
@@ -1087,7 +1087,7 @@ function TrackEditableField({
         setSaving(true);
 
         router.patch(
-            `/v2/admin/release-reviews/${release.id}/tracks/${track.id}/metadata`,
+            `/admin/release-reviews/${release.id}/tracks/${track.id}/metadata`,
             {
                 [field.key]:
                     field.type === 'number'

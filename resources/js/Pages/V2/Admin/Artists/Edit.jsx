@@ -45,7 +45,7 @@ export default function Edit({
         event.preventDefault();
 
         patch(
-            `/v2/admin/artists/${artist.id}`,
+            `/admin/artists/${artist.id}`,
             {
                 preserveScroll: true,
             }
@@ -251,7 +251,7 @@ export default function Edit({
 
                 <div className="flex justify-end gap-3">
                     <Link
-                        href="/v2/admin/artists"
+                        href="/admin/artists"
                         className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
                     >
                         Cancel

@@ -23,7 +23,7 @@ class LabelUserAccessAuthorizationMatrixTest extends TestCase
         ]);
 
         $this->actingAs($owner)
-            ->get('/v2/label/user-access')
+            ->get('/label/user-access')
             ->assertOk();
     }
 
@@ -48,7 +48,7 @@ class LabelUserAccessAuthorizationMatrixTest extends TestCase
         ]);
 
         $response = $this->actingAs($childOwner)
-            ->get('/v2/label/user-access');
+            ->get('/label/user-access');
 
         $this->assertNotSame(
             200,
@@ -63,7 +63,7 @@ class LabelUserAccessAuthorizationMatrixTest extends TestCase
         ]);
 
         $response = $this->actingAs($artist)
-            ->get('/v2/label/user-access');
+            ->get('/label/user-access');
 
         $this->assertNotSame(
             200,
@@ -78,7 +78,7 @@ class LabelUserAccessAuthorizationMatrixTest extends TestCase
         ]);
 
         $response = $this->actingAs($admin)
-            ->get('/v2/label/user-access');
+            ->get('/label/user-access');
 
         $this->assertNotSame(
             200,
@@ -93,7 +93,7 @@ class LabelUserAccessAuthorizationMatrixTest extends TestCase
         ]);
 
         $response = $this->actingAs($superAdmin)
-            ->get('/v2/label/user-access');
+            ->get('/label/user-access');
 
         $this->assertNotSame(
             200,

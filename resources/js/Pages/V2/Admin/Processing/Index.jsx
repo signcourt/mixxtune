@@ -30,7 +30,7 @@ export default function Index({
 
     const openStatus = (status) => {
         router.get(
-            '/v2/admin/processing',
+            '/admin/processing',
             {
                 status,
                 search:
@@ -131,7 +131,7 @@ export default function Index({
                                     'Enter'
                                 ) {
                                     router.get(
-                                        '/v2/admin/processing',
+                                        '/admin/processing',
                                         {
                                             ...filters,
                                             search:
@@ -242,7 +242,7 @@ export default function Index({
 
                                                 <td className="px-5 py-4">
                                                     <Link
-                                                        href={`/v2/admin/processing/${release.id}`}
+                                                        href={`/admin/processing/${release.id}`}
                                                         className="rounded-lg border border-violet-300 px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50"
                                                     >
                                                         Process

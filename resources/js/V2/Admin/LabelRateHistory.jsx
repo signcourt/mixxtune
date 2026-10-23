@@ -66,7 +66,7 @@ export default function LabelRateHistory({ labelId = null, labelName = '', butto
         setError('');
 
         try {
-            const response = await axios.get('/v2/admin/labels/rate-history', {
+            const response = await axios.get('/admin/labels/rate-history', {
                 params: labelId ? { label_id: labelId } : {},
             });
             setData(response.data);

@@ -34,7 +34,7 @@ export default function Show({ role = 'super_admin', admin, artists = [], labels
         if (!changed) return;
         const msg = `Save for ${admin.name}?\n\nLabels: +${dl.added} / -${dl.removed}\nArtists: +${da.added} / -${da.removed}`;
         if (!window.confirm(msg)) return;
-        form.patch(`/v2/admin/admins/${admin.id}/assignments`, { preserveScroll: true });
+        form.patch(`/admin/admins/${admin.id}/assignments`, { preserveScroll: true });
     };
 
     return (
@@ -44,7 +44,7 @@ export default function Show({ role = 'super_admin', admin, artists = [], labels
 
             <div className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <Link href="/v2/admin/admins" className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">← Managers</Link>
+                    <Link href="/admin/admins" className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">← Managers</Link>
                     <div className="text-xs text-slate-500">
                         Status: <b className="capitalize">{admin.account_status}</b> · Last login: {admin.last_login || 'never'}
                     </div>

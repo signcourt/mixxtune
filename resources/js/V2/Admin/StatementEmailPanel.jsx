@@ -37,7 +37,7 @@ function PreviewBox({ imports }) {
 
         const timer = setTimeout(async () => {
             try {
-                const response = await axios.get('/v2/admin/labels/ownership/labels', { params: { q } });
+                const response = await axios.get('/admin/labels/ownership/labels', { params: { q } });
                 setResults(response.data.labels ?? []);
             } catch {
                 setResults([]);
@@ -96,7 +96,7 @@ function PreviewBox({ imports }) {
                     )}
                 </div>
                 <a
-                    href={label && importId ? `/v2/admin/statement-emails/preview?label_id=${label.id}&import_id=${importId}` : undefined}
+                    href={label && importId ? `/admin/statement-emails/preview?label_id=${label.id}&import_id=${importId}` : undefined}
                     target="_blank"
                     rel="noreferrer"
                     className={[
@@ -125,7 +125,7 @@ export default function StatementEmailPanel() {
         setError('');
 
         try {
-            const response = await axios.get('/v2/admin/statement-emails', { params: selected ? { month: selected } : {} });
+            const response = await axios.get('/admin/statement-emails', { params: selected ? { month: selected } : {} });
             setData(response.data);
             setMonth(response.data.month || '');
         } catch (exception) {
@@ -165,7 +165,7 @@ export default function StatementEmailPanel() {
 
             while (remaining > 0 && guard < 200) {
                 guard++;
-                const response = await axios.post('/v2/admin/statement-emails/send', { month });
+                const response = await axios.post('/admin/statement-emails/send', { month });
                 const results = response.data.results ?? [];
                 addLog(results);
                 remaining = response.data.remaining ?? 0;
@@ -191,7 +191,7 @@ export default function StatementEmailPanel() {
         setError('');
 
         try {
-            const response = await axios.post('/v2/admin/statement-emails/send', { month, statement_ids: [row.id], force: true });
+            const response = await axios.post('/admin/statement-emails/send', { month, statement_ids: [row.id], force: true });
             addLog(response.data.results ?? []);
         } catch (exception) {
             setError(exception?.response?.data?.message ?? 'Could not send.');
@@ -301,7 +301,7 @@ export default function StatementEmailPanel() {
                                                 <td className="px-3 py-2 text-slate-600">{row.sent_at ? `✓ ${when(row.sent_at)}` : '—'}</td>
                                                 <td className="whitespace-nowrap px-3 py-2 text-right">
                                                     <a
-                                                        href={`/v2/statements/${row.id}/download`}
+                                                        href={`/statements/${row.id}/download`}
                                                         className="mr-3 font-semibold text-violet-700 hover:underline"
                                                     >
                                                         PDF

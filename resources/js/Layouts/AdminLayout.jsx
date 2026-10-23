@@ -29,13 +29,13 @@ const menuGroups = [
             { label: "Wallet", icon: "▰", href: "/admin/wallet" },
             { label: "Withdrawals", icon: "↗", href: "/admin/withdrawals" },
             { label: "Reports", icon: "▥", href: "/admin/reports" },
-            { label: "Invoices", icon: "□", href: "/v2/admin/invoices" },
+            { label: "Invoices", icon: "□", href: "/admin/invoices" },
         ],
     },
     {
         title: "MANAGEMENT",
         items: [
-            { label: "KYC & Profiles", icon: "✓", href: "/v2/admin/kyc" },
+            { label: "KYC & Profiles", icon: "✓", href: "/admin/kyc" },
             { label: "Support Tickets", icon: "?", href: "/admin/support" },
             { label: "Settings", icon: "⚙", href: "/admin/settings" },
             {

@@ -109,7 +109,7 @@ export default function ArtistActivitySection({
                         </div>
 
                         <Link
-                            href="/v2/releases"
+                            href="/releases"
                             className="inline-flex items-center gap-2 text-sm font-bold text-violet-700"
                         >
                             View All
@@ -177,7 +177,7 @@ export default function ArtistActivitySection({
                             description="Create your first release and begin distributing your music."
                             action={
                                 <Link
-                                    href="/v2/releases/create"
+                                    href="/releases/create"
                                     className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white"
                                 >
                                     <Plus size={17} />

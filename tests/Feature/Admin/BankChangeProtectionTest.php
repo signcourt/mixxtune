@@ -95,8 +95,8 @@ class BankChangeProtectionTest extends TestCase
     private function quickUpdate(User $admin, User $owner, array $changes)
     {
         return $this->actingAs($admin)
-            ->from('/v2/admin/users')
-            ->patch('/v2/admin/users/'.$owner->id.'/quick-update', array_merge([
+            ->from('/admin/users')
+            ->patch('/admin/users/'.$owner->id.'/quick-update', array_merge([
                 'name' => $owner->name,
                 'email' => $owner->email,
                 'account_status' => 'active',
@@ -138,10 +138,10 @@ class BankChangeProtectionTest extends TestCase
         $this->assertMatchesRegularExpression('/^\d{6}$/', $code);
 
         $wrong = $code === '000000' ? '111111' : '000000';
-        $this->actingAs($admin)->postJson('/v2/admin/bank-change/unlock', ['otp' => $wrong])
+        $this->actingAs($admin)->postJson('/admin/bank-change/unlock', ['otp' => $wrong])
             ->assertStatus(422)->assertJsonValidationErrors('otp');
 
-        $this->actingAs($admin)->postJson('/v2/admin/bank-change/unlock', ['otp' => $code])
+        $this->actingAs($admin)->postJson('/admin/bank-change/unlock', ['otp' => $code])
             ->assertOk()->assertJson(['ok' => true]);
 
         $this->quickUpdate($admin, $owner, ['bank_account_number' => '999988887777'])
@@ -209,9 +209,9 @@ class BankChangeProtectionTest extends TestCase
         $code = $this->sentCode($admin);
 
         // another admin cannot use it
-        $this->actingAs($other)->postJson('/v2/admin/bank-change/unlock', ['otp' => $code])->assertStatus(422);
+        $this->actingAs($other)->postJson('/admin/bank-change/unlock', ['otp' => $code])->assertStatus(422);
 
-        $this->actingAs($admin)->postJson('/v2/admin/bank-change/unlock', ['otp' => $code])->assertOk();
+        $this->actingAs($admin)->postJson('/admin/bank-change/unlock', ['otp' => $code])->assertOk();
 
         // unlocked for $owner only, not for $second
         $this->quickUpdate($admin, $second, ['upi_id' => 'second@upi'])->assertSessionHasErrors('bank_change_otp');
@@ -237,7 +237,7 @@ class BankChangeProtectionTest extends TestCase
 
         // bank change (unlocked) after the withdrawal was approved
         $this->quickUpdate($admin, $owner, ['bank_account_number' => '444455556666'])->assertSessionHasErrors('bank_change_otp');
-        $this->actingAs($admin)->postJson('/v2/admin/bank-change/unlock', ['otp' => $this->sentCode($admin)])->assertOk();
+        $this->actingAs($admin)->postJson('/admin/bank-change/unlock', ['otp' => $this->sentCode($admin)])->assertOk();
         $this->quickUpdate($admin, $owner, ['bank_account_number' => '444455556666'])->assertSessionHasNoErrors();
 
         try {

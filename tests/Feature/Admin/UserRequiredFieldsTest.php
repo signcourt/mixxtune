@@ -60,7 +60,7 @@ class UserRequiredFieldsTest extends TestCase
 
     private function saveFields(User $admin, array $fields)
     {
-        return $this->actingAs($admin)->postJson('/v2/admin/user-form/required-fields', ['fields' => $fields]);
+        return $this->actingAs($admin)->postJson('/admin/user-form/required-fields', ['fields' => $fields]);
     }
 
     public function test_only_super_admin_can_change_required_fields(): void
@@ -79,7 +79,7 @@ class UserRequiredFieldsTest extends TestCase
     public function test_default_settings_keep_pan_required_for_label(): void
     {
         $this->actingAs($this->account('super_admin'))
-            ->post('/v2/admin/users', $this->labelPayload(['pan_number']))
+            ->post('/admin/users', $this->labelPayload(['pan_number']))
             ->assertSessionHasErrors('pan_number');
     }
 
@@ -89,7 +89,7 @@ class UserRequiredFieldsTest extends TestCase
         $this->saveFields($admin, ['label' => ['pan_number' => false]])->assertOk();
 
         $this->actingAs($admin)
-            ->post('/v2/admin/users', $this->labelPayload(['pan_number']))
+            ->post('/admin/users', $this->labelPayload(['pan_number']))
             ->assertSessionDoesntHaveErrors('pan_number');
     }
 
@@ -99,7 +99,7 @@ class UserRequiredFieldsTest extends TestCase
         $this->saveFields($admin, ['label' => ['gst_number' => true]])->assertOk();
 
         $this->actingAs($admin)
-            ->post('/v2/admin/users', $this->labelPayload())
+            ->post('/admin/users', $this->labelPayload())
             ->assertSessionHasErrors('gst_number');
 
         $artist = $this->labelPayload();
@@ -107,14 +107,14 @@ class UserRequiredFieldsTest extends TestCase
         unset($artist['new_labels']);
 
         $this->actingAs($admin)
-            ->post('/v2/admin/users', $artist)
+            ->post('/admin/users', $artist)
             ->assertSessionDoesntHaveErrors('gst_number');
     }
 
     public function test_create_page_receives_required_field_settings(): void
     {
         $this->actingAs($this->account('super_admin'))
-            ->get('/v2/admin/users/create')
+            ->get('/admin/users/create')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('V2/Admin/Users/Create')
@@ -129,12 +129,12 @@ class UserRequiredFieldsTest extends TestCase
         $admin = $this->account('super_admin');
 
         $this->actingAs($admin)
-            ->get('/v2/admin/users/create?type=manager')
+            ->get('/admin/users/create?type=manager')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('accountType', 'manager'));
 
         $this->actingAs($admin)
-            ->get('/v2/admin/users/create')
+            ->get('/admin/users/create')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('accountType', 'user'));
     }

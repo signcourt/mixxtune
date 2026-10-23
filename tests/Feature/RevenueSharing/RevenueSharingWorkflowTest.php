@@ -65,7 +65,7 @@ class RevenueSharingWorkflowTest extends TestCase
         $this->masterLabel($user);
 
         $this->actingAs($user)
-            ->get('/v2/label/revenue-sharing')
+            ->get('/label/revenue-sharing')
             ->assertOk()
             ->assertInertia(
                 fn ($page) =>
@@ -113,7 +113,7 @@ class RevenueSharingWorkflowTest extends TestCase
         );
 
         $response = $this->actingAs($user)
-            ->get('/v2/label/revenue-sharing');
+            ->get('/label/revenue-sharing');
 
         $response->assertOk();
 
@@ -189,7 +189,7 @@ class RevenueSharingWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->patch(
-                "/v2/label/revenue-sharing/label/{$child->id}",
+                "/label/revenue-sharing/label/{$child->id}",
                 [
                     'revenue_share_percent' => 80,
                     'show_revenue_share' => true,
@@ -219,7 +219,7 @@ class RevenueSharingWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->patch(
-                "/v2/label/revenue-sharing/artist/{$artist->id}",
+                "/label/revenue-sharing/artist/{$artist->id}",
                 [
                     'revenue_share_percent' => 75,
                     'show_revenue_share' => false,
@@ -260,7 +260,7 @@ class RevenueSharingWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->patch(
-                "/v2/label/revenue-sharing/label/{$otherChild->id}",
+                "/label/revenue-sharing/label/{$otherChild->id}",
                 [
                     'revenue_share_percent' => 80,
                     'show_revenue_share' => true,
@@ -295,7 +295,7 @@ class RevenueSharingWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->patch(
-                "/v2/label/revenue-sharing/artist/{$otherArtist->id}",
+                "/label/revenue-sharing/artist/{$otherArtist->id}",
                 [
                     'revenue_share_percent' => 70,
                     'show_revenue_share' => true,
@@ -326,7 +326,7 @@ class RevenueSharingWorkflowTest extends TestCase
         );
 
         $this->actingAs($childUser)
-            ->get('/v2/label/revenue-sharing')
+            ->get('/label/revenue-sharing')
             ->assertForbidden();
     }
 
@@ -350,7 +350,7 @@ class RevenueSharingWorkflowTest extends TestCase
 
         $this->actingAs($childUser)
             ->patch(
-                "/v2/label/revenue-sharing/artist/{$artist->id}",
+                "/label/revenue-sharing/artist/{$artist->id}",
                 [
                     'revenue_share_percent' => 90,
                     'show_revenue_share' => true,
@@ -410,7 +410,7 @@ class RevenueSharingWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->delete(
-                "/v2/label/revenue-sharing/{$share->id}"
+                "/label/revenue-sharing/{$share->id}"
             )
             ->assertRedirect();
 
@@ -457,7 +457,7 @@ class RevenueSharingWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->patch(
-                "/v2/label/revenue-sharing/{$share->id}/toggle"
+                "/label/revenue-sharing/{$share->id}/toggle"
             )
             ->assertForbidden();
 
@@ -474,7 +474,7 @@ class RevenueSharingWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->patch(
-                "/v2/label/revenue-sharing/label/{$child->id}",
+                "/label/revenue-sharing/label/{$child->id}",
                 [
                     'revenue_share_percent' => 101,
                     'show_revenue_share' => true,
@@ -486,7 +486,7 @@ class RevenueSharingWorkflowTest extends TestCase
 
         $this->actingAs($user)
             ->patch(
-                "/v2/label/revenue-sharing/label/{$child->id}",
+                "/label/revenue-sharing/label/{$child->id}",
                 [
                     'revenue_share_percent' => -1,
                     'show_revenue_share' => true,

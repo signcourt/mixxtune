@@ -71,23 +71,23 @@ export default function Index({ role = "artist", counts = {}, recent = [] }) {
                                 Pick the type of problem below and fill in one short form. Each case gets a number, our team replies inside the case, and you can follow
                                 every case under <b>Case History</b>.
                             </p>
-                            <Link href="/v2/support?legal_section=history&tab=all" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-violet-700 hover:text-violet-900">
+                            <Link href="/support?legal_section=history&tab=all" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-violet-700 hover:text-violet-900">
                                 <FolderClock size={15} /> Open Case History <ArrowRight size={14} />
                             </Link>
                         </div>
                         <div className="grid grid-cols-3 gap-2 sm:w-[420px]">
-                            <Link href="/v2/support?legal_section=history" className="rounded-xl border border-slate-200 px-3 py-2.5 hover:border-violet-300">
+                            <Link href="/support?legal_section=history" className="rounded-xl border border-slate-200 px-3 py-2.5 hover:border-violet-300">
                                 <span className="block text-[11px] font-semibold text-slate-500">Open cases</span>
                                 <span className="text-xl font-black text-slate-950">{counts.open ?? 0}</span>
                             </Link>
                             <Link
-                                href="/v2/support?legal_section=history&tab=reply"
+                                href="/support?legal_section=history&tab=reply"
                                 className={`rounded-xl border px-3 py-2.5 ${Number(counts.your_turn || 0) > 0 ? "border-amber-300 bg-amber-50" : "border-slate-200 hover:border-violet-300"}`}
                             >
                                 <span className="block text-[11px] font-semibold text-slate-500">We replied</span>
                                 <span className="text-xl font-black text-slate-950">{counts.your_turn ?? 0}</span>
                             </Link>
-                            <Link href="/v2/support?legal_section=history&tab=closed" className="rounded-xl border border-slate-200 px-3 py-2.5 hover:border-violet-300">
+                            <Link href="/support?legal_section=history&tab=closed" className="rounded-xl border border-slate-200 px-3 py-2.5 hover:border-violet-300">
                                 <span className="block text-[11px] font-semibold text-slate-500">Closed</span>
                                 <span className="text-xl font-black text-slate-950">{counts.closed ?? 0}</span>
                             </Link>
@@ -114,7 +114,7 @@ export default function Index({ role = "artist", counts = {}, recent = [] }) {
                                 </div>
                             </div>
                             <Link
-                                href={`/v2/support/create?legal_section=${key}`}
+                                href={`/support/create?legal_section=${key}`}
                                 className="mt-4 inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
                             >
                                 <Plus size={16} /> New case
@@ -129,7 +129,7 @@ export default function Index({ role = "artist", counts = {}, recent = [] }) {
                             <FolderClock className="h-4 w-4 text-slate-500" />
                             <h2 className="text-base font-bold text-slate-900">Latest cases</h2>
                         </div>
-                        <Link href="/v2/support?legal_section=history&tab=all" className="inline-flex items-center gap-1 text-xs font-bold text-violet-700">
+                        <Link href="/support?legal_section=history&tab=all" className="inline-flex items-center gap-1 text-xs font-bold text-violet-700">
                             Case History <ArrowRight size={14} />
                         </Link>
                     </div>
@@ -139,7 +139,7 @@ export default function Index({ role = "artist", counts = {}, recent = [] }) {
                         <ul className="divide-y divide-slate-100">
                             {recent.map((c) => (
                                 <li key={c.id}>
-                                    <Link href={`/v2/support/${c.id}`} className="flex flex-col gap-1 px-5 py-3 hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
+                                    <Link href={`/support/${c.id}`} className="flex flex-col gap-1 px-5 py-3 hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="min-w-0">
                                             <div className="text-xs font-semibold text-violet-600">
                                                 {c.ticket_number}

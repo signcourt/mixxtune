@@ -70,7 +70,7 @@ class LabelTeamWalletAccessTest extends TestCase
 
         $response = $this
             ->actingAs($owner)
-            ->get('/v2/wallet');
+            ->get('/wallet');
 
         $response->assertOk();
 
@@ -107,7 +107,7 @@ class LabelTeamWalletAccessTest extends TestCase
 
         $response = $this
             ->actingAs($teamUser)
-            ->get('/v2/wallet');
+            ->get('/wallet');
 
         $response->assertOk();
 
@@ -153,7 +153,7 @@ class LabelTeamWalletAccessTest extends TestCase
 
         $response = $this
             ->actingAs($teamUser)
-            ->get('/v2/wallet');
+            ->get('/wallet');
 
         $response->assertForbidden();
 
@@ -185,7 +185,7 @@ class LabelTeamWalletAccessTest extends TestCase
 
         $response = $this
             ->actingAs($teamUser)
-            ->get('/v2/wallet');
+            ->get('/wallet');
 
         $response->assertForbidden();
 

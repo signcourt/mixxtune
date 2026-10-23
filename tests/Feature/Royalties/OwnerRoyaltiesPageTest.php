@@ -62,7 +62,7 @@ class OwnerRoyaltiesPageTest extends TestCase
             $this->statement($artistId, '2025-01', 1, 0, 'paid');
         }
 
-        $this->actingAs($user)->get('/v2/royalties')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($user)->get('/royalties')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Royalties/Index')
             ->where('summary.gross', fn ($v) => abs((float) $v - 376) < 0.001)
             ->where('summary.deductions', fn ($v) => abs((float) $v - 30) < 0.001)
@@ -74,16 +74,16 @@ class OwnerRoyaltiesPageTest extends TestCase
                 && abs(collect($rows)->firstWhere('month', '2026-07')['net'] - 230) < 0.001)
             ->where('statements.total', 30));
 
-        $this->actingAs($user)->get('/v2/royalties?status=paid')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($user)->get('/royalties?status=paid')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('filters.status', 'paid')
             ->where('statements.total', 27)
             ->where('statements.data.0.statement_month', '2026-07-01'));
 
-        $this->actingAs($user)->get('/v2/royalties?search=2026-06')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($user)->get('/royalties?search=2026-06')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('statements.total', 1)
             ->where('statements.data.0.status', 'pending'));
 
-        $this->actingAs($user)->get('/v2/royalties?status=nonsense')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($user)->get('/royalties?status=nonsense')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('filters.status', '')
             ->where('statements.total', 30));
     }
@@ -95,7 +95,7 @@ class OwnerRoyaltiesPageTest extends TestCase
         $this->statement($artistId, '2026-07', 10, 0, 'paid');
         $this->statement($otherArtist, '2026-07', 500, 0, 'paid');
 
-        $this->actingAs($user)->get('/v2/royalties')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($user)->get('/royalties')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('counts.all', 1)
             ->where('summary.gross', fn ($v) => abs((float) $v - 10) < 0.001));
     }

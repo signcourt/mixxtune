@@ -357,7 +357,7 @@ export default function Index({
 
         if (editingMember) {
             put(
-                `/v2/label/user-access/${editingMember.id}`,
+                `/label/user-access/${editingMember.id}`,
                 options
             );
 
@@ -365,14 +365,14 @@ export default function Index({
         }
 
         post(
-            '/v2/label/user-access',
+            '/label/user-access',
             options
         );
     };
 
     const changeStatus = (member, status) => {
         router.patch(
-            `/v2/label/user-access/${member.id}/status`,
+            `/label/user-access/${member.id}/status`,
             { status },
             {
                 preserveScroll: true,
@@ -390,7 +390,7 @@ export default function Index({
         }
 
         router.delete(
-            `/v2/label/user-access/${member.id}`,
+            `/label/user-access/${member.id}`,
             {
                 preserveScroll: true,
             }

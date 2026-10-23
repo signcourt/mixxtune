@@ -72,14 +72,14 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
     const submit = (e) => {
         e.preventDefault();
         if (sameMonth.length && !window.confirm(`${monthName(data.reporting_month)} already has ${sameMonth.length} report(s). Upload this one too?\n(Exact duplicate rows are skipped automatically.)`)) return;
-        post("/v2/admin/reports/imports", { forceFormData: true, preserveScroll: true, onSuccess: () => { reset(); const f = document.getElementById("report-file"); if (f) f.value = ""; } });
+        post("/admin/reports/imports", { forceFormData: true, preserveScroll: true, onSuccess: () => { reset(); const f = document.getElementById("report-file"); if (f) f.value = ""; } });
     };
 
     const saveEdit = (e) => {
         e.preventDefault();
         if (!editing || !editMonth || busy) return;
         setBusy(true);
-        router.patch(`/v2/admin/reports/imports/${editing.id}`, { reporting_month: editMonth }, {
+        router.patch(`/admin/reports/imports/${editing.id}`, { reporting_month: editMonth }, {
             preserveScroll: true,
             onSuccess: () => { setEditing(null); setEditMonth(""); },
             onFinish: () => setBusy(false),
@@ -89,13 +89,13 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
     const remove = (i) => {
         if (busy || !window.confirm(`Delete "${i.original_filename}" and its ${num(i.imported_rows)} rows?\n\nOnly possible while nothing from it is in wallets.`)) return;
         setBusy(true);
-        router.delete(`/v2/admin/reports/imports/${i.id}`, { preserveScroll: true, onFinish: () => setBusy(false) });
+        router.delete(`/admin/reports/imports/${i.id}`, { preserveScroll: true, onFinish: () => setBusy(false) });
     };
 
     const redetect = (i) => {
         if (busy || !window.confirm(`Check the ${num(i.unmapped_rows_count)} unmapped row(s) of ${i.original_filename} against the latest catalogue again?\n\nMapped rows are not changed. Nothing is credited or published.`)) return;
         setBusy(true);
-        router.post(`/v2/admin/reports/imports/${i.id}/re-detect-unmapped`, {}, { preserveScroll: true, preserveState: true, onFinish: () => setBusy(false) });
+        router.post(`/admin/reports/imports/${i.id}/re-detect-unmapped`, {}, { preserveScroll: true, preserveState: true, onFinish: () => setBusy(false) });
     };
 
     const errorList = Object.entries(pageErrors).filter(([k]) => !["reporting_month", "report_file"].includes(k));
@@ -200,7 +200,7 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
                                         </div>
 
                                         <div className="flex flex-wrap items-center gap-1.5">
-                                            <a href={`/v2/admin/reports/imports/${i.id}/view`} className="inline-flex h-9 items-center gap-1 rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white">
+                                            <a href={`/admin/reports/imports/${i.id}/view`} className="inline-flex h-9 items-center gap-1 rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white">
                                                 <Eye className="h-3.5 w-3.5" /> {locked || i.status === "failed" || running ? "Open" : "Open & review"}
                                             </a>
                                             {unmapped > 0 && !running && (
@@ -213,7 +213,7 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
                                                     <RefreshCw className="h-4 w-4" />
                                                 </button>
                                             )}
-                                            <a href={`/v2/admin/reports/imports/${i.id}/download`} title="Download the original file" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600">
+                                            <a href={`/admin/reports/imports/${i.id}/download`} title="Download the original file" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600">
                                                 <Download className="h-4 w-4" />
                                             </a>
                                             {!locked && !running && (

@@ -136,7 +136,7 @@ export default function CommonDashboard({
                 /* W89: one click opens the create-release form; the second button is removed */
                 primaryAction={{
                     label: 'Create Release',
-                    href: '/v2/releases/create',
+                    href: '/releases/create',
                 }}
                 secondaryAction={null}
             />

@@ -26,7 +26,7 @@ class ReleaseWizardStepsTest extends TestCase
         $label = Label::factory()->create(['name' => 'Wizard Label Music']);
         $release = Release::factory()->create(['status' => 'draft', 'label_id' => $label->id, 'created_by' => $super->id]);
 
-        $this->actingAs($super)->get('/v2/releases/'.$release->id.'/edit')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/releases/'.$release->id.'/edit')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('release.label_name', 'Wizard Label Music'));
     }
 
@@ -36,7 +36,7 @@ class ReleaseWizardStepsTest extends TestCase
         $store = \App\Models\DistributionStore::query()->create(['name' => 'Wizard Store', 'slug' => 'wizard-store', 'is_active' => true]);
         $release = Release::factory()->create(['status' => 'draft', 'created_by' => $super->id]);
 
-        $this->actingAs($super)->patch('/v2/releases/'.$release->id.'/distribution', [
+        $this->actingAs($super)->patch('/releases/'.$release->id.'/distribution', [
             'stores' => [$store->id], 'worldwide' => false, 'territories' => ['IN', 'NP'],
             'release_timezone' => 'Asia/Kolkata', 'pre_order' => false,
         ])->assertSessionHasNoErrors();

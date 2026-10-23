@@ -197,7 +197,7 @@ class LabelOwnershipService
             }
         }
 
-        $sub = Request::create('/v2/admin/users', 'POST', $payload);
+        $sub = Request::create('/admin/users', 'POST', $payload);
         $sub->setUserResolver(fn () => $admin);
         $session = app('session.store');
         $sub->setLaravelSession($session);

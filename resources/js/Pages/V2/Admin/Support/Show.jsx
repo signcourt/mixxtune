@@ -34,7 +34,7 @@ export default function Show({ role = "admin", ticket, messages = [], otherTicke
     const sendReply = (e) => {
         e.preventDefault();
         reply.transform((d) => ({ ...d, status: d.is_internal ? undefined : after }));
-        reply.post(`/v2/admin/support/${ticket.id}/reply`, {
+        reply.post(`/admin/support/${ticket.id}/reply`, {
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => reply.reset(),
@@ -43,7 +43,7 @@ export default function Show({ role = "admin", ticket, messages = [], otherTicke
 
     const saveSettings = (patch = {}) => {
         settings.transform((d) => ({ ...d, ...patch, assigned_admin_id: (patch.assigned_admin_id ?? d.assigned_admin_id) || null }));
-        settings.patch(`/v2/admin/support/${ticket.id}`, { preserveScroll: true });
+        settings.patch(`/admin/support/${ticket.id}`, { preserveScroll: true });
     };
 
     const select = "mt-1 h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm";
@@ -53,7 +53,7 @@ export default function Show({ role = "admin", ticket, messages = [], otherTicke
         <PanelLayout role={role} title={ticket.ticket_number} subtitle={ticket.subject}>
             <Head title={`${ticket.ticket_number} · ${ticket.subject}`} />
 
-            <Link href="/v2/admin/support" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-violet-700">
+            <Link href="/admin/support" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-violet-700">
                 <ArrowLeft className="h-4 w-4" /> All tickets
             </Link>
 
@@ -151,7 +151,7 @@ export default function Show({ role = "admin", ticket, messages = [], otherTicke
                                     {ticket.user.client_id ? ` · client ${ticket.user.client_id}` : ""}
                                 </div>
                                 {role === "super_admin" && (
-                                    <a href={`/v2/admin/users/${ticket.user.id}/edit`} className="mt-2 inline-block text-xs font-semibold text-violet-700 underline">Open user</a>
+                                    <a href={`/admin/users/${ticket.user.id}/edit`} className="mt-2 inline-block text-xs font-semibold text-violet-700 underline">Open user</a>
                                 )}
                             </div>
                         ) : (
@@ -215,7 +215,7 @@ export default function Show({ role = "admin", ticket, messages = [], otherTicke
                             <ul className="mt-2 space-y-1.5">
                                 {otherTickets.map((o) => (
                                     <li key={o.id}>
-                                        <Link href={`/v2/admin/support/${o.id}`} className="flex items-center justify-between gap-2 text-xs hover:underline">
+                                        <Link href={`/admin/support/${o.id}`} className="flex items-center justify-between gap-2 text-xs hover:underline">
                                             <span className="truncate text-slate-700">{o.subject}</span>
                                             <StatusPill status={o.status} />
                                         </Link>

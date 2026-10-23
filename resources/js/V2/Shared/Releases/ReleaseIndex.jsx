@@ -85,7 +85,7 @@ export default function ReleaseIndex({
 
     
     /* W76: artists used "/releases", which does not exist (every filter change gave a 404) */
-    const basePath = '/v2/releases';
+    const basePath = '/releases';
 
     const canCreate =
         role === 'artist'

@@ -124,7 +124,7 @@ class SupportDesk
         $files = collect($message->attachments ?? [])->values()->map(fn ($file, $i) => [
             'name' => $file['name'] ?? 'file',
             'size' => $file['size'] ?? null,
-            'url' => '/v2/support/'.$ticket->id.'/files/'.$message->id.'/'.$i,
+            'url' => '/support/'.$ticket->id.'/files/'.$message->id.'/'.$i,
         ])->all();
 
         return [
@@ -157,7 +157,7 @@ class SupportDesk
                     $type,
                     $title,
                     "{$ticket->ticket_number}: {$ticket->subject}",
-                    "/v2/admin/support/{$ticket->id}"
+                    "/admin/support/{$ticket->id}"
                 );
             }
         } catch (Throwable $exception) {
@@ -174,7 +174,7 @@ class SupportDesk
                     $type,
                     $title,
                     $message ?? "{$ticket->ticket_number}: {$ticket->subject}",
-                    "/v2/support/{$ticket->id}"
+                    "/support/{$ticket->id}"
                 );
             }
         } catch (Throwable $exception) {

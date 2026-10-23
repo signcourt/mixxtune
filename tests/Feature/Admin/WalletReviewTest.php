@@ -88,7 +88,7 @@ class WalletReviewTest extends TestCase
         $this->entry($wa, 'royalty_import', 'credit', 1000);
         $this->entry($wb, 'withdrawal_hold', 'debit', 50);
 
-        $this->actingAs($super)->get('/v2/admin/wallet')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/wallet')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Wallet/Index')
             ->where('wallet.in_withdrawal', 500)
             ->where('wallet.royalty_pending', 200)
@@ -101,7 +101,7 @@ class WalletReviewTest extends TestCase
             ->where('transactions.data.0.owner', 'Beta Owner')
             ->where('transactions.data.1.date', '21 Oct 2026, 12:00 PM'));
 
-        $this->actingAs($super)->get('/v2/admin/wallet?wallet='.$wa->id)->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/wallet?wallet='.$wa->id)->assertInertia(fn (Assert $p) => $p
             ->has('transactions.data', 1)
             ->where('historyWallet', $wa->id)
             ->where('historyOwner', 'Alpha Owner'));
@@ -114,7 +114,7 @@ class WalletReviewTest extends TestCase
         $w = $this->wallet($other, 10, 0);
         $this->entry($w, 'royalty_import', 'credit', 10);
 
-        $r = $this->actingAs($admin)->get('/v2/admin/wallet?wallet='.$w->id);
+        $r = $this->actingAs($admin)->get('/admin/wallet?wallet='.$w->id);
 
         /* an admin without the wallet permission is stopped before; otherwise nothing leaks */
         if ($r->status() === 403) {
@@ -135,7 +135,7 @@ class WalletReviewTest extends TestCase
         $this->withdrawal($w, 400, 'approved');
         $this->entry($w, 'manual_adjustment', 'credit', 300);
 
-        $this->actingAs($owner)->get('/v2/wallet')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($owner)->get('/wallet')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('inWithdrawal', 400)
             ->where('transactions.data.0.type', 'Manual adjustment'));
     }
@@ -145,11 +145,11 @@ class WalletReviewTest extends TestCase
         $super = $this->user('super_admin');
         $this->wallet($this->user('label', ['name' => 'Csv Wallet Owner']), 99, 0);
 
-        $r = $this->actingAs($super)->get('/v2/admin/wallet/export');
+        $r = $this->actingAs($super)->get('/admin/wallet/export');
         $r->assertOk();
         $this->assertStringContainsString('Csv Wallet Owner', $r->streamedContent());
         $this->assertSame(1, DB::table('audit_logs')->where('action', 'finance.wallets_exported')->count());
 
-        $this->actingAs($this->user('label'))->get('/v2/admin/wallet/export')->assertForbidden();
+        $this->actingAs($this->user('label'))->get('/admin/wallet/export')->assertForbidden();
     }
 }

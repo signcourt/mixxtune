@@ -1201,7 +1201,7 @@ class ReportAnalyticsService
      * MySQL can fail with "1062 Duplicate entry ... for key <group_key>"
      * when it groups text that differs only in trailing spaces / letter
      * case (e.g. "VR Bros HD" and "VR Bros HD "): the 91k-row July report
-     * made /v2/analytics a 500 page. Every name grouping now uses one
+     * made /analytics a 500 page. Every name grouping now uses one
      * normalized key (trimmed, lower case, MD5 on MySQL so no collation
      * can see two keys as equal) and shows one original spelling.
      */

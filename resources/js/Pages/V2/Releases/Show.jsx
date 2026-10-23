@@ -280,7 +280,7 @@ export default function Show({
             <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <Link
-                        href="/v2/releases"
+                        href="/releases"
                         className="inline-flex rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                     >
                         ← Back to Releases
@@ -293,7 +293,7 @@ export default function Show({
 
                         {release.editable && (
                             <Link
-                                href={`/v2/releases/${release.id}/edit`}
+                                href={`/releases/${release.id}/edit`}
                                 className="inline-flex rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
                             >
                                 Edit Release
@@ -302,7 +302,7 @@ export default function Show({
 
                         {!release.editable && release.admin_edit && (
                             <Link
-                                href={`/v2/releases/${release.id}/edit`}
+                                href={`/releases/${release.id}/edit`}
                                 className="inline-flex rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-600"
                             >
                                 Edit (Super Admin)

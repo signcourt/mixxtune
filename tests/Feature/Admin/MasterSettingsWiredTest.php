@@ -80,7 +80,7 @@ class MasterSettingsWiredTest extends TestCase
     {
         $super = $this->user('super_admin');
 
-        $this->actingAs($super)->patch('/v2/admin/settings', $this->payload([
+        $this->actingAs($super)->patch('/admin/settings', $this->payload([
             'release' => ['minimum_days_ahead' => 5, 'allow_explicit' => false, 'require_artwork' => false],
             'upload' => ['audio_max_mb' => 200, 'artwork_max_mb' => 10, 'report_max_mb' => 100],
             'invoice' => ['prefix' => 'MXT'],
@@ -94,24 +94,24 @@ class MasterSettingsWiredTest extends TestCase
         $this->assertFalse(PlatformRules::allowExplicit());
         $this->assertSame('MXT', PlatformRules::invoicePrefix());
 
-        $this->actingAs($super)->get('/v2/admin/settings')->assertOk();
+        $this->actingAs($super)->get('/admin/settings')->assertOk();
     }
 
     public function test_page_explains_what_is_wrong_and_refuses_half_filled_maintenance(): void
     {
         $super = $this->user('super_admin');
 
-        $this->actingAs($super)->patch('/v2/admin/settings', $this->payload(['maintenance' => ['enabled' => true]]))
+        $this->actingAs($super)->patch('/admin/settings', $this->payload(['maintenance' => ['enabled' => true]]))
             ->assertSessionHasErrors(['maintenance.date', 'maintenance.start_time', 'maintenance.end_time']);
 
-        $this->actingAs($super)->patch('/v2/admin/settings', $this->payload([
+        $this->actingAs($super)->patch('/admin/settings', $this->payload([
             'maintenance' => ['enabled' => true, 'date' => '2026-12-01', 'start_time' => '10:00', 'end_time' => '10:00'],
         ]))->assertSessionHasErrors('maintenance.end_time');
 
-        $this->actingAs($super)->patch('/v2/admin/settings', $this->payload(['invoice' => ['prefix' => 'MX-']]))
+        $this->actingAs($super)->patch('/admin/settings', $this->payload(['invoice' => ['prefix' => 'MX-']]))
             ->assertSessionHasErrors('invoice.prefix');
 
-        $this->actingAs($this->user('admin'))->patch('/v2/admin/settings', $this->payload())->assertForbidden();
+        $this->actingAs($this->user('admin'))->patch('/admin/settings', $this->payload())->assertForbidden();
     }
 
     public function test_overnight_maintenance_window_is_active_after_midnight(): void
@@ -121,7 +121,7 @@ class MasterSettingsWiredTest extends TestCase
 
         Carbon::setTestNow(Carbon::parse('2026-12-01 23:30', 'Asia/Kolkata'));
 
-        $this->actingAs($super)->patch('/v2/admin/settings', $this->payload([
+        $this->actingAs($super)->patch('/admin/settings', $this->payload([
             'maintenance' => ['enabled' => true, 'date' => '2026-12-01', 'start_time' => '23:00', 'end_time' => '02:00'],
         ]))->assertSessionHasNoErrors();
 
@@ -143,18 +143,18 @@ class MasterSettingsWiredTest extends TestCase
         Storage::fake('public');
         $super = $this->user('super_admin');
 
-        $path = $this->actingAs($super)->post('/v2/admin/settings/branding/upload', [
+        $path = $this->actingAs($super)->post('/admin/settings/branding/upload', [
             'type' => 'panel_logo', 'file' => UploadedFile::fake()->image('logo.png', 1200, 400),
         ])->assertOk()->json('path');
 
         $this->assertStringStartsWith('/storage/branding/panel_logo/', $path);
         Storage::disk('public')->assertExists(substr($path, strlen('/storage/')));
 
-        $this->actingAs($super)->postJson('/v2/admin/settings/branding/upload', [
+        $this->actingAs($super)->postJson('/admin/settings/branding/upload', [
             'type' => 'panel_logo', 'file' => UploadedFile::fake()->create('logo.pdf', 10, 'application/pdf'),
         ])->assertStatus(422);
 
-        $this->actingAs($this->user('admin'))->post('/v2/admin/settings/branding/upload', [
+        $this->actingAs($this->user('admin'))->post('/admin/settings/branding/upload', [
             'type' => 'favicon', 'file' => UploadedFile::fake()->image('f.png', 64, 64),
         ])->assertForbidden();
     }

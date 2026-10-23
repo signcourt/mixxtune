@@ -278,9 +278,9 @@ class KycReviewController extends Controller
         if ($profile->user) {
             try {
                 match ($status) {
-                    'verified' => $this->notices->send($profile->user, 'kyc.verified', 'Your KYC is verified', 'You can now request payouts to your bank account.', '/v2/withdrawals'),
-                    'rejected' => $this->notices->send($profile->user, 'kyc.rejected', 'Your KYC needs a correction', $note, '/v2/kyc-profile'),
-                    default => $this->notices->send($profile->user, 'kyc.sent_back', 'Please check your KYC details', $note, '/v2/kyc-profile'),
+                    'verified' => $this->notices->send($profile->user, 'kyc.verified', 'Your KYC is verified', 'You can now request payouts to your bank account.', '/withdrawals'),
+                    'rejected' => $this->notices->send($profile->user, 'kyc.rejected', 'Your KYC needs a correction', $note, '/kyc-profile'),
+                    default => $this->notices->send($profile->user, 'kyc.sent_back', 'Please check your KYC details', $note, '/kyc-profile'),
                 };
             } catch (Throwable $e) {
                 report($e);
@@ -332,7 +332,7 @@ class KycReviewController extends Controller
                 isset($profiles[$u->id])
                     ? 'Please check your payout details and press "Submit for Verification".'
                     : 'Please send us your PAN, bank account number, IFSC and address (reply to our e-mail or open a support ticket) so we can set up your payouts.',
-                isset($profiles[$u->id]) ? '/v2/kyc-profile' : '/v2/support/create?category=kyc'
+                isset($profiles[$u->id]) ? '/kyc-profile' : '/support/create?category=kyc'
             );
             $sent++;
         }

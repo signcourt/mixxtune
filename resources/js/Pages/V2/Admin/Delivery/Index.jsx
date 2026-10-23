@@ -36,7 +36,7 @@ export default function Index({
         status
     ) => {
         router.get(
-            '/v2/admin/distribution',
+            '/admin/distribution',
             {
                 status,
                 search:
@@ -149,7 +149,7 @@ export default function Index({
                                     'Enter'
                                 ) {
                                     router.get(
-                                        '/v2/admin/distribution',
+                                        '/admin/distribution',
                                         {
                                             ...filters,
                                             search:
@@ -271,7 +271,7 @@ export default function Index({
 
                                                 <td className="px-5 py-4">
                                                     <Link
-                                                        href={`/v2/admin/distribution/${release.id}`}
+                                                        href={`/admin/distribution/${release.id}`}
                                                         className="rounded-lg border border-violet-300 px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50"
                                                     >
                                                         Manage DSPs

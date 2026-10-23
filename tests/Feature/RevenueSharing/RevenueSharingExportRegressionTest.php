@@ -215,7 +215,7 @@ class RevenueSharingExportRegressionTest extends TestCase
             $this
                 ->actingAs($user)
                 ->get(
-                    "/v2/label/revenue-sharing/artist/{$artist->id}/export"
+                    "/label/revenue-sharing/artist/{$artist->id}/export"
                 );
 
         $response->assertOk();
@@ -274,7 +274,7 @@ class RevenueSharingExportRegressionTest extends TestCase
             $this
                 ->actingAs($user)
                 ->get(
-                    "/v2/label/revenue-sharing/artist/{$artist->id}/export"
+                    "/label/revenue-sharing/artist/{$artist->id}/export"
                 );
 
         $response->assertOk();

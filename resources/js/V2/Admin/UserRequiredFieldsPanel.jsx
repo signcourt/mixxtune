@@ -54,7 +54,7 @@ export default function UserRequiredFieldsPanel({
         setMessage("");
 
         try {
-            await axios.post("/v2/admin/user-form/required-fields", { fields: draft });
+            await axios.post("/admin/user-form/required-fields", { fields: draft });
             setMessage("Saved. The form below now follows these settings.");
             router.reload({ only: ["requiredFields"], preserveScroll: true });
         } catch (exception) {

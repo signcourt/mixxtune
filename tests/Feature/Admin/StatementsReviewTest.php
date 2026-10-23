@@ -52,7 +52,7 @@ class StatementsReviewTest extends TestCase
             $this->statement(['label_id' => $label->id, 'statement_month' => sprintf('2024-%02d-01', ($i % 12) + 1), 'status' => $i <= 4 ? 'pending' : 'paid']);
         }
 
-        $this->actingAs($super)->get('/v2/admin/statements')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/statements')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Statements/Index')
             ->has('statements.data', 25)
             ->where('summary.count', 30)
@@ -74,7 +74,7 @@ class StatementsReviewTest extends TestCase
 
         app(\App\Services\V2\WalletService::class)->account($owner)->forceFill(['available_balance' => 1234.5])->save();
 
-        $this->actingAs($owner)->get('/v2/statements?month=2026-08')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($owner)->get('/statements?month=2026-08')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->has('statements.data', 1)
             ->where('summary.count', 1)
             ->where('summary.wallet', 1234.5)
@@ -91,7 +91,7 @@ class StatementsReviewTest extends TestCase
         $this->statement(['artist_id' => $artistA->id]);
         $this->statement(['artist_id' => $artistB->id, 'net_payable' => 999999]);
 
-        $this->actingAs($a)->get('/v2/statements')->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($a)->get('/statements')->assertInertia(fn (Assert $p) => $p
             ->has('statements.data', 1)
             ->where('summary.net', 850));
     }
@@ -112,7 +112,7 @@ class StatementsReviewTest extends TestCase
         $mk(['financial_status' => 'published', 'published_at' => now()]);
         $mk(['status' => 'failed']);
 
-        $this->actingAs($super)->get('/v2/admin/statements')->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/statements')->assertInertia(fn (Assert $p) => $p
             ->has('pipeline', 5)
             ->where('pipeline.0.step', 'failed')
             ->where('pipeline.1.step', 'published')
@@ -123,6 +123,6 @@ class StatementsReviewTest extends TestCase
             ->where('pipeline.4.month', 'July 2026'));
 
         $owner = $this->user('artist');
-        $this->actingAs($owner)->get('/v2/statements')->assertInertia(fn (Assert $p) => $p->where('pipeline', []));
+        $this->actingAs($owner)->get('/statements')->assertInertia(fn (Assert $p) => $p->where('pipeline', []));
     }
 }

@@ -49,7 +49,7 @@ export default function Index({ role = "artist", invoices = {} }) {
                                         <div className="text-base font-black text-slate-900">{money(v.net, v.currency)}</div>
                                         {v.tds > 0 && <div className="text-xs text-slate-500">after TDS {money(v.tds, v.currency)}</div>}
                                     </div>
-                                    <a href={`/v2/invoices/${v.id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                    <a href={`/invoices/${v.id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                                         <Download className="h-3.5 w-3.5" /> PDF
                                     </a>
                                 </div>

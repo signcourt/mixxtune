@@ -12,9 +12,9 @@ import { COUNTRIES } from '@/V2/Shared/Releases/Steps/TerritoryStep';
 
 const RELEASES_BASE_PATH =
     typeof window !== 'undefined'
-    && window.location.pathname.startsWith('/artist')
+    && /^\/artist(\/|$)/.test(window.location.pathname)
         ? '/artist/releases'
-        : '/v2/releases';
+        : '/releases';
 
 const formatDate = (value) => {
     if (!value) return 'Not provided';
@@ -299,7 +299,7 @@ export default function ReviewStep({
                     </div>
                     <div className="mt-1 text-xs text-slate-600">{doneCount} of {checks.length} checks done</div>
                     {adminEdit ? (
-                        <Link href={`/v2/releases/${release.id}`} className="mt-3 block w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-emerald-700">
+                        <Link href={`/releases/${release.id}`} className="mt-3 block w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-emerald-700">
                             Done · changes are saved
                         </Link>
                     ) : (

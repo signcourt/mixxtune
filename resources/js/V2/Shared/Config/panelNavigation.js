@@ -219,7 +219,7 @@ const ownerNavigation = (
             label: 'Legal Operations',
             icon: ShieldCheck,
             /* W74: one click opens the Legal Operations page (no sub-menu); every topic + Case History is on that page */
-            href: '/v2/legal-operations',
+            href: '/legal-operations',
         },
     ];
 
@@ -321,7 +321,7 @@ const adminNavigation = (
                           {
                               id: 'account-panel-access',
                               label: 'Panel Access',
-                              href: '/v2/admin/panel-access',
+                              href: '/admin/panel-access',
                           },
                       ]
                     : []),
@@ -417,7 +417,7 @@ const adminNavigation = (
                               /* W57: Transfer History is a tab inside this page */
                               id: 'catalogue-ownership',
                               label: 'Ownership Transfer',
-                              href: '/v2/admin/ownership',
+                              href: '/admin/ownership',
                               permission: 'catalogue.view',
                           },
                       ]
@@ -439,7 +439,7 @@ const adminNavigation = (
                 {
                     id: 'financial-finance-royalties',
                     label: 'Finance & Royalties',
-                    href: '/v2/admin/finance',
+                    href: '/admin/finance',
                 },
                 /* MIXXTUNE_FINANCE_CLEANUP_V1: statement lists are in Finance & Royalties / Statements;
                    this page is only the IPRS / PRS rights royalty upload (super admin) */
@@ -468,7 +468,7 @@ const adminNavigation = (
                 {
                     id: 'financial-revenue-imports',
                     label: 'Revenue Imports',
-                    href: '/v2/admin/reports/imports',
+                    href: '/admin/reports/imports',
                     permission: 'reports.view',
                 },
                 /* MIXXTUNE_FINANCE_CLEANUP_V1: the page itself is super admin only */
@@ -494,12 +494,12 @@ const adminNavigation = (
                           {
                               id: 'financial-statements',
                               label: 'Statements',
-                              href: '/v2/admin/statements',
+                              href: '/admin/statements',
                           },
                           {
                               id: 'financial-invoices',
                               label: 'Invoices',
-                              href: '/v2/admin/invoices',
+                              href: '/admin/invoices',
                           },
                           {
                               id: 'financial-recoupment-advances',
@@ -549,7 +549,7 @@ const adminNavigation = (
                     ? [{
                           id: 'administration-send-notification',
                           label: 'Send Notification',
-                          href: '/v2/admin/notification-management',
+                          href: '/admin/notification-management',
                       }]
                     : []),
                 {

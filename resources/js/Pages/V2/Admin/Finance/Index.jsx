@@ -107,7 +107,7 @@ export default function Index({
         event.preventDefault();
 
         post(
-            '/v2/admin/finance/statements/generate',
+            '/admin/finance/statements/generate',
             {
                 preserveScroll: true,
                 onSuccess: () => reset(),
@@ -119,7 +119,7 @@ export default function Index({
         event.preventDefault();
 
         router.get(
-            '/v2/admin/finance',
+            '/admin/finance',
             {
                 search,
                 month,
@@ -139,7 +139,7 @@ export default function Index({
         setStatus('');
 
         router.get(
-            '/v2/admin/finance',
+            '/admin/finance',
             {},
             {
                 preserveState: true,
@@ -564,7 +564,7 @@ export default function Index({
                                         <Cell>
                                             <div className="flex flex-wrap gap-2">
                                                 <a
-                                                    href={`/v2/statements/${item.id}/download`}
+                                                    href={`/statements/${item.id}/download`}
                                                     className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                                                 >
                                                     PDF
@@ -580,7 +580,7 @@ export default function Index({
                                                             }
                                                             onClick={() =>
                                                                 run(
-                                                                    `/v2/admin/finance/statements/${item.id}/approve`,
+                                                                    `/admin/finance/statements/${item.id}/approve`,
                                                                     item.id
                                                                 )
                                                             }
@@ -600,7 +600,7 @@ export default function Index({
                                                             }
                                                             onClick={() =>
                                                                 run(
-                                                                    `/v2/admin/finance/statements/${item.id}/available`,
+                                                                    `/admin/finance/statements/${item.id}/available`,
                                                                     item.id
                                                                 )
                                                             }
@@ -630,7 +630,7 @@ export default function Index({
                                                                     )
                                                                 ) {
                                                                     run(
-                                                                        `/v2/admin/finance/holds/${item.unclaimed_hold_id}/release`,
+                                                                        `/admin/finance/holds/${item.unclaimed_hold_id}/release`,
                                                                         item.id
                                                                     );
                                                                 }

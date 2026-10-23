@@ -30,7 +30,7 @@ export default function Index({ role = "admin", filters = {}, counts = {}, profi
     const [search, setSearch] = useState(filters.search || "");
     const first = useRef(true);
 
-    const go = (patch) => router.get("/v2/admin/kyc", { ...filters, ...patch, page: undefined }, { preserveState: true, preserveScroll: true, replace: true });
+    const go = (patch) => router.get("/admin/kyc", { ...filters, ...patch, page: undefined }, { preserveState: true, preserveScroll: true, replace: true });
 
     useEffect(() => {
         if (first.current) {
@@ -48,7 +48,7 @@ export default function Index({ role = "admin", filters = {}, counts = {}, profi
     const remind = (ids) => {
         if (!ids.length) return;
         if (!window.confirm(`Send a "complete your KYC" notice to ${ids.length} owner(s)?`)) return;
-        router.post("/v2/admin/kyc/remind", { user_ids: ids }, { preserveScroll: true });
+        router.post("/admin/kyc/remind", { user_ids: ids }, { preserveScroll: true });
     };
 
     return (
@@ -135,7 +135,7 @@ export default function Index({ role = "admin", filters = {}, counts = {}, profi
                                 <div className="flex shrink-0 gap-2">
                                     <button type="button" onClick={() => remind([u.user_id])} className="h-9 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700">Remind</button>
                                     {role === "super_admin" && (
-                                        <a href={`/v2/admin/users/${u.user_id}/edit`} className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white">Add bank + PAN</a>
+                                        <a href={`/admin/users/${u.user_id}/edit`} className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white">Add bank + PAN</a>
                                     )}
                                 </div>
                             </li>
@@ -203,7 +203,7 @@ function ProfileCard({ p, role, reasons, onRemind }) {
         }
         setBusy(true);
         setTried(true);
-        router.post(`/v2/admin/kyc/${p.id}/verify`, { status, kyc_notes: note, override }, { preserveScroll: true, onFinish: () => setBusy(false), onSuccess: () => setNote("") });
+        router.post(`/admin/kyc/${p.id}/verify`, { status, kyc_notes: note, override }, { preserveScroll: true, onFinish: () => setBusy(false), onSuccess: () => setNote("") });
     };
 
     const reveal = () => {
@@ -211,7 +211,7 @@ function ProfileCard({ p, role, reasons, onRemind }) {
             setFull(null);
             return;
         }
-        axios.post(`/v2/admin/kyc/${p.id}/reveal`).then(({ data }) => setFull(data));
+        axios.post(`/admin/kyc/${p.id}/reveal`).then(({ data }) => setFull(data));
     };
 
     const loadHistory = () => {
@@ -219,7 +219,7 @@ function ProfileCard({ p, role, reasons, onRemind }) {
             setHist(null);
             return;
         }
-        axios.get(`/v2/admin/kyc/${p.id}/history`).then(({ data }) => setHist(data.items || []));
+        axios.get(`/admin/kyc/${p.id}/history`).then(({ data }) => setHist(data.items || []));
     };
 
     return (
@@ -292,7 +292,7 @@ function ProfileCard({ p, role, reasons, onRemind }) {
                                 <button type="button" onClick={reveal} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700">
                                     <Eye className="h-3.5 w-3.5" /> {full ? "Hide full numbers" : "Show full PAN / account"}
                                 </button>
-                                <a href={`/v2/admin/users/${p.user_id}/edit`} className="inline-flex h-9 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700">Edit details</a>
+                                <a href={`/admin/users/${p.user_id}/edit`} className="inline-flex h-9 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700">Edit details</a>
                             </>
                         )}
                         <button type="button" onClick={loadHistory} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700">

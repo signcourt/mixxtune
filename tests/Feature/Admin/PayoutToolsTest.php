@@ -171,7 +171,7 @@ class PayoutToolsTest extends TestCase
         PayoutProfile::query()->where('user_id', $notVerified->id)->update(['kyc_status' => 'submitted']);
         $this->pay($this->owner(), $super, 1200); // paid: never in the file
 
-        $csv = $this->actingAs($super)->get('/v2/admin/payouts/axis-file?format=csv');
+        $csv = $this->actingAs($super)->get('/admin/payouts/axis-file?format=csv');
         $csv->assertOk();
         $lines = array_values(array_filter(explode("\n", $csv->streamedContent())));
         $this->assertCount(2, $lines, 'header + one ready payment');
@@ -183,7 +183,7 @@ class PayoutToolsTest extends TestCase
         $this->assertSame('DEMO0000001', $row[6]);
         $this->assertSame($readyWd->withdrawal_number, $row[8]);
 
-        $xlsx = $this->actingAs($super)->get('/v2/admin/payouts/axis-file');
+        $xlsx = $this->actingAs($super)->get('/admin/payouts/axis-file');
         $xlsx->assertOk();
         $path = tempnam(sys_get_temp_dir(), 'axis').'.xlsx';
         file_put_contents($path, $xlsx->streamedContent());
@@ -199,7 +199,7 @@ class PayoutToolsTest extends TestCase
         $this->assertSame('approved', $readyWd->fresh()->status, 'the file never marks anything paid');
 
         $manager = $this->makeUser('admin');
-        $this->actingAs($manager)->get('/v2/admin/payouts/axis-file')->assertForbidden();
+        $this->actingAs($manager)->get('/admin/payouts/axis-file')->assertForbidden();
     }
 
     public function test_tds_report_lists_paid_payouts_of_the_year(): void
@@ -207,7 +207,7 @@ class PayoutToolsTest extends TestCase
         $super = $this->makeUser('super_admin');
         $paid = $this->pay($this->owner(), $super, 1500);
 
-        $response = $this->actingAs($super)->get('/v2/admin/payouts/tds-report?fy='.PayoutDeductionService::financialYear()['label']);
+        $response = $this->actingAs($super)->get('/admin/payouts/tds-report?fy='.PayoutDeductionService::financialYear()['label']);
         $response->assertOk();
         $path = tempnam(sys_get_temp_dir(), 'tds').'.xlsx';
         file_put_contents($path, $response->streamedContent());
@@ -220,7 +220,7 @@ class PayoutToolsTest extends TestCase
         $this->assertEquals(150, $rows[1][10]);
         $this->assertEquals(1350, $rows[1][11]);
 
-        $this->actingAs($this->makeUser('label'))->get('/v2/admin/payouts/tds-report')->assertForbidden();
+        $this->actingAs($this->makeUser('label'))->get('/admin/payouts/tds-report')->assertForbidden();
     }
 
     public function test_admin_page_shows_tds_and_net_to_transfer(): void
@@ -228,7 +228,7 @@ class PayoutToolsTest extends TestCase
         $super = $this->makeUser('super_admin');
         $this->approved($this->owner(), $super, 1500);
 
-        $this->actingAs($super)->get('/v2/admin/withdrawals?status=approved')
+        $this->actingAs($super)->get('/admin/withdrawals?status=approved')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('withdrawals.data.0.deduction.tds_amount', 150)
@@ -292,8 +292,8 @@ class PayoutToolsTest extends TestCase
         Notification::assertNothingSent();
 
         // the button sends due reminders even when the daily run is off
-        $this->actingAs($this->makeUser('admin'))->post('/v2/admin/users/invitation-reminders')->assertForbidden();
-        $this->actingAs($super)->post('/v2/admin/users/invitation-reminders')->assertSessionHas('success');
+        $this->actingAs($this->makeUser('admin'))->post('/admin/users/invitation-reminders')->assertForbidden();
+        $this->actingAs($super)->post('/admin/users/invitation-reminders')->assertSessionHas('success');
         Notification::assertSentTo($due, UserInvitationNotification::class);
     }
 
@@ -312,7 +312,7 @@ class PayoutToolsTest extends TestCase
             'invoice' => ['prefix' => 'INV', 'gst_percent' => 0, 'tds_percent' => 10],
         ];
 
-        $this->actingAs($super)->patch('/v2/admin/settings', $payload)->assertSessionHasNoErrors();
+        $this->actingAs($super)->patch('/admin/settings', $payload)->assertSessionHasNoErrors();
 
         $this->assertEquals(30000, (float) DB::table('system_settings')->where('key', 'invoice.tds_threshold')->value('value'));
         $this->assertSame('1', DB::table('system_settings')->where('key', 'invitation.reminders_enabled')->value('value'));
@@ -320,11 +320,11 @@ class PayoutToolsTest extends TestCase
 
         $payload['payout'] = ['debit_account_number' => '9120001234'];
         $payload['invitation'] = ['reminders_enabled' => false, 'reminder_every_days' => 5, 'reminder_max' => 2];
-        $this->actingAs($super)->patch('/v2/admin/settings', $payload)->assertSessionHasNoErrors();
+        $this->actingAs($super)->patch('/admin/settings', $payload)->assertSessionHasNoErrors();
         $this->assertSame('9120001234', DB::table('system_settings')->where('key', 'payout.debit_account_number')->value('value'));
         $this->assertSame('0', DB::table('system_settings')->where('key', 'invitation.reminders_enabled')->value('value'));
 
         $payload['payout'] = ['debit_account_number' => 'abc-123'];
-        $this->actingAs($super)->patch('/v2/admin/settings', $payload)->assertSessionHasErrors('payout.debit_account_number');
+        $this->actingAs($super)->patch('/admin/settings', $payload)->assertSessionHasErrors('payout.debit_account_number');
     }
 }

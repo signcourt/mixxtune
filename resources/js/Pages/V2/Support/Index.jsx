@@ -35,7 +35,7 @@ export default function Index({ role = "artist", tickets = {}, tab = "active", c
                 {counts.reply > 0 && (
                     <button
                         type="button"
-                        onClick={() => router.get("/v2/support", { ...extra, tab: "reply" }, { preserveScroll: true })}
+                        onClick={() => router.get("/support", { ...extra, tab: "reply" }, { preserveScroll: true })}
                         className="w-full rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-left text-sm font-semibold text-violet-800"
                     >
                         We replied on {counts.reply} ticket{counts.reply === 1 ? "" : "s"} — please have a look.
@@ -49,11 +49,11 @@ export default function Index({ role = "artist", tickets = {}, tab = "active", c
                             <LifeBuoy className="h-5 w-5 text-violet-600" />
                             <h2 className="text-base font-semibold text-slate-900">Open a new legal case</h2>
                         </div>
-                        <Link href="/v2/legal-operations" className="text-xs font-semibold text-violet-700">All legal topics →</Link>
+                        <Link href="/legal-operations" className="text-xs font-semibold text-violet-700">All legal topics →</Link>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                         {Object.entries(legalSections).map(([key, label]) => (
-                            <Link key={key} href={`/v2/support/create?legal_section=${key}`} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:border-violet-300 hover:bg-violet-50/50">
+                            <Link key={key} href={`/support/create?legal_section=${key}`} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:border-violet-300 hover:bg-violet-50/50">
                                 {label}
                             </Link>
                         ))}
@@ -66,13 +66,13 @@ export default function Index({ role = "artist", tickets = {}, tab = "active", c
                             <LifeBuoy className="h-5 w-5 text-violet-600" />
                             <h2 className="text-base font-semibold text-slate-900">Need help with…</h2>
                         </div>
-                        <Link href="/v2/support/create" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700">
+                        <Link href="/support/create" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700">
                             <Plus className="h-4 w-4" /> New ticket
                         </Link>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                         {QUICK.map(([cat, label]) => (
-                            <Link key={cat} href={`/v2/support/create?category=${cat}`} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:border-violet-300 hover:bg-violet-50/50">
+                            <Link key={cat} href={`/support/create?category=${cat}`} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 hover:border-violet-300 hover:bg-violet-50/50">
                                 {label}
                             </Link>
                         ))}
@@ -86,7 +86,7 @@ export default function Index({ role = "artist", tickets = {}, tab = "active", c
                             <button
                                 key={key}
                                 type="button"
-                                onClick={() => router.get("/v2/support", { ...extra, tab: key }, { preserveScroll: true, preserveState: true })}
+                                onClick={() => router.get("/support", { ...extra, tab: key }, { preserveScroll: true, preserveState: true })}
                                 className={`shrink-0 border-b-2 px-3 pb-2.5 pt-1 text-sm font-semibold ${tab === key ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}
                             >
                                 {label} <span className="ml-1 rounded-full bg-slate-100 px-1.5 text-xs text-slate-600">{counts[key] ?? 0}</span>
@@ -103,7 +103,7 @@ export default function Index({ role = "artist", tickets = {}, tab = "active", c
                         <ul className="divide-y divide-slate-100">
                             {rows.map((t) => (
                                 <li key={t.id}>
-                                    <Link href={`/v2/support/${t.id}`} className="flex flex-col gap-2 px-4 py-3 hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
+                                    <Link href={`/support/${t.id}`} className="flex flex-col gap-2 px-4 py-3 hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="min-w-0">
                                             <div className="text-xs font-semibold text-violet-600">
                                                 {t.ticket_number} <span className="font-normal text-slate-400">· {t.legal_section ? legalSections[t.legal_section] ?? "Legal case" : categories[t.category] ?? t.category}</span>

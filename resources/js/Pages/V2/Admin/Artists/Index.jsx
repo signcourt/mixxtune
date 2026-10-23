@@ -24,7 +24,7 @@ export default function Index({
 
             <div className="mb-5 flex justify-end">
                 <a
-                    href="/v2/admin/artists/create"
+                    href="/admin/artists/create"
                     className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
                 >
                     + Add Artist
@@ -42,7 +42,7 @@ export default function Index({
                             event.key === 'Enter'
                         ) {
                             router.get(
-                                '/v2/admin/artists',
+                                '/admin/artists',
                                 {
                                     search:
                                         event
@@ -118,7 +118,7 @@ export default function Index({
 
                                         <Cell>
                                             <a
-                                                href={`/v2/releases?artist_id=${artist.id}`}
+                                                href={`/releases?artist_id=${artist.id}`}
                                                 className="font-semibold text-violet-600 hover:text-violet-800 hover:underline"
                                                 title={`View releases for ${artist.stage_name ?? artist.name ?? 'artist'}`}
                                             >
@@ -152,7 +152,7 @@ export default function Index({
                                                         }
                                                         onChange={(event) => {
                                                             router.patch(
-                                                                `/v2/admin/artists/${artist.id}/admin`,
+                                                                `/admin/artists/${artist.id}/admin`,
                                                                 {
                                                                     admin_id:
                                                                         event.target.value || null,
@@ -183,7 +183,7 @@ export default function Index({
                                                 )}
 
                                                 <a
-                                                    href={`/v2/admin/artists/${artist.id}`}
+                                                    href={`/admin/artists/${artist.id}`}
                                                     title="View"
                                                     className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-50"
                                                 >
@@ -191,7 +191,7 @@ export default function Index({
                                                 </a>
 
                                                 <a
-                                                    href={`/v2/admin/artists/${artist.id}/edit`}
+                                                    href={`/admin/artists/${artist.id}/edit`}
                                                     title="Edit"
                                                     className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-50"
                                                 >
@@ -208,7 +208,7 @@ export default function Index({
                                                             )
                                                         ) {
                                                             router.delete(
-                                                                `/v2/admin/artists/${artist.id}`,
+                                                                `/admin/artists/${artist.id}`,
                                                                 {
                                                                     preserveScroll: true,
                                                                 }

@@ -24,7 +24,7 @@ export default function Index({
         changes = {}
     ) => {
         router.get(
-            '/v2/label/artists',
+            '/label/artists',
             {
                 search,
                 status:
@@ -142,7 +142,7 @@ export default function Index({
                         </div>
 
                         <Link
-                            href="/v2/label/artists/create"
+                            href="/label/artists/create"
                             className="rounded-xl bg-violet-600 px-5 py-3 text-center text-sm font-semibold text-white shadow-sm hover:bg-violet-700"
                         >
                             + Create Artist
@@ -169,7 +169,7 @@ export default function Index({
                             </p>
 
                             <Link
-                                href="/v2/label/artists/create"
+                                href="/label/artists/create"
                                 className="mt-6 inline-flex rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700"
                             >
                                 Create First Artist
@@ -276,14 +276,14 @@ export default function Index({
                                                 <Cell>
                                                     <div className="flex gap-2">
                                                         <Link
-                                                            href={`/v2/label/artists/${artist.id}`}
+                                                            href={`/label/artists/${artist.id}`}
                                                             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                                         >
                                                             View
                                                         </Link>
 
                                                         <Link
-                                                            href={`/v2/label/artists/${artist.id}/edit`}
+                                                            href={`/label/artists/${artist.id}/edit`}
                                                             className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700"
                                                         >
                                                             Edit

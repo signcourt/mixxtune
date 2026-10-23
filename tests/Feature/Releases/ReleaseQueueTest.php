@@ -55,7 +55,7 @@ class ReleaseQueueTest extends TestCase
         Release::factory()->count(26)->create(['status' => 'submitted', 'label_id' => $label->id, 'submitted_at' => now()->subDays(2)]);
         Release::factory()->create(['status' => 'approved', 'label_id' => $label->id]);
 
-        $this->actingAs($super)->get('/v2/admin/release-reviews?status=submitted')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/release-reviews?status=submitted')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('counts.submitted', 26)
             ->where('counts.approved', 1)
             ->where('releases.total', 26)
@@ -70,14 +70,14 @@ class ReleaseQueueTest extends TestCase
         $second = Release::factory()->create(['status' => 'submitted', 'submitted_at' => now()->subDay()]);
         $live = Release::factory()->create(['status' => 'live']);
 
-        $this->actingAs($super)->get('/v2/admin/release-reviews/'.$first->id)->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/release-reviews/'.$first->id)->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('nextInQueue.id', $second->id)
             ->where('canEditMetadata', true)
             ->where('deliveryUrl', null));
 
-        $this->actingAs($super)->get('/v2/admin/release-reviews/'.$live->id)->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/release-reviews/'.$live->id)->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('canEditMetadata', false)
-            ->where('deliveryUrl', '/v2/admin/distribution/'.$live->id));
+            ->where('deliveryUrl', '/admin/distribution/'.$live->id));
     }
 
     public function test_metadata_edit_says_what_changed_and_is_logged(): void
@@ -86,16 +86,16 @@ class ReleaseQueueTest extends TestCase
         $release = Release::factory()->create(['status' => 'submitted', 'title' => 'Old Title']);
         $track = Track::factory()->create(['release_id' => $release->id, 'track_number' => 1]);
 
-        $this->actingAs($super)->patch('/v2/admin/release-reviews/'.$release->id.'/metadata', ['title' => 'New Title'])
+        $this->actingAs($super)->patch('/admin/release-reviews/'.$release->id.'/metadata', ['title' => 'New Title'])
             ->assertSessionHas('success', 'Saved: title.');
         $this->assertSame('New Title', $release->fresh()->title);
         $this->assertTrue(DB::table('audit_logs')->where('action', 'release.metadata_edited_in_review')->where('auditable_id', $release->id)->exists());
 
-        $this->actingAs($super)->patch('/v2/admin/release-reviews/'.$release->id.'/metadata', ['title' => 'New Title'])
+        $this->actingAs($super)->patch('/admin/release-reviews/'.$release->id.'/metadata', ['title' => 'New Title'])
             ->assertSessionHas('success', 'Nothing changed.');
 
         /* an emptied number is sent as null now, not 0 */
-        $this->actingAs($super)->patch('/v2/admin/release-reviews/'.$release->id.'/tracks/'.$track->id.'/metadata', ['disc_number' => null])
+        $this->actingAs($super)->patch('/admin/release-reviews/'.$release->id.'/tracks/'.$track->id.'/metadata', ['disc_number' => null])
             ->assertSessionHasNoErrors();
     }
 
@@ -107,7 +107,7 @@ class ReleaseQueueTest extends TestCase
         Release::factory()->create(['status' => 'submitted', 'label_id' => $a->id]);
         Release::factory()->create(['status' => 'submitted', 'label_id' => $b->id]);
 
-        $this->actingAs($super)->get('/v2/releases?label_id='.$a->id)->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/releases?label_id='.$a->id)->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('releases.total', 1)
             ->where('releases.data.0.label_id', $a->id));
     }

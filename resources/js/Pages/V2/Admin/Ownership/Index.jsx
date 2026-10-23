@@ -32,7 +32,7 @@ function Picker({ label, type, value, onChange, placeholder, error }) {
         timer.current = window.setTimeout(async () => {
             setBusy(true);
             try {
-                const res = await fetch(`/v2/admin/ownership/search?type=${type}&q=${encodeURIComponent(q)}`, {
+                const res = await fetch(`/admin/ownership/search?type=${type}&q=${encodeURIComponent(q)}`, {
                     headers: { Accept: 'application/json' },
                     credentials: 'same-origin',
                 });
@@ -108,7 +108,7 @@ function Preview({ params }) {
         }
         let stop = false;
         setState({ loading: true });
-        fetch(`/v2/admin/ownership/preview?${key}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+        fetch(`/admin/ownership/preview?${key}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
             .then((r) => r.json())
             .then((d) => !stop && setState(d))
             .catch(() => !stop && setState({ ok: false, message: 'Preview could not load.' }));
@@ -207,7 +207,7 @@ function useTransferForm(initial, url, onDone) {
 function ReleaseForm() {
     const [release, setRelease] = useState(null);
     const [owner, setOwner] = useState(null);
-    const [form, submit] = useTransferForm({ release_id: '', owner_type: 'label', owner_id: '', scope: 'future_only', reason: '' }, '/v2/admin/ownership/release', () => {
+    const [form, submit] = useTransferForm({ release_id: '', owner_type: 'label', owner_id: '', scope: 'future_only', reason: '' }, '/admin/ownership/release', () => {
         setRelease(null);
         setOwner(null);
     });
@@ -238,7 +238,7 @@ function ReleaseForm() {
 function TrackForm() {
     const [track, setTrack] = useState(null);
     const [release, setRelease] = useState(null);
-    const [form, submit] = useTransferForm({ track_id: '', release_id: '', scope: 'future_only', reason: '' }, '/v2/admin/ownership/track', () => {
+    const [form, submit] = useTransferForm({ track_id: '', release_id: '', scope: 'future_only', reason: '' }, '/admin/ownership/track', () => {
         setTrack(null);
         setRelease(null);
     });
@@ -261,7 +261,7 @@ function LoginForm({ kind }) {
     const [entity, setEntity] = useState(null);
     const [user, setUser] = useState(null);
     const field = isLabel ? 'label_id' : 'artist_id';
-    const [form, submit] = useTransferForm({ [field]: '', user_id: '', reason: '' }, isLabel ? '/v2/admin/ownership/label-user' : '/v2/admin/ownership/artist-user', () => {
+    const [form, submit] = useTransferForm({ [field]: '', user_id: '', reason: '' }, isLabel ? '/admin/ownership/label-user' : '/admin/ownership/artist-user', () => {
         setEntity(null);
         setUser(null);
     });
@@ -281,7 +281,7 @@ function LoginForm({ kind }) {
 function History({ history, filters, types }) {
     const [q, setQ] = useState(filters.q || '');
     const go = (extra) =>
-        router.get('/v2/admin/ownership', { section: 'history', type: filters.type || '', q, ...extra }, { preserveScroll: true, preserveState: true, replace: true });
+        router.get('/admin/ownership', { section: 'history', type: filters.type || '', q, ...extra }, { preserveScroll: true, preserveState: true, replace: true });
     const rows = history.data || [];
 
     return (
@@ -297,7 +297,7 @@ function History({ history, filters, types }) {
                     </select>
                     <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Search</button>
                 </form>
-                <a href="/v2/admin/ownership/export" className="rounded-xl border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <a href="/admin/ownership/export" className="rounded-xl border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     Export CSV
                 </a>
             </div>

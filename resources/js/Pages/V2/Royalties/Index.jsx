@@ -96,7 +96,7 @@ function Summary({ summary, counts, active, onPick }) {
                         <span>Deductions −{formatAmount(summary.deductions)}</span>
                         <span>{counts.all ?? 0} statement{(counts.all ?? 0) === 1 ? '' : 's'}</span>
                     </div>
-                    <Link href="/v2/wallet" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-violet-700 hover:text-violet-900">
+                    <Link href="/wallet" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-violet-700 hover:text-violet-900">
                         Open wallet to request payment <ArrowRight size={13} />
                     </Link>
                 </div>
@@ -282,7 +282,7 @@ function Statements({ statements, filters, counts }) {
                                         </td>
                                         <td className="px-5 py-3 text-right">
                                             <a
-                                                href={`/v2/statements/${item.id}/download`}
+                                                href={`/statements/${item.id}/download`}
                                                 className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
                                             >
                                                 <Download size={13} /> PDF
@@ -345,10 +345,10 @@ export default function Index({ role = 'artist', summary = {}, counts = {}, mont
                     <h2 className="text-lg font-bold text-slate-900">Where are the royalty statements?</h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">This page is for rights royalty files (IPRS / PRS / TPL). Monthly statements are in one place each:</p>
                     <div className="mt-4 flex flex-wrap gap-3">
-                        <Link href="/v2/admin/finance" className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700">
+                        <Link href="/admin/finance" className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700">
                             Finance &amp; Royalties · approve and release
                         </Link>
-                        <Link href="/v2/admin/statements" className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        <Link href="/admin/statements" className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                             Statements · PDF and e-mail to owners
                         </Link>
                     </div>

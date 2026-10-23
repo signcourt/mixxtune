@@ -15,7 +15,7 @@ export default function DashboardHero({
     kycStatus = 'pending',
     primaryAction = {
         label: 'Create Release',
-        href: '/v2/releases/create',
+        href: '/releases/create',
     },
     secondaryAction = {
         label: 'View Catalogue',

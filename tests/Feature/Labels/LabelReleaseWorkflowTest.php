@@ -44,7 +44,7 @@ class LabelReleaseWorkflowTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->get('/v2/releases');
+            ->get('/releases');
 
         $response->assertSuccessful();
     }
@@ -55,7 +55,7 @@ class LabelReleaseWorkflowTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->get('/v2/releases/create');
+            ->get('/releases/create');
 
         $response->assertSuccessful();
     }

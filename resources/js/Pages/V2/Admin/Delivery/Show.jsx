@@ -66,13 +66,13 @@ export default function Show({
     const startDelivery = () => {
         if (!window.confirm("Start delivery for this release? Store records are created" + (readiness?.notes?.length ? " and: " + readiness.notes.join(" ") : "."))) return;
         setStarting(true);
-        router.post(`/v2/admin/distribution/${release.id}/initialise`, {}, { preserveScroll: true, onFinish: () => setStarting(false) });
+        router.post(`/admin/distribution/${release.id}/initialise`, {}, { preserveScroll: true, onFinish: () => setStarting(false) });
     };
     const sendAction = () => {
         if (!action) return;
         setProcessing(true);
         router.patch(
-            `/v2/admin/distribution/deliveries/${action.delivery.id}`,
+            `/admin/distribution/deliveries/${action.delivery.id}`,
             {
                 status: action.status,
                 delivery_note: actionNote.trim() || null,
@@ -158,7 +158,7 @@ export default function Show({
         setProcessing(true);
 
         router.patch(
-            `/v2/admin/distribution/${release.id}/bulk`,
+            `/admin/distribution/${release.id}/bulk`,
             {
                 delivery_ids: selected,
 
@@ -223,7 +223,7 @@ export default function Show({
             <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <Link
-                        href="/v2/admin/distribution"
+                        href="/admin/distribution"
                         className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
                     >
                         ← Distribution Queue

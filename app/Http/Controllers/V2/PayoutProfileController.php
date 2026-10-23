@@ -329,7 +329,7 @@ class PayoutProfileController extends Controller
         try {
             $notices = app(\App\Services\V2\PanelNotificationService::class);
             foreach (\App\Models\User::query()->where('role', 'super_admin')->where('account_status', 'active')->get() as $staff) {
-                $notices->send($staff, 'kyc.submitted', 'KYC sent for verification', ($user->name ?: $user->email).' sent payout KYC / bank details.', '/v2/admin/kyc?status=submitted');
+                $notices->send($staff, 'kyc.submitted', 'KYC sent for verification', ($user->name ?: $user->email).' sent payout KYC / bank details.', '/admin/kyc?status=submitted');
             }
         } catch (\Throwable $e) {
             report($e);

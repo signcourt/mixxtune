@@ -53,7 +53,7 @@ export default function ProfitIndex({
         event.preventDefault();
 
         router.get(
-            '/v2/admin/profit',
+            '/admin/profit',
             form,
             {
                 preserveState: true,
@@ -75,7 +75,7 @@ export default function ProfitIndex({
         setForm(empty);
 
         router.get(
-            '/v2/admin/profit',
+            '/admin/profit',
             empty,
             {
                 preserveState: true,
@@ -99,8 +99,8 @@ export default function ProfitIndex({
         const query = params.toString();
 
         return query
-            ? `/v2/admin/profit/export?${query}`
-            : '/v2/admin/profit/export';
+            ? `/admin/profit/export?${query}`
+            : '/admin/profit/export';
     };
 
     const cards = [
@@ -192,7 +192,7 @@ export default function ProfitIndex({
                                 onClick={() => {
                                     const next = { ...form, stage: value };
                                     setForm(next);
-                                    router.get('/v2/admin/profit', next, { preserveState: true, preserveScroll: true, replace: true });
+                                    router.get('/admin/profit', next, { preserveState: true, preserveScroll: true, replace: true });
                                 }}
                                 className={`rounded-xl px-4 py-2 text-sm font-semibold ${form.stage === value ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
                             >

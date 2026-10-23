@@ -53,12 +53,12 @@ class AnalyticsPreviewTest extends TestCase
         $this->row($this->import('review_pending', 'july.csv'), null, 500);
 
         /* W50: nothing published yet -> staff get the preview by themselves */
-        $this->actingAs($super)->get('/v2/analytics')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/analytics')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('preview', true)
             ->where('autoPreview', true)
             ->where('summary.rows', 1));
 
-        $this->actingAs($super)->get('/v2/analytics?preview=0')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/analytics?preview=0')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Analytics/Index')
             ->where('preview', false)
             ->where('summary.rows', 0)
@@ -66,12 +66,12 @@ class AnalyticsPreviewTest extends TestCase
             ->where('unpublished.0.file', 'july.csv')
             ->where('unpublished.0.step', 'Waiting for review'));
 
-        $this->actingAs($super)->get('/v2/analytics?preview=1')->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/analytics?preview=1')->assertInertia(fn (Assert $p) => $p
             ->where('preview', true)
             ->where('summary.rows', 1)
             ->has('filterOptions.months', 1));
 
-        $csv = $this->actingAs($super)->get('/v2/analytics/export?preview=1');
+        $csv = $this->actingAs($super)->get('/analytics/export?preview=1');
         $csv->assertOk();
         $this->assertStringContainsString('Spotify', $csv->streamedContent());
     }
@@ -82,7 +82,7 @@ class AnalyticsPreviewTest extends TestCase
         $label = Label::factory()->create(['user_id' => $owner->id]);
         $this->row($this->import('review_pending', 'july.csv'), $label->id, 500);
 
-        $this->actingAs($owner)->get('/v2/analytics?preview=1')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($owner)->get('/analytics?preview=1')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('preview', false)
             ->where('unpublished', [])
             ->has('filterOptions.months', 0));
@@ -94,7 +94,7 @@ class AnalyticsPreviewTest extends TestCase
         $this->row($this->import('published', 'june.csv'), null, 100);
         $this->row($this->import('review_pending', 'july.csv'), null, 500);
 
-        $this->actingAs($super)->get('/v2/analytics')->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/analytics')->assertInertia(fn (Assert $p) => $p
             ->where('preview', false)
             ->where('autoPreview', false)
             ->where('summary.rows', 1));

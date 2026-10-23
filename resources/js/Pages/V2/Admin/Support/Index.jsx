@@ -24,7 +24,7 @@ export default function Index({ role = "admin", tickets = {}, counts = {}, filte
     const first = useRef(true);
 
     const go = (patch) =>
-        router.get("/v2/admin/support", { ...filters, ...patch, page: undefined }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get("/admin/support", { ...filters, ...patch, page: undefined }, { preserveState: true, preserveScroll: true, replace: true });
 
     useEffect(() => {
         if (first.current) {
@@ -116,7 +116,7 @@ export default function Index({ role = "admin", tickets = {}, counts = {}, filte
                         <ul className="divide-y divide-slate-100 border-t border-slate-100">
                             {rows.map((t) => (
                                 <li key={t.id}>
-                                    <Link href={`/v2/admin/support/${t.id}`} className={`flex flex-col gap-2 px-4 py-3 hover:bg-slate-50 sm:flex-row sm:items-center sm:gap-4 ${t.late ? "bg-red-50/40" : ""}`}>
+                                    <Link href={`/admin/support/${t.id}`} className={`flex flex-col gap-2 px-4 py-3 hover:bg-slate-50 sm:flex-row sm:items-center sm:gap-4 ${t.late ? "bg-red-50/40" : ""}`}>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2 text-xs">
                                                 <span className="font-semibold text-violet-600">{t.ticket_number}</span>
@@ -193,7 +193,7 @@ function NewTicketDialog({ categories, onClose }) {
         const t = setTimeout(() => {
             setBusy(true);
             axios
-                .get("/v2/admin/support/search-users", { params: { q } })
+                .get("/admin/support/search-users", { params: { q } })
                 .then(({ data: r }) => setFound(r.users || []))
                 .finally(() => setBusy(false));
         }, 300);
@@ -202,7 +202,7 @@ function NewTicketDialog({ categories, onClose }) {
 
     const submit = (e) => {
         e.preventDefault();
-        post("/v2/admin/support", { forceFormData: true });
+        post("/admin/support", { forceFormData: true });
     };
 
     const input = "mt-1.5 h-11 w-full rounded-xl border border-slate-300 px-3 text-sm";

@@ -70,7 +70,7 @@ class PanelAccessTest extends TestCase
         $label = $this->user('label');
         $this->legacy($label, []);
         $this->assertContains('royalties.view', $this->perms($label));
-        $this->actingAs($label)->get('/v2/royalties')->assertOk();
+        $this->actingAs($label)->get('/royalties')->assertOk();
 
         $manager = $this->user('admin');
         $this->legacy($manager, ['can_manage_wallet' => true]);
@@ -85,24 +85,24 @@ class PanelAccessTest extends TestCase
         $a = $this->user('artist');
         $b = $this->user('artist');
 
-        $this->actingAs($a)->get('/v2/panel-access-probe-not-a-route')->assertNotFound();
-        $this->actingAs($this->user('label'))->put('/v2/admin/panel-access', ['defaults' => ['artist' => ['royalties' => false]]])->assertForbidden();
+        $this->actingAs($a)->get('/panel-access-probe-not-a-route')->assertNotFound();
+        $this->actingAs($this->user('label'))->put('/admin/panel-access', ['defaults' => ['artist' => ['royalties' => false]]])->assertForbidden();
 
-        $this->actingAs($super)->put('/v2/admin/panel-access', ['defaults' => ['artist' => ['royalties' => false], 'bogus' => ['x' => true]]])
+        $this->actingAs($super)->put('/admin/panel-access', ['defaults' => ['artist' => ['royalties' => false], 'bogus' => ['x' => true]]])
             ->assertRedirect()->assertSessionHas('success');
         $this->assertSame(0, (int) DB::table('panel_role_defaults')->where('role', 'artist')->where('tab', 'royalties')->value('allowed'));
         $this->assertDatabaseHas('audit_logs', ['action' => 'panel.role_defaults_changed']);
 
         $this->assertNotContains('royalties.view', $this->perms($a));
-        $this->actingAs($a)->get('/v2/royalties')->assertForbidden();
+        $this->actingAs($a)->get('/royalties')->assertForbidden();
 
         /* one account allowed again from Edit User */
-        $this->actingAs($super)->get('/v2/admin/users/'.$b->id.'/edit')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/users/'.$b->id.'/edit')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->where('panelTabs', fn ($rows) => collect($rows)->firstWhere('key', 'royalties')['role_default'] === false
                 && collect($rows)->firstWhere('key', 'royalties')['override'] === 'default'));
         $this->assertDatabaseMissing('user_panel_permissions', ['user_id' => $b->id]);
 
-        $this->actingAs($super)->patch('/v2/admin/users/'.$b->id, [
+        $this->actingAs($super)->patch('/admin/users/'.$b->id, [
             'name' => $b->name, 'email' => $b->email, 'role' => 'artist', 'account_status' => 'active', 'kyc_status' => 'pending', 'revenue_share_percentage' => 80,
             'tab_overrides' => ['royalties' => 'allow', 'catalogue' => 'block', 'not_a_tab' => 'allow'],
             'tab_overrides_touched' => true,
@@ -110,13 +110,13 @@ class PanelAccessTest extends TestCase
 
         $this->assertContains('royalties.view', $this->perms($b));
         $this->assertNotContains('catalogue.view', $this->perms($b));
-        $this->actingAs($b)->get('/v2/royalties')->assertOk();
+        $this->actingAs($b)->get('/royalties')->assertOk();
         $this->assertDatabaseHas('audit_logs', ['action' => 'panel.user_access_changed']);
         $this->assertSame(2, DB::table('panel_access_overrides')->where('user_id', $b->id)->count());
         $this->assertDatabaseMissing('user_panel_permissions', ['user_id' => $b->id]);
 
         /* back to default */
-        $this->actingAs($super)->patch('/v2/admin/users/'.$b->id, [
+        $this->actingAs($super)->patch('/admin/users/'.$b->id, [
             'name' => $b->name, 'email' => $b->email, 'role' => 'artist', 'account_status' => 'active', 'kyc_status' => 'pending', 'revenue_share_percentage' => 80,
             'tab_overrides' => ['royalties' => 'default', 'catalogue' => 'default'], 'tab_overrides_touched' => true,
         ])->assertSessionHasNoErrors();
@@ -131,14 +131,14 @@ class PanelAccessTest extends TestCase
         DB::table('panel_access_overrides')->insert(['user_id' => $manager->id, 'tab' => 'catalogue', 'allowed' => false, 'created_at' => now(), 'updated_at' => now()]);
 
         $this->assertNotContains('catalogue.view', $this->perms($manager));
-        $this->actingAs($manager)->get('/v2/catalogue')->assertForbidden();
+        $this->actingAs($manager)->get('/catalogue')->assertForbidden();
 
-        $this->actingAs($super)->get('/v2/admin/panel-access')->assertOk()->assertInertia(fn (Assert $p) => $p
+        $this->actingAs($super)->get('/admin/panel-access')->assertOk()->assertInertia(fn (Assert $p) => $p
             ->component('V2/Admin/PanelAccess/Index')
             ->where('roles.0.role', 'label')
             ->where('roles.2.role', 'admin')
             ->where('roles.2.own_settings', 1)
             ->where('roles.1.tabs', fn ($tabs) => !collect($tabs)->contains('key', 'team')));
-        $this->actingAs($manager)->get('/v2/admin/panel-access')->assertForbidden();
+        $this->actingAs($manager)->get('/admin/panel-access')->assertForbidden();
     }
 }

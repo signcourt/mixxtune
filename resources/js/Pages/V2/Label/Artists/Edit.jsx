@@ -64,7 +64,7 @@ export default function Edit({
         event.preventDefault();
 
         patch(
-            `/v2/label/artists/${artist.id}`,
+            `/label/artists/${artist.id}`,
             {
                 preserveScroll: true,
             }
@@ -85,7 +85,7 @@ export default function Edit({
         }
 
         router.post(
-            `/v2/label/artists/${artist.id}/${action}`,
+            `/label/artists/${artist.id}/${action}`,
             {},
             {
                 preserveScroll: true,
@@ -122,7 +122,7 @@ export default function Edit({
                         </div>
 
                         <Link
-                            href="/v2/label/artists"
+                            href="/label/artists"
                             className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
                         >
                             Back to Artists
@@ -414,7 +414,7 @@ export default function Edit({
 
                 <div className="sticky bottom-4 z-20 flex justify-end gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
                     <Link
-                        href="/v2/label/artists"
+                        href="/label/artists"
                         className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700"
                     >
                         Cancel

@@ -96,7 +96,7 @@ export default function Create({
         event.preventDefault();
 
         post(
-            '/v2/label/artists',
+            '/label/artists',
             {
                 preserveScroll: true,
             }
@@ -131,7 +131,7 @@ export default function Create({
                         </div>
 
                         <Link
-                            href="/v2/label/artists"
+                            href="/label/artists"
                             className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
                         >
                             Back to Artists
@@ -399,7 +399,7 @@ export default function Create({
 
                 <div className="sticky bottom-4 z-20 flex justify-end gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
                     <Link
-                        href="/v2/label/artists"
+                        href="/label/artists"
                         className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700"
                     >
                         Cancel
