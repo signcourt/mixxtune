@@ -1795,7 +1795,8 @@ Route::middleware(['auth', 'verified'])
         'v2.admin.reports.imports.approve-and-schedule'
     );
 
-            Route::post(
+            /* login needed (was reachable without login - answered 403) */
+            Route::middleware(['auth', 'verified'])->post(
                 '/admin/reports/imports/{reportImport}/missing-revenue-rates',
                 [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'saveMissingRevenueRates']
             )->name(

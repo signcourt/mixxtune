@@ -76,6 +76,21 @@ class ReportImportService
             'territory',
         ],
 
+        /* W93: full country name ("South Africa") and the store's sub-source - see rowHash() */
+        'territory_name' => [
+            'country name',
+            'territory name',
+            'country full name',
+        ],
+
+        'sale_source' => [
+            'sale source',
+            'sales source',
+            'source',
+            'sub platform',
+            'sub-platform',
+        ],
+
         'cms' => [
             'cms',
         ],
@@ -919,7 +934,8 @@ class ReportImportService
                 $mapped['currency'],
 
             'country_code' =>
-                $mapped['country_code'],
+                /* W93: a full country name is turned into its ISO code (unknown stays empty) */
+                $this->countryCode($mapped),
 
             'cms' =>
                 $mapped['cms'],
@@ -1165,8 +1181,33 @@ class ReportImportService
                     ?? '',
                 $row['collected_revenue']
                     ?? '',
-            ])
+            ]
+            /*
+             * W93 MIXXTUNE_DUPLICATE_KEY_COUNTRY_SOURCE
+             * Reports that give the country as a full name ("Country Name")
+             * or a "Sale Source" column: two lines that differ only there are
+             * two different sales (July 2026 lost 512 such lines). Added only
+             * when present, so the key of every other report is unchanged.
+             */
+            + (
+                $canonicalText($row['territory_name'] ?? '') !== ''
+                || $canonicalText($row['sale_source'] ?? '') !== ''
+                    ? [3000 => 'T:'.$canonicalText($row['territory_name'] ?? '').'|S:'.$canonicalText($row['sale_source'] ?? '')]
+                    : []
+            ))
         );
+    }
+
+    /* W93: country code from the code column, else from the full country name */
+    private function countryCode(array $mapped): ?string
+    {
+        $code = trim((string) ($mapped['country_code'] ?? ''));
+        if ($code !== '') {
+            /* "IN" stays "IN"; a name in the code column ("South Africa") becomes "ZA" */
+            return mb_strlen($code) <= 3 ? $code : (\App\Support\CountryNames::code($code) ?? mb_substr($code, 0, 10));
+        }
+
+        return \App\Support\CountryNames::code($mapped['territory_name'] ?? null);
     }
 
     private function normalizedIsrcSql(): string
