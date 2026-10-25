@@ -16,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -105,6 +106,7 @@ class MailController extends Controller
                         'reply_to' => collect($msg->reply_to ?? [])->pluck('email')->first(),
                         'to_list' => collect($msg->to ?? [])->pluck('email')->values(),
                         'cc_list' => collect($msg->cc ?? [])->pluck('email')->values(),
+                        'bcc' => $this->people($msg->bcc ?? []),
                         'at' => optional($msg->sent_at)->toIso8601String(),
                         'text' => $msg->body_text,
                         'has_html' => !empty($msg->body_html),
@@ -122,6 +124,7 @@ class MailController extends Controller
                 'address' => $a->address,
                 'display_name' => $a->display_name,
                 'mine' => $mine->contains((int) $a->id),
+                'from' => $a->fromAddresses(),
                 'is_private' => (bool) $a->is_private,
                 'unread' => MailMessage::query()->where('mail_account_id', $a->id)->where('folder', 'inbox')->where('seen', false)->count(),
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),
@@ -185,13 +188,16 @@ class MailController extends Controller
     {
         $acc = $this->account($request, $access, $account);
         $split = fn ($v) => collect(preg_split('/[,;\s]+/', (string) $v, -1, PREG_SPLIT_NO_EMPTY))->map(fn ($e) => strtolower(trim($e, " <>\"'")))->unique()->values()->all();
-        $request->merge(['to_list' => $split($request->input('to')), 'cc_list' => $split($request->input('cc'))]);
+        $request->merge(['to_list' => $split($request->input('to')), 'cc_list' => $split($request->input('cc')), 'bcc_list' => $split($request->input('bcc'))]);
         $data = $request->validate([
             'to' => ['required', 'string', 'max:4000'],
             'to_list' => ['required', 'array', 'min:1', 'max:50'],
             'to_list.*' => ['email:rfc'],
             'cc_list' => ['nullable', 'array', 'max:50'],
             'cc_list.*' => ['email:rfc'],
+            'bcc_list' => ['nullable', 'array', 'max:50'],
+            'bcc_list.*' => ['email:rfc'],
+            'from' => ['nullable', 'string', Rule::in(collect($acc->fromAddresses())->pluck('address')->all())],
             'subject' => ['required', 'string', 'max:500'],
             'body' => ['required', 'string', 'max:100000'],
             'files' => ['nullable', 'array', 'max:10'],
@@ -203,6 +209,8 @@ class MailController extends Controller
         ], [
             'to_list.*.email' => 'One of the "To" addresses is not a valid e-mail address.',
             'cc_list.*.email' => 'One of the "Cc" addresses is not a valid e-mail address.',
+            'bcc_list.*.email' => 'One of the "Bcc" addresses is not a valid e-mail address.',
+            'from.in' => 'Pick one of the addresses of this mailbox.',
             'files.*.max' => 'Each attachment can be at most 20 MB.',
         ]);
         $files = $request->file('files', []);
@@ -224,13 +232,13 @@ class MailController extends Controller
             $reply = MailMessage::query()->where('mail_account_id', $acc->id)->find((int) $data['reply_to_id']);
         }
         try {
-            $msg = $sender->send($acc, $request->user(), ['to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'subject' => $data['subject'], 'body' => $data['body']], $files, $reply, $carried);
+            $msg = $sender->send($acc, $request->user(), ['to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'bcc' => $data['bcc_list'] ?? [], 'from' => $data['from'] ?? null, 'subject' => $data['subject'], 'body' => $data['body']], $files, $reply, $carried);
         } catch (Throwable $e) {
             report($e);
 
             return back()->withErrors(['send' => 'The mail was NOT sent: '.$e->getMessage()]);
         }
-        $audit->record('mail.sent', 'mail', 'Mail sent from '.$acc->address.' to '.implode(', ', $data['to_list']).'.', [], ['subject' => $data['subject'], 'to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'attachments' => count($files) + count($carried)], $msg, $request);
+        $audit->record('mail.sent', 'mail', 'Mail sent from '.($data['from'] ?? $acc->address).' to '.implode(', ', $data['to_list']).'.', [], ['subject' => $data['subject'], 'to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'bcc' => $data['bcc_list'] ?? [], 'from' => $data['from'] ?? $acc->address, 'attachments' => count($files) + count($carried)], $msg, $request);
 
         return redirect('/mail?account='.$acc->id.'&folder=sent&m='.$msg->id)->with('success', 'Mail sent.');
     }

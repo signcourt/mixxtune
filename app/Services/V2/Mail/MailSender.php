@@ -25,13 +25,15 @@ class MailSender
     }
 
     /**
-     * @param array{to:string[], cc?:string[], subject:string, body:string} $data
+     * @param array{to:string[], cc?:string[], bcc?:string[], from?:string, subject:string, body:string} $data
      * @param UploadedFile[] $files
      * @param MailAttachment[] $carried attachments of a forwarded mail that go along (W96)
      */
     public function send(MailAccount $account, User $by, array $data, array $files = [], ?MailMessage $replyTo = null, array $carried = []): MailMessage
     {
-        $domain = Str::after($account->address, '@') ?: 'mixxtune.com';
+        /* W101: send from the mailbox itself or one of its aliases */
+        $from = collect($account->fromAddresses())->firstWhere('address', strtolower((string) ($data['from'] ?? $account->address))) ?? $account->fromAddresses()[0];
+        $domain = Str::after($from['address'], '@') ?: 'mixxtune.com';
         $messageId = '<'.Str::uuid()->toString().'@'.$domain.'>';
         $body = rtrim($data['body']);
         if ($account->signature) {
@@ -39,13 +41,16 @@ class MailSender
         }
 
         $email = (new Email())
-            ->from(new Address($account->address, (string) ($account->display_name ?? '')))
+            ->from(new Address($from['address'], $from['name']))
             ->to(...array_map(fn ($a) => new Address($a), $data['to']))
             ->subject($data['subject'])
             ->text($body)
             ->html(self::html($body));
         if (!empty($data['cc'])) {
             $email->cc(...array_map(fn ($a) => new Address($a), $data['cc']));
+        }
+        if (!empty($data['bcc'])) {
+            $email->bcc(...array_map(fn ($a) => new Address($a), $data['bcc']));
         }
         $email->getHeaders()->addIdHeader('Message-ID', trim($messageId, '<>'));
         if ($replyTo && $replyTo->message_id) {
@@ -69,10 +74,11 @@ class MailSender
             'in_reply_to' => $replyTo?->message_id,
             'references_header' => $replyTo ? trim(($replyTo->references_header ? $replyTo->references_header.' ' : '').$replyTo->message_id) : null,
             'subject' => mb_substr($data['subject'], 0, 998),
-            'from_name' => $account->display_name,
-            'from_email' => $account->address,
+            'from_name' => $from['name'] ?: null,
+            'from_email' => $from['address'],
             'to' => array_map(fn ($a) => ['name' => '', 'email' => strtolower($a)], $data['to']),
             'cc' => array_map(fn ($a) => ['name' => '', 'email' => strtolower($a)], $data['cc'] ?? []),
+            'bcc' => array_map(fn ($a) => ['name' => '', 'email' => strtolower($a)], $data['bcc'] ?? []),
             'sent_at' => now(),
             'snippet' => MailSync::snippet($body, null),
             'body_text' => $body,

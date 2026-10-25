@@ -349,4 +349,44 @@ class PanelMailTest extends TestCase
         $this->actingAs($boss)->post("/admin/mail-accounts/{$own->id}", ['is_private' => false])->assertSessionHasNoErrors();
         $this->actingAs($other)->get('/mail')->assertInertia(fn (Assert $p) => $p->has('accounts', 2));
     }
+
+    /* W101: aliases kept per mailbox, From picks one of them, Bcc is sent but stays hidden */
+    public function test_send_from_an_alias_with_bcc(): void
+    {
+        $super = $this->user('super_admin');
+        $mine = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'manager1@mixxtune.com', 'display_name' => 'Mixx Tune', 'username' => 'manager1@mixxtune.com', 'password' => 'x', 'status' => 'active', 'sent_folder' => 'INBOX.Sent']);
+        $a->users()->sync([$mine->id]);
+
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['aliases' => [
+            ['address' => 'Support@MixxTune.com', 'name' => 'Mixx Tune Support'],
+            ['address' => 'manager1@mixxtune.com', 'name' => 'same as the mailbox - dropped'],
+            ['address' => 'not-an-email', 'name' => ''],
+        ]])->assertSessionHasErrors('aliases.2.address');
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['aliases' => [
+            ['address' => 'Support@MixxTune.com', 'name' => 'Mixx Tune Support'],
+            ['address' => 'manager1@mixxtune.com', 'name' => 'dropped'],
+        ]])->assertSessionHasNoErrors();
+        $this->assertSame([['address' => 'support@mixxtune.com', 'name' => 'Mixx Tune Support']], $a->fresh()->aliases);
+
+        $this->actingAs($mine)->get('/mail')->assertInertia(fn (Assert $p) => $p
+            ->where('accounts.0.from.0.address', 'manager1@mixxtune.com')
+            ->where('accounts.0.from.1.address', 'support@mixxtune.com')
+            ->where('accounts.0.from.1.name', 'Mixx Tune Support'));
+
+        /* an address that is not this mailbox's is refused */
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['from' => 'ceo@other.com', 'to' => 'x@example.com', 'subject' => 's', 'body' => 'b'])->assertSessionHasErrors('from');
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'bcc' => 'bad', 'subject' => 's', 'body' => 'b'])->assertSessionHasErrors('bcc_list.0');
+        $this->assertSame([], FakeTransport::$sent);
+
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['from' => 'support@mixxtune.com', 'to' => 'saras@example.com', 'bcc' => 'boss@example.com, owner@example.com', 'subject' => 'Hello', 'body' => 'Hi'])->assertSessionHasNoErrors();
+        $raw = FakeTransport::$sent[0];
+        $this->assertStringContainsString('From: Mixx Tune Support <support@mixxtune.com>', $raw);
+        $this->assertStringContainsString('@mixxtune.com>', $raw);
+        $this->assertStringNotContainsString('boss@example.com', $raw, 'Bcc must not be visible in the sent mail');
+        $sent = MailMessage::query()->where('folder', 'sent')->firstOrFail();
+        $this->assertSame('support@mixxtune.com', $sent->from_email);
+        $this->assertSame(['boss@example.com', 'owner@example.com'], collect($sent->bcc)->pluck('email')->all());
+        $this->actingAs($mine)->get("/mail?account={$a->id}&folder=sent&m={$sent->id}")->assertInertia(fn (Assert $p) => $p->where('open.bcc', 'boss@example.com, owner@example.com'));
+    }
 }

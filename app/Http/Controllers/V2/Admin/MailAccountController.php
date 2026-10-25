@@ -36,6 +36,15 @@ class MailAccountController extends Controller
         abort_unless(app(MailAccess::class)->canManage($request->user(), $account), 403, 'This is a private mailbox - only its own people can change it.');
     }
 
+    /* W101: clean alias list - lower case, not the mailbox itself, no doubles */
+    private function aliases(array $list, string $address): array
+    {
+        return collect($list)
+            ->map(fn ($a) => ['address' => strtolower(trim((string) ($a['address'] ?? ''))), 'name' => trim((string) ($a['name'] ?? ''))])
+            ->filter(fn ($a) => $a['address'] !== '' && $a['address'] !== strtolower($address))
+            ->unique('address')->values()->all();
+    }
+
     private function people()
     {
         return User::query()->whereIn('role', ['admin', 'super_admin'])->orderBy('role')->orderBy('name')
@@ -62,6 +71,7 @@ class MailAccountController extends Controller
                 'smtp' => $a->smtp_host.':'.$a->smtp_port,
                 'sent_folder' => $a->sent_folder,
                 'signature' => $a->signature,
+                'aliases' => array_values((array) ($a->aliases ?? [])),
                 'status' => $a->status,
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),
                 'last_error' => $a->last_error,
@@ -86,6 +96,9 @@ class MailAccountController extends Controller
             'signature' => ['nullable', 'string', 'max:2000'],
             'status' => ['nullable', Rule::in(['active', 'disabled'])],
             'is_private' => ['nullable', 'boolean'],
+            'aliases' => ['nullable', 'array', 'max:20'],
+            'aliases.*.address' => ['required', 'email:rfc', 'max:190', 'distinct:ignore_case'],
+            'aliases.*.name' => ['nullable', 'string', 'max:190'],
             'user_ids' => ['nullable', 'array'],
             'user_ids.*' => ['integer', Rule::exists('users', 'id')->whereIn('role', ['admin', 'super_admin'])],
         ];
@@ -126,6 +139,7 @@ class MailAccountController extends Controller
             'signature' => $data['signature'] ?? null,
             'status' => 'active',
             'is_private' => (bool) ($data['is_private'] ?? false),
+            'aliases' => $this->aliases($data['aliases'] ?? [], $address),
             'created_by' => $request->user()->id,
         ]);
         if ($account->is_private && empty($data['user_ids'])) {
@@ -160,6 +174,9 @@ class MailAccountController extends Controller
             $account->signature = $data['signature'];
         }
         $account->is_private = $privateAfter;
+        if (array_key_exists('aliases', $data)) {
+            $account->aliases = $this->aliases($data['aliases'] ?? [], $account->address);
+        }
         if (!empty($data['password'])) {
             $account->password = $data['password'];
             if ($error = $this->check($account, $connector, $sync)) {

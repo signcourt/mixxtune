@@ -23,6 +23,11 @@ function Compose({ account, draft, onClose }) {
     const [to, setTo] = useState(draft.to ?? "");
     const [cc, setCc] = useState(draft.cc ?? "");
     const [showCc, setShowCc] = useState(Boolean(draft.cc));
+    /* W101: Bcc, and the From address (the mailbox or one of its aliases) */
+    const [bcc, setBcc] = useState("");
+    const [showBcc, setShowBcc] = useState(false);
+    const fromList = account.from?.length ? account.from : [{ address: account.address, name: account.display_name || "" }];
+    const [from, setFrom] = useState(draft.from && fromList.some((f) => f.address === draft.from) ? draft.from : fromList[0].address);
     const [subject, setSubject] = useState(draft.subject ?? "");
     const [body, setBody] = useState(draft.body ?? "");
     const [files, setFiles] = useState([]);
@@ -64,23 +69,35 @@ function Compose({ account, draft, onClose }) {
         setBusy(true);
         router.post(
             `/mail/accounts/${account.id}/send`,
-            { to, cc, subject, body, files, reply_to_id: draft.reply_to_id ?? "", forward_of: draft.forward_of ?? "", keep_attachments: kept.map((a) => a.id) },
+            { from, to, cc, bcc, subject, body, files, reply_to_id: draft.reply_to_id ?? "", forward_of: draft.forward_of ?? "", keep_attachments: kept.map((a) => a.id) },
             { forceFormData: true, preserveScroll: true, onSuccess: onClose, onFinish: () => setBusy(false) },
         );
     };
 
-    const err = errors.to || errors.to_list || errors["to_list.0"] || errors.cc_list || errors.subject || errors.body || errors.files || errors["files.0"] || errors.send;
+    const err = errors.to || errors.to_list || errors["to_list.0"] || errors.cc_list || errors["cc_list.0"] || errors.bcc_list || errors["bcc_list.0"] || errors.from || errors.subject || errors.body || errors.files || errors["files.0"] || errors.send;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 sm:items-center sm:p-4">
             <div className="flex max-h-[94vh] w-full max-w-2xl flex-col rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl">
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-                    <h3 className="text-sm font-bold text-slate-900">{draft.title ?? "New mail"} · from {account.address}</h3>
+                    <h3 className="text-sm font-bold text-slate-900">{draft.title ?? "New mail"} · from {from}</h3>
                     <button type="button" onClick={onClose} disabled={busy} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" aria-label="Close">
                         <X size={18} />
                     </button>
                 </div>
                 <div className="space-y-2 overflow-y-auto px-5 py-3">
+                    {fromList.length > 1 && (
+                        <div className="flex items-center gap-2">
+                            <span className="w-14 text-xs font-semibold text-slate-500">From</span>
+                            <select value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From" className="h-9 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-sm">
+                                {fromList.map((f) => (
+                                    <option key={f.address} value={f.address}>
+                                        {f.name ? `${f.name} <${f.address}>` : f.address}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div className="flex items-center gap-2">
                         <span className="w-14 text-xs font-semibold text-slate-500">To</span>
                         <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="name@example.com, other@example.com" className="h-9 min-w-0 flex-1 rounded-lg border border-slate-300 px-3 text-sm" />
@@ -89,11 +106,22 @@ function Compose({ account, draft, onClose }) {
                                 Cc
                             </button>
                         )}
+                        {!showBcc && (
+                            <button type="button" onClick={() => setShowBcc(true)} className="text-xs font-semibold text-violet-700">
+                                Bcc
+                            </button>
+                        )}
                     </div>
                     {showCc && (
                         <div className="flex items-center gap-2">
                             <span className="w-14 text-xs font-semibold text-slate-500">Cc</span>
                             <input value={cc} onChange={(e) => setCc(e.target.value)} className="h-9 min-w-0 flex-1 rounded-lg border border-slate-300 px-3 text-sm" />
+                        </div>
+                    )}
+                    {showBcc && (
+                        <div className="flex items-center gap-2">
+                            <span className="w-14 text-xs font-semibold text-slate-500">Bcc</span>
+                            <input value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="hidden copy - others do not see these addresses" className="h-9 min-w-0 flex-1 rounded-lg border border-slate-300 px-3 text-sm" />
                         </div>
                     )}
                     <div className="flex items-center gap-2">
@@ -176,7 +204,9 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
         const own = account.address.toLowerCase();
         const back = open.folder === "sent" ? open.to_list.join(", ") : open.reply_to || open.from_email;
         const others = all ? [...open.to_list, ...open.cc_list].filter((e) => e && e.toLowerCase() !== own && e.toLowerCase() !== String(back).toLowerCase()) : [];
-        setDraft({ title: all ? "Reply all" : "Reply", to: back, cc: others.join(", "), subject: re(open.subject), body: quote(open), reply_to_id: open.id });
+        const mineAddr = (account.from ?? []).map((f) => f.address);
+        const hit = [...(open.to_list ?? []), ...(open.cc_list ?? [])].map((e) => String(e).toLowerCase()).find((e) => mineAddr.includes(e));
+        setDraft({ title: all ? "Reply all" : "Reply", to: back, cc: others.filter((e) => !mineAddr.includes(String(e).toLowerCase())).join(", "), subject: re(open.subject), body: quote(open), reply_to_id: open.id, from: open.folder === "sent" ? open.from_email : hit });
     };
     const forward = () =>
         setDraft({
@@ -323,6 +353,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                                         </div>
                                         <div className="break-words text-xs text-slate-500">To: {open.to || "—"}</div>
                                         {open.cc && <div className="break-words text-xs text-slate-500">Cc: {open.cc}</div>}
+                                        {open.bcc && <div className="break-words text-xs text-slate-500">Bcc: {open.bcc}</div>}
                                     </div>
                                     <span className="text-xs text-slate-400">{when(open.at, true)}</span>
                                 </div>

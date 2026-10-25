@@ -9,13 +9,14 @@ class MailMessage extends Model
 {
     protected $fillable = [
         'mail_account_id', 'folder', 'uid', 'message_id', 'in_reply_to', 'references_header', 'subject',
-        'from_name', 'from_email', 'to', 'cc', 'reply_to', 'sent_at', 'snippet', 'body_text', 'body_html',
+        'from_name', 'from_email', 'to', 'cc', 'bcc', 'reply_to', 'sent_at', 'snippet', 'body_text', 'body_html',
         'has_attachments', 'seen', 'size', 'sent_by',
     ];
 
     protected $casts = [
         'to' => 'array',
         'cc' => 'array',
+        'bcc' => 'array',
         'reply_to' => 'array',
         'sent_at' => 'datetime',
         'has_attachments' => 'boolean',

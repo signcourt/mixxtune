@@ -40,6 +40,7 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
         status: account?.status ?? "active",
         user_ids: account?.user_ids ?? preset?.user_ids ?? [],
         is_private: account?.is_private ?? preset?.is_private ?? false,
+        aliases: account?.aliases ?? [],
     });
     const [busy, setBusy] = useState(false);
     const set = (k, v) => setData((d) => ({ ...d, [k]: v }));
@@ -47,7 +48,7 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
     const save = () => {
         if (busy) return;
         setBusy(true);
-        const payload = account ? { display_name: data.display_name, password: data.password || null, signature: data.signature, status: data.status, user_ids: data.user_ids, is_private: data.is_private } : data;
+        const payload = account ? { display_name: data.display_name, password: data.password || null, signature: data.signature, status: data.status, user_ids: data.user_ids, is_private: data.is_private, aliases: data.aliases.filter((a) => a.address?.trim()) } : { ...data, aliases: data.aliases.filter((a) => a.address?.trim()) };
         router.post(account ? `/admin/mail-accounts/${account.id}` : "/admin/mail-accounts", payload, { preserveScroll: true, onSuccess: onDone, onFinish: () => setBusy(false) });
     };
 
@@ -77,6 +78,42 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
                 <p className="mb-1 text-[11px] text-slate-500">Super Admins can open every shared mailbox (not the private ones).</p>
                 <People people={people} value={data.user_ids} onChange={(v) => set("user_ids", v)} />
                 {errors.user_ids && <span className="mt-1 block text-xs text-red-600">{errors.user_ids}</span>}
+            </div>
+            {/* W101: other addresses of this mailbox (aliases made in Hostinger) - pick one as "From" when writing */}
+            <div>
+                <span className="text-xs font-semibold text-slate-700">Aliases (send as)</span>
+                <p className="mb-1 text-[11px] text-slate-500">Hostinger hPanel → Emails → Aliases. Mail to an alias already arrives in this mailbox; list it here to also send from it.</p>
+                <div className="space-y-1.5">
+                    {data.aliases.map((al, i) => (
+                        <div key={i} className="flex flex-wrap gap-1.5">
+                            <input
+                                value={al.address}
+                                onChange={(e) => set("aliases", data.aliases.map((x, j) => (j === i ? { ...x, address: e.target.value } : x)))}
+                                placeholder="support@mixxtune.com"
+                                aria-label="Alias address"
+                                className="h-9 min-w-0 flex-[2_1_200px] rounded-lg border border-slate-300 px-3 text-sm"
+                            />
+                            <input
+                                value={al.name ?? ""}
+                                onChange={(e) => set("aliases", data.aliases.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                                placeholder="Name shown (optional)"
+                                aria-label="Alias name"
+                                className="h-9 min-w-0 flex-[1_1_160px] rounded-lg border border-slate-300 px-3 text-sm"
+                            />
+                            <button type="button" onClick={() => set("aliases", data.aliases.filter((_, j) => j !== i))} aria-label="Remove alias" className="h-9 rounded-lg border border-slate-300 px-3 text-sm text-slate-600 hover:bg-slate-50">
+                                ×
+                            </button>
+                        </div>
+                    ))}
+                    {data.aliases.length < 20 && (
+                        <button type="button" onClick={() => set("aliases", [...data.aliases, { address: "", name: "" }])} className="text-xs font-semibold text-violet-700">
+                            + Add alias
+                        </button>
+                    )}
+                    {Object.entries(errors).filter(([k]) => k.startsWith("aliases")).slice(0, 1).map(([k, v]) => (
+                        <span key={k} className="block text-xs text-red-600">{v}</span>
+                    ))}
+                </div>
             </div>
             {/* W100: private = only the people ticked can open it, other Super Admins cannot */}
             <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
@@ -205,6 +242,7 @@ export default function MailAccounts({ role = "super_admin", accounts = [], peop
                                 <div className="mt-1 text-xs text-slate-500">
                                     {a.inbox} in inbox · {a.unread} unread · read {when(a.last_synced_at)}
                                     {a.sent_folder ? ` · sent folder "${a.sent_folder}"` : ""}
+                                    {a.aliases?.length ? ` · aliases: ${a.aliases.map((x) => x.address).join(", ")}` : ""}
                                 </div>
                                 {a.last_error && <div className="mt-1 break-words text-xs font-semibold text-red-600">Problem: {a.last_error}</div>}
                                 <div className="mt-2 flex flex-wrap gap-1.5">
