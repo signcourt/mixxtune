@@ -3,7 +3,7 @@ import { CheckCircle2, Lock, Mail, Plus, RefreshCw, Trash2, UserRound } from "lu
 import { useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
-import SignatureDesigner, { defaultDesign, renderSignature } from "@/V2/Shared/Mail/SignatureDesigner";
+import SignatureDesigner, { defaultDesign, normalizeDesign, renderSignature } from "@/V2/Shared/Mail/SignatureDesigner";
 
 /*
  * W95 MIXXTUNE_PANEL_MAIL
@@ -77,7 +77,7 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
         password: "",
         signature: account?.signature ?? "",
         sig_mode: account?.signature_design || account?.signature_html ? "design" : "text",
-        signature_design: account?.signature_design ? { ...defaultDesign(account, brandLogo), ...account.signature_design } : defaultDesign({ address: account?.address ?? "" }, brandLogo),
+        signature_design: account?.signature_design ? normalizeDesign(account.signature_design, account, brandLogo) : defaultDesign({ address: account?.address ?? "" }, brandLogo),
         status: account?.status ?? "active",
         user_ids: account?.user_ids ?? preset?.user_ids ?? [],
         is_private: account?.is_private ?? preset?.is_private ?? false,

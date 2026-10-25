@@ -60,6 +60,37 @@ export const defaultDesign = (account = {}, brandLogo = "") => ({
     border_color: "#e2e4ea",
 });
 
+/*
+ * W109: settings read back from the server - an empty box is saved as null (Laravel turns ""
+ * into null), so every value is put back in its own type here. Without this, Edit of a mailbox
+ * with a designer signature crashed ("Cannot read properties of null").
+ */
+export function normalizeDesign(raw, account = {}, brandLogo = "") {
+    const base = defaultDesign(account, brandLogo);
+    const src = raw && typeof raw === "object" ? raw : {};
+    const out = {};
+    Object.keys(base).forEach((k) => {
+        const def = base[k];
+        const has = Object.prototype.hasOwnProperty.call(src, k);
+        const v = src[k];
+        if (k === "socials") {
+            const so = v && typeof v === "object" ? v : {};
+            out.socials = {};
+            Object.keys(def).forEach((n) => (out.socials[n] = so[n] == null ? "" : String(so[n])));
+        } else if (typeof def === "string") {
+            out[k] = !has ? def : v == null ? "" : String(v);
+        } else if (typeof def === "number") {
+            const n = Number(v);
+            out[k] = v == null || v === "" || Number.isNaN(n) ? def : n;
+        } else if (typeof def === "boolean") {
+            out[k] = v == null ? def : v === true || v === 1 || v === "1" || v === "true";
+        } else {
+            out[k] = v == null ? def : v;
+        }
+    });
+    return out;
+}
+
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const href = (v) => {
     const s = String(v ?? "").trim();
@@ -77,7 +108,7 @@ const SOCIAL = [
 
 /* the signature HTML - used for the preview and saved as the signature that is sent */
 export function renderSignature(raw) {
-    const d = { ...defaultDesign(), ...(raw || {}), socials: { ...defaultDesign().socials, ...(raw?.socials || {}) } };
+    const d = normalizeDesign(raw);
     const font = (SIG_FONTS.find(([n]) => n === d.font) || SIG_FONTS[0])[1];
     const ts = Number(d.text_size) || 13;
     const lab = (short, word) => (d.labels === "letters" ? `<b style="color:${d.title_color}">${short}</b>&nbsp; ` : d.labels === "words" ? `<span style="color:${d.title_color}">${word}:</span> ` : "");
