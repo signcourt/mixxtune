@@ -7,7 +7,6 @@ import {
 } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
-import ReleaseWizardSidebar from '@/V2/Shared/Releases/V3/ReleaseWizardSidebar';
 import ReleaseHelpfulTip from '@/V2/Shared/Releases/V4/ReleaseHelpfulTip';
 import ReleaseCoverArtCard from '@/V2/Shared/Releases/V4/ReleaseCoverArtCard';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
@@ -16,10 +15,6 @@ import TrackManager from '@/V2/Shared/Releases/Steps/TrackManager';
 import TerritoryStep from '@/V2/Shared/Releases/Steps/TerritoryStep';
 import ReviewStep from '@/V2/Shared/Releases/Steps/ReviewStep';
 
-import {
-    MascotStage,
-    getMascotState,
-} from '@/V2/Shared/Mascot';
 
 const RELEASES_BASE_PATH =
     typeof window !== 'undefined'
@@ -31,7 +26,7 @@ const RELEASES_BASE_PATH =
 const wizardSteps = [
     {
         id: 1,
-        label: 'Release Details',
+        label: 'Release details',
     },
     {
         id: 2,
@@ -664,13 +659,6 @@ export default function ReleaseWizard({
         );
     };
 
-    const mascotState = getMascotState({
-        currentStep,
-        saveState,
-        processing,
-        mascotEvent,
-    });
-
     return (
         <PanelLayout
             role={role}
@@ -678,82 +666,55 @@ export default function ReleaseWizard({
         >
             <Head title={title} />
 
-            <div className="mixx-v3-release-shell">
-                <ReleaseWizardSidebar
-                    currentStep={currentStep}
-                    onStepChange={(step) => {
-                        setMascotEvent(null);
-                        setCurrentStep(step);
-                    }}
-                    release={release}
-                />
+            {/* W97 MIXXTUNE_NEW_RELEASE_UI: steps on top, form + side column, actions at the bottom (N1-N6) */}
+            <div className="mx-auto w-full max-w-[1280px] space-y-5">
+                <div className="sticky top-0 z-40 rounded-2xl border border-slate-200 bg-white/95 shadow-sm backdrop-blur-xl">
+                    <div className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-5">
+                        <Link
+                            href={RELEASES_BASE_PATH}
+                            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-base font-bold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                            title="Back to releases"
+                            aria-label="Back to releases"
+                        >
+                            ←
+                        </Link>
 
-                <div className="mixx-v3-main min-w-0 space-y-6">
-                    <div className="sticky top-0 z-40 overflow-hidden rounded-3xl border border-slate-200 bg-white/95 shadow-lg shadow-slate-200/50 backdrop-blur-xl">
-                    <div className="h-1.5 bg-slate-100">
-                        <div
-                            className={`h-full rounded-r-full bg-gradient-to-r from-violet-600 via-purple-500 to-blue-500 ${
-saveState === 'saving'
-? 'transition-all duration-500'
-: ''
-}` }
-                            style={{
-                                width: `${Math.round(currentStep * 100 / LAST_STEP)}%`,
-                            }}
+                        <div className="min-w-0 flex-[1_1_200px]">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h1 className="truncate text-base font-bold text-slate-950">
+                                    {data.title?.trim() || release?.title || (release?.id ? 'Edit release' : 'New release')}
+                                </h1>
+                                <SaveStatus state={saveState} hasRelease={Boolean(release?.id)} />
+                            </div>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                                {typeLabel(data.release_type)}
+                                {' · '}
+                                {adminEdit ? statusLabel(release?.status) : 'Draft'}
+                                {' · '}
+                                Step {currentStep} of {LAST_STEP}
+                            </p>
+                        </div>
+
+                        <WizardTopActions
+                            currentStep={currentStep}
+                            adminEdit={adminEdit}
+                            releaseId={release?.id}
+                            processing={processing}
+                            onBack={null}
+                            onSaveDraft={saveDraft}
+                            onNext={nextStep}
+                            onSubmit={submitForReview}
                         />
                     </div>
 
-                    <div className="flex flex-col gap-4 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div className="flex min-w-0 items-center gap-4">
-                            <Link
-                                href={RELEASES_BASE_PATH}
-                                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg font-bold text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
-                                title="Back to releases"
-                            >
-                                ←
-                            </Link>
-
-                            <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <h1 className="truncate text-lg font-black text-slate-950 sm:text-xl">
-                                        {release?.id
-                                            ? 'Edit Release'
-                                            : 'Create Release'}
-                                    </h1>
-
-                                    <SaveStatus
-                                        state={saveState}
-                                        hasRelease={Boolean(
-                                            release?.id
-                                        )}
-                                    />
-                                </div>
-
-                                <p className="mt-1 text-xs font-medium text-slate-500 sm:text-sm">
-                                    Step {currentStep} of {LAST_STEP}
-                                    {' · '}
-                                    {wizardSteps[
-                                        currentStep - 1
-                                    ]?.label}
-                                    {' · '}
-                                    {Math.round(currentStep * 100 / LAST_STEP)}% complete
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="overflow-x-auto pb-1 xl:pb-0">
-                            <WizardTopActions
-                                currentStep={currentStep}
-                                adminEdit={adminEdit}
-                                releaseId={release?.id}
-                                processing={processing}
-                                onBack={previousStep}
-                                onSaveDraft={saveDraft}
-                                onNext={nextStep}
-                                onSubmit={submitForReview}
-                            />
-                        </div>
-                    </div>
+                    <StepNav
+                        currentStep={currentStep}
+                        canJump={Boolean(release?.id)}
+                        onStepChange={(step) => {
+                            setMascotEvent(null);
+                            setCurrentStep(step);
+                        }}
+                    />
                 </div>
 
                 {adminEdit && (
@@ -781,11 +742,8 @@ saveState === 'saving'
                     </div>
                 )}
 
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-<div className="min-h-[420px] p-6">
-
-                        <div className={`mixx-v4-step-grid ${currentStep === LAST_STEP ? 'mixx-v4-step-grid--full' : ''}`}>
-                            <div className="mixx-v4-step-main">
+                <div className="flex flex-wrap items-start gap-5">
+                    <main className="min-w-0 flex-[999_1_640px] space-y-4">
                         {currentStep === 1 && (
                             <ReleaseDetailsStep
                                 role={role}
@@ -794,110 +752,108 @@ saveState === 'saving'
                                 errors={errors}
                                 artist={artist}
                                 label={label}
-                                availableArtists={
-                                    availableArtists
-                                }
-                                availableLabels={
-                                    availableLabels
-                                }
-                                artistNameSuggestions={
-                                    artistNameSuggestions
-                                }
+                                availableArtists={availableArtists}
+                                availableLabels={availableLabels}
+                                artistNameSuggestions={artistNameSuggestions}
                             />
                         )}
 
-                        {currentStep === 2 && (
-                            release?.id ? (
-                                <TrackManager
-                                    release={release}
-                                    onMascotEvent={
-                                        handleMascotEvent
-                                    }
-                                    onSaved={() => {
-                                        setMascotEvent(null);
-                                        setCurrentStep(3);
-                                    }}
-                                />
-                            ) : (
-                                <StepPlaceholder
-                                    title="Tracks"
-                                    description="Save release details first to add tracks."
-                                />
-                            )
+                        {currentStep > 1 && (
+                            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                                {currentStep === 2 && (
+                                    release?.id ? (
+                                        <TrackManager
+                                            release={release}
+                                            onMascotEvent={handleMascotEvent}
+                                            onSaved={() => {
+                                                setMascotEvent(null);
+                                                setCurrentStep(3);
+                                            }}
+                                        />
+                                    ) : (
+                                        <StepPlaceholder title="Tracks" description="Save release details first to add tracks." />
+                                    )
+                                )}
+
+                                {currentStep === 3 && (
+                                    release?.id ? (
+                                        <TerritoryStep
+                                            release={release}
+                                            distributionStores={distributionStores}
+                                            onMascotEvent={handleMascotEvent}
+                                            onSaved={() => {
+                                                setMascotEvent(null);
+                                                setCurrentStep(4);
+                                            }}
+                                        />
+                                    ) : (
+                                        <StepPlaceholder title="Territories" description="Save the release before selecting territories." />
+                                    )
+                                )}
+
+                                {currentStep === LAST_STEP && (
+                                    release?.id ? (
+                                        <ReviewStep
+                                            release={release}
+                                            adminEdit={adminEdit}
+                                            artist={artist}
+                                            label={label}
+                                            distributionStores={distributionStores}
+                                            onEditStep={setCurrentStep}
+                                            onMascotEvent={handleMascotEvent}
+                                        />
+                                    ) : (
+                                        <StepPlaceholder title="Review & Publish" description="Save the release before reviewing it." />
+                                    )
+                                )}
+                            </section>
                         )}
+                    </main>
 
-                        {currentStep === 3 && (
-                            release?.id ? (
-                                <TerritoryStep
-                                    release={release}
-                                    distributionStores={
-                                        distributionStores
-                                    }
-                                    onMascotEvent={
-                                        handleMascotEvent
-                                    }
-                                    onSaved={() => {
-                                        setMascotEvent(null);
-                                        setCurrentStep(4);
-                                    }}
-                                />
-                            ) : (
-                                <StepPlaceholder
-                                    title="Territories"
-                                    description="Save the release before selecting territories."
-                                />
-                            )
-                        )}
-
-                        {currentStep === LAST_STEP && (
-                            release?.id ? (
-                                <ReviewStep
-                                    release={release}
-                                    adminEdit={adminEdit}
-                                    artist={artist}
-                                    label={label}
-                                    distributionStores={
-                                        distributionStores
-                                    }
-                                    onEditStep={
-                                        setCurrentStep
-                                    }
-                                    onMascotEvent={
-                                        handleMascotEvent
-                                    }
-                                />
-                            ) : (
-                                <StepPlaceholder
-                                    title="Review & Publish"
-                                    description="Save the release before reviewing it."
-                                />
-                            )
-                        )}
-
-                            </div>
-
+                    {currentStep < LAST_STEP && (
+                        <aside className="flex min-w-0 max-w-full flex-[1_1_300px] flex-col gap-4 lg:max-w-[360px]">
                             {currentStep === 1 ? (
-                                <ReleaseCoverArtCard
-                                    data={data}
-                                    setData={setData}
-                                    error={errors.artwork ?? pageErrors.artwork}
-                                    adminEdit={adminEdit}
-                                />
-                            ) : (
-                                currentStep < LAST_STEP && (
-                                    <ReleaseHelpfulTip
-                                        currentStep={
-                                            currentStep
-                                        }
+                                <>
+                                    <ReleaseCoverArtCard
+                                        data={data}
+                                        setData={setData}
+                                        error={errors.artwork ?? pageErrors.artwork}
+                                        adminEdit={adminEdit}
                                     />
-                                )
+                                    <StepChecklist items={detailsChecklist(data)} />
+                                </>
+                            ) : (
+                                <ReleaseHelpfulTip currentStep={currentStep} />
                             )}
-                        </div>
-                    </div>
-
-                </section>
+                        </aside>
+                    )}
                 </div>
 
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-8">
+                    <div>
+                        {currentStep > 1 && (
+                            <button
+                                type="button"
+                                onClick={previousStep}
+                                disabled={processing}
+                                className="h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                            >
+                                ← Back
+                            </button>
+                        )}
+                    </div>
+                    <WizardTopActions
+                        currentStep={currentStep}
+                        adminEdit={adminEdit}
+                        releaseId={release?.id}
+                        processing={processing}
+                        onBack={null}
+                        onSaveDraft={saveDraft}
+                        onNext={nextStep}
+                        onSubmit={submitForReview}
+                        nextText={['', 'Continue to tracks →', 'Continue to territories →', 'Continue to review →'][currentStep] || null}
+                    />
+                </div>
             </div>
         </PanelLayout>
     );
@@ -936,18 +892,19 @@ function WizardTopActions({
     onSaveDraft,
     onNext,
     onSubmit,
+    nextText = null,
 }) {
     const isLastStep =
         currentStep === LAST_STEP;
 
     return (
-        <div className="flex items-center justify-end gap-3">
-            {currentStep > 1 && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+            {currentStep > 1 && onBack && (
                 <button
                     type="button"
                     onClick={onBack}
                     disabled={processing}
-                    className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     Back
                 </button>
@@ -957,19 +914,19 @@ function WizardTopActions({
                 type="button"
                 onClick={onSaveDraft}
                 disabled={processing}
-                className="rounded-xl border border-violet-300 bg-violet-50 px-5 py-3 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
                 {processing
                     ? 'Saving...'
                     : adminEdit
                       ? 'Save Changes'
-                      : 'Save Draft'}
+                      : 'Save draft'}
             </button>
 
             {isLastStep && adminEdit ? (
                 <Link
                     href={`/releases/${releaseId}`}
-                    className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    className="inline-flex h-10 items-center rounded-lg bg-emerald-600 px-5 text-sm font-semibold text-white transition hover:bg-emerald-700"
                 >
                     Done
                 </Link>
@@ -978,20 +935,20 @@ function WizardTopActions({
                     type="button"
                     onClick={onSubmit}
                     disabled={processing}
-                    className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-10 rounded-lg bg-emerald-600 px-5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {processing
                         ? 'Submitting...'
-                        : 'Submit for Review'}
+                        : 'Submit for review'}
                 </button>
             ) : (
                 <button
                     type="button"
                     onClick={onNext}
                     disabled={processing}
-                    className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-10 rounded-lg bg-violet-600 px-5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    Next →
+                    {nextText ?? 'Continue →'}
                 </button>
             )}
         </div>
@@ -1048,5 +1005,90 @@ function SaveStatus({
         >
             {current.text}
         </span>
+    );
+}
+
+const TYPE_LABELS = { single: 'Single', ep: 'EP', album: 'Album' };
+const typeLabel = (v) => TYPE_LABELS[String(v ?? '').toLowerCase()] ?? (v ? String(v) : 'Single');
+const statusLabel = (v) => String(v ?? 'draft').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+/* W97: N1 "This step" - what is still missing on the details step */
+function detailsChecklist(data) {
+    const has = (v) => String(v ?? '').trim() !== '';
+    const firstArtist = Array.isArray(data.primary_artists) ? data.primary_artists[0]?.name : data.primary_artist_name;
+    const upcOk = data.generate_upc !== false || /^\d{12,13}$/.test(String(data.upc ?? '').trim());
+
+    return [
+        { label: 'Catalogue label', done: has(data.label_id) },
+        { label: 'Title & primary artist', done: has(data.title) && has(firstArtist) },
+        { label: 'Genre, language, date', done: has(data.primary_genre) && has(data.sub_genre) && has(data.language) && has(data.digital_release_date) },
+        { label: 'C / P line', done: has(data.copyright_owner) && has(data.phonographic_owner) },
+        { label: data.generate_upc === false ? 'Your UPC (12 or 13 digits)' : 'UPC: added by Mixx Tune', done: upcOk },
+        { label: 'Cover art 3000 × 3000', done: Boolean(data.artwork || data.artwork_preview) },
+    ];
+}
+
+function StepChecklist({ title = 'This step', items = [] }) {
+    const done = items.filter((i) => i.done).length;
+
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-slate-900">{title}</h2>
+                <span className={`text-xs font-semibold ${done === items.length ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {done} / {items.length}
+                </span>
+            </div>
+            <ul className="mt-3 space-y-1.5">
+                {items.map((item) => (
+                    <li key={item.label} className="flex items-center gap-2 text-xs text-slate-700">
+                        <span aria-hidden="true" className={item.done ? 'font-bold text-emerald-700' : 'text-amber-700'}>
+                            {item.done ? '✓' : '○'}
+                        </span>
+                        <span>{item.label}</span>
+                        <span className="sr-only">{item.done ? '(done)' : '(missing)'}</span>
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
+/* W97: N1 steps row - done steps get a tick; later steps open once the draft is saved */
+function StepNav({ currentStep, canJump, onStepChange }) {
+    return (
+        <nav aria-label="Steps" className="flex gap-1.5 overflow-x-auto px-4 pb-3 sm:px-5">
+            {wizardSteps.map((step) => {
+                const active = step.id === currentStep;
+                const done = step.id < currentStep;
+                const enabled = step.id === 1 || canJump;
+
+                return (
+                    <button
+                        key={step.id}
+                        type="button"
+                        disabled={!enabled}
+                        aria-current={active ? 'step' : undefined}
+                        onClick={() => enabled && onStepChange(step.id)}
+                        className={`flex h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                            active ? 'bg-violet-100 text-violet-900' : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                    >
+                        <span
+                            className={`flex h-6 w-6 items-center justify-center rounded-full border text-[11px] ${
+                                active
+                                    ? 'border-violet-600 bg-violet-600 text-white'
+                                    : done
+                                      ? 'border-emerald-600 bg-emerald-600 text-white'
+                                      : 'border-slate-300 text-slate-600'
+                            }`}
+                        >
+                            {done ? '✓' : step.id}
+                        </span>
+                        {step.id === LAST_STEP ? 'Review & submit' : step.label}
+                    </button>
+                );
+            })}
+        </nav>
     );
 }

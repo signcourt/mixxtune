@@ -467,78 +467,49 @@ export default function ReleaseDetailsStep({
         }
     };
 
+    /* W97 MIXXTUNE_NEW_RELEASE_UI (N1): the same fields in four cards */
     return (
-        <div className="mixx-release-details-v7">
-            {isOperator && (
-                <div className="mb-7 rounded-2xl border border-violet-200 bg-violet-50/50 p-5">
-                    <div className="mb-4">
-                        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-600">
-                            Release Ownership
-                        </span>
-
-                        <h3 className="mt-1 text-base font-black text-slate-950">
-                            Catalog Account
-                        </h3>
-
-                        <p className="mt-1 text-xs text-slate-500">
-                            Select the catalog owner for this release. Artist credits are entered separately below.
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        <Field
-                            label="Catalogue Label"
-                            required
-                            error={errors.label_id}
-                        >
+        <div className="mixx-release-details-v7 space-y-4">
+            <Card title="Catalogue owner">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <Field
+                        label="Catalogue Label"
+                        required
+                        error={errors.label_id}
+                        hint={labels.length > 1 ? 'Select the exact catalogue label that owns this release.' : null}
+                    >
                             <select
-                                className={selectClass}
-                                value={data.label_id ?? ''}
-                                onChange={(event) =>
-                                    changeCatalogueLevel(
-                                        event.target.value
-                                    )
-                                }
-                            >
-                                <option value="">
-                                    Select catalogue label
-                                </option>
+                            className={selectClass}
+                            value={data.label_id ?? ''}
+                            onChange={(event) =>
+                                changeCatalogueLevel(
+                                    event.target.value
+                                )
+                            }
+                        >
+                            <option value="">
+                                Select catalogue label
+                            </option>
 
-                                {labels.map(
-                                    (item) => (
-                                        <option
-                                            key={item.id}
-                                            value={item.id}
-                                        >
-                                            {labelOptionName(
-                                                item
-                                            )}
-                                        </option>
-                                    )
-                                )}
-                            </select>
-                        </Field>
-
-                        {/* W83: "Account Artist" removed - linked in the background */}
-                    </div>
+                            {labels.map(
+                                (item) => (
+                                    <option
+                                        key={item.id}
+                                        value={item.id}
+                                    >
+                                        {labelOptionName(
+                                            item
+                                        )}
+                                    </option>
+                                )
+                            )}
+                        </select>
+                    </Field>
                 </div>
-            )}
+            </Card>
 
-            <div className="mb-6">
-                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-600">
-                    Release Metadata
-                </span>
-
-                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
-                    Release Details
-                </h2>
-
-                <p className="mt-1 text-xs text-slate-500">
-                    Enter the core metadata for this release.
-                </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <Card title="Release">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Field
                     label="Release Title"
                     required
@@ -588,11 +559,6 @@ export default function ReleaseDetailsStep({
                         )}
                     </select>
                 </Field>
-            </div>
-
-            <SectionDivider title="Artists" />
-
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 <div>
                     <div className="mb-2 flex items-center justify-between gap-3">
                         <label className="text-sm font-bold text-slate-700">
@@ -712,57 +678,11 @@ export default function ReleaseDetailsStep({
                         }
                     />
                 </div>
-            </div>
+                </div>
+            </Card>
 
-            <SectionDivider title="Classification" />
-
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {!isOperator && (
-                    <Field
-                        label="Catalogue Label"
-                        required
-                        error={errors.label_id}
-                    >
-                        <select
-                            className={selectClass}
-                            value={
-                                data.label_id
-                                ?? ''
-                            }
-                            onChange={(event) =>
-                                changeCatalogueLevel(
-                                    event.target.value
-                                )
-                            }
-                        >
-                            <option value="">
-                                Select catalogue label
-                            </option>
-
-                            {labels.map(
-                                (item) => (
-                                    <option
-                                        key={item.id}
-                                        value={item.id}
-                                    >
-                                        {labelOptionName(
-                                            item
-                                        )}
-                                    </option>
-                                )
-                            )}
-                        </select>
-
-                        {labels.length > 1 && (
-                            <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
-                                Select the exact catalogue label that owns this release.
-                            </p>
-                        )}
-                    </Field>
-                )}
-
-                {/* W83: "Account Artist" removed from the form - the server links the artist account in the background */}
-
+            <Card title="Genre & date">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <Field
                     label="Genre"
                     required
@@ -892,11 +812,11 @@ export default function ReleaseDetailsStep({
                         Select the production year.
                     </p>
                 </Field>
-            </div>
+                </div>
+            </Card>
 
-            <SectionDivider title="Rights & Identifiers" />
-
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <Card title="Rights & codes">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="space-y-5">
                     <Field
                         label="C Line"
@@ -1044,8 +964,18 @@ export default function ReleaseDetailsStep({
                         />
                     </Field>
                 </div>
-            </div>
+                </div>
+            </Card>
         </div>
+    );
+}
+
+function Card({ title, children }) {
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-sm font-bold text-slate-900">{title}</h2>
+            {children}
+        </section>
     );
 }
 
