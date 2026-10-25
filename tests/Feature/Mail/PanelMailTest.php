@@ -26,6 +26,9 @@ class FakeImap extends ImapClient
     public static array $folders = [];
     public static array $appended = [];
     public static array $flagged = [];
+    /* W110: flags per folder / uid that the server gives, and every +/- flag change */
+    public static array $flagsOf = [];
+    public static array $flagLog = [];
     private string $sel = 'INBOX';
 
     public function listFolders(): array
@@ -47,12 +50,18 @@ class FakeImap extends ImapClient
 
     public function fetch(array $uids, bool $withBody = true, bool $headerOnly = false): array
     {
-        return array_map(fn ($u) => ['uid' => $u, 'flags' => [], 'size' => strlen(self::$folders[$this->sel][$u]), 'raw' => $withBody || $headerOnly ? self::$folders[$this->sel][$u] : null], $uids);
+        return array_map(fn ($u) => ['uid' => $u, 'flags' => self::$flagsOf[$this->sel][$u] ?? [], 'size' => strlen(self::$folders[$this->sel][$u]), 'raw' => $withBody || $headerOnly ? self::$folders[$this->sel][$u] : null], $uids);
     }
 
     public function addFlags(int $uid, string $flags): void
     {
         self::$flagged[] = $uid;
+        self::$flagLog[] = [$this->sel, $uid, '+', $flags];
+    }
+
+    public function removeFlags(int $uid, string $flags): void
+    {
+        self::$flagLog[] = [$this->sel, $uid, '-', $flags];
     }
 
     public function append(string $folder, string $raw, string $flags = '\\Seen'): void
@@ -116,6 +125,8 @@ class PanelMailTest extends TestCase
         FakeImap::$folders = ['INBOX' => [], 'INBOX.Sent' => []];
         FakeImap::$appended = [];
         FakeImap::$flagged = [];
+        FakeImap::$flagsOf = [];
+        FakeImap::$flagLog = [];
         FakeTransport::$sent = [];
         FakeConnector::$loginWorks = true;
         $this->app->instance(MailConnector::class, new FakeConnector());
@@ -628,5 +639,71 @@ class PanelMailTest extends TestCase
         $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature' => 'Regards', 'signature_html' => '', 'signature_design' => ''])->assertSessionHasNoErrors();
         $this->assertNull($a->fresh()->signature_design);
         $this->assertNull($a->fresh()->signature_html);
+    }
+    /* W110: star (also \\Flagged in the mailbox), Starred list, drafts kept while writing, address suggestions */
+    public function test_star_drafts_and_address_suggestions(): void
+    {
+        $mine = $this->user('admin');
+        $other = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'manager1@mixxtune.com', 'display_name' => 'Mixx Tune', 'username' => 'manager1@mixxtune.com', 'password' => 'x', 'status' => 'active', 'sent_folder' => 'INBOX.Sent', 'aliases' => [['address' => 'support@mixxtune.com', 'name' => '']]]);
+        $a->users()->sync([$mine->id, $other->id]);
+
+        /* a mail starred in webmail comes in starred */
+        FakeImap::$folders['INBOX'] = [
+            3 => $this->mail('Contract', 'Saras Music <saras@example.com>', "Content-Type: text/plain\r\n\r\nPlease sign"),
+            4 => $this->mail('Newsletter', 'No Reply <noreply@shop.example>', "Content-Type: text/plain\r\n\r\nSale"),
+        ];
+        FakeImap::$flagsOf['INBOX'][3] = ['\\Seen', '\\Flagged'];
+        $this->artisan('mail:sync')->assertExitCode(0);
+        $contract = MailMessage::query()->where('subject', 'Contract')->firstOrFail();
+        $news = MailMessage::query()->where('subject', 'Newsletter')->firstOrFail();
+        $this->assertTrue($contract->starred);
+        $this->assertFalse($news->starred);
+
+        /* star / unstar from the panel */
+        $this->actingAs($mine)->post("/mail/messages/{$news->id}/star", ['starred' => 1])->assertRedirect();
+        $this->assertTrue($news->fresh()->starred);
+        $this->assertContains(['INBOX', 4, '+', '\\Flagged'], FakeImap::$flagLog);
+        $this->actingAs($mine)->post("/mail/messages/{$contract->id}/star", ['starred' => 0]);
+        $this->assertFalse($contract->fresh()->starred);
+        $this->assertContains(['INBOX', 3, '-', '\\Flagged'], FakeImap::$flagLog);
+        $this->actingAs($mine)->get("/mail?account={$a->id}&folder=starred")->assertInertia(fn (Assert $p) => $p
+            ->where('folder', 'starred')->where('messages.total', 1)->where('messages.data.0.subject', 'Newsletter')->where('messages.data.0.starred', true)->where('counts.starred', 1));
+
+        /* a draft: saved, saved again (same one), only its writer sees it */
+        $r = $this->actingAs($mine)->postJson("/mail/accounts/{$a->id}/drafts", ['to' => 'saras@example.com, half-typed', 'cc' => '', 'subject' => 'Offer', 'body' => 'Hello Saras', 'html' => 'Hello <b>Saras</b><script>x()</script>', 'from' => 'support@mixxtune.com', 'signature' => 0])->assertOk();
+        $id = $r->json('id');
+        $this->actingAs($mine)->postJson("/mail/accounts/{$a->id}/drafts", ['draft_id' => $id, 'to' => 'saras@example.com', 'subject' => 'Offer 2', 'body' => 'Hello again', 'html' => 'Hello again'])->assertOk()->assertJson(['id' => $id]);
+        $this->assertSame(1, MailMessage::query()->where('folder', 'drafts')->count());
+        $this->actingAs($mine)->postJson("/mail/accounts/{$a->id}/drafts", ['from' => 'ceo@other.com', 'subject' => 'x'])->assertStatus(422);
+        $this->actingAs($mine)->get("/mail?account={$a->id}&folder=drafts")->assertInertia(fn (Assert $p) => $p->where('messages.total', 1)->where('messages.data.0.subject', 'Offer 2')->where('messages.data.0.folder', 'drafts')->where('counts.drafts', 1));
+        $this->actingAs($mine)->get("/mail?account={$a->id}&folder=drafts&m={$id}")->assertInertia(fn (Assert $p) => $p
+            ->where('open.draft.id', $id)->where('open.draft.to', 'saras@example.com')->where('open.draft.subject', 'Offer 2')->where('open.draft.from', 'manager1@mixxtune.com'));
+        $this->actingAs($other)->get("/mail?account={$a->id}&folder=drafts")->assertInertia(fn (Assert $p) => $p->where('messages.total', 0)->where('counts.drafts', 0));
+        $this->actingAs($other)->get("/mail?account={$a->id}&m={$id}")->assertInertia(fn (Assert $p) => $p->where('open', null));
+        $this->actingAs($other)->postJson("/mail/drafts/{$id}/delete")->assertNotFound();
+        $this->actingAs($other)->post("/mail/messages/{$id}/star", ['starred' => 1])->assertStatus(422);
+
+        /* sending it removes the draft */
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'saras@example.com', 'subject' => 'Offer 2', 'body' => 'Hello again', 'draft_id' => $id])->assertSessionHasNoErrors();
+        $this->assertSame(0, MailMessage::query()->where('folder', 'drafts')->count());
+
+        /* a second draft deleted with Discard */
+        $id2 = $this->actingAs($mine)->postJson("/mail/accounts/{$a->id}/drafts", ['subject' => 'Later'])->json('id');
+        $this->actingAs($mine)->postJson("/mail/drafts/{$id2}/delete")->assertOk();
+        $this->assertNull(MailMessage::query()->find($id2));
+
+        /* suggestions: people written to first, newest name kept, own addresses and no-reply left out */
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'tarun@label.example', 'cc' => 'support@mixxtune.com', 'subject' => 'Hi', 'body' => 'Hi'])->assertSessionHasNoErrors();
+        $c = $this->actingAs($mine)->getJson("/mail/accounts/{$a->id}/contacts")->assertOk()->json('contacts');
+        $emails = array_column($c, 'email');
+        $this->assertSame('saras@example.com', $emails[0]);
+        $this->assertSame('Saras Music', $c[0]['name']);
+        $this->assertContains('tarun@label.example', $emails);
+        $this->assertNotContains('support@mixxtune.com', $emails);
+        $this->assertNotContains('manager1@mixxtune.com', $emails);
+        $this->assertNotContains('noreply@shop.example', $emails);
+        $outsider = $this->user('admin');
+        $this->actingAs($outsider)->getJson("/mail/accounts/{$a->id}/contacts")->assertForbidden();
     }
 }

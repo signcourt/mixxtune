@@ -1,8 +1,9 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import { ALargeSmall, ArrowLeft, CornerUpLeft, CornerUpRight, ImagePlus, Inbox, Link2, Mail, Maximize2, Minimize2, Minus, Paperclip, PenLine, PenSquare, RefreshCw, ReplyAll, Search, Send, Smile, Trash2, X } from "lucide-react";
+import { ALargeSmall, ArrowLeft, CornerUpLeft, CornerUpRight, FileText, ImagePlus, Inbox, Link2, Mail, Maximize2, Minimize2, Minus, Paperclip, PenLine, PenSquare, RefreshCw, ReplyAll, Search, Send, Smile, Star, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import AddressInput from "@/V2/Shared/Mail/AddressInput";
 import { EMOJI, Editor, esc, shrinkImage, textToHtml, Toolbar, useRich } from "@/V2/Shared/Mail/RichEditor";
 
 /*
@@ -37,8 +38,8 @@ function Compose({ account, draft, onClose }) {
     const [cc, setCc] = useState(draft.cc ?? "");
     const [showCc, setShowCc] = useState(Boolean(draft.cc));
     /* W101: Bcc, and the From address (the mailbox or one of its aliases) */
-    const [bcc, setBcc] = useState("");
-    const [showBcc, setShowBcc] = useState(false);
+    const [bcc, setBcc] = useState(draft.bcc ?? "");
+    const [showBcc, setShowBcc] = useState(Boolean(draft.bcc));
     const fromList = account.from?.length ? account.from : [{ address: account.address, name: account.display_name || "" }];
     const [from, setFrom] = useState(draft.from && fromList.some((f) => f.address === draft.from) ? draft.from : fromList[0].address);
     const [subject, setSubject] = useState(draft.subject ?? "");
@@ -50,7 +51,14 @@ function Compose({ account, draft, onClose }) {
     const [mode, setMode] = useState("normal");
     const [tools, setTools] = useState(true);
     const hasSignature = Boolean(account.signature_html || account.signature);
-    const [sigOn, setSigOn] = useState(true);
+    const [sigOn, setSigOn] = useState(draft.signature !== false);
+    /* W110: drafts (saved by themselves while writing) and the address suggestions */
+    const [contacts, setContacts] = useState([]);
+    const [savedAt, setSavedAt] = useState(draft.draft_id ? "kept" : null);
+    const draftId = useRef(draft.draft_id ?? null);
+    const chain = useRef(Promise.resolve());
+    const changed = useRef(false);
+    const sending = useRef(false);
     const [pop, setPop] = useState(null);
     const [link, setLink] = useState({ text: "", url: "" });
     const [askDiscard, setAskDiscard] = useState(false);
@@ -58,22 +66,90 @@ function Compose({ account, draft, onClose }) {
     const picture = useRef(null);
     const total = files.reduce((s, f) => s + f.size, 0) + kept.reduce((s, a) => s + (a.size ?? 0), 0) + html.length;
     const hasImage = /<img\b/i.test(html);
+    const first = useRef(true);
     const sync = () => {
         const el = rich.ref.current;
         if (!el) return;
+        if (first.current) first.current = false;
+        else changed.current = true;
         setHtml(el.innerHTML);
         setText(el.innerText ?? "");
     };
     const fromLabel = (f) => (f.name ? `${f.name} <${f.address}>` : f.address);
 
-    const send = () => {
+    useEffect(() => {
+        let live = true;
+        window.axios
+            .get(`/mail/accounts/${account.id}/contacts`)
+            .then(({ data: r }) => live && setContacts(r.contacts ?? []))
+            .catch(() => {});
+        return () => {
+            live = false;
+        };
+    }, [account.id]);
+
+    const hasContent = () => Boolean(to.trim() || cc.trim() || bcc.trim() || subject.trim() || (rich.ref.current?.innerText ?? text).trim() || /<img\b/i.test(rich.ref.current?.innerHTML ?? html));
+    const saveDraft = () => {
+        chain.current = chain.current.then(async () => {
+            if (sending.current || !hasContent()) return;
+            const el = rich.ref.current;
+            setSavedAt("saving");
+            try {
+                const { data: r } = await window.axios.post(`/mail/accounts/${account.id}/drafts`, {
+                    draft_id: draftId.current, from, to, cc, bcc, subject,
+                    body: (el?.innerText ?? text).replace(/\u00a0/g, " "), html: el?.innerHTML ?? html, signature: sigOn ? 1 : 0,
+                    reply_to_id: draft.reply_to_id ?? null, forward_of: draft.forward_of ?? null, keep_attachments: kept.map((a) => a.id),
+                });
+                draftId.current = r.id;
+                changed.current = false;
+                setSavedAt(new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }).format(new Date()));
+            } catch {
+                setSavedAt("failed");
+            }
+        });
+        return chain.current;
+    };
+    /* a few seconds after the last change the draft is saved */
+    useEffect(() => {
+        if (!changed.current) return undefined;
+        const t = setTimeout(saveDraft, 2500);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [to, cc, bcc, subject, html, from, sigOn, kept]);
+    const touch = (fn) => (v) => {
+        changed.current = true;
+        fn(v);
+    };
+    const close = async () => {
+        if (changed.current && hasContent()) await saveDraft();
+        else await chain.current;
+        onClose(Boolean(draftId.current));
+    };
+    const discard = async () => {
+        sending.current = true;
+        await chain.current;
+        if (draftId.current) await window.axios.post(`/mail/drafts/${draftId.current}/delete`).catch(() => {});
+        onClose(true);
+    };
+
+    const send = async () => {
         if (busy || !canSend) return;
         setBusy(true);
+        await chain.current;
+        sending.current = true;
         const el = rich.ref.current;
         router.post(
             `/mail/accounts/${account.id}/send`,
-            { from, to, cc, bcc, subject, body: (el?.innerText ?? text).replace(/ /g, " "), html: el?.innerHTML ?? html, signature: sigOn ? 1 : 0, files, reply_to_id: draft.reply_to_id ?? "", forward_of: draft.forward_of ?? "", keep_attachments: kept.map((a) => a.id) },
-            { forceFormData: true, preserveScroll: true, onSuccess: onClose, onFinish: () => setBusy(false) },
+            { from, to, cc, bcc, subject, body: (el?.innerText ?? text).replace(/\u00a0/g, " "), html: el?.innerHTML ?? html, signature: sigOn ? 1 : 0, files, reply_to_id: draft.reply_to_id ?? "", forward_of: draft.forward_of ?? "", keep_attachments: kept.map((a) => a.id), draft_id: draftId.current ?? "" },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onSuccess: () => onClose(false),
+                onError: () => {
+                    sending.current = false;
+                },
+                onFinish: () => setBusy(false),
+            },
         );
     };
     const canSend = !busy && to.trim() && subject.trim() && (text.trim() || hasImage) && total <= 24 * 1048576;
@@ -136,7 +212,7 @@ function Compose({ account, draft, onClose }) {
                         <button type="button" onClick={() => setMode(big ? "normal" : "max")} className={`${icon} hidden sm:block`} title={big ? "Exit full screen" : "Full screen"} aria-label={big ? "Exit full screen" : "Full screen"}>
                             {big ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                         </button>
-                        <button type="button" onClick={onClose} disabled={busy} className={icon} title="Save nothing and close" aria-label="Close">
+                        <button type="button" onClick={close} disabled={busy} className={icon} title="Close - the draft is kept in Drafts" aria-label="Close">
                             <X size={17} />
                         </button>
                     </div>
@@ -146,7 +222,7 @@ function Compose({ account, draft, onClose }) {
                         <div className={row}>
                             <span className="w-14 shrink-0 text-sm text-slate-500">From</span>
                             {fromList.length > 1 ? (
-                                <select value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From" className="h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-slate-800 focus:ring-0">
+                                <select value={from} onChange={(e) => touch(setFrom)(e.target.value)} aria-label="From" className="h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-slate-800 focus:ring-0">
                                     {fromList.map((f) => (
                                         <option key={f.address} value={f.address}>
                                             {fromLabel(f)}
@@ -159,7 +235,7 @@ function Compose({ account, draft, onClose }) {
                         </div>
                         <div className={row}>
                             <span className="w-14 shrink-0 text-sm text-slate-500">To</span>
-                            <input value={to} onChange={(e) => setTo(e.target.value)} autoFocus={!draft.to} aria-label="To" placeholder="name@example.com, other@example.com" className="h-8 min-w-0 flex-1 border-0 px-0 text-sm focus:ring-0" />
+                            <AddressInput value={to} onChange={touch(setTo)} contacts={contacts} autoFocus={!draft.to} label="To" placeholder="name@example.com, other@example.com" />
                             {!showCc && (
                                 <button type="button" onClick={() => setShowCc(true)} className="text-sm text-slate-600 hover:text-slate-900 hover:underline">
                                     Cc
@@ -174,17 +250,17 @@ function Compose({ account, draft, onClose }) {
                         {showCc && (
                             <div className={row}>
                                 <span className="w-14 shrink-0 text-sm text-slate-500">Cc</span>
-                                <input value={cc} onChange={(e) => setCc(e.target.value)} aria-label="Cc" className="h-8 min-w-0 flex-1 border-0 px-0 text-sm focus:ring-0" />
+                                <AddressInput value={cc} onChange={touch(setCc)} contacts={contacts} label="Cc" />
                             </div>
                         )}
                         {showBcc && (
                             <div className={row}>
                                 <span className="w-14 shrink-0 text-sm text-slate-500">Bcc</span>
-                                <input value={bcc} onChange={(e) => setBcc(e.target.value)} aria-label="Bcc" placeholder="hidden copy - others do not see these addresses" className="h-8 min-w-0 flex-1 border-0 px-0 text-sm focus:ring-0" />
+                                <AddressInput value={bcc} onChange={touch(setBcc)} contacts={contacts} label="Bcc" placeholder="hidden copy - others do not see these addresses" />
                             </div>
                         )}
                         <div className={row}>
-                            <input value={subject} onChange={(e) => setSubject(e.target.value)} aria-label="Subject" placeholder="Subject" className="h-8 min-w-0 flex-1 border-0 px-0 text-sm focus:ring-0" />
+                            <input value={subject} onChange={(e) => touch(setSubject)(e.target.value)} aria-label="Subject" placeholder="Subject" className="h-8 min-w-0 flex-1 border-0 px-0 text-sm focus:ring-0" />
                         </div>
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto px-4" onClick={(e) => e.target === e.currentTarget && rich.restore()}>
@@ -203,7 +279,7 @@ function Compose({ account, draft, onClose }) {
                                 {kept.map((a) => (
                                     <span key={`k${a.id}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-800">
                                         <Paperclip size={12} /> {a.filename} · {size(a.size ?? 0)}
-                                        <button type="button" onClick={() => setKept(kept.filter((k) => k.id !== a.id))} aria-label="Remove">
+                                        <button type="button" onClick={() => touch(setKept)(kept.filter((k) => k.id !== a.id))} aria-label="Remove">
                                             <X size={12} />
                                         </button>
                                     </span>
@@ -246,19 +322,22 @@ function Compose({ account, draft, onClose }) {
                             </button>
                             <input ref={picture} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple className="hidden" onChange={(e) => { addPictures(e.target.files); e.target.value = ""; }} />
                             {hasSignature && (
-                                <button type="button" onClick={() => setSigOn(!sigOn)} className={tool(sigOn)} title={sigOn ? "Signature on - click to send this mail without it" : "Signature off - click to add it"} aria-label="Signature on or off">
+                                <button type="button" onClick={() => touch(setSigOn)(!sigOn)} className={tool(sigOn)} title={sigOn ? "Signature on - click to send this mail without it" : "Signature off - click to add it"} aria-label="Signature on or off">
                                     <PenLine size={18} />
                                 </button>
                             )}
-                            <div className="flex-1" />
+                            <div className="flex-1 truncate px-1 text-right text-[11px] text-slate-400">
+                                {savedAt === "saving" ? "Saving draft..." : savedAt === "failed" ? <span className="text-red-600">Draft not saved</span> : savedAt === "kept" ? "Draft" : savedAt ? `Draft saved ${savedAt}` : ""}
+                                {files.length > 0 && savedAt && savedAt !== "saving" && <span className="block text-amber-700">New attachments are not kept in a draft</span>}
+                            </div>
                             {askDiscard ? (
                                 <span className="flex items-center gap-1 text-xs text-slate-600">
                                     Discard?
-                                    <button type="button" onClick={onClose} className="rounded-md bg-red-600 px-2 py-1 font-semibold text-white">Yes</button>
+                                    <button type="button" onClick={discard} className="rounded-md bg-red-600 px-2 py-1 font-semibold text-white">Yes</button>
                                     <button type="button" onClick={() => setAskDiscard(false)} className="rounded-md border border-slate-300 px-2 py-1 font-semibold">No</button>
                                 </span>
                             ) : (
-                                <button type="button" onClick={() => (text.trim() || hasImage || files.length ? setAskDiscard(true) : onClose())} disabled={busy} className={tool()} title="Discard this mail" aria-label="Discard">
+                                <button type="button" onClick={() => (hasContent() || files.length || draftId.current ? setAskDiscard(true) : discard())} disabled={busy} className={tool()} title="Discard this mail (the draft is deleted)" aria-label="Discard">
                                     <Trash2 size={18} />
                                 </button>
                             )}
@@ -295,7 +374,7 @@ function Compose({ account, draft, onClose }) {
     );
 }
 
-export default function MailIndex({ role = "admin", accounts = [], current = null, folder = "inbox", search = "", messages = null, open = null, isSuperAdmin = false }) {
+export default function MailIndex({ role = "admin", accounts = [], current = null, folder = "inbox", search = "", messages = null, open = null, isSuperAdmin = false, counts = { drafts: 0, starred: 0 } }) {
     const { flash = {}, errors = {} } = usePage().props;
     const account = accounts.find((a) => a.id === current) ?? null;
     const [q, setQ] = useState(search);
@@ -305,6 +384,15 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
     const rows = messages?.data ?? [];
 
     useEffect(() => setPlain(false), [open?.id]);
+    /* W110: a draft opens again in the Write window */
+    useEffect(() => {
+        if (open?.draft) setDraft({ ...open.draft, draft_id: open.draft.id, title: "Draft" });
+    }, [open?.draft?.id]);
+    const star = (m, on) => router.post(`/mail/messages/${m.id}/star`, { starred: on ? 1 : 0 }, { preserveScroll: true, preserveState: true });
+    const closeCompose = (saved) => {
+        setDraft(null);
+        if (saved || folder === "drafts") router.reload({ only: ["messages", "counts", "open"], preserveScroll: true });
+    };
 
     const go = (params) => router.get("/mail", { account: current, folder, q: q || undefined, ...params }, { preserveScroll: true, preserveState: true });
     const refresh = () => {
@@ -336,7 +424,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
             note: open.attachments?.length ? "The attachments of the original mail go along - remove any you do not want to send." : null,
         });
 
-    const listTitle = useMemo(() => (folder === "sent" ? "Sent" : "Inbox"), [folder]);
+    const listTitle = useMemo(() => ({ sent: "Sent", drafts: "Drafts", starred: "Starred" })[folder] ?? "Inbox", [folder]);
 
     if (accounts.length === 0) {
         return (
@@ -394,11 +482,14 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                 <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
                     {[
                         ["inbox", "Inbox", Inbox],
+                        ["starred", "Starred", Star],
                         ["sent", "Sent", Send],
+                        ["drafts", "Drafts", FileText],
                     ].map(([key, label, Icon]) => (
                         <button key={key} type="button" onClick={() => router.get("/mail", { account: current, folder: key })} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ${folder === key ? "bg-violet-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
                             <Icon size={15} /> {label}
                             {key === "inbox" && account?.unread > 0 && <span className={`rounded-full px-1.5 text-[11px] font-black ${folder === key ? "bg-white text-violet-700" : "bg-violet-600 text-white"}`}>{account.unread}</span>}
+                            {(key === "drafts" || key === "starred") && counts[key] > 0 && <span className={`text-[11px] font-bold ${folder === key ? "text-violet-100" : "text-slate-400"}`}>{counts[key]}</span>}
                         </button>
                     ))}
                 </div>
@@ -422,14 +513,25 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
             <div className="mt-3 grid min-h-[60vh] gap-3 lg:grid-cols-[380px_minmax(0,1fr)]">
                 <section className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${open ? "hidden lg:block" : ""}`}>
                     {rows.length === 0 ? (
-                        <p className="px-5 py-16 text-center text-sm text-slate-500">{search ? "Nothing found." : folder === "sent" ? "No sent mail yet." : "No mail yet."}</p>
+                        <p className="px-5 py-16 text-center text-sm text-slate-500">{search ? "Nothing found." : { sent: "No sent mail yet.", drafts: "No drafts. A mail you start writing is kept here until it is sent.", starred: "No starred mail. Press the star on a mail to keep it here." }[folder] ?? "No mail yet."}</p>
                     ) : (
                         <ul className="divide-y divide-slate-100">
                             {rows.map((m) => (
-                                <li key={m.id}>
-                                    <button type="button" onClick={() => go({ m: m.id })} className={`block w-full px-4 py-3 text-left hover:bg-slate-50 ${open?.id === m.id ? "bg-violet-50" : ""}`}>
+                                <li key={m.id} className={`flex items-stretch ${open?.id === m.id ? "bg-violet-50" : ""}`}>
+                                    {m.folder !== "drafts" ? (
+                                        <button type="button" onClick={() => star(m, !m.starred)} title={m.starred ? "Starred - click to remove the star" : "Star this mail"} aria-label={m.starred ? "Remove star" : "Star"} aria-pressed={m.starred} className="shrink-0 pl-3 pr-1 text-slate-300 hover:text-amber-500">
+                                            <Star size={17} className={m.starred ? "fill-amber-400 text-amber-500" : ""} />
+                                        </button>
+                                    ) : (
+                                        <span className="w-3 shrink-0" />
+                                    )}
+                                    <button type="button" onClick={() => go({ m: m.id })} className="block min-w-0 flex-1 py-3 pl-1 pr-4 text-left hover:bg-slate-50">
                                         <div className="flex items-center justify-between gap-2">
-                                            <span className={`truncate text-sm ${m.seen ? "text-slate-700" : "font-black text-slate-950"}`}>{m.who || "—"}</span>
+                                            <span className={`truncate text-sm ${m.seen ? "text-slate-700" : "font-black text-slate-950"}`}>
+                                                {m.folder === "drafts" && <span className="mr-1 font-semibold text-red-600">Draft</span>}
+                                                {folder === "starred" && m.folder === "sent" && <span className="mr-1 text-slate-400">To:</span>}
+                                                {m.who || "—"}
+                                            </span>
                                             <span className="shrink-0 text-[11px] text-slate-400">{when(m.at)}</span>
                                         </div>
                                         <div className={`flex items-center gap-1 truncate text-sm ${m.seen ? "text-slate-600" : "font-bold text-slate-900"}`}>
@@ -456,6 +558,13 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                 <section className={`min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm ${open ? "" : "hidden lg:block"}`}>
                     {!open ? (
                         <p className="px-5 py-24 text-center text-sm text-slate-400">Choose a mail to read it.</p>
+                    ) : open.folder === "drafts" ? (
+                        <div className="px-5 py-20 text-center">
+                            <p className="text-sm text-slate-500">This draft opens in the Write window.</p>
+                            <button type="button" onClick={() => setDraft({ ...open.draft, draft_id: open.draft.id, title: "Draft" })} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700">
+                                <PenSquare size={15} /> Open the draft
+                            </button>
+                        </div>
                     ) : (
                         <article className="flex h-full flex-col">
                             <div className="border-b border-slate-100 px-5 py-4">
@@ -472,7 +581,14 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                                         {open.cc && <div className="break-words text-xs text-slate-500">Cc: {open.cc}</div>}
                                         {open.bcc && <div className="break-words text-xs text-slate-500">Bcc: {open.bcc}</div>}
                                     </div>
-                                    <span className="text-xs text-slate-400">{when(open.at, true)}</span>
+                                    <span className="flex items-center gap-2 text-xs text-slate-400">
+                                        {when(open.at, true)}
+                                        {open.folder !== "drafts" && (
+                                            <button type="button" onClick={() => star(open, !open.starred)} title={open.starred ? "Starred - click to remove the star" : "Star this mail"} aria-label={open.starred ? "Remove star" : "Star"} aria-pressed={open.starred} className="rounded-full p-1 hover:bg-amber-50">
+                                                <Star size={18} className={open.starred ? "fill-amber-400 text-amber-500" : "text-slate-400"} />
+                                            </button>
+                                        )}
+                                    </span>
                                 </div>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     <button type="button" onClick={() => reply(false)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
@@ -512,7 +628,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                 </section>
             </div>
 
-            {draft && account && <Compose key={`${account.id}-${draft.title ?? "new"}-${draft.reply_to_id ?? ""}-${draft.forward_of ?? ""}`} account={account} draft={draft} onClose={() => setDraft(null)} />}
+            {draft && account && <Compose key={`${account.id}-${draft.draft_id ?? "x"}-${draft.title ?? "new"}-${draft.reply_to_id ?? ""}-${draft.forward_of ?? ""}`} account={account} draft={draft} onClose={closeCompose} />}
         </PanelLayout>
     );
 }

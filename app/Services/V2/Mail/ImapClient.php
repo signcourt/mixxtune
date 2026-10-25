@@ -158,6 +158,12 @@ class ImapClient
         $this->command("UID STORE {$uid} +FLAGS.SILENT ({$flags})");
     }
 
+    /* W110: take a flag away again (star off = \\Flagged removed) */
+    public function removeFlags(int $uid, string $flags): void
+    {
+        $this->command("UID STORE {$uid} -FLAGS.SILENT ({$flags})");
+    }
+
     public function append(string $folder, string $raw, string $flags = '\\Seen'): void
     {
         $raw = preg_replace("/(?<!\r)\n/", "\r\n", $raw);

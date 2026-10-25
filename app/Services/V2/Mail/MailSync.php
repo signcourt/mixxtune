@@ -158,6 +158,8 @@ class MailSync
                 'body_html' => $headersOnly ? null : ($m['html'] !== '' ? $m['html'] : null),
                 'has_attachments' => collect($m['attachments'])->contains(fn ($a) => !$a['inline']),
                 'seen' => $kind === 'sent' ? true : $seen,
+                /* W110: a mail starred in webmail / Gmail app comes in starred */
+                'starred' => in_array('\\Flagged', $row['flags'], true),
                 'size' => (int) $row['size'],
             ]);
             foreach ($m['attachments'] as $i => $a) {
