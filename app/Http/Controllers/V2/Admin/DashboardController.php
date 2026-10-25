@@ -425,6 +425,14 @@ class DashboardController extends Controller
 
                 'setup' => $setup,
 
+                /* W94 MIXXTUNE_ACCOUNT_AGREEMENTS: agreements ending within 90 days (or ended, not renewed) */
+                'agreements' => $role === 'super_admin' ? (function () use ($request) {
+                    $svc = app(\App\Services\V2\AccountAgreements::class);
+                    $due = $svc->due();
+
+                    return ['due' => $due, 'popup' => $due !== [] && $svc->popupDue($request->user())];
+                })() : null,
+
                 'growth' => [
                     'month' => $growth['current_month'] ?? null,
                     'previous_month' => $growth['previous_month'] ?? null,

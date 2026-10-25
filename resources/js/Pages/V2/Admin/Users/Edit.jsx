@@ -4,6 +4,7 @@ import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import { useEffect, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import AgreementPanel from "@/V2/Shared/Components/AgreementPanel";
 
 
 export default function Edit({
@@ -18,6 +19,7 @@ export default function Edit({
     assignedLabelIds = [],
     kycLock = null,
     panelTabs = null,
+    agreement = null,
 }) {
     const { flash = {} } = usePage().props;
 
@@ -1080,6 +1082,9 @@ export default function Edit({
                     </button>
                 </div>
             </form>
+
+            {/* W94 MIXXTUNE_ACCOUNT_AGREEMENTS */}
+            <AgreementPanel userId={managedUser.id} agreement={agreement} />
         </PanelLayout>
     );
 }

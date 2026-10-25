@@ -1862,6 +1862,9 @@ return Inertia::render(
                         )
                         ->values(),
 
+                /* W94 MIXXTUNE_ACCOUNT_AGREEMENTS */
+                'agreement' => app(\App\Services\V2\AccountAgreements::class)->forUser($user),
+
                 /* W80 MIXXTUNE_KYC_EDIT_LOCK */
                 'kycLock' => in_array($user->role, ['label', 'artist'], true) ? $this->kycLockPayload($user) : null,
                 'panelTabs' => app(\App\Services\V2\PanelAccess::class)->handles((string) $user->role) ? app(\App\Services\V2\PanelAccess::class)->tabsFor($user) : null,

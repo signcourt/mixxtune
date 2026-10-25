@@ -26,6 +26,7 @@ import {
     WalletCards,
 } from 'lucide-react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import AgreementAlert from '@/V2/Shared/Components/AgreementAlert';
 
 /*
  * W69 MIXXTUNE_DASHBOARD_V2
@@ -345,6 +346,7 @@ export default function Dashboard({
     recentReleases = [],
     recentImports = [],
     recentWithdrawals = [],
+    agreements = null,
 }) {
     const isSuperAdmin = role === 'super_admin';
     const panelName = isSuperAdmin ? 'Super Admin' : 'Manager';
@@ -564,6 +566,9 @@ export default function Dashboard({
                     </div>
                 </div>
             </section>
+
+            {/* W94 MIXXTUNE_ACCOUNT_AGREEMENTS */}
+            {isSuperAdmin && <AgreementAlert agreements={agreements} />}
 
             <section className="mt-5" aria-labelledby="attention-title">
                 <div className="mb-2.5 flex items-center justify-between gap-3">

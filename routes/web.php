@@ -3068,6 +3068,19 @@ Route::middleware(['auth', 'verified'])
         Route::get('kyc-unlocks/{unlock}/document', [\App\Http\Controllers\V2\Admin\KycUnlockController::class, 'document'])->whereNumber('unlock')->name('kyc-unlocks.document');
     });
 
+/* W94 MIXXTUNE_ACCOUNT_AGREEMENTS: signed agreement per Label / Artist account, renewal warnings */
+Route::middleware(['auth', 'verified'])
+    ->prefix('admin')
+    ->name('v2.admin.')
+    ->group(function () {
+        Route::post('users/{user}/agreement', [\App\Http\Controllers\V2\Admin\AccountAgreementController::class, 'store'])->whereNumber('user')->name('users.agreement.store');
+        Route::post('users/{user}/agreement/renew', [\App\Http\Controllers\V2\Admin\AccountAgreementController::class, 'renew'])->whereNumber('user')->name('users.agreement.renew');
+        Route::post('users/{user}/agreement/end', [\App\Http\Controllers\V2\Admin\AccountAgreementController::class, 'end'])->whereNumber('user')->name('users.agreement.end');
+        Route::post('agreements/{agreement}', [\App\Http\Controllers\V2\Admin\AccountAgreementController::class, 'update'])->whereNumber('agreement')->name('agreements.update');
+        Route::get('agreements/{agreement}/document', [\App\Http\Controllers\V2\Admin\AccountAgreementController::class, 'document'])->whereNumber('agreement')->name('agreements.document');
+        Route::post('agreements/popup-seen', [\App\Http\Controllers\V2\Admin\AccountAgreementController::class, 'seen'])->name('agreements.popup-seen');
+    });
+
 /* W81 MIXXTUNE_PANEL_ACCESS: default sidebar tabs per role (Super Admin) */
 Route::middleware(['auth', 'verified'])
     ->prefix('admin')
