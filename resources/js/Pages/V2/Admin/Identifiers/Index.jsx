@@ -54,6 +54,7 @@ export default function Index({
     const [busy, setBusy] = useState(false);
     const [notice, setNotice] = useState('');
     const [error, setError] = useState('');
+    const [info, setInfo] = useState('');
 
     const [manualIdentifier, setManualIdentifier] =
         useState(null);
@@ -261,6 +262,13 @@ export default function Index({
                     </div>
                 )}
 
+                {info && (
+                    <div className="flex items-start justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-800">
+                        <span>{info}</span>
+                        <button type="button" onClick={() => setInfo('')} aria-label="Close" className="text-violet-500 hover:text-violet-800">×</button>
+                    </div>
+                )}
+
                 {error && (
                     <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                         {error}
@@ -298,7 +306,7 @@ export default function Index({
                     }
                 >
                     <div className="overflow-x-auto">
-                        <table className="min-w-full">
+                        <table className="w-full min-w-[980px]">
                             <thead className="bg-slate-50">
                                 <tr>
                                     <HeaderCell>
@@ -325,18 +333,11 @@ export default function Index({
                                             }
                                         />
                                     </HeaderCell>
-                                    <HeaderCell>
-                                        Track
-                                    </HeaderCell>
-                                    <HeaderCell>
-                                        Release
-                                    </HeaderCell>
-                                    <HeaderCell>
-                                        Audio Status
-                                    </HeaderCell>
-                                    <HeaderCell>
-                                        Action
-                                    </HeaderCell>
+                                    <HeaderCell>Song (track)</HeaderCell>
+                                    <HeaderCell>Artists &amp; credits</HeaderCell>
+                                    <HeaderCell>Release</HeaderCell>
+                                    <HeaderCell>Audio file</HeaderCell>
+                                    <HeaderCell>Action</HeaderCell>
                                 </tr>
                             </thead>
 
@@ -344,7 +345,7 @@ export default function Index({
                                 {tracks.length === 0 ? (
                                     <EmptyRow
                                         text="No pending ISRC tracks."
-                                        columns={5}
+                                        columns={6}
                                     />
                                 ) : (
                                     tracks.map(
@@ -384,32 +385,52 @@ export default function Index({
                                                     />
                                                 </Cell>
 
+                                                {/* W98: the song name typed in Track details; the file name stays in its own column */}
+                                                <Cell>
+                                                    <div className="font-semibold text-slate-900">
+                                                        {track.title || 'Untitled track'}
+                                                        {track.version ? <span className="font-normal text-slate-500"> ({track.version})</span> : null}
+                                                    </div>
+                                                    <div className="mt-0.5 text-xs text-slate-500">
+                                                        Track {track.track_number ?? '—'}
+                                                        {track.disc_number > 1 ? ` · Disc ${track.disc_number}` : ''}
+                                                        {track.language ? ` · ${track.language}` : ''}
+                                                    </div>
+                                                </Cell>
+
+                                                <Cell>
+                                                    <Line label="Singer" value={track.primary_artist_name} />
+                                                    {track.featuring_artist_name && <Line label="Feat." value={track.featuring_artist_name} />}
+                                                    <Line label="Lyrics" value={track.author_name} />
+                                                    <Line label="Music" value={track.composer_name} />
+                                                </Cell>
+
                                                 <Cell>
                                                     <div className="font-semibold text-slate-800">
-                                                        {track.title ??
-                                                            'Untitled Track'}
+                                                        {track.release?.title || '—'}
+                                                        {track.release?.version ? <span className="font-normal text-slate-500"> ({track.release.version})</span> : null}
                                                     </div>
-
-                                                    <div className="text-xs text-slate-500">
-                                                        Track #
-                                                        {track.track_number ??
-                                                            '—'}
+                                                    <div className="mt-0.5 text-xs text-slate-500">
+                                                        {[typeName(track.release?.release_type), track.release?.label, track.release?.catalog_number].filter(Boolean).join(' · ')}
+                                                    </div>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                        <StatusBadge value={track.release?.status} />
+                                                        {track.release?.id && (
+                                                            <Link href={`/releases/${track.release.id}`} className="text-xs font-semibold text-violet-700 hover:underline">
+                                                                Open #{track.release.id}
+                                                            </Link>
+                                                        )}
                                                     </div>
                                                 </Cell>
 
                                                 <Cell>
-                                                    {track
-                                                        ?.release
-                                                        ?.title ??
-                                                        '—'}
-                                                </Cell>
-
-                                                <Cell>
-                                                    <StatusBadge
-                                                        value={
-                                                            track.audio_validation_status
-                                                        }
-                                                    />
+                                                    <div className="max-w-[220px] truncate text-xs text-slate-700" title={track.audio_original_name || ''}>
+                                                        {track.has_audio ? (track.audio_original_name || 'audio file') : 'No audio yet'}
+                                                    </div>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                        <StatusBadge value={track.audio_validation_status} />
+                                                        {track.duration && <span className="text-xs text-slate-500">{track.duration}</span>}
+                                                    </div>
                                                 </Cell>
 
                                                 <Cell>
@@ -465,7 +486,7 @@ export default function Index({
                     description={`${pendingUpc?.total ?? 0} releases waiting for UPC · type the UPC allotted to Mixx Tune (it is checked: 12 or 13 digits, correct last digit, not used before)`}
                 >
                     <div className="overflow-x-auto">
-                        <table className="min-w-full">
+                        <table className="w-full min-w-[980px]">
                             <thead className="bg-slate-50">
                                 <tr>
                                     <HeaderCell>
@@ -492,21 +513,13 @@ export default function Index({
                                             }
                                         />
                                     </HeaderCell>
-                                    <HeaderCell>
-                                        Release
-                                    </HeaderCell>
-                                    <HeaderCell>
-                                        Artist
-                                    </HeaderCell>
-                                    <HeaderCell>
-                                        Label
-                                    </HeaderCell>
-                                    <HeaderCell>
-                                        Status
-                                    </HeaderCell>
-                                    <HeaderCell>
-                                        Action
-                                    </HeaderCell>
+                                    <HeaderCell>Release</HeaderCell>
+                                    <HeaderCell>Artist</HeaderCell>
+                                    <HeaderCell>Label</HeaderCell>
+                                    <HeaderCell>Tracks</HeaderCell>
+                                    <HeaderCell>Dates</HeaderCell>
+                                    <HeaderCell>Status</HeaderCell>
+                                    <HeaderCell>Action</HeaderCell>
                                 </tr>
                             </thead>
 
@@ -515,7 +528,7 @@ export default function Index({
                                 0 ? (
                                     <EmptyRow
                                         text="No pending UPC releases."
-                                        columns={6}
+                                        columns={8}
                                     />
                                 ) : (
                                     releases.map(
@@ -556,41 +569,54 @@ export default function Index({
                                                 </Cell>
 
                                                 <Cell>
-                                                    <div className="font-semibold text-slate-800">
-                                                        {release.title ??
-                                                            'Untitled Release'}
+                                                    <div className="font-semibold text-slate-900">
+                                                        {release.title || 'Untitled release'}
+                                                        {release.version ? <span className="font-normal text-slate-500"> ({release.version})</span> : null}
                                                     </div>
-
-                                                    <div className="text-xs text-slate-500">
-                                                        ID #
-                                                        {release.id}
+                                                    <div className="mt-0.5 text-xs text-slate-500">
+                                                        {[typeName(release.release_type), release.catalog_number].filter(Boolean).join(' · ')}
                                                     </div>
+                                                    <Link href={`/releases/${release.id}`} className="text-xs font-semibold text-violet-700 hover:underline">
+                                                        Open #{release.id}
+                                                    </Link>
                                                 </Cell>
 
                                                 <Cell>
-                                                    {release
-                                                        ?.artist
-                                                        ?.stage_name ??
-                                                        '—'}
+                                                    <div className="text-slate-800">{release.primary_artist_name || '—'}</div>
+                                                    {release.featuring_artist_name && <div className="text-xs text-slate-500">feat. {release.featuring_artist_name}</div>}
+                                                </Cell>
+
+                                                <Cell>{release.label || '—'}</Cell>
+
+                                                <Cell>
+                                                    <div className="text-slate-800">{release.tracks_count} {release.tracks_count === 1 ? 'track' : 'tracks'}</div>
+                                                    <div className="text-xs text-slate-500">ISRC {release.tracks_with_isrc_count} / {release.tracks_count}</div>
                                                 </Cell>
 
                                                 <Cell>
-                                                    {release
-                                                        ?.label
-                                                        ?.name ??
-                                                        '—'}
+                                                    <Line label="Release" value={dateText(release.release_date)} empty="—" />
+                                                    <Line label="Sent" value={dateText(release.submitted_at)} empty="not sent yet" />
                                                 </Cell>
 
                                                 <Cell>
-                                                    <StatusBadge
-                                                        value={
-                                                            release.status
-                                                        }
-                                                    />
+                                                    <StatusBadge value={release.status} />
                                                 </Cell>
 
                                                 <Cell>
                                                     <div className="flex flex-wrap gap-2">
+                                                        <button
+                                                            type="button"
+                                                            disabled={busy || isOld}
+                                                            onClick={() => {
+                                                                setNotice('');
+                                                                setError('');
+                                                                setInfo(`Generate UPC for "${release.title}" starts working once the list of UPCs allotted to Mixx Tune is uploaded - then the next free UPC is filled in by itself. Until then use Enter UPC.`);
+                                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                            }}
+                                                            className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-40"
+                                                        >
+                                                            Generate UPC
+                                                        </button>
 
                                                         <button
                                                             type="button"
@@ -769,6 +795,23 @@ function Section({
 
             {children}
         </section>
+    );
+}
+
+const TYPE_NAMES = { single: 'Single', ep: 'EP', album: 'Album' };
+const typeName = (v) => (v ? TYPE_NAMES[String(v).toLowerCase()] ?? String(v) : null);
+const dateText = (v) => {
+    if (!v) return null;
+    const d = new Date(`${String(v).slice(0, 10)}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+function Line({ label, value, empty = 'missing' }) {
+    return (
+        <div className="text-xs leading-5">
+            <span className="text-slate-400">{label}: </span>
+            <span className={value ? 'text-slate-700' : empty === 'missing' ? 'text-amber-700' : 'text-slate-400'}>{value || empty}</span>
+        </div>
     );
 }
 

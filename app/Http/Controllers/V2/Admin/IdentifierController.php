@@ -49,7 +49,8 @@ class IdentifierController extends Controller
 
         $trackQuery = Track::query()
             ->with([
-                'release:id,title,status,artist_id,label_id,catalog_number',
+                'release:id,title,version,status,artist_id,label_id,catalog_number,release_type,primary_artist_name,digital_release_date',
+                'release.label:id,name',
             ])
             ->whereNull('isrc')
             ->whereNull('deleted_at')
@@ -63,6 +64,7 @@ class IdentifierController extends Controller
                 'artist:id,stage_name',
                 'label:id,name',
             ])
+            ->withCount(['tracks', 'tracks as tracks_with_isrc_count' => fn ($t) => $t->whereNotNull('isrc')])
             ->whereNull('upc')
             ->whereNull('deleted_at')
             ->where($scope === 'old' ? $legacy : $notLegacy)
@@ -78,7 +80,8 @@ class IdentifierController extends Controller
                 ['*'],
                 'isrc_page'
             )
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (Track $t) => $this->trackRow($t));
 
         $pendingUpc = $releaseQuery
             ->orderByDesc('id')
@@ -87,7 +90,8 @@ class IdentifierController extends Controller
                 ['*'],
                 'upc_page'
             )
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (Release $r) => $this->releaseRow($r));
 
         return Inertia::render(
             'V2/Admin/Identifiers/Index',
@@ -107,6 +111,60 @@ class IdentifierController extends Controller
                 'q' => $q,
             ]
         );
+    }
+
+    /* W98 MIXXTUNE_IDENTIFIER_DETAILS: everything needed to tell the songs apart */
+    private function trackRow(Track $t): array
+    {
+        $r = $t->release;
+        $secs = (int) ($t->audio_duration_seconds ?: $t->duration_seconds ?: 0);
+
+        return [
+            'id' => $t->id,
+            'title' => $t->title,
+            'version' => $t->version,
+            'track_number' => $t->track_number,
+            'disc_number' => $t->disc_number,
+            'primary_artist_name' => $t->primary_artist_name,
+            'featuring_artist_name' => $t->featuring_artist_name,
+            'author_name' => $t->author_name,
+            'composer_name' => $t->composer_name,
+            'language' => $t->language,
+            'audio_original_name' => $t->audio_original_name,
+            'has_audio' => !empty($t->audio_path),
+            'duration' => $secs > 0 ? sprintf('%d:%02d', intdiv($secs, 60), $secs % 60) : null,
+            'audio_validation_status' => $t->audio_validation_status,
+            'release' => $r ? [
+                'id' => $r->id,
+                'title' => $r->title,
+                'version' => $r->version,
+                'release_type' => $r->release_type,
+                'status' => $r->status,
+                'catalog_number' => $r->catalog_number,
+                'primary_artist_name' => $r->primary_artist_name,
+                'label' => $r->label?->name,
+                'release_date' => optional($r->digital_release_date)->toDateString(),
+            ] : null,
+        ];
+    }
+
+    private function releaseRow(Release $r): array
+    {
+        return [
+            'id' => $r->id,
+            'title' => $r->title,
+            'version' => $r->version,
+            'release_type' => $r->release_type,
+            'catalog_number' => $r->catalog_number,
+            'primary_artist_name' => $r->primary_artist_name ?: $r->artist?->stage_name,
+            'featuring_artist_name' => $r->featuring_artist_name,
+            'label' => $r->label?->name,
+            'status' => $r->status,
+            'release_date' => optional($r->digital_release_date)->toDateString(),
+            'submitted_at' => optional($r->submitted_at)->toDateString(),
+            'tracks_count' => (int) $r->tracks_count,
+            'tracks_with_isrc_count' => (int) $r->tracks_with_isrc_count,
+        ];
     }
 
     public function assignIsrc(
