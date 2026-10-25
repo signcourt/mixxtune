@@ -160,8 +160,12 @@ export default function Sidebar({
                           )
                           .filter(Boolean);
 
+            /* W95 MIXXTUNE_PANEL_MAIL: "Mail" only for someone who has a mailbox (Super Admin always) */
+            const mailAccounts = Number(page.props?.auth?.mail?.accounts ?? 0);
+
             return permissionFilteredNavigation.filter(
                     (item) =>
+                        (item.id !== "mail" || normalizedRole === "super_admin" || mailAccounts > 0) &&
                         ![
                             "notifications",
                             "settings",
@@ -181,7 +185,7 @@ export default function Sidebar({
                         ].includes(item.label),
                 );
         },
-        [role, permissions],
+        [role, permissions, page.props?.auth?.mail?.accounts],
     );
 
     const orderedNavigation = useMemo(() => {
@@ -686,7 +690,8 @@ function SidebarItem({
             ),
         );
 
-    const badge = item.badgeKey === "notifications" ? notificationCount : 0;
+    const mailUnread = Number(usePage().props?.auth?.mail?.unread ?? 0);
+    const badge = item.badgeKey === "notifications" ? notificationCount : item.badgeKey === "mail" ? mailUnread : 0;
 
     if (hasChildren) {
         return (

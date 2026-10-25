@@ -1,0 +1,210 @@
+import { Head, Link, router, usePage } from "@inertiajs/react";
+import { CheckCircle2, Mail, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { useState } from "react";
+
+import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+
+/*
+ * W95 MIXXTUNE_PANEL_MAIL
+ * Super Admin > Email accounts: mailboxes made in Hostinger hPanel are added
+ * here with their password (checked by logging in) and given to managers.
+ */
+const when = (v) => (v ? new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true }).format(new Date(v)) : "never");
+const roleName = (r) => (r === "super_admin" ? "Super Admin" : "Manager");
+
+function People({ people, value, onChange }) {
+    const toggle = (id) => onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
+
+    return (
+        <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 p-2">
+            {people.length === 0 && <p className="px-1 py-2 text-xs text-slate-500">No managers yet.</p>}
+            {people.map((p) => (
+                <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-slate-50">
+                    <input type="checkbox" checked={value.includes(p.id)} onChange={() => toggle(p.id)} />
+                    <span className="min-w-0 truncate">
+                        <b className="font-semibold text-slate-800">{p.full_name || p.name}</b> <span className="text-xs text-slate-500">{p.email} · {roleName(p.role)}</span>
+                    </span>
+                </label>
+            ))}
+        </div>
+    );
+}
+
+function AccountForm({ people, account = null, onDone }) {
+    const errors = usePage().props.errors ?? {};
+    const [data, setData] = useState({
+        address: "",
+        display_name: account?.display_name ?? "",
+        password: "",
+        signature: account?.signature ?? "",
+        status: account?.status ?? "active",
+        user_ids: account?.user_ids ?? [],
+    });
+    const [busy, setBusy] = useState(false);
+    const set = (k, v) => setData((d) => ({ ...d, [k]: v }));
+
+    const save = () => {
+        if (busy) return;
+        setBusy(true);
+        const payload = account ? { display_name: data.display_name, password: data.password || null, signature: data.signature, status: data.status, user_ids: data.user_ids } : data;
+        router.post(account ? `/admin/mail-accounts/${account.id}` : "/admin/mail-accounts", payload, { preserveScroll: true, onSuccess: onDone, onFinish: () => setBusy(false) });
+    };
+
+    return (
+        <div className="space-y-3">
+            {!account && (
+                <label className="block">
+                    <span className="text-xs font-semibold text-slate-700">Mailbox address *</span>
+                    <input value={data.address} onChange={(e) => set("address", e.target.value)} placeholder="manager1@mixxtune.com" className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" />
+                    {errors.address && <span className="mt-1 block text-xs text-red-600">{errors.address}</span>}
+                </label>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                    <span className="text-xs font-semibold text-slate-700">{account ? "New password (leave empty to keep)" : "Mailbox password *"}</span>
+                    <input type="password" autoComplete="new-password" value={data.password} onChange={(e) => set("password", e.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" />
+                    <span className="mt-1 block text-[11px] text-slate-500">The same password as in Hostinger hPanel. Kept encrypted.</span>
+                    {errors.password && <span className="mt-1 block text-xs text-red-600">{errors.password}</span>}
+                </label>
+                <label className="block">
+                    <span className="text-xs font-semibold text-slate-700">Name shown to receivers</span>
+                    <input value={data.display_name} onChange={(e) => set("display_name", e.target.value)} placeholder="Mixx Tune Support" className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" />
+                </label>
+            </div>
+            <div>
+                <span className="text-xs font-semibold text-slate-700">Who can use this mailbox</span>
+                <p className="mb-1 text-[11px] text-slate-500">Super Admins can always open every mailbox.</p>
+                <People people={people} value={data.user_ids} onChange={(v) => set("user_ids", v)} />
+            </div>
+            <label className="block">
+                <span className="text-xs font-semibold text-slate-700">Signature (added under every mail)</span>
+                <textarea rows={3} value={data.signature} onChange={(e) => set("signature", e.target.value)} placeholder={"Regards,\nMixx Tune Entertainment"} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+            </label>
+            {account && (
+                <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={data.status === "disabled"} onChange={(e) => set("status", e.target.checked ? "disabled" : "active")} /> Switch off (not read, not shown)
+                </label>
+            )}
+            <div className="flex justify-end gap-2">
+                <button type="button" onClick={onDone} disabled={busy} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+                    Cancel
+                </button>
+                <button type="button" onClick={save} disabled={busy || (!account && (!data.address || !data.password))} className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
+                    {busy ? "Checking login..." : account ? "Save" : "Check login and add"}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+export default function MailAccounts({ role = "super_admin", accounts = [], people = [] }) {
+    const { flash = {}, errors = {} } = usePage().props;
+    const [adding, setAdding] = useState(false);
+    const [editing, setEditing] = useState(null);
+    const [busy, setBusy] = useState(null);
+    const nameOf = (id) => {
+        const p = people.find((x) => x.id === id);
+        return p ? p.full_name || p.name || p.email : `#${id}`;
+    };
+
+    const test = (a) => {
+        setBusy(a.id);
+        router.post(`/admin/mail-accounts/${a.id}/test`, {}, { preserveScroll: true, onFinish: () => setBusy(null) });
+    };
+    const remove = (a) => {
+        const typed = window.prompt(`Remove ${a.address} from the panel?\nThe mailbox and its mail stay at Hostinger.\n\nType the address to confirm:`);
+        if (typed === null) return;
+        router.post(`/admin/mail-accounts/${a.id}/delete`, { confirm: typed.trim().toLowerCase() }, { preserveScroll: true });
+    };
+
+    return (
+        <PanelLayout role={role} title="Email accounts" subtitle="Domain mailboxes used inside the panel">
+            <Head title="Email accounts" />
+
+            {flash.success && (
+                <div className="mb-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
+                    <CheckCircle2 size={16} /> {flash.success}
+                </div>
+            )}
+            {(errors.mail || errors.confirm) && <div className="mb-3 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700">{errors.mail || errors.confirm}</div>}
+
+            <section className="rounded-2xl border border-violet-100 bg-violet-50/50 p-4 text-sm text-slate-700">
+                <b className="text-slate-900">How to add a mailbox</b>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-xs">
+                    <li>Hostinger hPanel → Emails → mixxtune.com → Create mailbox (address + password).</li>
+                    <li>Here: Add mailbox → same address and password → choose who can use it.</li>
+                    <li>They find it under "Mail" in their panel. New mail comes in every 2 minutes.</li>
+                </ol>
+            </section>
+
+            <div className="mt-4 flex items-center justify-between">
+                <h2 className="text-[15px] font-bold text-slate-900">Mailboxes ({accounts.length})</h2>
+                {!adding && (
+                    <button type="button" onClick={() => setAdding(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700">
+                        <Plus size={16} /> Add mailbox
+                    </button>
+                )}
+            </div>
+
+            {adding && (
+                <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                    <h3 className="mb-3 text-sm font-bold text-slate-900">Add mailbox</h3>
+                    <AccountForm people={people} onDone={() => setAdding(false)} />
+                </section>
+            )}
+
+            <div className="mt-3 space-y-3">
+                {accounts.length === 0 && !adding && <p className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm text-slate-500">No mailbox added yet.</p>}
+                {accounts.map((a) => (
+                    <section key={a.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Mail size={16} className="text-violet-600" />
+                                    <b className="break-all text-sm text-slate-900">{a.address}</b>
+                                    {a.display_name && <span className="text-xs text-slate-500">"{a.display_name}"</span>}
+                                    {a.status === "disabled" && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">off</span>}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-500">
+                                    {a.inbox} in inbox · {a.unread} unread · read {when(a.last_synced_at)}
+                                    {a.sent_folder ? ` · sent folder "${a.sent_folder}"` : ""}
+                                </div>
+                                {a.last_error && <div className="mt-1 break-words text-xs font-semibold text-red-600">Problem: {a.last_error}</div>}
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {a.user_ids.length === 0 ? (
+                                        <span className="text-xs text-slate-400">Only Super Admins</span>
+                                    ) : (
+                                        a.user_ids.map((id) => (
+                                            <span key={id} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                                {nameOf(id)}
+                                            </span>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Link href={`/mail?account=${a.id}`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                    Open
+                                </Link>
+                                <button type="button" onClick={() => test(a)} disabled={busy === a.id} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                                    <RefreshCw size={13} className={busy === a.id ? "animate-spin" : ""} /> Test & read now
+                                </button>
+                                <button type="button" onClick={() => setEditing(editing === a.id ? null : a.id)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                    {editing === a.id ? "Close" : "Edit"}
+                                </button>
+                                <button type="button" onClick={() => remove(a)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">
+                                    <Trash2 size={13} /> Remove
+                                </button>
+                            </div>
+                        </div>
+                        {editing === a.id && (
+                            <div className="mt-4 border-t border-slate-100 pt-4">
+                                <AccountForm people={people} account={a} onDone={() => setEditing(null)} />
+                            </div>
+                        )}
+                    </section>
+                ))}
+            </div>
+        </PanelLayout>
+    );
+}

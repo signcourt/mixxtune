@@ -42,3 +42,9 @@ Schedule::command('invitations:send-reminders')
 Schedule::command('tracks:clean-pending-audio')
     ->hourly()
     ->withoutOverlapping(30);
+
+/* W95 MIXXTUNE_PANEL_MAIL: new mail of the domain mailboxes into the panel */
+Schedule::command('mail:sync')
+    ->everyTwoMinutes()
+    ->withoutOverlapping(15)
+    ->runInBackground();

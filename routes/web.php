@@ -3068,6 +3068,20 @@ Route::middleware(['auth', 'verified'])
         Route::get('kyc-unlocks/{unlock}/document', [\App\Http\Controllers\V2\Admin\KycUnlockController::class, 'document'])->whereNumber('unlock')->name('kyc-unlocks.document');
     });
 
+/* W95 MIXXTUNE_PANEL_MAIL: domain mailboxes inside the panel */
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/mail', [\App\Http\Controllers\V2\MailController::class, 'index'])->name('v2.mail.index');
+    Route::get('/mail/messages/{message}/html', [\App\Http\Controllers\V2\MailController::class, 'html'])->whereNumber('message')->name('v2.mail.html');
+    Route::get('/mail/attachments/{attachment}', [\App\Http\Controllers\V2\MailController::class, 'attachment'])->whereNumber('attachment')->name('v2.mail.attachment');
+    Route::post('/mail/accounts/{account}/refresh', [\App\Http\Controllers\V2\MailController::class, 'refresh'])->whereNumber('account')->middleware('throttle:20,1')->name('v2.mail.refresh');
+    Route::post('/mail/accounts/{account}/send', [\App\Http\Controllers\V2\MailController::class, 'send'])->whereNumber('account')->middleware('throttle:30,1')->name('v2.mail.send');
+    Route::get('/admin/mail-accounts', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'index'])->name('v2.admin.mail-accounts.index');
+    Route::post('/admin/mail-accounts', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'store'])->middleware('throttle:20,1')->name('v2.admin.mail-accounts.store');
+    Route::post('/admin/mail-accounts/{account}', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'update'])->whereNumber('account')->middleware('throttle:30,1')->name('v2.admin.mail-accounts.update');
+    Route::post('/admin/mail-accounts/{account}/test', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'test'])->whereNumber('account')->middleware('throttle:20,1')->name('v2.admin.mail-accounts.test');
+    Route::post('/admin/mail-accounts/{account}/delete', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'destroy'])->whereNumber('account')->name('v2.admin.mail-accounts.destroy');
+});
+
 /* W94 MIXXTUNE_ACCOUNT_AGREEMENTS: signed agreement per Label / Artist account, renewal warnings */
 Route::middleware(['auth', 'verified'])
     ->prefix('admin')

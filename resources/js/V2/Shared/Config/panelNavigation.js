@@ -13,6 +13,7 @@ import {
     Landmark,
     Library,
     ListMusic,
+    Mail,
     Settings,
     ShieldCheck,
     Store,
@@ -40,6 +41,7 @@ const icons = {
     analytics: ChartNoAxesCombined,
     kyc: UserRound,
     support: Headphones,
+    mail: Mail,
     notifications: Bell,
     settings: Settings,
 
@@ -521,11 +523,27 @@ const adminNavigation = (
                 },
             ],
         },
+        /* W95 MIXXTUNE_PANEL_MAIL */
+        {
+            id: 'mail',
+            label: 'Mail',
+            icon: icons.mail,
+            href: '/mail',
+            badgeKey: 'mail',
+        },
         {
             id: 'administration',
             label: 'Administration',
             icon: icons.settings,
             children: [
+                /* W95 MIXXTUNE_PANEL_MAIL */
+                ...(role === 'super_admin'
+                    ? [{
+                          id: 'administration-mail-accounts',
+                          label: 'Email accounts',
+                          href: '/admin/mail-accounts',
+                      }]
+                    : []),
                 {
                     id: 'administration-kyc',
                     label: 'KYC Reviews',

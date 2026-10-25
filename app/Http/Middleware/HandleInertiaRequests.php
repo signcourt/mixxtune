@@ -178,6 +178,15 @@ class HandleInertiaRequests extends Middleware
                     $permissionData[
                         'isSuperAdmin'
                     ],
+
+                /* W95 MIXXTUNE_PANEL_MAIL: mailboxes + unread mail for the sidebar */
+                'mail' => function () use ($request) {
+                    try {
+                        return app(\App\Services\V2\Mail\MailAccess::class)->summary($request->user());
+                    } catch (\Throwable) {
+                        return null;
+                    }
+                },
             ],
         ];
     }
