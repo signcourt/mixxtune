@@ -220,15 +220,29 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
             )}
 
             <div className="flex flex-wrap items-center gap-2">
+                {/* W100: own mailbox first; a Super Admin also sees the team mailboxes */}
                 {accounts.length > 1 && (
-                    <select value={current ?? ""} onChange={(e) => router.get("/mail", { account: e.target.value, folder })} className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold">
-                        {accounts.map((a) => (
-                            <option key={a.id} value={a.id}>
-                                {a.address}
-                                {a.unread ? ` (${a.unread})` : ""}
-                            </option>
-                        ))}
+                    <select value={current ?? ""} onChange={(e) => router.get("/mail", { account: e.target.value, folder })} aria-label="Mailbox" className="h-10 max-w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold">
+                        {[
+                            ["My mailbox", accounts.filter((a) => a.mine)],
+                            [isSuperAdmin ? "Team mailboxes" : "Shared with me", accounts.filter((a) => !a.mine)],
+                        ]
+                            .filter(([, list]) => list.length > 0)
+                            .map(([label, list]) => (
+                                <optgroup key={label} label={label}>
+                                    {list.map((a) => (
+                                        <option key={a.id} value={a.id}>
+                                            {a.address}
+                                            {a.is_private ? " (private)" : ""}
+                                            {a.unread ? ` · ${a.unread} new` : ""}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            ))}
                     </select>
+                )}
+                {account?.mine && isSuperAdmin && (
+                    <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-800">My mailbox{account.is_private ? " · private" : ""}</span>
                 )}
                 <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
                     {[

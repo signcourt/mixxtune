@@ -51,7 +51,8 @@ class MailController extends Controller
     public function index(Request $request, MailAccess $access, PermissionService $permissions): Response
     {
         $accounts = $access->accountsFor($request->user());
-        $current = $accounts->firstWhere('id', (int) $request->query('account')) ?? $accounts->first();
+        $mine = $access->assignedIds($request->user());
+        $current = $accounts->firstWhere('id', (int) $request->query('account')) ?? $accounts->first(fn ($a) => $mine->contains((int) $a->id)) ?? $accounts->first();
         $folder = $request->query('folder') === 'sent' ? 'sent' : 'inbox';
         $search = trim((string) $request->query('q', ''));
 
@@ -120,6 +121,8 @@ class MailController extends Controller
                 'id' => $a->id,
                 'address' => $a->address,
                 'display_name' => $a->display_name,
+                'mine' => $mine->contains((int) $a->id),
+                'is_private' => (bool) $a->is_private,
                 'unread' => MailMessage::query()->where('mail_account_id', $a->id)->where('folder', 'inbox')->where('seen', false)->count(),
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),
                 'last_error' => $a->last_error,

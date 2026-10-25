@@ -28,18 +28,38 @@ class MailAccess
         return $user && $this->permissions->role($user) === 'super_admin';
     }
 
-    /** @return Collection<int, MailAccount> */
+    /** ids of the mailboxes given to this person */
+    public function assignedIds(?User $user): Collection
+    {
+        if (!$user || !$this->ready()) {
+            return collect();
+        }
+
+        return DB::table('mail_account_user')->where('user_id', $user->id)->pluck('mail_account_id')->map(fn ($v) => (int) $v);
+    }
+
+    /*
+     * W100: Super Admin sees every shared mailbox plus his own; a private mailbox only
+     * shows for the people it is given to. Own mailboxes come first and carry mine = true.
+     *
+     * @return Collection<int, MailAccount>
+     */
     public function accountsFor(?User $user): Collection
     {
         if (!$user || !$this->ready()) {
             return collect();
         }
+        $mine = $this->assignedIds($user);
         $q = MailAccount::query()->where('status', 'active')->orderBy('address');
-        if (!$this->isSuperAdmin($user)) {
-            $q->whereIn('id', DB::table('mail_account_user')->where('user_id', $user->id)->pluck('mail_account_id'));
+        if ($this->isSuperAdmin($user)) {
+            $q->where(fn ($w) => $w->where('is_private', false)->orWhereIn('id', $mine->all() ?: [0]));
+        } else {
+            $q->whereIn('id', $mine->all() ?: [0]);
         }
 
-        return $q->get();
+        return $q->get()
+            ->sortBy(fn (MailAccount $a) => ($mine->contains((int) $a->id) ? '0' : '1').$a->address)
+            ->values();
     }
 
     public function canUse(?User $user, MailAccount $account): bool
@@ -47,9 +67,16 @@ class MailAccess
         if (!$user || $account->status !== 'active') {
             return false;
         }
+        $assigned = DB::table('mail_account_user')->where('user_id', $user->id)->where('mail_account_id', $account->id)->exists();
 
+        return $assigned || ($this->isSuperAdmin($user) && !$account->is_private);
+    }
+
+    /* W100: a private mailbox is managed (password, people, remove) only by its own people */
+    public function canManage(?User $user, MailAccount $account): bool
+    {
         return $this->isSuperAdmin($user)
-            || DB::table('mail_account_user')->where('user_id', $user->id)->where('mail_account_id', $account->id)->exists();
+            && (!$account->is_private || DB::table('mail_account_user')->where('user_id', $user->id)->where('mail_account_id', $account->id)->exists());
     }
 
     /** sidebar: how many mailboxes and unread inbox mails this user has */
@@ -58,11 +85,17 @@ class MailAccess
         if (!$user || !$this->ready() || !in_array($this->permissions->role($user), ['admin', 'super_admin'], true)) {
             return null;
         }
-        $ids = $this->accountsFor($user)->pluck('id');
+        $list = $this->accountsFor($user);
+        $ids = $list->pluck('id');
+        /* W100: the badge counts the person's own mailboxes when he has one (a Super Admin with his own mail) */
+        $assigned = $this->assignedIds($user);
+        $own = $ids->filter(fn ($id) => $assigned->contains((int) $id))->values();
+        $badgeIds = $own->isNotEmpty() ? $own : $ids;
 
         return [
             'accounts' => $ids->count(),
-            'unread' => $ids->isEmpty() ? 0 : DB::table('mail_messages')->whereIn('mail_account_id', $ids)->where('folder', 'inbox')->where('seen', false)->count(),
+            'mine' => $own->count(),
+            'unread' => $badgeIds->isEmpty() ? 0 : DB::table('mail_messages')->whereIn('mail_account_id', $badgeIds)->where('folder', 'inbox')->where('seen', false)->count(),
         ];
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Mail\MailAccount;
 use App\Models\User;
 use App\Services\V2\AuditLogService;
+use App\Services\V2\Mail\MailAccess;
 use App\Services\V2\Mail\MailConnector;
 use App\Services\V2\Mail\MailSync;
 use App\Services\V2\PermissionService;
@@ -30,6 +31,11 @@ class MailAccountController extends Controller
         abort_unless($permissions->role($request->user()) === 'super_admin', 403, 'Only a Super Admin can manage e-mail accounts.');
     }
 
+    private function manage(Request $request, MailAccount $account): void
+    {
+        abort_unless(app(MailAccess::class)->canManage($request->user(), $account), 403, 'This is a private mailbox - only its own people can change it.');
+    }
+
     private function people()
     {
         return User::query()->whereIn('role', ['admin', 'super_admin'])->orderBy('role')->orderBy('name')
@@ -44,7 +50,10 @@ class MailAccountController extends Controller
 
         return Inertia::render('V2/Admin/MailAccounts/Index', [
             'role' => 'super_admin',
+            'me' => $request->user()->id,
             'accounts' => MailAccount::query()->orderBy('address')->get()->map(fn (MailAccount $a) => [
+                'is_private' => (bool) $a->is_private,
+                'can_manage' => app(MailAccess::class)->canManage($request->user(), $a),
                 'id' => $a->id,
                 'address' => $a->address,
                 'display_name' => $a->display_name,
@@ -76,6 +85,7 @@ class MailAccountController extends Controller
             'smtp_port' => ['nullable', 'integer', 'between:1,65535'],
             'signature' => ['nullable', 'string', 'max:2000'],
             'status' => ['nullable', Rule::in(['active', 'disabled'])],
+            'is_private' => ['nullable', 'boolean'],
             'user_ids' => ['nullable', 'array'],
             'user_ids.*' => ['integer', Rule::exists('users', 'id')->whereIn('role', ['admin', 'super_admin'])],
         ];
@@ -115,8 +125,12 @@ class MailAccountController extends Controller
             'smtp_encryption' => (int) ($data['smtp_port'] ?? 465) === 587 ? 'tls' : 'ssl',
             'signature' => $data['signature'] ?? null,
             'status' => 'active',
+            'is_private' => (bool) ($data['is_private'] ?? false),
             'created_by' => $request->user()->id,
         ]);
+        if ($account->is_private && empty($data['user_ids'])) {
+            return back()->withErrors(['user_ids' => 'A private mailbox needs at least one person who can open it (tick yourself for your own mailbox).'])->withInput($request->except('password'));
+        }
         if ($error = $this->check($account, $connector, $sync)) {
             return back()->withErrors(['password' => 'Could not log in to '.$address.': '.$error])->withInput($request->except('password'));
         }
@@ -130,12 +144,22 @@ class MailAccountController extends Controller
     public function update(Request $request, MailAccount $account, PermissionService $permissions, MailConnector $connector, MailSync $sync, AuditLogService $audit): RedirectResponse
     {
         $this->superAdmin($request, $permissions);
+        $this->manage($request, $account);
         $data = $request->validate($this->rules($account));
-        $before = ['users' => $account->users()->pluck('users.id')->all(), 'status' => $account->status];
+        $privateAfter = array_key_exists('is_private', $data) && $data['is_private'] !== null ? (bool) $data['is_private'] : (bool) $account->is_private;
+        $usersAfter = array_key_exists('user_ids', $data) ? ($data['user_ids'] ?? []) : $account->users()->pluck('users.id')->all();
+        if ($privateAfter && empty($usersAfter)) {
+            return back()->withErrors(['user_ids' => 'A private mailbox needs at least one person who can open it.']);
+        }
+        if ($privateAfter && !in_array((int) $request->user()->id, array_map('intval', $usersAfter), true)) {
+            return back()->withErrors(['user_ids' => 'Tick yourself too - otherwise you could no longer open or change this private mailbox.']);
+        }
+        $before = ['users' => $account->users()->pluck('users.id')->all(), 'status' => $account->status, 'private' => (bool) $account->is_private];
         $account->fill(collect($data)->only(['display_name', 'signature', 'status', 'imap_host', 'imap_port', 'smtp_host', 'smtp_port'])->filter(fn ($v) => $v !== null)->all());
         if (array_key_exists('signature', $data)) {
             $account->signature = $data['signature'];
         }
+        $account->is_private = $privateAfter;
         if (!empty($data['password'])) {
             $account->password = $data['password'];
             if ($error = $this->check($account, $connector, $sync)) {
@@ -147,7 +171,7 @@ class MailAccountController extends Controller
         if (array_key_exists('user_ids', $data)) {
             $account->users()->sync($data['user_ids'] ?? []);
         }
-        $audit->record('mail.account_changed', 'mail', 'Mailbox '.$account->address.' changed'.(!empty($data['password']) ? ' (new password)' : '').'.', $before, ['users' => $account->users()->pluck('users.id')->all(), 'status' => $account->status], $account, $request);
+        $audit->record('mail.account_changed', 'mail', 'Mailbox '.$account->address.' changed'.(!empty($data['password']) ? ' (new password)' : '').'.', $before, ['users' => $account->users()->pluck('users.id')->all(), 'status' => $account->status, 'private' => (bool) $account->is_private], $account, $request);
 
         return back()->with('success', 'Mailbox '.$account->address.' saved.');
     }
@@ -155,6 +179,7 @@ class MailAccountController extends Controller
     public function test(Request $request, MailAccount $account, PermissionService $permissions, MailConnector $connector, MailSync $sync): RedirectResponse
     {
         $this->superAdmin($request, $permissions);
+        $this->manage($request, $account);
         if ($error = $this->check($account, $connector, $sync)) {
             $account->forceFill(['last_error' => mb_substr($error, 0, 1000)])->save();
 
@@ -173,6 +198,7 @@ class MailAccountController extends Controller
     public function destroy(Request $request, MailAccount $account, PermissionService $permissions, AuditLogService $audit): RedirectResponse
     {
         $this->superAdmin($request, $permissions);
+        $this->manage($request, $account);
         $request->validate(['confirm' => ['required', 'in:'.$account->address]], ['confirm.in' => 'Type the mailbox address to remove it.']);
         $address = $account->address;
         DB::transaction(function () use ($account) {

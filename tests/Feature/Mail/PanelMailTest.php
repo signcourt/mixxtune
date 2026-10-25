@@ -306,4 +306,47 @@ class PanelMailTest extends TestCase
         $this->assertStringContainsString('Saras: Payment query', $bell[0]->message);
         $this->assertStringStartsWith("/mail?account={$a->id}&m=", $bell[0]->action_url);
     }
+
+    /* W100: a Super Admin's own private mailbox - first for him, hidden from the other Super Admin */
+    public function test_super_admin_has_his_own_private_mailbox(): void
+    {
+        $boss = $this->user('super_admin');
+        $other = $this->user('super_admin');
+        $manager = $this->user('admin');
+        $team = MailAccount::query()->create(['address' => 'manager1@mixxtune.com', 'username' => 'manager1@mixxtune.com', 'password' => 'x', 'status' => 'active']);
+        $team->users()->sync([$manager->id]);
+
+        /* private needs people, and his own login check passes */
+        $this->actingAs($boss)->post('/admin/mail-accounts', ['address' => 'boss@mixxtune.com', 'password' => 'p', 'is_private' => true])->assertSessionHasErrors('user_ids');
+        $this->actingAs($boss)->post('/admin/mail-accounts', ['address' => 'boss@mixxtune.com', 'password' => 'p', 'is_private' => true, 'user_ids' => [$boss->id]])->assertSessionHasNoErrors();
+        $own = MailAccount::query()->where('address', 'boss@mixxtune.com')->firstOrFail();
+        $this->assertTrue($own->is_private);
+        DB::table('mail_messages')->insert([
+            ['mail_account_id' => $own->id, 'folder' => 'inbox', 'uid' => 1, 'subject' => 'For the boss', 'seen' => false, 'has_attachments' => false, 'created_at' => now(), 'updated_at' => now()],
+            ['mail_account_id' => $team->id, 'folder' => 'inbox', 'uid' => 1, 'subject' => 'For the team', 'seen' => false, 'has_attachments' => false, 'created_at' => now(), 'updated_at' => now()],
+            ['mail_account_id' => $team->id, 'folder' => 'inbox', 'uid' => 2, 'subject' => 'For the team 2', 'seen' => false, 'has_attachments' => false, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        /* the boss: own mailbox first and opened by default, team mailbox below; badge = own unread */
+        $this->actingAs($boss)->get('/mail')->assertInertia(fn (Assert $p) => $p
+            ->where('current', $own->id)
+            ->where('accounts.0.address', 'boss@mixxtune.com')->where('accounts.0.mine', true)->where('accounts.0.is_private', true)
+            ->where('accounts.1.address', 'manager1@mixxtune.com')->where('accounts.1.mine', false)
+            ->where('auth.mail.accounts', 2)->where('auth.mail.mine', 1)->where('auth.mail.unread', 1));
+        $this->actingAs($boss)->get('/mail?account='.$team->id)->assertInertia(fn (Assert $p) => $p->where('current', $team->id));
+
+        /* the other Super Admin: only the team mailbox, cannot open, change or remove the private one */
+        $this->actingAs($other)->get('/mail')->assertInertia(fn (Assert $p) => $p->has('accounts', 1)->where('accounts.0.address', 'manager1@mixxtune.com')->where('auth.mail.unread', 2));
+        $this->actingAs($other)->get('/mail?account='.$own->id)->assertInertia(fn (Assert $p) => $p->where('current', $team->id));
+        $this->actingAs($other)->post("/mail/accounts/{$own->id}/send", ['to' => 'x@example.com', 'subject' => 's', 'body' => 'b'])->assertForbidden();
+        $this->actingAs($other)->post("/admin/mail-accounts/{$own->id}", ['user_ids' => [$other->id]])->assertForbidden();
+        $this->actingAs($other)->post("/admin/mail-accounts/{$own->id}/delete", ['confirm' => 'boss@mixxtune.com'])->assertForbidden();
+        $this->actingAs($other)->get('/admin/mail-accounts')->assertInertia(fn (Assert $p) => $p->where('accounts.0.address', 'boss@mixxtune.com')->where('accounts.0.can_manage', false));
+
+        /* the boss cannot lock himself out of his own private mailbox */
+        $this->actingAs($boss)->post("/admin/mail-accounts/{$own->id}", ['user_ids' => [$other->id]])->assertSessionHasErrors('user_ids');
+        /* making it shared again lets the other Super Admin see it */
+        $this->actingAs($boss)->post("/admin/mail-accounts/{$own->id}", ['is_private' => false])->assertSessionHasNoErrors();
+        $this->actingAs($other)->get('/mail')->assertInertia(fn (Assert $p) => $p->has('accounts', 2));
+    }
 }

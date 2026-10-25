@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import { CheckCircle2, Mail, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CheckCircle2, Lock, Mail, Plus, RefreshCw, Trash2, UserRound } from "lucide-react";
 import { useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
@@ -30,7 +30,7 @@ function People({ people, value, onChange }) {
     );
 }
 
-function AccountForm({ people, account = null, onDone }) {
+function AccountForm({ people, account = null, onDone, preset = null }) {
     const errors = usePage().props.errors ?? {};
     const [data, setData] = useState({
         address: "",
@@ -38,7 +38,8 @@ function AccountForm({ people, account = null, onDone }) {
         password: "",
         signature: account?.signature ?? "",
         status: account?.status ?? "active",
-        user_ids: account?.user_ids ?? [],
+        user_ids: account?.user_ids ?? preset?.user_ids ?? [],
+        is_private: account?.is_private ?? preset?.is_private ?? false,
     });
     const [busy, setBusy] = useState(false);
     const set = (k, v) => setData((d) => ({ ...d, [k]: v }));
@@ -46,7 +47,7 @@ function AccountForm({ people, account = null, onDone }) {
     const save = () => {
         if (busy) return;
         setBusy(true);
-        const payload = account ? { display_name: data.display_name, password: data.password || null, signature: data.signature, status: data.status, user_ids: data.user_ids } : data;
+        const payload = account ? { display_name: data.display_name, password: data.password || null, signature: data.signature, status: data.status, user_ids: data.user_ids, is_private: data.is_private } : data;
         router.post(account ? `/admin/mail-accounts/${account.id}` : "/admin/mail-accounts", payload, { preserveScroll: true, onSuccess: onDone, onFinish: () => setBusy(false) });
     };
 
@@ -55,7 +56,7 @@ function AccountForm({ people, account = null, onDone }) {
             {!account && (
                 <label className="block">
                     <span className="text-xs font-semibold text-slate-700">Mailbox address *</span>
-                    <input value={data.address} onChange={(e) => set("address", e.target.value)} placeholder="manager1@mixxtune.com" className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" />
+                    <input value={data.address} onChange={(e) => set("address", e.target.value)} placeholder={preset ? "yourname@mixxtune.com" : "manager1@mixxtune.com"} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" />
                     {errors.address && <span className="mt-1 block text-xs text-red-600">{errors.address}</span>}
                 </label>
             )}
@@ -73,9 +74,18 @@ function AccountForm({ people, account = null, onDone }) {
             </div>
             <div>
                 <span className="text-xs font-semibold text-slate-700">Who can use this mailbox</span>
-                <p className="mb-1 text-[11px] text-slate-500">Super Admins can always open every mailbox.</p>
+                <p className="mb-1 text-[11px] text-slate-500">Super Admins can open every shared mailbox (not the private ones).</p>
                 <People people={people} value={data.user_ids} onChange={(v) => set("user_ids", v)} />
+                {errors.user_ids && <span className="mt-1 block text-xs text-red-600">{errors.user_ids}</span>}
             </div>
+            {/* W100: private = only the people ticked can open it, other Super Admins cannot */}
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                <input type="checkbox" className="mt-0.5" checked={data.is_private} onChange={(e) => set("is_private", e.target.checked)} />
+                <span>
+                    <b className="font-semibold text-slate-800">Private mailbox</b>
+                    <span className="block text-xs text-slate-500">Only the people ticked above can open it. Other Super Admins cannot see it. Use this for your own mail.</span>
+                </span>
+            </label>
             <label className="block">
                 <span className="text-xs font-semibold text-slate-700">Signature (added under every mail)</span>
                 <textarea rows={3} value={data.signature} onChange={(e) => set("signature", e.target.value)} placeholder={"Regards,\nMixx Tune Entertainment"} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
@@ -97,9 +107,10 @@ function AccountForm({ people, account = null, onDone }) {
     );
 }
 
-export default function MailAccounts({ role = "super_admin", accounts = [], people = [] }) {
+export default function MailAccounts({ role = "super_admin", accounts = [], people = [], me = null }) {
     const { flash = {}, errors = {} } = usePage().props;
     const [adding, setAdding] = useState(false);
+    const [preset, setPreset] = useState(null);
     const [editing, setEditing] = useState(null);
     const [busy, setBusy] = useState(null);
     const nameOf = (id) => {
@@ -140,16 +151,36 @@ export default function MailAccounts({ role = "super_admin", accounts = [], peop
             <div className="mt-4 flex items-center justify-between">
                 <h2 className="text-[15px] font-bold text-slate-900">Mailboxes ({accounts.length})</h2>
                 {!adding && (
-                    <button type="button" onClick={() => setAdding(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700">
-                        <Plus size={16} /> Add mailbox
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setPreset(me ? { user_ids: [me], is_private: true } : null);
+                                setAdding(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-violet-300 px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50"
+                        >
+                            <UserRound size={16} /> Add my own mailbox
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setPreset(null);
+                                setAdding(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+                        >
+                            <Plus size={16} /> Add mailbox
+                        </button>
+                    </div>
                 )}
             </div>
 
             {adding && (
                 <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                    <h3 className="mb-3 text-sm font-bold text-slate-900">Add mailbox</h3>
-                    <AccountForm people={people} onDone={() => setAdding(false)} />
+                    <h3 className="mb-3 text-sm font-bold text-slate-900">{preset ? "Add my own mailbox" : "Add mailbox"}</h3>
+                    {preset && <p className="mb-3 text-xs text-slate-500">Make it in Hostinger hPanel first (for example yourname@mixxtune.com). You are ticked and it is private - only you open it, and it shows first under Mail.</p>}
+                    <AccountForm key={preset ? "mine" : "team"} people={people} preset={preset} onDone={() => setAdding(false)} />
                 </section>
             )}
 
@@ -163,6 +194,12 @@ export default function MailAccounts({ role = "super_admin", accounts = [], peop
                                     <Mail size={16} className="text-violet-600" />
                                     <b className="break-all text-sm text-slate-900">{a.address}</b>
                                     {a.display_name && <span className="text-xs text-slate-500">"{a.display_name}"</span>}
+                                    {a.is_private && (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-800">
+                                            <Lock size={10} /> private
+                                        </span>
+                                    )}
+                                    {me && a.user_ids.includes(me) && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-800">mine</span>}
                                     {a.status === "disabled" && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">off</span>}
                                 </div>
                                 <div className="mt-1 text-xs text-slate-500">
@@ -182,6 +219,9 @@ export default function MailAccounts({ role = "super_admin", accounts = [], peop
                                     )}
                                 </div>
                             </div>
+                            {a.can_manage === false ? (
+                                <p className="max-w-xs text-xs text-slate-500">Private mailbox - only its own people can open or change it.</p>
+                            ) : (
                             <div className="flex flex-wrap gap-2">
                                 <Link href={`/mail?account=${a.id}`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                                     Open
@@ -196,6 +236,7 @@ export default function MailAccounts({ role = "super_admin", accounts = [], peop
                                     <Trash2 size={13} /> Remove
                                 </button>
                             </div>
+                            )}
                         </div>
                         {editing === a.id && (
                             <div className="mt-4 border-t border-slate-100 pt-4">
