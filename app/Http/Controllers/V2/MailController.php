@@ -125,6 +125,8 @@ class MailController extends Controller
                 'display_name' => $a->display_name,
                 'mine' => $mine->contains((int) $a->id),
                 'from' => $a->fromAddresses(),
+                'signature' => $a->signature,
+                'signature_html' => $a->signature_html,
                 'is_private' => (bool) $a->is_private,
                 'unread' => MailMessage::query()->where('mail_account_id', $a->id)->where('folder', 'inbox')->where('seen', false)->count(),
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),

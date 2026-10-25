@@ -36,8 +36,15 @@ class MailSender
         $domain = Str::after($from['address'], '@') ?: 'mixxtune.com';
         $messageId = '<'.Str::uuid()->toString().'@'.$domain.'>';
         $body = rtrim($data['body']);
-        if ($account->signature) {
+        $html = self::html($body);
+        /* W102: a designed signature (HTML source code) goes as it is; the text version gets its lines */
+        $sigHtml = SignatureHtml::clean($account->signature_html);
+        if ($sigHtml) {
+            $body .= "\n\n-- \n".SignatureHtml::text($sigHtml);
+            $html = '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">'.$html.'<br><div class="mx-signature">'.$sigHtml.'</div></div>';
+        } elseif ($account->signature) {
             $body .= "\n\n-- \n".$account->signature;
+            $html = self::html($body);
         }
 
         $email = (new Email())
@@ -45,7 +52,7 @@ class MailSender
             ->to(...array_map(fn ($a) => new Address($a), $data['to']))
             ->subject($data['subject'])
             ->text($body)
-            ->html(self::html($body));
+            ->html($html);
         if (!empty($data['cc'])) {
             $email->cc(...array_map(fn ($a) => new Address($a), $data['cc']));
         }
@@ -82,6 +89,7 @@ class MailSender
             'sent_at' => now(),
             'snippet' => MailSync::snippet($body, null),
             'body_text' => $body,
+            'body_html' => $sigHtml ? $html : null,
             'has_attachments' => $files !== [] || $carried !== [],
             'seen' => true,
             'size' => strlen($email->toString()),

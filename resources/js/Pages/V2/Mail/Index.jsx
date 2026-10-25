@@ -141,6 +141,15 @@ function Compose({ account, draft, onClose }) {
                         <span className="ml-1 text-[11px] text-slate-500">**bold**, _italic_, "- " list - shown formatted to the receiver; links become clickable</span>
                     </div>
                     <textarea ref={box} value={body} onChange={(e) => setBody(e.target.value)} rows={12} autoFocus={!draft.body} className="w-full rounded-lg border border-slate-300 p-3 text-sm leading-relaxed" placeholder="Write your mail..." />
+                    {/* W102: the signature that goes under this mail */}
+                    {account.signature_html ? (
+                        <div className="rounded-lg border border-dashed border-slate-300">
+                            <div className="px-3 pt-1.5 text-[11px] font-semibold text-slate-500">Signature (added automatically)</div>
+                            <iframe title="Signature" sandbox="" srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>body{margin:8px 12px;font-family:Arial,sans-serif;font-size:14px}img{max-width:100%}</style></head><body>${account.signature_html}</body></html>`} className="h-64 w-full rounded-b-lg bg-white" />
+                        </div>
+                    ) : account.signature ? (
+                        <p className="whitespace-pre-line rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500">-- {"\n"}{account.signature}</p>
+                    ) : null}
                     <div className="flex flex-wrap items-center gap-2">
                         <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                             <Paperclip size={14} /> Attach files

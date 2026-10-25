@@ -30,6 +30,44 @@ function People({ people, value, onChange }) {
     );
 }
 
+/* W102: the signature - simple text, or a designed one pasted as HTML source code */
+export const sigDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:8px;font-family:Arial,sans-serif;font-size:14px}img{max-width:100%}</style></head><body>${html}</body></html>`;
+
+function SignatureBox({ data, set, error }) {
+    const tab = (mode, label) => (
+        <button type="button" onClick={() => set("sig_mode", mode)} className={`rounded-md px-3 py-1 text-xs font-semibold ${data.sig_mode === mode ? "bg-white text-violet-700 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>
+            {label}
+        </button>
+    );
+
+    return (
+        <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-700">Signature (added under every mail)</span>
+                <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
+                    {tab("text", "Simple text")}
+                    {tab("html", "Design (HTML code)")}
+                </div>
+            </div>
+            {data.sig_mode === "text" ? (
+                <textarea rows={3} value={data.signature} onChange={(e) => set("signature", e.target.value)} placeholder={"Regards,\nMixx Tune Entertainment"} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+            ) : (
+                <>
+                    <textarea rows={6} spellCheck={false} value={data.signature_html} onChange={(e) => set("signature_html", e.target.value)} placeholder={"Paste here: in the signature maker press \"Copy signature source code\", then Ctrl+V"} className="w-full rounded-lg border border-slate-300 p-2.5 font-mono text-[11px] leading-snug" />
+                    <p className="text-[11px] text-slate-500">Pictures (logo) must be web links (https://...) as the signature maker gives them. Scripts and forms are removed for safety.</p>
+                    {error && <span className="block text-xs text-red-600">{error}</span>}
+                    {data.signature_html.trim() !== "" && (
+                        <div className="rounded-lg border border-slate-200">
+                            <div className="border-b border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-500">Preview - this is how receivers see it</div>
+                            <iframe title="Signature preview" sandbox="" srcDoc={sigDoc(data.signature_html)} className="h-52 w-full rounded-b-lg bg-white" />
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    );
+}
+
 function AccountForm({ people, account = null, onDone, preset = null }) {
     const errors = usePage().props.errors ?? {};
     const [data, setData] = useState({
@@ -37,6 +75,8 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
         display_name: account?.display_name ?? "",
         password: "",
         signature: account?.signature ?? "",
+        signature_html: account?.signature_html ?? "",
+        sig_mode: account?.signature_html ? "html" : "text",
         status: account?.status ?? "active",
         user_ids: account?.user_ids ?? preset?.user_ids ?? [],
         is_private: account?.is_private ?? preset?.is_private ?? false,
@@ -48,7 +88,9 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
     const save = () => {
         if (busy) return;
         setBusy(true);
-        const payload = account ? { display_name: data.display_name, password: data.password || null, signature: data.signature, status: data.status, user_ids: data.user_ids, is_private: data.is_private, aliases: data.aliases.filter((a) => a.address?.trim()) } : { ...data, aliases: data.aliases.filter((a) => a.address?.trim()) };
+        const sig = { signature: data.signature, signature_html: data.sig_mode === "html" ? data.signature_html : "" };
+        const { sig_mode, ...rest } = data;
+        const payload = account ? { display_name: data.display_name, password: data.password || null, ...sig, status: data.status, user_ids: data.user_ids, is_private: data.is_private, aliases: data.aliases.filter((a) => a.address?.trim()) } : { ...rest, ...sig, aliases: data.aliases.filter((a) => a.address?.trim()) };
         router.post(account ? `/admin/mail-accounts/${account.id}` : "/admin/mail-accounts", payload, { preserveScroll: true, onSuccess: onDone, onFinish: () => setBusy(false) });
     };
 
@@ -123,10 +165,7 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
                     <span className="block text-xs text-slate-500">Only the people ticked above can open it. Other Super Admins cannot see it. Use this for your own mail.</span>
                 </span>
             </label>
-            <label className="block">
-                <span className="text-xs font-semibold text-slate-700">Signature (added under every mail)</span>
-                <textarea rows={3} value={data.signature} onChange={(e) => set("signature", e.target.value)} placeholder={"Regards,\nMixx Tune Entertainment"} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
-            </label>
+            <SignatureBox data={data} set={set} error={errors.signature_html} />
             {account && (
                 <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={data.status === "disabled"} onChange={(e) => set("status", e.target.checked ? "disabled" : "active")} /> Switch off (not read, not shown)

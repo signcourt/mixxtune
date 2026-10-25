@@ -389,4 +389,39 @@ class PanelMailTest extends TestCase
         $this->assertSame(['boss@example.com', 'owner@example.com'], collect($sent->bcc)->pluck('email')->all());
         $this->actingAs($mine)->get("/mail?account={$a->id}&folder=sent&m={$sent->id}")->assertInertia(fn (Assert $p) => $p->where('open.bcc', 'boss@example.com, owner@example.com'));
     }
+    /* W102: a designed signature pasted as HTML source code goes out as it is, without anything unsafe */
+    public function test_html_signature_is_cleaned_and_sent_under_the_mail(): void
+    {
+        $super = $this->user('super_admin');
+        $mine = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'contact@mixxtune.com', 'display_name' => 'Mixx Tune', 'username' => 'contact@mixxtune.com', 'password' => 'x', 'status' => 'active', 'sent_folder' => 'INBOX.Sent']);
+        $a->users()->sync([$mine->id]);
+
+        $code = '<table style="width:500px"><tr><td style="color:#4f4bdc;font-size:20px"><b>Your Name Here</b></td></tr>'
+            .'<tr><td>Contact@mixxtune.com<br>+1 (123) 456-7890</td></tr>'
+            .'<tr><td style="background:#4f4bdc" onclick="steal()"><img src="https://mixxtune.com/logo.png" alt="mixx tune" onerror="x()"> '
+            .'<a href="https://www.mixxtune.com">www.mixxtune.com</a> <a href="javascript:alert(1)">bad</a></td></tr></table><script>alert(1)</script>';
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature' => 'old text', 'signature_html' => $code])->assertSessionHasNoErrors();
+        $saved = (string) $a->fresh()->signature_html;
+        $this->assertStringContainsString('Your Name Here', $saved);
+        $this->assertStringContainsString('https://mixxtune.com/logo.png', $saved);
+        $this->assertStringContainsString('background:#4f4bdc', $saved);
+        foreach (['<script', 'onclick', 'onerror', 'javascript:'] as $bad) {
+            $this->assertStringNotContainsString($bad, $saved);
+        }
+
+        $this->actingAs($mine)->get('/mail')->assertInertia(fn (Assert $p) => $p->where('accounts.0.signature_html', $saved));
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'saras@example.com', 'subject' => 'Hello', 'body' => 'Hi **there**'])->assertSessionHasNoErrors();
+        $raw = quoted_printable_decode(FakeTransport::$sent[0]);
+        $this->assertStringContainsString('https://mixxtune.com/logo.png', $raw);
+        $this->assertStringContainsString('<b>there</b>', $raw);
+        $this->assertStringNotContainsString('old text', $raw, 'the designed signature replaces the text one');
+        $sent = MailMessage::query()->where('folder', 'sent')->firstOrFail();
+        $this->assertStringContainsString("-- \nYour Name Here\nContact@mixxtune.com\n+1 (123) 456-7890", $sent->body_text);
+        $this->assertStringContainsString('Your Name Here', (string) $sent->body_html);
+
+        /* back to simple text */
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature' => 'Regards', 'signature_html' => ''])->assertSessionHasNoErrors();
+        $this->assertNull($a->fresh()->signature_html);
+    }
 }

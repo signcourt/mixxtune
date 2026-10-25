@@ -9,6 +9,7 @@ use App\Services\V2\AuditLogService;
 use App\Services\V2\Mail\MailAccess;
 use App\Services\V2\Mail\MailConnector;
 use App\Services\V2\Mail\MailSync;
+use App\Services\V2\Mail\SignatureHtml;
 use App\Services\V2\PermissionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,6 +72,7 @@ class MailAccountController extends Controller
                 'smtp' => $a->smtp_host.':'.$a->smtp_port,
                 'sent_folder' => $a->sent_folder,
                 'signature' => $a->signature,
+                'signature_html' => $a->signature_html,
                 'aliases' => array_values((array) ($a->aliases ?? [])),
                 'status' => $a->status,
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),
@@ -94,6 +96,7 @@ class MailAccountController extends Controller
             'smtp_host' => ['nullable', 'string', 'max:190', 'regex:/^[a-z0-9.-]+$/i'],
             'smtp_port' => ['nullable', 'integer', 'between:1,65535'],
             'signature' => ['nullable', 'string', 'max:2000'],
+            'signature_html' => ['nullable', 'string', 'max:200000'],
             'status' => ['nullable', Rule::in(['active', 'disabled'])],
             'is_private' => ['nullable', 'boolean'],
             'aliases' => ['nullable', 'array', 'max:20'],
@@ -137,6 +140,7 @@ class MailAccountController extends Controller
             'smtp_port' => $data['smtp_port'] ?? 465,
             'smtp_encryption' => (int) ($data['smtp_port'] ?? 465) === 587 ? 'tls' : 'ssl',
             'signature' => $data['signature'] ?? null,
+            'signature_html' => SignatureHtml::clean($data['signature_html'] ?? null),
             'status' => 'active',
             'is_private' => (bool) ($data['is_private'] ?? false),
             'aliases' => $this->aliases($data['aliases'] ?? [], $address),
@@ -172,6 +176,9 @@ class MailAccountController extends Controller
         $account->fill(collect($data)->only(['display_name', 'signature', 'status', 'imap_host', 'imap_port', 'smtp_host', 'smtp_port'])->filter(fn ($v) => $v !== null)->all());
         if (array_key_exists('signature', $data)) {
             $account->signature = $data['signature'];
+        }
+        if (array_key_exists('signature_html', $data)) {
+            $account->signature_html = SignatureHtml::clean($data['signature_html']);
         }
         $account->is_private = $privateAfter;
         if (array_key_exists('aliases', $data)) {
