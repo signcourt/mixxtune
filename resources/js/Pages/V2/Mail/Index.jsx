@@ -274,30 +274,6 @@ function Compose({ account, draft, onClose }) {
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto px-4" onClick={(e) => e.target === e.currentTarget && rich.restore()}>
                         <Editor rich={rich} initialHtml={draft.html ?? textToHtml(draft.body ?? "")} caretAtStart={Boolean(draft.html)} autoFocus={Boolean(draft.to)} onChange={sync} />
-                        {/* W102: the signature that goes under this mail (W103: can be switched off for one mail).
-                            W111: folded to one line while writing; click it to slide the full signature open */}
-                        {sigOn && (account.signature_html || account.signature) && (
-                            <div className="mb-2 rounded-lg border border-dashed border-slate-300">
-                                <button type="button" onClick={() => setSigOpen(!sigOpen)} aria-expanded={sigOpen} title={sigOpen ? "Hide the signature" : "Show the signature"} className="flex w-full min-w-0 items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[11px] hover:bg-slate-50">
-                                    <PenLine size={13} className="shrink-0 text-slate-400" />
-                                    <span className="shrink-0 font-semibold text-slate-500">Signature (added automatically)</span>
-                                    {!sigOpen && sigLine && <span className="min-w-0 truncate text-slate-400">· {sigLine}</span>}
-                                    <span className="ml-auto flex shrink-0 items-center gap-0.5 font-semibold text-violet-700">
-                                        {sigOpen ? "Hide" : "Show"}
-                                        <ChevronDown size={13} className={`transition-transform duration-300 ${sigOpen ? "rotate-180" : ""}`} />
-                                    </span>
-                                </button>
-                                <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${sigOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                                    <div className="overflow-hidden">
-                                        {account.signature_html ? (
-                                            <iframe title="Signature" sandbox="" tabIndex={sigOpen ? 0 : -1} srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>html{zoom:0.8}body{margin:6px 12px;font-family:Arial,sans-serif;font-size:14px}img{max-width:100%}</style></head><body>${account.signature_html}</body></html>`} className="h-40 w-full rounded-b-lg bg-white" />
-                                        ) : (
-                                            <p className="whitespace-pre-line px-3 pb-2 text-sm text-slate-500">-- {"\n"}{account.signature}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                         {(kept.length > 0 || files.length > 0) && (
                             <div className="mb-2 flex flex-wrap items-center gap-2">
                                 {kept.map((a) => (
@@ -323,6 +299,31 @@ function Compose({ account, draft, onClose }) {
                     <div className="space-y-2 px-3 pb-3 pt-1">
                         {total > 24 * 1048576 && <p className="text-xs font-semibold text-red-600">Too big: attachments and pictures together can be at most 24 MB</p>}
                         {err && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{err}</p>}
+                        {/* W102: the signature that goes under this mail (W103: can be switched off for one mail).
+                            W111/W112: a thin bar at the very bottom, just above the toolbar; "Show" slides the
+                            signature open upwards, "Hide" folds it down again - the writing space stays free */}
+                        {sigOn && (account.signature_html || account.signature) && (
+                            <div className="rounded-lg border border-dashed border-slate-300">
+                                <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${sigOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                                    <div className="overflow-hidden">
+                                        {account.signature_html ? (
+                                            <iframe title="Signature" sandbox="" tabIndex={sigOpen ? 0 : -1} srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>html{zoom:0.8}body{margin:6px 12px;font-family:Arial,sans-serif;font-size:14px}img{max-width:100%}</style></head><body>${account.signature_html}</body></html>`} className="h-40 w-full rounded-t-lg bg-white" />
+                                        ) : (
+                                            <p className="whitespace-pre-line px-3 pt-2 text-sm text-slate-500">-- {"\n"}{account.signature}</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <button type="button" onClick={() => setSigOpen(!sigOpen)} aria-expanded={sigOpen} title={sigOpen ? "Hide the signature" : "Show the signature"} className="flex w-full min-w-0 items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[11px] hover:bg-slate-50">
+                                    <PenLine size={13} className="shrink-0 text-slate-400" />
+                                    <span className="shrink-0 font-semibold text-slate-500">Signature (added automatically)</span>
+                                    {!sigOpen && sigLine && <span className="min-w-0 truncate text-slate-400">· {sigLine}</span>}
+                                    <span className="ml-auto flex shrink-0 items-center gap-0.5 font-semibold text-violet-700">
+                                        {sigOpen ? "Hide" : "Show"}
+                                        <ChevronDown size={13} className={`transition-transform duration-300 ${sigOpen ? "" : "rotate-180"}`} />
+                                    </span>
+                                </button>
+                            </div>
+                        )}
                         {tools && <Toolbar rich={rich} />}
                         <div className="relative flex items-center gap-1">
                             <button type="button" onClick={send} disabled={!canSend} title="Send (Ctrl+Enter)" className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-6 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
