@@ -11,7 +11,7 @@ class MailAccount extends Model
     protected $fillable = [
         'address', 'display_name', 'aliases', 'username', 'password',
         'imap_host', 'imap_port', 'imap_encryption', 'smtp_host', 'smtp_port', 'smtp_encryption',
-        'sent_folder', 'signature', 'signature_html', 'status', 'is_private', 'last_synced_at', 'last_error', 'created_by',
+        'sent_folder', 'signature', 'signature_html', 'signature_scale', 'status', 'is_private', 'last_synced_at', 'last_error', 'created_by',
     ];
 
     protected $casts = [
@@ -21,6 +21,7 @@ class MailAccount extends Model
         'last_synced_at' => 'datetime',
         'is_private' => 'boolean',
         'aliases' => 'array',
+        'signature_scale' => 'integer',
     ];
 
     protected $hidden = ['password'];

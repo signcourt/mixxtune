@@ -462,4 +462,32 @@ class PanelMailTest extends TestCase
         $this->assertStringContainsString('Hi <i>there</i>', $dec2);
         $this->assertStringContainsString('Team Mixx Tune', $dec2);
     }
+    /* W104: the designed signature can be made smaller; Reply / Forward keep the mail's own formatting */
+    public function test_signature_size_and_formatted_forward(): void
+    {
+        $super = $this->user('super_admin');
+        $mine = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'contact@mixxtune.com', 'display_name' => 'Mixx Tune', 'username' => 'contact@mixxtune.com', 'password' => 'x', 'status' => 'active', 'sent_folder' => 'INBOX.Sent']);
+        $a->users()->sync([$mine->id]);
+        $code = '<table cellpadding="10"><tr><td style="font-size:20px;padding:12px 8px"><img src="https://mixxtune.com/logo.png" width="200" height="100" style="width:200px;border-radius:9px"></td><td style="font-size: 14pt; width: 50%">Kapil Koli</td></tr></table>';
+
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code, 'signature_scale' => 20])->assertSessionHasErrors('signature_scale');
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code, 'signature_scale' => 50])->assertSessionHasNoErrors();
+        $this->assertSame(50, $a->fresh()->signature_scale);
+        $this->assertStringContainsString('width="200"', (string) $a->fresh()->signature_html, 'the pasted code is kept as it is');
+
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'saras@example.com', 'subject' => 'Small', 'body' => 'Hi', 'html' => 'Hi'])->assertSessionHasNoErrors();
+        $dec = quoted_printable_decode(FakeTransport::$sent[0]);
+        foreach (['font-size:10px', 'padding:6px 4px', 'width="100"', 'height="50"', 'width:100px', 'border-radius:4.5px', 'font-size: 7pt', 'width: 50%', 'cellpadding="5"'] as $want) {
+            $this->assertStringContainsString($want, $dec);
+        }
+        $this->actingAs($mine)->get('/mail')->assertInertia(fn (Assert $p) => $p->where('accounts.0.signature_html', fn ($h) => str_contains((string) $h, 'width="100"')));
+
+        /* a formatted mail in the inbox: Reply / Forward get its cleaned HTML */
+        FakeImap::$folders['INBOX'] = [5 => $this->mail('Formatted', 'Saras <saras@example.com>', "Content-Type: text/html; charset=utf-8\r\n\r\n<p><b>Bold news</b></p><script>bad()</script><img src=\"cid:x1\">")];
+        $this->artisan('mail:sync')->assertExitCode(0);
+        $m = MailMessage::query()->where('folder', 'inbox')->firstOrFail();
+        $this->actingAs($mine)->get("/mail?account={$a->id}&m={$m->id}")->assertInertia(fn (Assert $p) => $p
+            ->where('open.html', fn ($h) => str_contains((string) $h, '<b>Bold news</b>') && !str_contains((string) $h, 'script') && !str_contains((string) $h, 'cid:')));
+    }
 }

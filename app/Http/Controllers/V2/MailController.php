@@ -11,6 +11,7 @@ use App\Services\V2\Mail\MailAccess;
 use App\Services\V2\Mail\MailConnector;
 use App\Services\V2\Mail\MailSender;
 use App\Services\V2\Mail\MailSync;
+use App\Services\V2\Mail\SignatureHtml;
 use App\Services\V2\PermissionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -110,6 +111,8 @@ class MailController extends Controller
                         'at' => optional($msg->sent_at)->toIso8601String(),
                         'text' => $msg->body_text,
                         'has_html' => !empty($msg->body_html),
+                        /* W104: the mail's own formatting, for Reply / Forward (cleaned; very big mails stay text) */
+                        'html' => !empty($msg->body_html) && strlen((string) $msg->body_html) <= 600000 ? SignatureHtml::clean(preg_replace('/\bsrc=(["\'])cid:[^"\']*\1/i', '', (string) $msg->body_html)) : null,
                         'folder' => $msg->folder,
                         'attachments' => $msg->attachments()->where('inline', false)->get(['id', 'filename', 'mime', 'size']),
                     ];
@@ -126,7 +129,7 @@ class MailController extends Controller
                 'mine' => $mine->contains((int) $a->id),
                 'from' => $a->fromAddresses(),
                 'signature' => $a->signature,
-                'signature_html' => $a->signature_html,
+                'signature_html' => SignatureHtml::scale($a->signature_html, $a->signature_scale),
                 'is_private' => (bool) $a->is_private,
                 'unread' => MailMessage::query()->where('mail_account_id', $a->id)->where('folder', 'inbox')->where('seen', false)->count(),
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),

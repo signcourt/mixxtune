@@ -315,7 +315,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
 
     /* W103: the earlier mail goes under the reply as a grey quote, as in Gmail */
     const who = (m) => (m.from_name ? `${m.from_name} <${m.from_email}>` : m.from_email);
-    const quote = (m) => `<br><br><div>On ${esc(when(m.at, true))}, ${esc(who(m))} wrote:</div><blockquote style="margin:0 0 0 0.8ex;border-left:1px solid #ccc;padding-left:1ex">${textToHtml(m.text ?? "")}</blockquote>`;
+    const quote = (m) => `<br><br><div>On ${esc(when(m.at, true))}, ${esc(who(m))} wrote:</div><blockquote style="margin:0 0 0 0.8ex;border-left:1px solid #ccc;padding-left:1ex">${m.html || textToHtml(m.text ?? "")}</blockquote>`;
     const re = (s) => (/^re:/i.test(s) ? s : `Re: ${s}`);
     const reply = (all) => {
         const own = account.address.toLowerCase();
@@ -330,7 +330,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
             title: "Forward",
             to: "",
             subject: /^fwd?:/i.test(open.subject) ? open.subject : `Fwd: ${open.subject}`,
-            html: `<br><br><div>---------- Forwarded message ---------<br>From: ${esc(who(open))}<br>Date: ${esc(when(open.at, true))}<br>Subject: ${esc(open.subject)}<br>To: ${esc(open.to)}</div><br>${textToHtml(open.text ?? "")}`,
+            html: `<br><br><div>---------- Forwarded message ---------<br>From: ${esc(who(open))}<br>Date: ${esc(when(open.at, true))}<br>Subject: ${esc(open.subject)}<br>To: ${esc(open.to)}</div><br>${open.html || textToHtml(open.text ?? "")}`,
             forward_of: open.id,
             carried: open.attachments ?? [],
             note: open.attachments?.length ? "The attachments of the original mail go along - remove any you do not want to send." : null,

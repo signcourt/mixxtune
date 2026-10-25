@@ -48,7 +48,7 @@ class MailSender
         $body = $text;
         $html = $main;
         /* W102: a designed signature (HTML source code) goes as it is; the text version gets its lines */
-        $sigHtml = $withSignature ? SignatureHtml::clean($account->signature_html) : null;
+        $sigHtml = $withSignature ? SignatureHtml::scale(SignatureHtml::clean($account->signature_html), $account->signature_scale) : null; /* W104: at the chosen size */
         if ($sigHtml) {
             $body .= "\n\n-- \n".SignatureHtml::text($sigHtml);
             $html = $wrap($main.'<br><div class="mx-signature">'.$sigHtml.'</div>');

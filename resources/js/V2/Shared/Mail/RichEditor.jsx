@@ -302,3 +302,61 @@ export const shrinkImage = (file) =>
         };
         r.readAsDataURL(file);
     });
+
+/*
+ * W104: the same size change the server makes before sending (px / pt in styles,
+ * width / height / cellpadding / cellspacing), so the preview is exactly what receivers get.
+ */
+export function scaleHtml(html, percent) {
+    const k = Math.max(30, Math.min(200, Number(percent) || 100)) / 100;
+    if (!html || Math.abs(k - 1) < 0.001) return html || "";
+    const doc = new DOMParser().parseFromString(`<div id="mxsig">${html}</div>`, "text/html");
+    const root = doc.getElementById("mxsig");
+    const num = (v) => {
+        let r = Math.round(v * k * 10) / 10;
+        if (v > 0 && r < 1) r = 1;
+        return String(r);
+    };
+    root.querySelectorAll("*").forEach((el) => {
+        const st = el.getAttribute("style");
+        if (st) el.setAttribute("style", st.replace(/(\d*\.?\d+)(px|pt)\b/gi, (m, n, u) => num(parseFloat(n)) + u));
+        ["width", "height", "cellpadding", "cellspacing"].forEach((a) => {
+            const v = el.getAttribute(a);
+            const m = v && /^\s*(\d+(?:\.\d+)?)\s*(px)?\s*$/i.exec(v);
+            if (m) el.setAttribute(a, String(Math.max(1, Math.round(parseFloat(m[1]) * k))));
+        });
+    });
+    return root.innerHTML;
+}
+
+/* pictures without a size in the code get their real size written in, so they can be made smaller too */
+export async function fixPictureSizes(html) {
+    if (!html || !/<img\b/i.test(html)) return html;
+    const doc = new DOMParser().parseFromString(`<div id="mxsig">${html}</div>`, "text/html");
+    const root = doc.getElementById("mxsig");
+    const open = [...root.querySelectorAll("img")].filter((i) => !i.getAttribute("width") && !i.getAttribute("height") && !/(^|;)\s*(width|height)\s*:/i.test(i.getAttribute("style") || ""));
+    if (open.length === 0) return html;
+    await Promise.all(
+        open.map(
+            (i) =>
+                new Promise((done) => {
+                    const im = new Image();
+                    const t = setTimeout(done, 5000);
+                    im.onload = () => {
+                        clearTimeout(t);
+                        if (im.naturalWidth && im.naturalHeight) {
+                            i.setAttribute("width", String(im.naturalWidth));
+                            i.setAttribute("height", String(im.naturalHeight));
+                        }
+                        done();
+                    };
+                    im.onerror = () => {
+                        clearTimeout(t);
+                        done();
+                    };
+                    im.src = i.getAttribute("src") || "";
+                }),
+        ),
+    );
+    return root.innerHTML;
+}

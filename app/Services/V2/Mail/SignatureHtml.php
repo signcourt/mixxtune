@@ -87,6 +87,55 @@ class SignatureHtml
         return $attr === 'src' && preg_match('#^data:image/(png|jpe?g|gif|webp);base64,#', $u) === 1;
     }
 
+    /*
+     * W104: make the designed signature smaller or bigger (percent). Every size written in the
+     * code (px / pt in styles, width / height / cellpadding / cellspacing) is multiplied, so it
+     * looks the same in every mail app (Gmail etc. do not understand CSS zoom).
+     */
+    public static function scale(?string $html, ?int $percent): ?string
+    {
+        $html = trim((string) $html);
+        $k = max(30, min(200, (int) ($percent ?: 100))) / 100;
+        if ($html === '' || abs($k - 1) < 0.001) {
+            return $html === '' ? null : $html;
+        }
+        $doc = new DOMDocument('1.0', 'UTF-8');
+        $old = libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="UTF-8"><!DOCTYPE html><html><body><div id="mxsig">'.$html.'</div></body></html>', LIBXML_NONET | LIBXML_HTML_NODEFDTD | LIBXML_PARSEHUGE);
+        libxml_clear_errors();
+        libxml_use_internal_errors($old);
+        $root = $doc->getElementById('mxsig');
+        if (!$root) {
+            return $html;
+        }
+        $num = function (float $v) use ($k): string {
+            $r = round($v * $k, 1);
+            if ($v > 0 && $r < 1) {
+                $r = 1;
+            }
+
+            return rtrim(rtrim(number_format($r, 1, '.', ''), '0'), '.');
+        };
+        foreach (iterator_to_array((new DOMXPath($doc))->query('.//*', $root)) as $el) {
+            /** @var DOMElement $el */
+            if ($el->hasAttribute('style')) {
+                $el->setAttribute('style', preg_replace_callback('/(\d*\.?\d+)(px|pt)\b/i', fn ($m) => $num((float) $m[1]).$m[2], $el->getAttribute('style')));
+            }
+            foreach (['width', 'height', 'cellpadding', 'cellspacing'] as $a) {
+                $v = $el->getAttribute($a);
+                if ($v !== '' && preg_match('/^\s*(\d+(?:\.\d+)?)\s*(px)?\s*$/i', $v, $m)) {
+                    $el->setAttribute($a, (string) max(1, (int) round((float) $m[1] * $k)));
+                }
+            }
+        }
+        $out = '';
+        foreach ($root->childNodes as $n) {
+            $out .= $doc->saveHTML($n);
+        }
+
+        return trim($out);
+    }
+
     public static function text(?string $html): string
     {
         $s = (string) $html;

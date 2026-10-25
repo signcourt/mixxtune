@@ -1,8 +1,9 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import { CheckCircle2, Lock, Mail, Plus, RefreshCw, Trash2, UserRound } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { fixPictureSizes, scaleHtml } from "@/V2/Shared/Mail/RichEditor";
 
 /*
  * W95 MIXXTUNE_PANEL_MAIL
@@ -34,6 +35,18 @@ function People({ people, value, onChange }) {
 export const sigDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:8px;font-family:Arial,sans-serif;font-size:14px}img{max-width:100%}</style></head><body>${html}</body></html>`;
 
 function SignatureBox({ data, set, error }) {
+    /* W104: the preview uses the picture sizes too (looked up once the code stops changing) */
+    const [shown, setShown] = useState(data.signature_html);
+    useEffect(() => {
+        let live = true;
+        const t = setTimeout(() => {
+            fixPictureSizes(data.signature_html).then((h) => live && setShown(h));
+        }, 400);
+        return () => {
+            live = false;
+            clearTimeout(t);
+        };
+    }, [data.signature_html]);
     const tab = (mode, label) => (
         <button type="button" onClick={() => set("sig_mode", mode)} className={`rounded-md px-3 py-1 text-xs font-semibold ${data.sig_mode === mode ? "bg-white text-violet-700 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>
             {label}
@@ -58,8 +71,25 @@ function SignatureBox({ data, set, error }) {
                     {error && <span className="block text-xs text-red-600">{error}</span>}
                     {data.signature_html.trim() !== "" && (
                         <div className="rounded-lg border border-slate-200">
-                            <div className="border-b border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-500">Preview - this is how receivers see it</div>
-                            <iframe title="Signature preview" sandbox="" srcDoc={sigDoc(data.signature_html)} className="h-52 w-full rounded-b-lg bg-white" />
+                            {/* W104: size of the signature (zoom out / zoom in) */}
+                            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5">
+                                <span className="text-[11px] font-semibold text-slate-600">Size</span>
+                                <button type="button" onClick={() => set("signature_scale", Math.max(30, data.signature_scale - 5))} className="h-7 w-7 rounded-md border border-slate-300 bg-white text-sm font-bold text-slate-700 hover:bg-slate-100" aria-label="Smaller" title="Smaller">
+                                    −
+                                </button>
+                                <input type="range" min={30} max={150} step={5} value={data.signature_scale} onChange={(e) => set("signature_scale", Number(e.target.value))} aria-label="Signature size" className="w-40 accent-violet-600" />
+                                <button type="button" onClick={() => set("signature_scale", Math.min(150, data.signature_scale + 5))} className="h-7 w-7 rounded-md border border-slate-300 bg-white text-sm font-bold text-slate-700 hover:bg-slate-100" aria-label="Bigger" title="Bigger">
+                                    +
+                                </button>
+                                <span className="w-10 text-xs font-bold text-violet-700">{data.signature_scale}%</span>
+                                {[60, 75, 90, 100].map((v) => (
+                                    <button key={v} type="button" onClick={() => set("signature_scale", v)} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${data.signature_scale === v ? "bg-violet-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100"}`}>
+                                        {v}%
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="border-b border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-500">Preview - this is how receivers see it (any mail app)</div>
+                            <iframe title="Signature preview" sandbox="" srcDoc={sigDoc(`<div style="margin-bottom:8px;color:#333">Hello, this is a sample mail.</div>${scaleHtml(shown, data.signature_scale)}`)} className="h-56 w-full rounded-b-lg bg-white" />
                         </div>
                     )}
                 </>
@@ -77,6 +107,7 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
         signature: account?.signature ?? "",
         signature_html: account?.signature_html ?? "",
         sig_mode: account?.signature_html ? "html" : "text",
+        signature_scale: account?.signature_scale ?? 100,
         status: account?.status ?? "active",
         user_ids: account?.user_ids ?? preset?.user_ids ?? [],
         is_private: account?.is_private ?? preset?.is_private ?? false,
@@ -85,10 +116,12 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
     const [busy, setBusy] = useState(false);
     const set = (k, v) => setData((d) => ({ ...d, [k]: v }));
 
-    const save = () => {
+    const save = async () => {
         if (busy) return;
         setBusy(true);
-        const sig = { signature: data.signature, signature_html: data.sig_mode === "html" ? data.signature_html : "" };
+        /* W104: pictures without a size get their real size, so the Size setting works on them too */
+        const code = data.sig_mode === "html" ? await fixPictureSizes(data.signature_html) : "";
+        const sig = { signature: data.signature, signature_html: code, signature_scale: data.signature_scale };
         const { sig_mode, ...rest } = data;
         const payload = account ? { display_name: data.display_name, password: data.password || null, ...sig, status: data.status, user_ids: data.user_ids, is_private: data.is_private, aliases: data.aliases.filter((a) => a.address?.trim()) } : { ...rest, ...sig, aliases: data.aliases.filter((a) => a.address?.trim()) };
         router.post(account ? `/admin/mail-accounts/${account.id}` : "/admin/mail-accounts", payload, { preserveScroll: true, onSuccess: onDone, onFinish: () => setBusy(false) });

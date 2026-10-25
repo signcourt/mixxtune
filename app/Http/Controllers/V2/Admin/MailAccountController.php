@@ -73,6 +73,7 @@ class MailAccountController extends Controller
                 'sent_folder' => $a->sent_folder,
                 'signature' => $a->signature,
                 'signature_html' => $a->signature_html,
+                'signature_scale' => (int) ($a->signature_scale ?: 100),
                 'aliases' => array_values((array) ($a->aliases ?? [])),
                 'status' => $a->status,
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),
@@ -97,6 +98,7 @@ class MailAccountController extends Controller
             'smtp_port' => ['nullable', 'integer', 'between:1,65535'],
             'signature' => ['nullable', 'string', 'max:2000'],
             'signature_html' => ['nullable', 'string', 'max:200000'],
+            'signature_scale' => ['nullable', 'integer', 'between:30,150'],
             'status' => ['nullable', Rule::in(['active', 'disabled'])],
             'is_private' => ['nullable', 'boolean'],
             'aliases' => ['nullable', 'array', 'max:20'],
@@ -141,6 +143,7 @@ class MailAccountController extends Controller
             'smtp_encryption' => (int) ($data['smtp_port'] ?? 465) === 587 ? 'tls' : 'ssl',
             'signature' => $data['signature'] ?? null,
             'signature_html' => SignatureHtml::clean($data['signature_html'] ?? null),
+            'signature_scale' => (int) ($data['signature_scale'] ?? 100),
             'status' => 'active',
             'is_private' => (bool) ($data['is_private'] ?? false),
             'aliases' => $this->aliases($data['aliases'] ?? [], $address),
@@ -179,6 +182,9 @@ class MailAccountController extends Controller
         }
         if (array_key_exists('signature_html', $data)) {
             $account->signature_html = SignatureHtml::clean($data['signature_html']);
+        }
+        if (array_key_exists('signature_scale', $data) && $data['signature_scale'] !== null) {
+            $account->signature_scale = (int) $data['signature_scale'];
         }
         $account->is_private = $privateAfter;
         if (array_key_exists('aliases', $data)) {
