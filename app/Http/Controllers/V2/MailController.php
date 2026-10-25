@@ -194,13 +194,25 @@ class MailController extends Controller
             'files' => ['nullable', 'array', 'max:10'],
             'files.*' => ['file', 'max:20480'],
             'reply_to_id' => ['nullable', 'integer'],
+            'forward_of' => ['nullable', 'integer'],
+            'keep_attachments' => ['nullable', 'array', 'max:20'],
+            'keep_attachments.*' => ['integer'],
         ], [
             'to_list.*.email' => 'One of the "To" addresses is not a valid e-mail address.',
             'cc_list.*.email' => 'One of the "Cc" addresses is not a valid e-mail address.',
             'files.*.max' => 'Each attachment can be at most 20 MB.',
         ]);
         $files = $request->file('files', []);
-        $total = collect($files)->sum(fn ($f) => $f->getSize());
+        /* W96: attachments of the forwarded mail (only from this mailbox, only files that still exist) */
+        $carried = [];
+        if (!empty($data['forward_of']) && !empty($data['keep_attachments'])) {
+            $orig = MailMessage::query()->where('mail_account_id', $acc->id)->find((int) $data['forward_of']);
+            if ($orig) {
+                $carried = $orig->attachments()->whereIn('id', array_map('intval', $data['keep_attachments']))->where('inline', false)->get()
+                    ->filter(fn (MailAttachment $a) => Storage::disk('local')->exists($a->path))->values()->all();
+            }
+        }
+        $total = collect($files)->sum(fn ($f) => $f->getSize()) + collect($carried)->sum(fn ($a) => (int) $a->size);
         if ($total > 24 * 1024 * 1024) {
             return back()->withErrors(['files' => 'All attachments together can be at most 24 MB (the mail server limit is 25 MB).']);
         }
@@ -209,13 +221,13 @@ class MailController extends Controller
             $reply = MailMessage::query()->where('mail_account_id', $acc->id)->find((int) $data['reply_to_id']);
         }
         try {
-            $msg = $sender->send($acc, $request->user(), ['to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'subject' => $data['subject'], 'body' => $data['body']], $files, $reply);
+            $msg = $sender->send($acc, $request->user(), ['to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'subject' => $data['subject'], 'body' => $data['body']], $files, $reply, $carried);
         } catch (Throwable $e) {
             report($e);
 
             return back()->withErrors(['send' => 'The mail was NOT sent: '.$e->getMessage()]);
         }
-        $audit->record('mail.sent', 'mail', 'Mail sent from '.$acc->address.' to '.implode(', ', $data['to_list']).'.', [], ['subject' => $data['subject'], 'to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'attachments' => count($files)], $msg, $request);
+        $audit->record('mail.sent', 'mail', 'Mail sent from '.$acc->address.' to '.implode(', ', $data['to_list']).'.', [], ['subject' => $data['subject'], 'to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'attachments' => count($files) + count($carried)], $msg, $request);
 
         return redirect('/mail?account='.$acc->id.'&folder=sent&m='.$msg->id)->with('success', 'Mail sent.');
     }

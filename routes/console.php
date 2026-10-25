@@ -48,3 +48,18 @@ Schedule::command('mail:sync')
     ->everyTwoMinutes()
     ->withoutOverlapping(15)
     ->runInBackground();
+
+/*
+| W96 MIXXTUNE_STAFF_ALERTS (India time)
+| 09:05 agreements to renew (e-mail at 90/60/30/15/7/3/1/0 days, weekly after the end)
+| 09:10 did the backups run? (failed / missing / too old -> bell + e-mail to Super Admins)
+*/
+Schedule::command('agreements:remind')
+    ->dailyAt('09:05')
+    ->timezone('Asia/Kolkata')
+    ->withoutOverlapping(30);
+
+Schedule::command('backups:check --quiet-ok')
+    ->dailyAt('09:10')
+    ->timezone('Asia/Kolkata')
+    ->withoutOverlapping(30);

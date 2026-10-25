@@ -262,4 +262,48 @@ class PanelMailTest extends TestCase
         $this->assertStringContainsString('A0001 LOGIN "a@b.c" "pa\\"ss\\\\w"', $sent);
         $this->assertStringContainsString('A0003 UID SEARCH UID 5:*', $sent);
     }
+
+    /* W96: forward carries the attachments of the original; the bell rings for new mail (not on the first read) */
+    public function test_forward_keeps_attachments_and_new_mail_rings_the_bell(): void
+    {
+        $mine = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'manager1@mixxtune.com', 'username' => 'manager1@mixxtune.com', 'password' => 'x', 'status' => 'active', 'sent_folder' => 'INBOX.Sent']);
+        $a->users()->sync([$mine->id]);
+        FakeImap::$folders['INBOX'] = [1 => $this->mail('With file', 'Maa <maa@example.com>', "Content-Type: multipart/mixed; boundary=\"b1\"\r\n\r\n--b1\r\nContent-Type: text/plain\r\n\r\nSee file\r\n--b1\r\nContent-Type: application/pdf; name=\"report.pdf\"\r\nContent-Disposition: attachment; filename=\"report.pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0xLjQ=\r\n--b1--\r\n")];
+        $this->artisan('mail:sync')->assertSuccessful();
+        $this->assertSame(0, DB::table('panel_notifications')->count(), 'first read of a mailbox: no bell');
+
+        $orig = MailMessage::query()->firstOrFail();
+        $att = $orig->attachments()->firstOrFail();
+        $other = MailAccount::query()->create(['address' => 'other@mixxtune.com', 'username' => 'other@mixxtune.com', 'password' => 'x', 'status' => 'active']);
+        $this->actingAs($mine)->post("/mail/accounts/{$other->id}/send", ['to' => 'x@example.com', 'subject' => 'Fwd', 'body' => 'b', 'forward_of' => $orig->id, 'keep_attachments' => [$att->id]])->assertForbidden();
+
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", [
+            'to' => 'boss@example.com', 'subject' => 'Fwd: With file', 'body' => "**Please check** _today_\n- one\n- two\nhttps://www.mixxtune.com/x",
+            'forward_of' => $orig->id, 'keep_attachments' => [$att->id, 999999],
+        ])->assertSessionHasNoErrors();
+        $raw = FakeTransport::$sent[0];
+        $this->assertStringContainsString('report.pdf', $raw);
+        $this->assertStringContainsString('JVBERi0xLjQ=', $raw);
+        $sent = MailMessage::query()->where('folder', 'sent')->firstOrFail();
+        $this->assertSame(['report.pdf'], $sent->attachments()->pluck('filename')->all());
+        Storage::disk('local')->assertExists($sent->attachments()->first()->path);
+        Storage::disk('local')->assertExists($att->path);
+
+        $html = \App\Services\V2\Mail\MailSender::html("**Please check** _today_ <script>\n- one\n- two\n> old\nhttps://www.mixxtune.com/x.");
+        $this->assertStringContainsString('<b>Please check</b> <i>today</i> &lt;script&gt;', $html);
+        $this->assertStringContainsString('<li>one</li><li>two</li></ul>', $html);
+        $this->assertStringContainsString('<a href="https://www.mixxtune.com/x">https://www.mixxtune.com/x</a>.', $html);
+        $this->assertStringContainsString('border-left:3px solid #ccc', $html);
+
+        /* a new mail arrives: the manager gets one bell */
+        FakeImap::$folders['INBOX'][2] = $this->mail('Payment query', 'Saras <saras@example.com>', "Content-Type: text/plain\r\n\r\nWhen?");
+        $this->artisan('mail:sync')->assertSuccessful();
+        $bell = DB::table('panel_notifications')->where('type', 'mail.new')->get();
+        $this->assertCount(1, $bell);
+        $this->assertSame($mine->id, (int) $bell[0]->user_id);
+        $this->assertSame('New mail in manager1@mixxtune.com', $bell[0]->title);
+        $this->assertStringContainsString('Saras: Payment query', $bell[0]->message);
+        $this->assertStringStartsWith("/mail?account={$a->id}&m=", $bell[0]->action_url);
+    }
 }

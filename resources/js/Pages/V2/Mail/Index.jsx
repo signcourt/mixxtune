@@ -1,6 +1,6 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import { ArrowLeft, CornerUpLeft, CornerUpRight, Inbox, Mail, Paperclip, PenSquare, RefreshCw, ReplyAll, Search, Send, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Bold, CornerUpLeft, CornerUpRight, Inbox, Italic, List, Mail, Paperclip, PenSquare, RefreshCw, ReplyAll, Search, Send, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 
@@ -26,15 +26,45 @@ function Compose({ account, draft, onClose }) {
     const [subject, setSubject] = useState(draft.subject ?? "");
     const [body, setBody] = useState(draft.body ?? "");
     const [files, setFiles] = useState([]);
+    const [kept, setKept] = useState(draft.carried ?? []);
     const [busy, setBusy] = useState(false);
-    const total = files.reduce((s, f) => s + f.size, 0);
+    const box = useRef(null);
+    const total = files.reduce((s, f) => s + f.size, 0) + kept.reduce((s, a) => s + (a.size ?? 0), 0);
+
+    /* W96: simple marks, turned into bold / italic / list in the mail that is sent */
+    const mark = (kind) => {
+        const el = box.current;
+        if (!el) return;
+        const a = el.selectionStart ?? body.length;
+        const b = el.selectionEnd ?? body.length;
+        const sel = body.slice(a, b);
+        let next;
+        let caret;
+        if (kind === "list") {
+            const start = body.lastIndexOf("\n", a - 1) + 1;
+            const block = body.slice(start, b) || "";
+            const lines = (block || " ").split("\n").map((l) => (/^\s*[-•]\s/.test(l) ? l : `- ${l}`));
+            next = body.slice(0, start) + lines.join("\n") + body.slice(b);
+            caret = start + lines.join("\n").length;
+        } else {
+            const m = kind === "bold" ? "**" : "_";
+            const inner = sel || (kind === "bold" ? "bold text" : "italic text");
+            next = body.slice(0, a) + m + inner + m + body.slice(b);
+            caret = a + m.length + inner.length + m.length;
+        }
+        setBody(next);
+        requestAnimationFrame(() => {
+            el.focus();
+            el.setSelectionRange(caret, caret);
+        });
+    };
 
     const send = () => {
         if (busy) return;
         setBusy(true);
         router.post(
             `/mail/accounts/${account.id}/send`,
-            { to, cc, subject, body, files, reply_to_id: draft.reply_to_id ?? "" },
+            { to, cc, subject, body, files, reply_to_id: draft.reply_to_id ?? "", forward_of: draft.forward_of ?? "", keep_attachments: kept.map((a) => a.id) },
             { forceFormData: true, preserveScroll: true, onSuccess: onClose, onFinish: () => setBusy(false) },
         );
     };
@@ -70,12 +100,32 @@ function Compose({ account, draft, onClose }) {
                         <span className="w-14 text-xs font-semibold text-slate-500">Subject</span>
                         <input value={subject} onChange={(e) => setSubject(e.target.value)} className="h-9 min-w-0 flex-1 rounded-lg border border-slate-300 px-3 text-sm" />
                     </div>
-                    <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={12} autoFocus={!draft.body} className="w-full rounded-lg border border-slate-300 p-3 text-sm leading-relaxed" placeholder="Write your mail..." />
+                    <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => mark("bold")} title="Bold" className="rounded-md border border-slate-300 p-1.5 text-slate-700 hover:bg-slate-50">
+                            <Bold size={14} />
+                        </button>
+                        <button type="button" onClick={() => mark("italic")} title="Italic" className="rounded-md border border-slate-300 p-1.5 text-slate-700 hover:bg-slate-50">
+                            <Italic size={14} />
+                        </button>
+                        <button type="button" onClick={() => mark("list")} title="List" className="rounded-md border border-slate-300 p-1.5 text-slate-700 hover:bg-slate-50">
+                            <List size={14} />
+                        </button>
+                        <span className="ml-1 text-[11px] text-slate-500">**bold**, _italic_, "- " list - shown formatted to the receiver; links become clickable</span>
+                    </div>
+                    <textarea ref={box} value={body} onChange={(e) => setBody(e.target.value)} rows={12} autoFocus={!draft.body} className="w-full rounded-lg border border-slate-300 p-3 text-sm leading-relaxed" placeholder="Write your mail..." />
                     <div className="flex flex-wrap items-center gap-2">
                         <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                             <Paperclip size={14} /> Attach files
                             <input type="file" multiple className="hidden" onChange={(e) => setFiles([...files, ...Array.from(e.target.files ?? [])].slice(0, 10))} />
                         </label>
+                        {kept.map((a) => (
+                            <span key={`k${a.id}`} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] text-violet-800">
+                                <Paperclip size={11} /> {a.filename} · {size(a.size ?? 0)}
+                                <button type="button" onClick={() => setKept(kept.filter((k) => k.id !== a.id))} aria-label="Remove">
+                                    <X size={12} />
+                                </button>
+                            </span>
+                        ))}
                         {files.map((f, i) => (
                             <span key={`${f.name}-${i}`} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-700">
                                 {f.name} · {size(f.size)}
@@ -134,7 +184,9 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
             to: "",
             subject: /^fwd?:/i.test(open.subject) ? open.subject : `Fwd: ${open.subject}`,
             body: `\n\n\n---------- Forwarded message ----------\nFrom: ${open.from_name ? `${open.from_name} <${open.from_email}>` : open.from_email}\nDate: ${when(open.at, true)}\nSubject: ${open.subject}\nTo: ${open.to}\n\n${open.text ?? ""}`,
-            note: open.attachments?.length ? "Attachments of the original mail are not forwarded automatically - download them and attach them again if needed." : null,
+            forward_of: open.id,
+            carried: open.attachments ?? [],
+            note: open.attachments?.length ? "The attachments of the original mail go along - remove any you do not want to send." : null,
         });
 
     const listTitle = useMemo(() => (folder === "sent" ? "Sent" : "Inbox"), [folder]);
