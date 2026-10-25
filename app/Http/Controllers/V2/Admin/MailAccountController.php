@@ -11,6 +11,7 @@ use App\Services\V2\Mail\MailConnector;
 use App\Services\V2\Mail\MailSync;
 use App\Services\V2\Mail\SignatureHtml;
 use App\Services\V2\PermissionService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 use Throwable;
 
 /*
@@ -61,6 +63,7 @@ class MailAccountController extends Controller
         return Inertia::render('V2/Admin/MailAccounts/Index', [
             'role' => 'super_admin',
             'me' => $request->user()->id,
+            'brandLogo' => url('/images/mixx-tune-mail-logo.png'),
             'accounts' => MailAccount::query()->orderBy('address')->get()->map(fn (MailAccount $a) => [
                 'is_private' => (bool) $a->is_private,
                 'can_manage' => app(MailAccess::class)->canManage($request->user(), $a),
@@ -246,6 +249,70 @@ class MailAccountController extends Controller
         }
 
         return back()->with('success', $account->address.': login works. '.$n['inbox'].' new mail read.');
+    }
+
+    /*
+     * W107 MIXXTUNE_SIGNATURE_PICTURES: the logo of a signature kept on our own website.
+     * A signature maker's picture link can stop working (the picture is then empty in every
+     * mail); a picture uploaded here stays. Optional: put it in place of a broken link in
+     * every signature that has that link.
+     */
+    public function uploadSignaturePicture(Request $request, PermissionService $permissions, AuditLogService $audit): JsonResponse
+    {
+        $this->superAdmin($request, $permissions);
+        $data = $request->validate([
+            'picture' => ['required_without:use_brand', 'nullable', 'file', 'mimes:png,jpg,jpeg,gif,webp', 'max:2048', 'dimensions:max_width=3000,max_height=3000'],
+            'use_brand' => ['nullable', 'boolean'],
+            'replace' => ['nullable', 'string', 'max:2000'],
+            'everywhere' => ['nullable', 'boolean'],
+        ], ['picture.max' => 'The picture can be at most 2 MB.', 'picture.mimes' => 'Use a PNG, JPG, GIF or WEBP picture.']);
+        $file = $request->file('picture');
+        if ($file) {
+            $info = @getimagesize($file->getRealPath());
+            $ext = [IMAGETYPE_PNG => 'png', IMAGETYPE_JPEG => 'jpg', IMAGETYPE_GIF => 'gif', IMAGETYPE_WEBP => 'webp'][$info[2] ?? 0] ?? null;
+            abort_unless($ext !== null, 422, 'This file is not a picture.');
+            $name = bin2hex(random_bytes(16)).'.'.$ext;
+            Storage::disk('local')->putFileAs('mail-signature', $file, $name);
+            $url = url('/mail-sig/'.$name);
+        } else {
+            /* the Mixx Tune logo that comes with the panel */
+            $info = @getimagesize(public_path('images/mixx-tune-mail-logo.png')) ?: [500, 400];
+            $url = url('/images/mixx-tune-mail-logo.png');
+        }
+
+        $updated = 0;
+        if (!empty($data['replace']) && !empty($data['everywhere'])) {
+            $access = app(MailAccess::class);
+            foreach (MailAccount::query()->whereNotNull('signature_html')->get() as $acc) {
+                if (!$access->canManage($request->user(), $acc)) {
+                    continue;
+                }
+                [$html, $n] = SignatureHtml::replacePicture($acc->signature_html, $data['replace'], $url);
+                if ($n > 0) {
+                    $acc->forceFill(['signature_html' => $html])->save();
+                    $updated++;
+                }
+            }
+        }
+        $audit->record('mail.signature_picture', 'mail', 'Signature picture uploaded'.($updated ? ' and put in '.$updated.' signature(s)' : '').'.', [], ['url' => $url, 'replaced' => $data['replace'] ?? null, 'signatures' => $updated, 'size' => $file?->getSize(), 'width' => $info[0] ?? null, 'height' => $info[1] ?? null], null, $request);
+
+        return response()->json(['url' => $url, 'width' => $info[0] ?? null, 'height' => $info[1] ?? null, 'updated' => $updated]);
+    }
+
+    /* the picture itself - open to everyone (the receivers' mail apps load it), never anything else */
+    public function signaturePicture(string $file): SymfonyResponse
+    {
+        abort_unless(preg_match('/^[a-f0-9]{32}\.(png|jpg|gif|webp)$/', $file) === 1, 404);
+        $path = 'mail-signature/'.$file;
+        abort_unless(Storage::disk('local')->exists($path), 404);
+        $type = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp'][pathinfo($file, PATHINFO_EXTENSION)];
+
+        return response(Storage::disk('local')->get($path), 200, [
+            'Content-Type' => $type,
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'",
+        ]);
     }
 
     public function destroy(Request $request, MailAccount $account, PermissionService $permissions, AuditLogService $audit): RedirectResponse

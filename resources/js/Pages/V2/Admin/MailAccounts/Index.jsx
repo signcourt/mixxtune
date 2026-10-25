@@ -1,6 +1,6 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import { CheckCircle2, Lock, Mail, Plus, RefreshCw, Trash2, UserRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 import { boxHtml, fixPictureSizes, scaleHtml, seeThroughHtml } from "@/V2/Shared/Mail/RichEditor";
@@ -33,6 +33,118 @@ function People({ people, value, onChange }) {
 
 /* W102: the signature - simple text, or a designed one pasted as HTML source code */
 export const sigDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:8px;font-family:Arial,sans-serif;font-size:14px}img{max-width:100%}</style></head><body>${html}</body></html>`;
+
+/*
+ * W107: the pictures (logo) of the signature. A signature maker's link can stop working
+ * (zoviz.com: pictures gone) - then put the Mixx Tune logo or your own file in its place;
+ * it is kept on our own website and does not break.
+ */
+const parseSig = (code) => {
+    const doc = new DOMParser().parseFromString(`<div id="mxsig">${code}</div>`, "text/html");
+    return doc.getElementById("mxsig");
+};
+
+function SignaturePictures({ code, onCode }) {
+    const brandLogo = usePage().props.brandLogo;
+    const pics = useMemo(() => (code && /<img/i.test(code) ? [...new Set([...parseSig(code).querySelectorAll("img")].map((i) => i.getAttribute("src") || ""))] : []), [code]);
+    const [state, setState] = useState({});
+    const [busy, setBusy] = useState(null);
+    const [msg, setMsg] = useState(null);
+    const [everywhere, setEverywhere] = useState(true);
+    useEffect(() => {
+        pics.forEach((src) => {
+            if (state[src]) return;
+            setState((s) => ({ ...s, [src]: "checking" }));
+            if (!src) {
+                setState((s) => ({ ...s, [src]: "broken" }));
+                return;
+            }
+            const im = new Image();
+            im.onload = () => setState((s) => ({ ...s, [src]: im.naturalWidth > 1 ? "ok" : "broken" }));
+            im.onerror = () => setState((s) => ({ ...s, [src]: "broken" }));
+            im.src = src;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pics]);
+
+    const put = (old, url, w, h) => {
+        const root = parseSig(code);
+        root.querySelectorAll("img").forEach((i) => {
+            if ((i.getAttribute("src") || "") !== old) return;
+            i.setAttribute("src", url);
+            const sized = i.getAttribute("width") || i.getAttribute("height") || /(^|;)\s*(width|height)\s*:/i.test(i.getAttribute("style") || "");
+            if (!sized && w && h) {
+                const dw = Math.min(w, 125);
+                i.setAttribute("width", String(dw));
+                i.setAttribute("height", String(Math.round((h * dw) / w)));
+            }
+        });
+        setState((s) => ({ ...s, [url]: "ok" }));
+        onCode(root.innerHTML);
+    };
+    const send = async (old, file) => {
+        setBusy(old);
+        setMsg(null);
+        const fd = new FormData();
+        if (file) fd.append("picture", file);
+        else fd.append("use_brand", "1");
+        fd.append("replace", old);
+        fd.append("everywhere", everywhere ? "1" : "0");
+        try {
+            const { data: r } = await window.axios.post("/admin/mail-accounts/signature-picture", fd);
+            put(old, r.url, r.width, r.height);
+            setMsg({ ok: true, text: `Picture put in this signature${r.updated ? ` and saved in ${r.updated} signature(s) that had the same picture` : ""}. Press Save to keep this one.` });
+        } catch (e) {
+            const er = e?.response?.data;
+            setMsg({ ok: false, text: er?.errors ? Object.values(er.errors).flat()[0] : er?.message || "Upload did not work." });
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    if (pics.length === 0) return null;
+
+    return (
+        <div className="rounded-lg border border-slate-200">
+            <div className="border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600">Pictures in this signature</div>
+            <div className="divide-y divide-slate-100">
+                {pics.map((src) => {
+                    const st = state[src] ?? "checking";
+                    return (
+                        <div key={src} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                            <div className="flex h-12 w-16 items-center justify-center overflow-hidden rounded border border-slate-200 bg-[repeating-conic-gradient(#eef0f4_0_25%,#fff_0_50%)] bg-[length:12px_12px]">
+                                {st === "ok" ? <img src={src} alt="" className="max-h-12 max-w-16" /> : <span className="text-[10px] text-slate-400">{st === "checking" ? "..." : "empty"}</span>}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-[11px] text-slate-500" title={src}>{src || "(no link)"}</p>
+                                {st === "broken" ? (
+                                    <p className="text-[11px] font-semibold text-red-600">This picture does not open any more - its website removed it. Put a new one here:</p>
+                                ) : st === "ok" ? (
+                                    <p className="text-[11px] font-semibold text-emerald-700">Works{src.includes("/mail-sig/") || src === brandLogo ? " - kept on our own website" : ""}</p>
+                                ) : (
+                                    <p className="text-[11px] text-slate-500">Checking...</p>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button type="button" disabled={busy !== null} onClick={() => send(src, null)} className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-800 hover:bg-violet-100 disabled:opacity-50">
+                                    <img src={brandLogo} alt="" className="h-4 w-5 rounded-sm" /> Use the Mixx Tune logo
+                                </button>
+                                <label className={`cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 ${busy !== null ? "pointer-events-none opacity-50" : ""}`}>
+                                    {busy === src ? "Uploading..." : "Upload my logo file"}
+                                    <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) send(src, f); }} />
+                                </label>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            <label className="flex items-center gap-2 border-t border-slate-200 px-3 py-1.5 text-[11px] text-slate-600">
+                <input type="checkbox" checked={everywhere} onChange={(e) => setEverywhere(e.target.checked)} /> Also put it in all other signatures that have the same picture
+            </label>
+            {msg && <p className={`px-3 pb-2 text-[11px] font-semibold ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{msg.text}</p>}
+        </div>
+    );
+}
 
 function SignatureBox({ data, set, error }) {
     /* W104: the preview uses the picture sizes too (looked up once the code stops changing) */
@@ -69,6 +181,7 @@ function SignatureBox({ data, set, error }) {
                 <>
                     <textarea rows={6} spellCheck={false} value={data.signature_html} onChange={(e) => set("signature_html", e.target.value)} placeholder={"Paste here: in the signature maker press \"Copy signature source code\", then Ctrl+V"} className="w-full rounded-lg border border-slate-300 p-2.5 font-mono text-[11px] leading-snug" />
                     <p className="text-[11px] text-slate-500">Pictures (logo) must be web links (https://...) as the signature maker gives them. Scripts and forms are removed for safety.</p>
+                    <SignaturePictures code={data.signature_html} onCode={(c) => set("signature_html", c)} />
                     {error && <span className="block text-xs text-red-600">{error}</span>}
                     {data.signature_html.trim() !== "" && (
                         <div className="rounded-lg border border-slate-200">

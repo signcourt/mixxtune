@@ -556,4 +556,47 @@ class PanelMailTest extends TestCase
         $this->assertStringNotContainsString('role="presentation"', $dec3);
         $this->assertStringNotContainsString('background-color:#ffffff', $dec3);
     }
+    /* W107: a broken signature logo (zoviz.com) is replaced by a picture kept on our own website */
+    public function test_signature_picture_upload_replaces_a_broken_logo_everywhere(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $super = $this->user('super_admin');
+        $other = $this->user('super_admin');
+        $mine = $this->user('admin');
+        $old = 'https://zoviz.com/brand/abc/logo.png';
+        $sig = '<table><tr><td><img src="'.$old.'" width="125" height="100" alt="mixx tune"></td><td>Kapil Koli</td></tr></table>';
+        $a = MailAccount::query()->create(['address' => 'kapil@mixxtune.com', 'username' => 'kapil@mixxtune.com', 'password' => 'x', 'status' => 'active', 'signature_html' => $sig]);
+        $b = MailAccount::query()->create(['address' => 'info@mixxtune.com', 'username' => 'info@mixxtune.com', 'password' => 'x', 'status' => 'active', 'signature_html' => str_replace('Kapil Koli', 'Info', $sig)]);
+        $c = MailAccount::query()->create(['address' => 'boss@mixxtune.com', 'username' => 'boss@mixxtune.com', 'password' => 'x', 'status' => 'active', 'is_private' => true, 'signature_html' => $sig]);
+        $c->users()->sync([$other->id]);
+
+        $png = \Illuminate\Http\UploadedFile::fake()->image('logo.png', 500, 400);
+        $this->actingAs($mine)->post('/admin/mail-accounts/signature-picture', ['picture' => $png])->assertForbidden();
+        $this->actingAs($super)->postJson('/admin/mail-accounts/signature-picture', ['picture' => \Illuminate\Http\UploadedFile::fake()->create('x.pdf', 10, 'application/pdf')])->assertStatus(422);
+
+        $r = $this->actingAs($super)->postJson('/admin/mail-accounts/signature-picture', ['picture' => $png, 'replace' => $old, 'everywhere' => '1'])->assertOk();
+        $url = $r->json('url');
+        $this->assertMatchesRegularExpression('#/mail-sig/[a-f0-9]{32}\.png$#', $url);
+        $this->assertSame([500, 400, 2], [$r->json('width'), $r->json('height'), $r->json('updated')], 'two shared signatures changed, not the private one of another Super Admin');
+        $this->assertStringContainsString($url, $a->fresh()->signature_html);
+        $this->assertStringContainsString('width="125"', $a->fresh()->signature_html, 'the size stays');
+        $this->assertStringContainsString($url, $b->fresh()->signature_html);
+        $this->assertStringContainsString($old, $c->fresh()->signature_html);
+
+        /* receivers' mail apps open it without logging in */
+        auth()->logout();
+        $file = basename($url);
+        $res = $this->get('/mail-sig/'.$file)->assertOk();
+        $this->assertSame('image/png', $res->headers->get('Content-Type'));
+        $this->assertStringContainsString('max-age=31536000', (string) $res->headers->get('Cache-Control'));
+        $this->get('/mail-sig/'.str_repeat('0', 32).'.png')->assertNotFound();
+        $this->get('/mail-sig/..%2F.env')->assertNotFound();
+
+        /* the Mixx Tune logo that comes with the panel */
+        $r2 = $this->actingAs($super)->postJson('/admin/mail-accounts/signature-picture', ['use_brand' => '1', 'replace' => $url, 'everywhere' => '1'])->assertOk();
+        $this->assertStringEndsWith('/images/mixx-tune-mail-logo.png', $r2->json('url'));
+        $this->assertSame(2, $r2->json('updated'));
+        $this->assertFileExists(public_path('images/mixx-tune-mail-logo.png'));
+        $this->assertStringContainsString('/images/mixx-tune-mail-logo.png', $a->fresh()->signature_html);
+    }
 }

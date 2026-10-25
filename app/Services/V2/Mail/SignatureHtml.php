@@ -297,6 +297,37 @@ class SignatureHtml
         return trim($out);
     }
 
+    /* W107: put a new picture link in place of an old one (every <img> with exactly that link) */
+    public static function replacePicture(?string $html, string $old, string $new): array
+    {
+        $html = trim((string) $html);
+        if ($html === '' || $old === '' || !str_contains($html, '<img')) {
+            return [$html, 0];
+        }
+        $doc = new DOMDocument('1.0', 'UTF-8');
+        $prev = libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="UTF-8"><!DOCTYPE html><html><body><div id="mxsig">'.$html.'</div></body></html>', LIBXML_NONET | LIBXML_HTML_NODEFDTD | LIBXML_PARSEHUGE);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+        $root = $doc->getElementById('mxsig');
+        $n = 0;
+        foreach ($root ? iterator_to_array($root->getElementsByTagName('img')) : [] as $img) {
+            if (trim($img->getAttribute('src')) === trim($old)) {
+                $img->setAttribute('src', $new);
+                $n++;
+            }
+        }
+        if ($n === 0) {
+            return [$html, 0];
+        }
+        $out = '';
+        foreach ($root->childNodes as $c) {
+            $out .= $doc->saveHTML($c);
+        }
+
+        return [trim($out), $n];
+    }
+
     public static function text(?string $html): string
     {
         $s = (string) $html;

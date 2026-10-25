@@ -3068,6 +3068,12 @@ Route::middleware(['auth', 'verified'])
         Route::get('kyc-unlocks/{unlock}/document', [\App\Http\Controllers\V2\Admin\KycUnlockController::class, 'document'])->whereNumber('unlock')->name('kyc-unlocks.document');
     });
 
+/* W107 MIXXTUNE_SIGNATURE_PICTURES: a signature logo, open to the receivers' mail apps (no login) */
+Route::get('/mail-sig/{file}', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'signaturePicture'])
+    ->where('file', '[a-f0-9]{32}\.(png|jpg|gif|webp)')
+    ->middleware('throttle:600,1')
+    ->name('v2.mail.signature-picture');
+
 /* W95 MIXXTUNE_PANEL_MAIL: domain mailboxes inside the panel */
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/mail', [\App\Http\Controllers\V2\MailController::class, 'index'])->name('v2.mail.index');
@@ -3080,6 +3086,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/admin/mail-accounts/{account}', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'update'])->whereNumber('account')->middleware('throttle:30,1')->name('v2.admin.mail-accounts.update');
     Route::post('/admin/mail-accounts/{account}/test', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'test'])->whereNumber('account')->middleware('throttle:20,1')->name('v2.admin.mail-accounts.test');
     Route::post('/admin/mail-accounts/{account}/delete', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'destroy'])->whereNumber('account')->name('v2.admin.mail-accounts.destroy');
+    /* W107: signature logo kept on our own website */
+    Route::post('/admin/mail-accounts/signature-picture', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'uploadSignaturePicture'])->middleware('throttle:30,1')->name('v2.admin.mail-accounts.signature-picture');
 });
 
 /* W94 MIXXTUNE_ACCOUNT_AGREEMENTS: signed agreement per Label / Artist account, renewal warnings */
