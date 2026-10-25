@@ -424,4 +424,42 @@ class PanelMailTest extends TestCase
         $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature' => 'Regards', 'signature_html' => ''])->assertSessionHasNoErrors();
         $this->assertNull($a->fresh()->signature_html);
     }
+    /* W103: the rich editor - formatting, a picture inside the text, signature off for one mail */
+    public function test_rich_mail_with_picture_and_signature_switched_off(): void
+    {
+        $mine = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'contact@mixxtune.com', 'display_name' => 'Mixx Tune', 'username' => 'contact@mixxtune.com', 'password' => 'x', 'status' => 'active', 'sent_folder' => 'INBOX.Sent', 'signature' => 'Team Mixx Tune']);
+        $a->users()->sync([$mine->id]);
+        $png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+        /* nothing written at all */
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'subject' => 's', 'body' => '', 'html' => '<br>'])->assertSessionHasErrors('body');
+
+        $html = '<font face="Georgia, serif" size="5">Namaste</font> <b>Saras</b> <u>ji</u>,<br><span style="color: rgb(255, 0, 0);">Red</span>'
+            .'<ol><li>one</li><li>two</li></ol><div style="text-align: center;">centre</div>'
+            .'<a href="https://www.mixxtune.com" onclick="x()">site</a><img src="data:image/png;base64,'.$png.'" onerror="x()"><script>alert(1)</script>';
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", [
+            'to' => 'saras@example.com', 'subject' => 'Rich', 'body' => "Namaste Saras ji,\nRed\none\ntwo\ncentre\nsite", 'html' => $html, 'signature' => '0',
+        ])->assertSessionHasNoErrors();
+        $raw = FakeTransport::$sent[0];
+        $dec = quoted_printable_decode($raw);
+        $this->assertStringContainsString('multipart/related', $raw);
+        $this->assertMatchesRegularExpression('/Content-ID: <pic1\.[a-z0-9]+@mixxtune\.com>/', $raw);
+        $this->assertStringContainsString('src="cid:pic1.', $dec);
+        $this->assertStringContainsString('<font face="Georgia, serif" size="5">Namaste</font>', $dec);
+        $this->assertStringContainsString('<li>two</li>', $dec);
+        $this->assertStringContainsString('text-align: center;', $dec);
+        foreach (['<script', 'onclick', 'onerror', 'data:image', 'Team Mixx Tune'] as $bad) {
+            $this->assertStringNotContainsString($bad, $dec);
+        }
+        $sent = MailMessage::query()->where('folder', 'sent')->firstOrFail();
+        $this->assertStringContainsString('data:image/png;base64,', (string) $sent->body_html, 'the panel copy keeps the picture');
+        $this->assertSame("Namaste Saras ji,\nRed\none\ntwo\ncentre\nsite", $sent->body_text);
+
+        /* signature on (default) */
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'saras@example.com', 'subject' => 'Two', 'body' => 'Hi', 'html' => 'Hi <i>there</i>'])->assertSessionHasNoErrors();
+        $dec2 = quoted_printable_decode(FakeTransport::$sent[1]);
+        $this->assertStringContainsString('Hi <i>there</i>', $dec2);
+        $this->assertStringContainsString('Team Mixx Tune', $dec2);
+    }
 }

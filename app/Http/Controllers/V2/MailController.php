@@ -201,7 +201,10 @@ class MailController extends Controller
             'bcc_list.*' => ['email:rfc'],
             'from' => ['nullable', 'string', Rule::in(collect($acc->fromAddresses())->pluck('address')->all())],
             'subject' => ['required', 'string', 'max:500'],
-            'body' => ['required', 'string', 'max:100000'],
+            'body' => ['required_without:html', 'nullable', 'string', 'max:500000'],
+            /* W103: the text from the rich editor (cleaned again before sending) */
+            'html' => ['nullable', 'string', 'max:26000000'],
+            'signature' => ['nullable', 'boolean'],
             'files' => ['nullable', 'array', 'max:10'],
             'files.*' => ['file', 'max:20480'],
             'reply_to_id' => ['nullable', 'integer'],
@@ -225,16 +228,19 @@ class MailController extends Controller
                     ->filter(fn (MailAttachment $a) => Storage::disk('local')->exists($a->path))->values()->all();
             }
         }
-        $total = collect($files)->sum(fn ($f) => $f->getSize()) + collect($carried)->sum(fn ($a) => (int) $a->size);
+        $total = collect($files)->sum(fn ($f) => $f->getSize()) + collect($carried)->sum(fn ($a) => (int) $a->size) + strlen((string) ($data['html'] ?? ''));
         if ($total > 24 * 1024 * 1024) {
-            return back()->withErrors(['files' => 'All attachments together can be at most 24 MB (the mail server limit is 25 MB).']);
+            return back()->withErrors(['files' => 'Attachments and pictures together can be at most 24 MB (the mail server limit is 25 MB).']);
+        }
+        if (trim((string) ($data['body'] ?? '')) === '' && !preg_match('/<img\b/i', (string) ($data['html'] ?? ''))) {
+            return back()->withErrors(['body' => 'Write something in the mail.']);
         }
         $reply = null;
         if (!empty($data['reply_to_id'])) {
             $reply = MailMessage::query()->where('mail_account_id', $acc->id)->find((int) $data['reply_to_id']);
         }
         try {
-            $msg = $sender->send($acc, $request->user(), ['to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'bcc' => $data['bcc_list'] ?? [], 'from' => $data['from'] ?? null, 'subject' => $data['subject'], 'body' => $data['body']], $files, $reply, $carried);
+            $msg = $sender->send($acc, $request->user(), ['to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'bcc' => $data['bcc_list'] ?? [], 'from' => $data['from'] ?? null, 'subject' => $data['subject'], 'body' => (string) ($data['body'] ?? ''), 'html' => $data['html'] ?? null, 'signature' => !array_key_exists('signature', $data) || $data['signature'] === null || (bool) $data['signature']], $files, $reply, $carried);
         } catch (Throwable $e) {
             report($e);
 

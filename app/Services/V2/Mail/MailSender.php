@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\Part\DataPart;
 use Throwable;
 
 /*
@@ -35,24 +36,34 @@ class MailSender
         $from = collect($account->fromAddresses())->firstWhere('address', strtolower((string) ($data['from'] ?? $account->address))) ?? $account->fromAddresses()[0];
         $domain = Str::after($from['address'], '@') ?: 'mixxtune.com';
         $messageId = '<'.Str::uuid()->toString().'@'.$domain.'>';
-        $body = rtrim($data['body']);
-        $html = self::html($body);
+        /* W103: the rich editor sends HTML - cleaned here like a pasted signature (no scripts, forms, ...) */
+        $userHtml = SignatureHtml::clean($data['html'] ?? null);
+        $text = rtrim(str_replace("\u{00A0}", ' ', (string) ($data['body'] ?? '')));
+        if (trim($text) === '' && $userHtml) {
+            $text = SignatureHtml::text($userHtml);
+        }
+        $wrap = fn (string $inner): string => '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">'.$inner.'</div>';
+        $main = $userHtml ? $wrap($userHtml) : self::html($text);
+        $withSignature = ($data['signature'] ?? true) !== false;
+        $body = $text;
+        $html = $main;
         /* W102: a designed signature (HTML source code) goes as it is; the text version gets its lines */
-        $sigHtml = SignatureHtml::clean($account->signature_html);
+        $sigHtml = $withSignature ? SignatureHtml::clean($account->signature_html) : null;
         if ($sigHtml) {
             $body .= "\n\n-- \n".SignatureHtml::text($sigHtml);
-            $html = '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">'.$html.'<br><div class="mx-signature">'.$sigHtml.'</div></div>';
-        } elseif ($account->signature) {
+            $html = $wrap($main.'<br><div class="mx-signature">'.$sigHtml.'</div>');
+        } elseif ($withSignature && $account->signature) {
             $body .= "\n\n-- \n".$account->signature;
-            $html = self::html($body);
+            $html = $userHtml ? $wrap($main.'<br><div>-- <br>'.nl2br(e($account->signature)).'</div>') : self::html($body);
         }
+        $keepHtml = $userHtml !== null || $sigHtml !== null;
 
         $email = (new Email())
             ->from(new Address($from['address'], $from['name']))
             ->to(...array_map(fn ($a) => new Address($a), $data['to']))
             ->subject($data['subject'])
-            ->text($body)
-            ->html($html);
+            ->text($body);
+        $email->html($this->embedPictures($email, $html, $domain));
         if (!empty($data['cc'])) {
             $email->cc(...array_map(fn ($a) => new Address($a), $data['cc']));
         }
@@ -89,7 +100,7 @@ class MailSender
             'sent_at' => now(),
             'snippet' => MailSync::snippet($body, null),
             'body_text' => $body,
-            'body_html' => $sigHtml ? $html : null,
+            'body_html' => $keepHtml ? $html : null,
             'has_attachments' => $files !== [] || $carried !== [],
             'seen' => true,
             'size' => strlen($email->toString()),
@@ -124,6 +135,29 @@ class MailSender
         }
 
         return $msg;
+    }
+
+    /*
+     * W103: pictures put inside the text (data:image/...;base64) go along as inline parts
+     * (cid:), which every mail app shows; the panel keeps its own copy as it is.
+     */
+    private function embedPictures(Email $email, string $html, string $domain): string
+    {
+        $n = 0;
+
+        return preg_replace_callback('#src=(["\'])data:image/(png|jpe?g|gif|webp);base64,([A-Za-z0-9+/=\s]+)\1#i', function (array $m) use ($email, $domain, &$n) {
+            $bytes = base64_decode(preg_replace('/\s+/', '', $m[3]), true);
+            if ($bytes === false || $bytes === '') {
+                return 'src=""';
+            }
+            $n++;
+            $ext = strtolower($m[2]) === 'jpg' ? 'jpeg' : strtolower($m[2]);
+            $part = (new DataPart($bytes, 'picture'.$n.'.'.($ext === 'jpeg' ? 'jpg' : $ext), 'image/'.$ext))->asInline();
+            $part->setContentId('pic'.$n.'.'.Str::lower(Str::random(10)).'@'.$domain);
+            $email->addPart($part);
+
+            return 'src='.$m[1].'cid:'.$part->getContentId().$m[1];
+        }, $html) ?? $html;
     }
 
     /*

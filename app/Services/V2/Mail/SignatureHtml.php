@@ -26,7 +26,7 @@ class SignatureHtml
         }
         $doc = new DOMDocument('1.0', 'UTF-8');
         $old = libxml_use_internal_errors(true);
-        $doc->loadHTML('<?xml encoding="UTF-8"><!DOCTYPE html><html><body><div id="mxsig">'.$html.'</div></body></html>', LIBXML_NONET | LIBXML_HTML_NODEFDTD);
+        $doc->loadHTML('<?xml encoding="UTF-8"><!DOCTYPE html><html><body><div id="mxsig">'.$html.'</div></body></html>', LIBXML_NONET | LIBXML_HTML_NODEFDTD | LIBXML_PARSEHUGE);
         libxml_clear_errors();
         libxml_use_internal_errors($old);
 
