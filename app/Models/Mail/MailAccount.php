@@ -11,7 +11,7 @@ class MailAccount extends Model
     protected $fillable = [
         'address', 'display_name', 'aliases', 'username', 'password',
         'imap_host', 'imap_port', 'imap_encryption', 'smtp_host', 'smtp_port', 'smtp_encryption',
-        'sent_folder', 'signature', 'signature_html', 'signature_scale', 'signature_transparent', 'signature_bg', 'signature_bg_color', 'signature_bg_padding', 'signature_bg_radius', 'status', 'is_private', 'last_synced_at', 'last_error', 'created_by',
+        'sent_folder', 'signature', 'signature_html', 'signature_design', 'signature_scale', 'signature_transparent', 'signature_bg', 'signature_bg_color', 'signature_bg_padding', 'signature_bg_radius', 'status', 'is_private', 'last_synced_at', 'last_error', 'created_by',
     ];
 
     protected $casts = [
@@ -22,6 +22,7 @@ class MailAccount extends Model
         'is_private' => 'boolean',
         'aliases' => 'array',
         'signature_scale' => 'integer',
+        'signature_design' => 'array',
         'signature_transparent' => 'boolean',
         'signature_bg_padding' => 'integer',
         'signature_bg_radius' => 'integer',

@@ -48,6 +48,21 @@ class MailAccountController extends Controller
             ->unique('address')->values()->all();
     }
 
+    /* W108: the designer settings (kept to redo the signature later); empty = none */
+    private function design(array $data): ?array
+    {
+        $d = $data['signature_design'] ?? null;
+
+        return is_array($d) && $d !== [] ? $d : null;
+    }
+
+    private function designTooBig(array $data): ?string
+    {
+        $d = $this->design($data);
+
+        return $d && strlen((string) json_encode($d)) > 20000 ? 'The signature settings are too long.' : null;
+    }
+
     private function people()
     {
         return User::query()->whereIn('role', ['admin', 'super_admin'])->orderBy('role')->orderBy('name')
@@ -76,6 +91,7 @@ class MailAccountController extends Controller
                 'sent_folder' => $a->sent_folder,
                 'signature' => $a->signature,
                 'signature_html' => $a->signature_html,
+                'signature_design' => $a->signature_design,
                 'signature_scale' => (int) ($a->signature_scale ?: 100),
                 'signature_transparent' => (bool) $a->signature_transparent,
                 'signature_bg' => $a->signature_bg ?: 'box',
@@ -106,6 +122,7 @@ class MailAccountController extends Controller
             'smtp_port' => ['nullable', 'integer', 'between:1,65535'],
             'signature' => ['nullable', 'string', 'max:2000'],
             'signature_html' => ['nullable', 'string', 'max:200000'],
+            'signature_design' => ['nullable', 'array'],
             'signature_scale' => ['nullable', 'integer', 'between:30,150'],
             'signature_transparent' => ['nullable', 'boolean'],
             'signature_bg' => ['nullable', Rule::in(['pasted', 'none', 'box'])],
@@ -156,6 +173,7 @@ class MailAccountController extends Controller
             'smtp_encryption' => (int) ($data['smtp_port'] ?? 465) === 587 ? 'tls' : 'ssl',
             'signature' => $data['signature'] ?? null,
             'signature_html' => SignatureHtml::clean($data['signature_html'] ?? null),
+            'signature_design' => $this->design($data),
             'signature_scale' => (int) ($data['signature_scale'] ?? 100),
             'signature_transparent' => (bool) ($data['signature_transparent'] ?? false),
             'signature_bg' => $data['signature_bg'] ?? 'box',
@@ -167,6 +185,12 @@ class MailAccountController extends Controller
             'aliases' => $this->aliases($data['aliases'] ?? [], $address),
             'created_by' => $request->user()->id,
         ]);
+        if ($tooBig = $this->designTooBig($data)) {
+            return back()->withErrors(['signature_design' => $tooBig]);
+        }
+        if ($account->signature_design) {
+            $account->forceFill(['signature_bg' => 'pasted', 'signature_scale' => 100, 'signature_transparent' => false]);
+        }
         if ($account->is_private && empty($data['user_ids'])) {
             return back()->withErrors(['user_ids' => 'A private mailbox needs at least one person who can open it (tick yourself for your own mailbox).'])->withInput($request->except('password'));
         }
@@ -200,6 +224,16 @@ class MailAccountController extends Controller
         }
         if (array_key_exists('signature_html', $data)) {
             $account->signature_html = SignatureHtml::clean($data['signature_html']);
+        }
+        /* W108: made in the designer - its own size and background, so the older settings go back to "as made" */
+        if (array_key_exists('signature_design', $data)) {
+            if ($tooBig = $this->designTooBig($data)) {
+                return back()->withErrors(['signature_design' => $tooBig]);
+            }
+            $account->signature_design = $this->design($data);
+            if ($account->signature_design) {
+                $account->forceFill(['signature_bg' => 'pasted', 'signature_scale' => 100, 'signature_transparent' => false]);
+            }
         }
         if (array_key_exists('signature_scale', $data) && $data['signature_scale'] !== null) {
             $account->signature_scale = (int) $data['signature_scale'];

@@ -1,9 +1,9 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import { CheckCircle2, Lock, Mail, Plus, RefreshCw, Trash2, UserRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
-import { boxHtml, fixPictureSizes, scaleHtml, seeThroughHtml } from "@/V2/Shared/Mail/RichEditor";
+import SignatureDesigner, { defaultDesign, renderSignature } from "@/V2/Shared/Mail/SignatureDesigner";
 
 /*
  * W95 MIXXTUNE_PANEL_MAIL
@@ -34,132 +34,8 @@ function People({ people, value, onChange }) {
 /* W102: the signature - simple text, or a designed one pasted as HTML source code */
 export const sigDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:8px;font-family:Arial,sans-serif;font-size:14px}img{max-width:100%}</style></head><body>${html}</body></html>`;
 
-/*
- * W107: the pictures (logo) of the signature. A signature maker's link can stop working
- * (zoviz.com: pictures gone) - then put the Mixx Tune logo or your own file in its place;
- * it is kept on our own website and does not break.
- */
-const parseSig = (code) => {
-    const doc = new DOMParser().parseFromString(`<div id="mxsig">${code}</div>`, "text/html");
-    return doc.getElementById("mxsig");
-};
-
-function SignaturePictures({ code, onCode }) {
-    const brandLogo = usePage().props.brandLogo;
-    const pics = useMemo(() => (code && /<img/i.test(code) ? [...new Set([...parseSig(code).querySelectorAll("img")].map((i) => i.getAttribute("src") || ""))] : []), [code]);
-    const [state, setState] = useState({});
-    const [busy, setBusy] = useState(null);
-    const [msg, setMsg] = useState(null);
-    const [everywhere, setEverywhere] = useState(true);
-    useEffect(() => {
-        pics.forEach((src) => {
-            if (state[src]) return;
-            setState((s) => ({ ...s, [src]: "checking" }));
-            if (!src) {
-                setState((s) => ({ ...s, [src]: "broken" }));
-                return;
-            }
-            const im = new Image();
-            im.onload = () => setState((s) => ({ ...s, [src]: im.naturalWidth > 1 ? "ok" : "broken" }));
-            im.onerror = () => setState((s) => ({ ...s, [src]: "broken" }));
-            im.src = src;
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pics]);
-
-    const put = (old, url, w, h) => {
-        const root = parseSig(code);
-        root.querySelectorAll("img").forEach((i) => {
-            if ((i.getAttribute("src") || "") !== old) return;
-            i.setAttribute("src", url);
-            const sized = i.getAttribute("width") || i.getAttribute("height") || /(^|;)\s*(width|height)\s*:/i.test(i.getAttribute("style") || "");
-            if (!sized && w && h) {
-                const dw = Math.min(w, 125);
-                i.setAttribute("width", String(dw));
-                i.setAttribute("height", String(Math.round((h * dw) / w)));
-            }
-        });
-        setState((s) => ({ ...s, [url]: "ok" }));
-        onCode(root.innerHTML);
-    };
-    const send = async (old, file) => {
-        setBusy(old);
-        setMsg(null);
-        const fd = new FormData();
-        if (file) fd.append("picture", file);
-        else fd.append("use_brand", "1");
-        fd.append("replace", old);
-        fd.append("everywhere", everywhere ? "1" : "0");
-        try {
-            const { data: r } = await window.axios.post("/admin/mail-accounts/signature-picture", fd);
-            put(old, r.url, r.width, r.height);
-            setMsg({ ok: true, text: `Picture put in this signature${r.updated ? ` and saved in ${r.updated} signature(s) that had the same picture` : ""}. Press Save to keep this one.` });
-        } catch (e) {
-            const er = e?.response?.data;
-            setMsg({ ok: false, text: er?.errors ? Object.values(er.errors).flat()[0] : er?.message || "Upload did not work." });
-        } finally {
-            setBusy(null);
-        }
-    };
-
-    if (pics.length === 0) return null;
-
-    return (
-        <div className="rounded-lg border border-slate-200">
-            <div className="border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600">Pictures in this signature</div>
-            <div className="divide-y divide-slate-100">
-                {pics.map((src) => {
-                    const st = state[src] ?? "checking";
-                    return (
-                        <div key={src} className="flex flex-wrap items-center gap-3 px-3 py-2">
-                            <div className="flex h-12 w-16 items-center justify-center overflow-hidden rounded border border-slate-200 bg-[repeating-conic-gradient(#eef0f4_0_25%,#fff_0_50%)] bg-[length:12px_12px]">
-                                {st === "ok" ? <img src={src} alt="" className="max-h-12 max-w-16" /> : <span className="text-[10px] text-slate-400">{st === "checking" ? "..." : "empty"}</span>}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-[11px] text-slate-500" title={src}>{src || "(no link)"}</p>
-                                {st === "broken" ? (
-                                    <p className="text-[11px] font-semibold text-red-600">This picture does not open any more - its website removed it. Put a new one here:</p>
-                                ) : st === "ok" ? (
-                                    <p className="text-[11px] font-semibold text-emerald-700">Works{src.includes("/mail-sig/") || src === brandLogo ? " - kept on our own website" : ""}</p>
-                                ) : (
-                                    <p className="text-[11px] text-slate-500">Checking...</p>
-                                )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button type="button" disabled={busy !== null} onClick={() => send(src, null)} className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-800 hover:bg-violet-100 disabled:opacity-50">
-                                    <img src={brandLogo} alt="" className="h-4 w-5 rounded-sm" /> Use the Mixx Tune logo
-                                </button>
-                                <label className={`cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 ${busy !== null ? "pointer-events-none opacity-50" : ""}`}>
-                                    {busy === src ? "Uploading..." : "Upload my logo file"}
-                                    <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) send(src, f); }} />
-                                </label>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-            <label className="flex items-center gap-2 border-t border-slate-200 px-3 py-1.5 text-[11px] text-slate-600">
-                <input type="checkbox" checked={everywhere} onChange={(e) => setEverywhere(e.target.checked)} /> Also put it in all other signatures that have the same picture
-            </label>
-            {msg && <p className={`px-3 pb-2 text-[11px] font-semibold ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{msg.text}</p>}
-        </div>
-    );
-}
-
-function SignatureBox({ data, set, error }) {
-    /* W104: the preview uses the picture sizes too (looked up once the code stops changing) */
-    const [back, setBack] = useState("#eef0f4");
-    const [shown, setShown] = useState(data.signature_html);
-    useEffect(() => {
-        let live = true;
-        const t = setTimeout(() => {
-            fixPictureSizes(data.signature_html).then((h) => live && setShown(h));
-        }, 400);
-        return () => {
-            live = false;
-            clearTimeout(t);
-        };
-    }, [data.signature_html]);
+/* W108: the signature - simple text, or made in the Signature Designer (no code pasted any more) */
+function SignatureBox({ data, set, error, hadPasted }) {
     const tab = (mode, label) => (
         <button type="button" onClick={() => set("sig_mode", mode)} className={`rounded-md px-3 py-1 text-xs font-semibold ${data.sig_mode === mode ? "bg-white text-violet-700 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}>
             {label}
@@ -172,93 +48,20 @@ function SignatureBox({ data, set, error }) {
                 <span className="text-xs font-semibold text-slate-700">Signature (added under every mail)</span>
                 <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
                     {tab("text", "Simple text")}
-                    {tab("html", "Design (HTML code)")}
+                    {tab("design", "Signature designer")}
                 </div>
             </div>
             {data.sig_mode === "text" ? (
                 <textarea rows={3} value={data.signature} onChange={(e) => set("signature", e.target.value)} placeholder={"Regards,\nMixx Tune Entertainment"} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
             ) : (
                 <>
-                    <textarea rows={6} spellCheck={false} value={data.signature_html} onChange={(e) => set("signature_html", e.target.value)} placeholder={"Paste here: in the signature maker press \"Copy signature source code\", then Ctrl+V"} className="w-full rounded-lg border border-slate-300 p-2.5 font-mono text-[11px] leading-snug" />
-                    <p className="text-[11px] text-slate-500">Pictures (logo) must be web links (https://...) as the signature maker gives them. Scripts and forms are removed for safety.</p>
-                    <SignaturePictures code={data.signature_html} onCode={(c) => set("signature_html", c)} />
-                    {error && <span className="block text-xs text-red-600">{error}</span>}
-                    {data.signature_html.trim() !== "" && (
-                        <div className="rounded-lg border border-slate-200">
-                            {/* W104: size of the signature (zoom out / zoom in) */}
-                            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5">
-                                <span className="text-[11px] font-semibold text-slate-600">Size</span>
-                                <button type="button" onClick={() => set("signature_scale", Math.max(30, data.signature_scale - 5))} className="h-7 w-7 rounded-md border border-slate-300 bg-white text-sm font-bold text-slate-700 hover:bg-slate-100" aria-label="Smaller" title="Smaller">
-                                    −
-                                </button>
-                                <input type="range" min={30} max={150} step={5} value={data.signature_scale} onChange={(e) => set("signature_scale", Number(e.target.value))} aria-label="Signature size" className="w-40 accent-violet-600" />
-                                <button type="button" onClick={() => set("signature_scale", Math.min(150, data.signature_scale + 5))} className="h-7 w-7 rounded-md border border-slate-300 bg-white text-sm font-bold text-slate-700 hover:bg-slate-100" aria-label="Bigger" title="Bigger">
-                                    +
-                                </button>
-                                <span className="w-10 text-xs font-bold text-violet-700">{data.signature_scale}%</span>
-                                {[60, 75, 90, 100].map((v) => (
-                                    <button key={v} type="button" onClick={() => set("signature_scale", v)} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${data.signature_scale === v ? "bg-violet-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-100"}`}>
-                                        {v}%
-                                    </button>
-                                ))}
-                            </div>
-                            {/* W106: the background behind the signature (W105 see-through is the "None" choice) */}
-                            <div className="space-y-2 border-b border-slate-200 px-3 py-2">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-[11px] font-semibold text-slate-600">Background</span>
-                                    {[
-                                        ["box", "White box - only as big as the signature"],
-                                        ["none", "None (see-through)"],
-                                        ["pasted", "As in the code"],
-                                    ].map(([v, n]) => (
-                                        <button key={v} type="button" onClick={() => set("signature_bg", v)} className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${data.signature_bg === v ? "bg-violet-600 text-white ring-violet-600" : "bg-white text-slate-600 ring-slate-300 hover:bg-slate-100"}`}>
-                                            {n}
-                                        </button>
-                                    ))}
-                                </div>
-                                {data.signature_bg === "box" && (
-                                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                                        <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
-                                            Colour
-                                            <input type="color" value={data.signature_bg_color} onChange={(e) => set("signature_bg_color", e.target.value)} className="h-7 w-9 cursor-pointer rounded border border-slate-300 bg-white p-0.5" aria-label="Box colour" />
-                                            <button type="button" onClick={() => set("signature_bg_color", "#ffffff")} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-300">White</button>
-                                        </label>
-                                        <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
-                                            Space around
-                                            <input type="range" min={0} max={40} step={1} value={data.signature_bg_padding} onChange={(e) => set("signature_bg_padding", Number(e.target.value))} aria-label="Space around" className="w-28 accent-violet-600" />
-                                            <span className="w-9 text-violet-700">{data.signature_bg_padding}px</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
-                                            Round corners
-                                            <input type="range" min={0} max={30} step={1} value={data.signature_bg_radius} onChange={(e) => set("signature_bg_radius", Number(e.target.value))} aria-label="Round corners" className="w-24 accent-violet-600" />
-                                            <span className="w-9 text-violet-700">{data.signature_bg_radius}px</span>
-                                        </label>
-                                    </div>
-                                )}
-                                <p className="text-[11px] text-slate-500">
-                                    {data.signature_bg === "box"
-                                        ? "The white is only behind the name, logo and details; around it the receiver's own mailbox colour shows. Extra white from the code is removed."
-                                        : data.signature_bg === "none"
-                                          ? "No background at all - the signature sits on the receiver's mailbox colour (dark text can be hard to read in dark mode)."
-                                          : "Sent exactly as in the pasted code."}{" "}
-                                    A white box inside the logo picture itself cannot be removed here.
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-1">
-                                <span className="text-[11px] font-semibold text-slate-500">Preview - this is how receivers see it, on a mailbox that is</span>
-                                {[
-                                    ["White", "#ffffff", "#333333"],
-                                    ["Grey", "#eef0f4", "#333333"],
-                                    ["Dark", "#1f1f1f", "#e8e8e8"],
-                                ].map(([n, bg]) => (
-                                    <button key={n} type="button" onClick={() => setBack(bg)} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${back === bg ? "bg-slate-800 text-white ring-slate-800" : "bg-white text-slate-600 ring-slate-300"}`}>
-                                        {n}
-                                    </button>
-                                ))}
-                            </div>
-                            <iframe title="Signature preview" sandbox="" srcDoc={sigDoc(`<style>html,body{background:${back}}</style><div style="margin-bottom:8px;color:${back === "#1f1f1f" ? "#e8e8e8" : "#333"}">Hello, this is a sample mail.</div>${scaleHtml(data.signature_bg === "box" ? boxHtml(shown, data.signature_bg_color, data.signature_bg_padding, data.signature_bg_radius) : data.signature_bg === "none" ? seeThroughHtml(shown) : shown, data.signature_scale)}`)} className="h-56 w-full rounded-b-lg" style={{ background: back }} />
-                        </div>
+                    {hadPasted && (
+                        <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                            This mailbox still has the signature pasted earlier (from zoviz). Fill the designer below - when you Save, the new signature takes its place.
+                        </p>
                     )}
+                    <SignatureDesigner design={data.signature_design} onChange={(v) => set("signature_design", v)} />
+                    {error && <span className="block text-xs text-red-600">{error}</span>}
                 </>
             )}
         </div>
@@ -266,20 +69,15 @@ function SignatureBox({ data, set, error }) {
 }
 
 function AccountForm({ people, account = null, onDone, preset = null }) {
-    const errors = usePage().props.errors ?? {};
+    const { errors = {}, brandLogo = "" } = usePage().props;
+    const [needName, alertName] = useState(false);
     const [data, setData] = useState({
         address: "",
         display_name: account?.display_name ?? "",
         password: "",
         signature: account?.signature ?? "",
-        signature_html: account?.signature_html ?? "",
-        sig_mode: account?.signature_html ? "html" : "text",
-        signature_scale: account?.signature_scale ?? 100,
-        signature_transparent: account?.signature_transparent ?? false,
-        signature_bg: account?.signature_bg ?? "box",
-        signature_bg_color: account?.signature_bg_color ?? "#ffffff",
-        signature_bg_padding: account?.signature_bg_padding ?? 12,
-        signature_bg_radius: account?.signature_bg_radius ?? 8,
+        sig_mode: account?.signature_design || account?.signature_html ? "design" : "text",
+        signature_design: account?.signature_design ? { ...defaultDesign(account, brandLogo), ...account.signature_design } : defaultDesign({ address: account?.address ?? "" }, brandLogo),
         status: account?.status ?? "active",
         user_ids: account?.user_ids ?? preset?.user_ids ?? [],
         is_private: account?.is_private ?? preset?.is_private ?? false,
@@ -291,10 +89,17 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
     const save = async () => {
         if (busy) return;
         setBusy(true);
-        /* W104: pictures without a size get their real size, so the Size setting works on them too */
-        const code = data.sig_mode === "html" ? await fixPictureSizes(data.signature_html) : "";
-        const sig = { signature: data.signature, signature_html: code, signature_scale: data.signature_scale, signature_transparent: data.signature_bg === "none" ? 1 : 0, signature_bg: data.signature_bg, signature_bg_color: data.signature_bg_color, signature_bg_padding: data.signature_bg_padding, signature_bg_radius: data.signature_bg_radius };
-        const { sig_mode, ...rest } = data;
+        /* W108: the designer makes the HTML; the text one clears it */
+        const design = data.sig_mode === "design";
+        if (design && !String(data.signature_design.name || "").trim()) {
+            setBusy(false);
+            alertName(true);
+            return;
+        }
+        const sig = design
+            ? { signature: data.signature, signature_html: renderSignature(data.signature_design), signature_design: data.signature_design }
+            : { signature: data.signature, signature_html: "", signature_design: "" };
+        const { sig_mode, signature_design, ...rest } = data;
         const payload = account ? { display_name: data.display_name, password: data.password || null, ...sig, status: data.status, user_ids: data.user_ids, is_private: data.is_private, aliases: data.aliases.filter((a) => a.address?.trim()) } : { ...rest, ...sig, aliases: data.aliases.filter((a) => a.address?.trim()) };
         router.post(account ? `/admin/mail-accounts/${account.id}` : "/admin/mail-accounts", payload, { preserveScroll: true, onSuccess: onDone, onFinish: () => setBusy(false) });
     };
@@ -370,7 +175,7 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
                     <span className="block text-xs text-slate-500">Only the people ticked above can open it. Other Super Admins cannot see it. Use this for your own mail.</span>
                 </span>
             </label>
-            <SignatureBox data={data} set={set} error={errors.signature_html} />
+            <SignatureBox data={data} set={set} error={(needName && data.sig_mode === "design" && !String(data.signature_design.name || "").trim() ? "Write the full name in the designer (1. Details)." : null) || errors.signature_html || errors.signature_design} hadPasted={Boolean(account?.signature_html && !account?.signature_design)} />
             {account && (
                 <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={data.status === "disabled"} onChange={(e) => set("status", e.target.checked ? "disabled" : "active")} /> Switch off (not read, not shown)

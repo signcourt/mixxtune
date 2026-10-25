@@ -599,4 +599,34 @@ class PanelMailTest extends TestCase
         $this->assertFileExists(public_path('images/mixx-tune-mail-logo.png'));
         $this->assertStringContainsString('/images/mixx-tune-mail-logo.png', $a->fresh()->signature_html);
     }
+    /* W108: a signature made in the designer is kept with its settings and sent exactly as made */
+    public function test_signature_made_in_the_designer(): void
+    {
+        $super = $this->user('super_admin');
+        $mine = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'kapil@mixxtune.com', 'username' => 'kapil@mixxtune.com', 'password' => 'x', 'status' => 'active', 'signature_scale' => 60]);
+        $a->users()->sync([$mine->id]);
+        $design = ['name' => 'Kapil Koli', 'title' => 'Operations Manager', 'company' => 'Mixx Tune Entertainments', 'logo_url' => 'https://www.mixxtune.com/images/mixx-tune-mail-logo.png', 'logo_width' => 125, 'font' => 'Arial', 'socials' => ['instagram' => 'instagram.com/mixxtune']];
+        $html = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-radius:8px;border-collapse:separate"><tr><td style="padding:12px">'
+            .'<table role="presentation" style="font-family:Arial, Helvetica, sans-serif"><tr><td style="vertical-align:top;padding-right:14px"><img src="https://www.mixxtune.com/images/mixx-tune-mail-logo.png" width="125" height="100" alt="Mixx Tune Entertainments"></td>'
+            .'<td style="vertical-align:top"><div style="font-size:20px;font-weight:bold;color:#111111">Kapil Koli</div><div style="font-size:14px;color:#111111">Operations Manager, Mixx Tune Entertainments</div></td></tr></table></td></tr></table>';
+
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_design' => 'not a list', 'signature_html' => $html])->assertSessionHasErrors('signature_design');
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_design' => $design, 'signature_html' => $html])->assertSessionHasNoErrors();
+        $f = $a->fresh();
+        $this->assertSame('Kapil Koli', $f->signature_design['name']);
+        $this->assertSame(['pasted', 100, false], [$f->signature_bg, $f->signature_scale, $f->signature_transparent], 'made in the designer = sent as made');
+        $this->actingAs($super)->get('/admin/mail-accounts')->assertInertia(fn (Assert $p) => $p->where('accounts.0.signature_design.title', 'Operations Manager')->where('brandLogo', fn ($u) => str_ends_with((string) $u, '/images/mixx-tune-mail-logo.png')));
+
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'subject' => 'Hi', 'body' => 'Hi'])->assertSessionHasNoErrors();
+        $dec = quoted_printable_decode(FakeTransport::$sent[0]);
+        $this->assertStringContainsString('width="125" height="100"', $dec);
+        $this->assertStringContainsString('font-size:20px', $dec);
+        $this->assertSame(1, substr_count($dec, 'role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor'), 'no second box around it');
+
+        /* back to simple text: the designer settings and the HTML go */
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature' => 'Regards', 'signature_html' => '', 'signature_design' => ''])->assertSessionHasNoErrors();
+        $this->assertNull($a->fresh()->signature_design);
+        $this->assertNull($a->fresh()->signature_html);
+    }
 }
