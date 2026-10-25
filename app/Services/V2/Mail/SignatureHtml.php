@@ -136,6 +136,76 @@ class SignatureHtml
         return trim($out);
     }
 
+    /*
+     * W105: remove white backgrounds (style background / background-colour, bgcolor) so the
+     * signature shows on the receiver's own mailbox colour. Coloured parts stay as they are.
+     */
+    public static function seeThrough(?string $html): ?string
+    {
+        $html = trim((string) $html);
+        if ($html === '' || !preg_match('/background|bgcolor/i', $html)) {
+            return $html === '' ? null : $html;
+        }
+        $white = '(?:#fff(?:fff)?(?![0-9a-f])|\bwhite\b|rgba?\(\s*255\s*,\s*255\s*,\s*255\s*(?:,\s*[\d.]+\s*)?\))';
+        $doc = new DOMDocument('1.0', 'UTF-8');
+        $old = libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="UTF-8"><!DOCTYPE html><html><body><div id="mxsig">'.$html.'</div></body></html>', LIBXML_NONET | LIBXML_HTML_NODEFDTD | LIBXML_PARSEHUGE);
+        libxml_clear_errors();
+        libxml_use_internal_errors($old);
+        $root = $doc->getElementById('mxsig');
+        if (!$root) {
+            return $html;
+        }
+        foreach (iterator_to_array((new DOMXPath($doc))->query('.//*', $root)) as $el) {
+            /** @var DOMElement $el */
+            if (preg_match('/^\s*'.$white.'\s*$/i', $el->getAttribute('bgcolor'))) {
+                $el->removeAttribute('bgcolor');
+            }
+            if (!$el->hasAttribute('style')) {
+                continue;
+            }
+            $keep = [];
+            foreach (explode(';', $el->getAttribute('style')) as $decl) {
+                if (!str_contains($decl, ':')) {
+                    if (trim($decl) !== '') {
+                        $keep[] = trim($decl);
+                    }
+                    continue;
+                }
+                [$prop, $val] = array_map('trim', explode(':', $decl, 2));
+                $p = strtolower($prop);
+                if ($p === 'background-color' && preg_match('/^'.$white.'(\s*!important)?$/i', $val)) {
+                    continue;
+                }
+                if ($p === 'background') {
+                    $val = trim(preg_replace('/'.$white.'/i', 'transparent', $val));
+                    if (preg_match('/^transparent(\s*!important)?$/i', $val)) {
+                        continue;
+                    }
+                }
+                $keep[] = $prop.':'.$val;
+            }
+            $keep === [] ? $el->removeAttribute('style') : $el->setAttribute('style', implode(';', $keep));
+        }
+        $out = '';
+        foreach ($root->childNodes as $n) {
+            $out .= $doc->saveHTML($n);
+        }
+
+        return trim($out);
+    }
+
+    /* W105: the signature as it goes out - cleaned, white background removed if asked, at the chosen size */
+    public static function forSending(?string $html, ?int $percent, bool $seeThrough = false): ?string
+    {
+        $h = self::clean($html);
+        if ($h && $seeThrough) {
+            $h = self::seeThrough($h);
+        }
+
+        return self::scale($h, $percent);
+    }
+
     public static function text(?string $html): string
     {
         $s = (string) $html;

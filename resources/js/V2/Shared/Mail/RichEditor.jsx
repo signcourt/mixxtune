@@ -360,3 +360,36 @@ export async function fixPictureSizes(html) {
     );
     return root.innerHTML;
 }
+
+/* W105: the same white-background removal the server does (coloured parts stay) */
+const WHITE = "(?:#fff(?:fff)?(?![0-9a-f])|\\bwhite\\b|rgba?\\(\\s*255\\s*,\\s*255\\s*,\\s*255\\s*(?:,\\s*[\\d.]+\\s*)?\\))";
+export function seeThroughHtml(html) {
+    if (!html || !/background|bgcolor/i.test(html)) return html || "";
+    const doc = new DOMParser().parseFromString(`<div id="mxsig">${html}</div>`, "text/html");
+    const root = doc.getElementById("mxsig");
+    root.querySelectorAll("*").forEach((el) => {
+        if (new RegExp(`^\\s*${WHITE}\\s*$`, "i").test(el.getAttribute("bgcolor") || "")) el.removeAttribute("bgcolor");
+        const st = el.getAttribute("style");
+        if (!st) return;
+        const keep = [];
+        st.split(";").forEach((d) => {
+            const i = d.indexOf(":");
+            if (i < 0) {
+                if (d.trim()) keep.push(d.trim());
+                return;
+            }
+            const prop = d.slice(0, i).trim();
+            let val = d.slice(i + 1).trim();
+            const p = prop.toLowerCase();
+            if (p === "background-color" && new RegExp(`^${WHITE}(\\s*!important)?$`, "i").test(val)) return;
+            if (p === "background") {
+                val = val.replace(new RegExp(WHITE, "gi"), "transparent").trim();
+                if (/^transparent(\s*!important)?$/i.test(val)) return;
+            }
+            keep.push(`${prop}:${val}`);
+        });
+        if (keep.length) el.setAttribute("style", keep.join(";"));
+        else el.removeAttribute("style");
+    });
+    return root.innerHTML;
+}

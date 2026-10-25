@@ -129,7 +129,7 @@ class MailController extends Controller
                 'mine' => $mine->contains((int) $a->id),
                 'from' => $a->fromAddresses(),
                 'signature' => $a->signature,
-                'signature_html' => SignatureHtml::scale($a->signature_html, $a->signature_scale),
+                'signature_html' => SignatureHtml::forSending($a->signature_html, $a->signature_scale, (bool) $a->signature_transparent),
                 'is_private' => (bool) $a->is_private,
                 'unread' => MailMessage::query()->where('mail_account_id', $a->id)->where('folder', 'inbox')->where('seen', false)->count(),
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),

@@ -74,6 +74,7 @@ class MailAccountController extends Controller
                 'signature' => $a->signature,
                 'signature_html' => $a->signature_html,
                 'signature_scale' => (int) ($a->signature_scale ?: 100),
+                'signature_transparent' => (bool) $a->signature_transparent,
                 'aliases' => array_values((array) ($a->aliases ?? [])),
                 'status' => $a->status,
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),
@@ -99,6 +100,7 @@ class MailAccountController extends Controller
             'signature' => ['nullable', 'string', 'max:2000'],
             'signature_html' => ['nullable', 'string', 'max:200000'],
             'signature_scale' => ['nullable', 'integer', 'between:30,150'],
+            'signature_transparent' => ['nullable', 'boolean'],
             'status' => ['nullable', Rule::in(['active', 'disabled'])],
             'is_private' => ['nullable', 'boolean'],
             'aliases' => ['nullable', 'array', 'max:20'],
@@ -144,6 +146,7 @@ class MailAccountController extends Controller
             'signature' => $data['signature'] ?? null,
             'signature_html' => SignatureHtml::clean($data['signature_html'] ?? null),
             'signature_scale' => (int) ($data['signature_scale'] ?? 100),
+            'signature_transparent' => (bool) ($data['signature_transparent'] ?? false),
             'status' => 'active',
             'is_private' => (bool) ($data['is_private'] ?? false),
             'aliases' => $this->aliases($data['aliases'] ?? [], $address),
@@ -185,6 +188,9 @@ class MailAccountController extends Controller
         }
         if (array_key_exists('signature_scale', $data) && $data['signature_scale'] !== null) {
             $account->signature_scale = (int) $data['signature_scale'];
+        }
+        if (array_key_exists('signature_transparent', $data) && $data['signature_transparent'] !== null) {
+            $account->signature_transparent = (bool) $data['signature_transparent'];
         }
         $account->is_private = $privateAfter;
         if (array_key_exists('aliases', $data)) {

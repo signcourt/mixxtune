@@ -490,4 +490,32 @@ class PanelMailTest extends TestCase
         $this->actingAs($mine)->get("/mail?account={$a->id}&m={$m->id}")->assertInertia(fn (Assert $p) => $p
             ->where('open.html', fn ($h) => str_contains((string) $h, '<b>Bold news</b>') && !str_contains((string) $h, 'script') && !str_contains((string) $h, 'cid:')));
     }
+    /* W105: "See-through background" removes only the white backgrounds of the signature */
+    public function test_signature_see_through_background(): void
+    {
+        $super = $this->user('super_admin');
+        $mine = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'contact@mixxtune.com', 'display_name' => 'Mixx Tune', 'username' => 'contact@mixxtune.com', 'password' => 'x', 'status' => 'active', 'sent_folder' => 'INBOX.Sent']);
+        $a->users()->sync([$mine->id]);
+        $code = '<table bgcolor="#FFFFFF" style="background-color:#ffffff;width:400px"><tr><td style="background:white;color:#111">Kapil</td>'
+            .'<td bgcolor="#4f4bdc" style="background: rgb(255, 255, 255) url(https://mixxtune.com/bg.png) no-repeat">x</td>'
+            .'<td style="background-color:#4f4bdc;color:#fff">mixx tune</td><td style="background:#fff000">y</td></tr></table>';
+
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code])->assertSessionHasNoErrors();
+        $this->assertFalse($a->fresh()->signature_transparent);
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'subject' => 'One', 'body' => 'Hi'])->assertSessionHasNoErrors();
+        $this->assertStringContainsString('background-color:#ffffff', quoted_printable_decode(FakeTransport::$sent[0]), 'off: nothing changes');
+
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_transparent' => '1'])->assertSessionHasNoErrors();
+        $this->assertTrue($a->fresh()->signature_transparent);
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'subject' => 'Two', 'body' => 'Hi'])->assertSessionHasNoErrors();
+        $dec = quoted_printable_decode(FakeTransport::$sent[1]);
+        foreach (['bgcolor="#FFFFFF"', 'background-color:#ffffff', 'background:white', 'rgb(255, 255, 255)'] as $gone) {
+            $this->assertStringNotContainsString($gone, $dec);
+        }
+        foreach (['width:400px', 'color:#111', 'bgcolor="#4f4bdc"', 'background:transparent url(https://mixxtune.com/bg.png) no-repeat', 'background-color:#4f4bdc', 'color:#fff', 'background:#fff000'] as $kept) {
+            $this->assertStringContainsString($kept, $dec);
+        }
+        $this->assertStringContainsString('#FFFFFF', (string) $a->fresh()->signature_html, 'the pasted code itself is kept');
+    }
 }

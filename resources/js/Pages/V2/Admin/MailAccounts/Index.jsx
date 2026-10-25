@@ -3,7 +3,7 @@ import { CheckCircle2, Lock, Mail, Plus, RefreshCw, Trash2, UserRound } from "lu
 import { useEffect, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
-import { fixPictureSizes, scaleHtml } from "@/V2/Shared/Mail/RichEditor";
+import { fixPictureSizes, scaleHtml, seeThroughHtml } from "@/V2/Shared/Mail/RichEditor";
 
 /*
  * W95 MIXXTUNE_PANEL_MAIL
@@ -36,6 +36,7 @@ export const sigDoc = (html) => `<!doctype html><html><head><meta charset="utf-8
 
 function SignatureBox({ data, set, error }) {
     /* W104: the preview uses the picture sizes too (looked up once the code stops changing) */
+    const [back, setBack] = useState("#eef0f4");
     const [shown, setShown] = useState(data.signature_html);
     useEffect(() => {
         let live = true;
@@ -88,8 +89,27 @@ function SignatureBox({ data, set, error }) {
                                     </button>
                                 ))}
                             </div>
-                            <div className="border-b border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-500">Preview - this is how receivers see it (any mail app)</div>
-                            <iframe title="Signature preview" sandbox="" srcDoc={sigDoc(`<div style="margin-bottom:8px;color:#333">Hello, this is a sample mail.</div>${scaleHtml(shown, data.signature_scale)}`)} className="h-56 w-full rounded-b-lg bg-white" />
+                            {/* W105: no white behind the signature - the receiver's own mailbox colour shows */}
+                            <label className="flex cursor-pointer items-start gap-2 border-b border-slate-200 px-3 py-2">
+                                <input type="checkbox" className="mt-0.5" checked={data.signature_transparent} onChange={(e) => set("signature_transparent", e.target.checked)} />
+                                <span className="text-xs">
+                                    <b className="font-semibold text-slate-800">See-through background</b>
+                                    <span className="block text-[11px] text-slate-500">Removes the white background of the signature, so it takes the colour of the receiver's mailbox (also dark mode). Coloured boxes stay. A white box inside the logo picture itself cannot be removed here - use a logo PNG with a see-through background.</span>
+                                </span>
+                            </label>
+                            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-1">
+                                <span className="text-[11px] font-semibold text-slate-500">Preview - this is how receivers see it, on a mailbox that is</span>
+                                {[
+                                    ["White", "#ffffff", "#333333"],
+                                    ["Grey", "#eef0f4", "#333333"],
+                                    ["Dark", "#1f1f1f", "#e8e8e8"],
+                                ].map(([n, bg]) => (
+                                    <button key={n} type="button" onClick={() => setBack(bg)} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${back === bg ? "bg-slate-800 text-white ring-slate-800" : "bg-white text-slate-600 ring-slate-300"}`}>
+                                        {n}
+                                    </button>
+                                ))}
+                            </div>
+                            <iframe title="Signature preview" sandbox="" srcDoc={sigDoc(`<style>html,body{background:${back}}</style><div style="margin-bottom:8px;color:${back === "#1f1f1f" ? "#e8e8e8" : "#333"}">Hello, this is a sample mail.</div>${scaleHtml(data.signature_transparent ? seeThroughHtml(shown) : shown, data.signature_scale)}`)} className="h-56 w-full rounded-b-lg" style={{ background: back }} />
                         </div>
                     )}
                 </>
@@ -108,6 +128,7 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
         signature_html: account?.signature_html ?? "",
         sig_mode: account?.signature_html ? "html" : "text",
         signature_scale: account?.signature_scale ?? 100,
+        signature_transparent: account?.signature_transparent ?? false,
         status: account?.status ?? "active",
         user_ids: account?.user_ids ?? preset?.user_ids ?? [],
         is_private: account?.is_private ?? preset?.is_private ?? false,
@@ -121,7 +142,7 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
         setBusy(true);
         /* W104: pictures without a size get their real size, so the Size setting works on them too */
         const code = data.sig_mode === "html" ? await fixPictureSizes(data.signature_html) : "";
-        const sig = { signature: data.signature, signature_html: code, signature_scale: data.signature_scale };
+        const sig = { signature: data.signature, signature_html: code, signature_scale: data.signature_scale, signature_transparent: data.signature_transparent ? 1 : 0 };
         const { sig_mode, ...rest } = data;
         const payload = account ? { display_name: data.display_name, password: data.password || null, ...sig, status: data.status, user_ids: data.user_ids, is_private: data.is_private, aliases: data.aliases.filter((a) => a.address?.trim()) } : { ...rest, ...sig, aliases: data.aliases.filter((a) => a.address?.trim()) };
         router.post(account ? `/admin/mail-accounts/${account.id}` : "/admin/mail-accounts", payload, { preserveScroll: true, onSuccess: onDone, onFinish: () => setBusy(false) });
