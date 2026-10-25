@@ -75,6 +75,10 @@ class MailAccountController extends Controller
                 'signature_html' => $a->signature_html,
                 'signature_scale' => (int) ($a->signature_scale ?: 100),
                 'signature_transparent' => (bool) $a->signature_transparent,
+                'signature_bg' => $a->signature_bg ?: 'box',
+                'signature_bg_color' => $a->signature_bg_color ?: '#ffffff',
+                'signature_bg_padding' => (int) ($a->signature_bg_padding ?? 12),
+                'signature_bg_radius' => (int) ($a->signature_bg_radius ?? 8),
                 'aliases' => array_values((array) ($a->aliases ?? [])),
                 'status' => $a->status,
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),
@@ -101,6 +105,10 @@ class MailAccountController extends Controller
             'signature_html' => ['nullable', 'string', 'max:200000'],
             'signature_scale' => ['nullable', 'integer', 'between:30,150'],
             'signature_transparent' => ['nullable', 'boolean'],
+            'signature_bg' => ['nullable', Rule::in(['pasted', 'none', 'box'])],
+            'signature_bg_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'signature_bg_padding' => ['nullable', 'integer', 'between:0,40'],
+            'signature_bg_radius' => ['nullable', 'integer', 'between:0,30'],
             'status' => ['nullable', Rule::in(['active', 'disabled'])],
             'is_private' => ['nullable', 'boolean'],
             'aliases' => ['nullable', 'array', 'max:20'],
@@ -147,6 +155,10 @@ class MailAccountController extends Controller
             'signature_html' => SignatureHtml::clean($data['signature_html'] ?? null),
             'signature_scale' => (int) ($data['signature_scale'] ?? 100),
             'signature_transparent' => (bool) ($data['signature_transparent'] ?? false),
+            'signature_bg' => $data['signature_bg'] ?? 'box',
+            'signature_bg_color' => strtolower($data['signature_bg_color'] ?? '#ffffff'),
+            'signature_bg_padding' => (int) ($data['signature_bg_padding'] ?? 12),
+            'signature_bg_radius' => (int) ($data['signature_bg_radius'] ?? 8),
             'status' => 'active',
             'is_private' => (bool) ($data['is_private'] ?? false),
             'aliases' => $this->aliases($data['aliases'] ?? [], $address),
@@ -191,6 +203,11 @@ class MailAccountController extends Controller
         }
         if (array_key_exists('signature_transparent', $data) && $data['signature_transparent'] !== null) {
             $account->signature_transparent = (bool) $data['signature_transparent'];
+        }
+        foreach (['signature_bg', 'signature_bg_color', 'signature_bg_padding', 'signature_bg_radius'] as $k) {
+            if (array_key_exists($k, $data) && $data[$k] !== null) {
+                $account->{$k} = $k === 'signature_bg_color' ? strtolower($data[$k]) : $data[$k];
+            }
         }
         $account->is_private = $privateAfter;
         if (array_key_exists('aliases', $data)) {

@@ -401,7 +401,7 @@ class PanelMailTest extends TestCase
             .'<tr><td>Contact@mixxtune.com<br>+1 (123) 456-7890</td></tr>'
             .'<tr><td style="background:#4f4bdc" onclick="steal()"><img src="https://mixxtune.com/logo.png" alt="mixx tune" onerror="x()"> '
             .'<a href="https://www.mixxtune.com">www.mixxtune.com</a> <a href="javascript:alert(1)">bad</a></td></tr></table><script>alert(1)</script>';
-        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature' => 'old text', 'signature_html' => $code])->assertSessionHasNoErrors();
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature' => 'old text', 'signature_html' => $code, 'signature_bg' => 'pasted'])->assertSessionHasNoErrors();
         $saved = (string) $a->fresh()->signature_html;
         $this->assertStringContainsString('Your Name Here', $saved);
         $this->assertStringContainsString('https://mixxtune.com/logo.png', $saved);
@@ -472,7 +472,7 @@ class PanelMailTest extends TestCase
         $code = '<table cellpadding="10"><tr><td style="font-size:20px;padding:12px 8px"><img src="https://mixxtune.com/logo.png" width="200" height="100" style="width:200px;border-radius:9px"></td><td style="font-size: 14pt; width: 50%">Kapil Koli</td></tr></table>';
 
         $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code, 'signature_scale' => 20])->assertSessionHasErrors('signature_scale');
-        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code, 'signature_scale' => 50])->assertSessionHasNoErrors();
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code, 'signature_scale' => 50, 'signature_bg' => 'pasted'])->assertSessionHasNoErrors();
         $this->assertSame(50, $a->fresh()->signature_scale);
         $this->assertStringContainsString('width="200"', (string) $a->fresh()->signature_html, 'the pasted code is kept as it is');
 
@@ -501,7 +501,7 @@ class PanelMailTest extends TestCase
             .'<td bgcolor="#4f4bdc" style="background: rgb(255, 255, 255) url(https://mixxtune.com/bg.png) no-repeat">x</td>'
             .'<td style="background-color:#4f4bdc;color:#fff">mixx tune</td><td style="background:#fff000">y</td></tr></table>';
 
-        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code])->assertSessionHasNoErrors();
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code, 'signature_bg' => 'pasted'])->assertSessionHasNoErrors();
         $this->assertFalse($a->fresh()->signature_transparent);
         $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'subject' => 'One', 'body' => 'Hi'])->assertSessionHasNoErrors();
         $this->assertStringContainsString('background-color:#ffffff', quoted_printable_decode(FakeTransport::$sent[0]), 'off: nothing changes');
@@ -517,5 +517,43 @@ class PanelMailTest extends TestCase
             $this->assertStringContainsString($kept, $dec);
         }
         $this->assertStringContainsString('#FFFFFF', (string) $a->fresh()->signature_html, 'the pasted code itself is kept');
+    }
+    /* W106: the white background only as big as the signature, with colour / space / corners */
+    public function test_signature_white_box_fits_the_content(): void
+    {
+        $super = $this->user('super_admin');
+        $mine = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'contact@mixxtune.com', 'display_name' => 'Mixx Tune', 'username' => 'contact@mixxtune.com', 'password' => 'x', 'status' => 'active', 'sent_folder' => 'INBOX.Sent']);
+        $a->users()->sync([$mine->id]);
+        $this->assertSame('box', $a->fresh()->signature_bg, 'every mailbox starts with the fitted white box');
+        $code = '<table width="100%" style="width:600px;background:#fff"><tr><td width="100%" style="background-color:#ffffff;color:#111"><img src="https://mixxtune.com/logo.png" width="120" height="96"> Kapil Koli</td>'
+            .'<td style="background-color:#4f4bdc;width:40%">box</td></tr></table>';
+
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code, 'signature_bg_color' => 'red'])->assertSessionHasErrors('signature_bg_color');
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code, 'signature_bg_padding' => 50])->assertSessionHasErrors('signature_bg_padding');
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code, 'signature_bg' => 'other'])->assertSessionHasErrors('signature_bg');
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_html' => $code])->assertSessionHasNoErrors();
+
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'subject' => 'Box', 'body' => 'Hi'])->assertSessionHasNoErrors();
+        $dec = quoted_printable_decode(FakeTransport::$sent[0]);
+        $this->assertStringContainsString('<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-radius:8px;border-collapse:separate"><tr><td style="padding:12px">', $dec);
+        foreach (['width="100%"', 'width:600px', 'background:#fff;', 'width:40%'] as $gone) {
+            $this->assertStringNotContainsString($gone, $dec);
+        }
+        foreach (['width="120"', 'background-color:#4f4bdc', 'color:#111', 'Kapil Koli'] as $kept) {
+            $this->assertStringContainsString($kept, $dec);
+        }
+
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_bg_color' => '#F5F5FF', 'signature_bg_padding' => 20, 'signature_bg_radius' => 0, 'signature_scale' => 50])->assertSessionHasNoErrors();
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'subject' => 'Box 2', 'body' => 'Hi'])->assertSessionHasNoErrors();
+        $dec2 = quoted_printable_decode(FakeTransport::$sent[1]);
+        $this->assertStringContainsString('bgcolor="#f5f5ff" style="background-color:#f5f5ff;border-radius:0px;border-collapse:separate"><tr><td style="padding:10px">', $dec2, 'space around follows the size too');
+        $this->assertStringContainsString('width="60"', $dec2);
+
+        $this->actingAs($super)->post("/admin/mail-accounts/{$a->id}", ['signature_bg' => 'none'])->assertSessionHasNoErrors();
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'subject' => 'None', 'body' => 'Hi'])->assertSessionHasNoErrors();
+        $dec3 = quoted_printable_decode(FakeTransport::$sent[2]);
+        $this->assertStringNotContainsString('role="presentation"', $dec3);
+        $this->assertStringNotContainsString('background-color:#ffffff', $dec3);
     }
 }

@@ -195,15 +195,106 @@ class SignatureHtml
         return trim($out);
     }
 
-    /* W105: the signature as it goes out - cleaned, white background removed if asked, at the chosen size */
-    public static function forSending(?string $html, ?int $percent, bool $seeThrough = false): ?string
+    /* W105/W106: the signature as it goes out - cleaned, background as chosen, at the chosen size */
+    public static function forSending(?string $html, ?int $percent, bool $seeThrough = false, string $bg = 'pasted', string $color = '#ffffff', int $padding = 12, int $radius = 8): ?string
     {
         $h = self::clean($html);
-        if ($h && $seeThrough) {
+        if ($h && ($bg === 'none' || ($bg === 'pasted' && $seeThrough))) {
             $h = self::seeThrough($h);
+        } elseif ($h && $bg === 'box') {
+            $h = self::box($h, $color, $padding, $radius);
         }
 
         return self::scale($h, $percent);
+    }
+
+    public static function forAccount(\App\Models\Mail\MailAccount $a): ?string
+    {
+        return self::forSending($a->signature_html, $a->signature_scale, (bool) $a->signature_transparent, (string) ($a->signature_bg ?: 'pasted'), (string) ($a->signature_bg_color ?: '#ffffff'), (int) ($a->signature_bg_padding ?? 12), (int) ($a->signature_bg_radius ?? 8));
+    }
+
+    /*
+     * W106: the white background only as big as the signature. Inner white backgrounds and
+     * "stretch" widths (100 %, the width of the outer wrapper) are removed, then the signature
+     * goes in one card (a table, which every mail app shrinks to its content) with the chosen
+     * colour, space around and round corners. Outside the card the receiver's colour shows.
+     */
+    public static function box(?string $html, string $color = '#ffffff', int $padding = 12, int $radius = 8): ?string
+    {
+        $h = self::fitWidth(self::seeThrough($html));
+        if (!$h) {
+            return null;
+        }
+        $c = preg_match('/^#[0-9a-f]{6}$/i', $color) ? strtolower($color) : '#ffffff';
+        $p = max(0, min(40, $padding));
+        $r = max(0, min(30, $radius));
+
+        return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="'.$c.'" style="background-color:'.$c.';border-radius:'.$r.'px;border-collapse:separate"><tr><td style="padding:'.$p.'px">'.$h.'</td></tr></table>';
+    }
+
+    private static function fitWidth(?string $html): ?string
+    {
+        $html = trim((string) $html);
+        if ($html === '') {
+            return null;
+        }
+        $doc = new DOMDocument('1.0', 'UTF-8');
+        $old = libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="UTF-8"><!DOCTYPE html><html><body><div id="mxsig">'.$html.'</div></body></html>', LIBXML_NONET | LIBXML_HTML_NODEFDTD | LIBXML_PARSEHUGE);
+        libxml_clear_errors();
+        libxml_use_internal_errors($old);
+        $root = $doc->getElementById('mxsig');
+        if (!$root) {
+            return $html;
+        }
+        $strip = function (DOMElement $el, bool $all): void {
+            $w = trim($el->getAttribute('width'));
+            if ($w !== '' && ($all || str_ends_with($w, '%'))) {
+                $el->removeAttribute('width');
+            }
+            if ($el->hasAttribute('style')) {
+                $keep = [];
+                foreach (explode(';', $el->getAttribute('style')) as $d) {
+                    if (trim($d) === '') {
+                        continue;
+                    }
+                    $p = strtolower(trim(strstr($d, ':', true) ?: ''));
+                    $v = trim((string) substr((string) strstr($d, ':'), 1));
+                    if (in_array($p, ['width', 'min-width'], true) && ($all || str_ends_with(trim(preg_replace('/!important$/i', '', $v)), '%'))) {
+                        continue;
+                    }
+                    $keep[] = trim($d);
+                }
+                $keep === [] ? $el->removeAttribute('style') : $el->setAttribute('style', implode(';', $keep));
+            }
+        };
+        $kids = fn (DOMElement $n): array => array_values(array_filter(iterator_to_array($n->childNodes), fn ($c) => $c instanceof DOMElement));
+        foreach (iterator_to_array((new DOMXPath($doc))->query('.//*', $root)) as $el) {
+            if (strtolower($el->nodeName) !== 'img') {
+                $strip($el, false);
+            }
+        }
+        /* the outer wrapper(s): table > tbody > tr > td ... while there is only one, any fixed width goes too */
+        $node = $root;
+        for ($depth = 0; $depth < 8; $depth++) {
+            $k = $kids($node);
+            if (count($k) !== 1 || strtolower($k[0]->nodeName) === 'img') {
+                foreach ($k as $c) {
+                    if (in_array(strtolower($c->nodeName), ['table', 'div', 'center'], true)) {
+                        $strip($c, true);
+                    }
+                }
+                break;
+            }
+            $strip($k[0], true);
+            $node = $k[0];
+        }
+        $out = '';
+        foreach ($root->childNodes as $n) {
+            $out .= $doc->saveHTML($n);
+        }
+
+        return trim($out);
     }
 
     public static function text(?string $html): string

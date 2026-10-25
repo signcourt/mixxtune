@@ -393,3 +393,45 @@ export function seeThroughHtml(html) {
     });
     return root.innerHTML;
 }
+
+/* W106: the same card the server makes - background only as big as the signature */
+export function boxHtml(html, color = "#ffffff", padding = 12, radius = 8) {
+    const h = seeThroughHtml(html);
+    if (!h) return "";
+    const doc = new DOMParser().parseFromString(`<div id="mxsig">${h}</div>`, "text/html");
+    const root = doc.getElementById("mxsig");
+    const strip = (el, all) => {
+        const w = (el.getAttribute("width") || "").trim();
+        if (w && (all || w.endsWith("%"))) el.removeAttribute("width");
+        const st = el.getAttribute("style");
+        if (st) {
+            const keep = st
+                .split(";")
+                .map((d) => d.trim())
+                .filter((d) => {
+                    if (!d) return false;
+                    const i = d.indexOf(":");
+                    const p = (i < 0 ? "" : d.slice(0, i)).trim().toLowerCase();
+                    const v = (i < 0 ? "" : d.slice(i + 1)).replace(/!important$/i, "").trim();
+                    return !((p === "width" || p === "min-width") && (all || v.endsWith("%")));
+                });
+            if (keep.length) el.setAttribute("style", keep.join(";"));
+            else el.removeAttribute("style");
+        }
+    };
+    root.querySelectorAll("*").forEach((el) => el.tagName.toLowerCase() !== "img" && strip(el, false));
+    let node = root;
+    for (let d = 0; d < 8; d++) {
+        const k = [...node.children];
+        if (k.length !== 1 || k[0].tagName.toLowerCase() === "img") {
+            k.forEach((c) => ["table", "div", "center"].includes(c.tagName.toLowerCase()) && strip(c, true));
+            break;
+        }
+        strip(k[0], true);
+        node = k[0];
+    }
+    const c = /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : "#ffffff";
+    const p = Math.max(0, Math.min(40, Number(padding) || 0));
+    const r = Math.max(0, Math.min(30, Number(radius) || 0));
+    return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="${c}" style="background-color:${c};border-radius:${r}px;border-collapse:separate"><tr><td style="padding:${p}px">${root.innerHTML}</td></tr></table>`;
+}

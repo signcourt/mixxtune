@@ -3,7 +3,7 @@ import { CheckCircle2, Lock, Mail, Plus, RefreshCw, Trash2, UserRound } from "lu
 import { useEffect, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
-import { fixPictureSizes, scaleHtml, seeThroughHtml } from "@/V2/Shared/Mail/RichEditor";
+import { boxHtml, fixPictureSizes, scaleHtml, seeThroughHtml } from "@/V2/Shared/Mail/RichEditor";
 
 /*
  * W95 MIXXTUNE_PANEL_MAIL
@@ -89,14 +89,48 @@ function SignatureBox({ data, set, error }) {
                                     </button>
                                 ))}
                             </div>
-                            {/* W105: no white behind the signature - the receiver's own mailbox colour shows */}
-                            <label className="flex cursor-pointer items-start gap-2 border-b border-slate-200 px-3 py-2">
-                                <input type="checkbox" className="mt-0.5" checked={data.signature_transparent} onChange={(e) => set("signature_transparent", e.target.checked)} />
-                                <span className="text-xs">
-                                    <b className="font-semibold text-slate-800">See-through background</b>
-                                    <span className="block text-[11px] text-slate-500">Removes the white background of the signature, so it takes the colour of the receiver's mailbox (also dark mode). Coloured boxes stay. A white box inside the logo picture itself cannot be removed here - use a logo PNG with a see-through background.</span>
-                                </span>
-                            </label>
+                            {/* W106: the background behind the signature (W105 see-through is the "None" choice) */}
+                            <div className="space-y-2 border-b border-slate-200 px-3 py-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-[11px] font-semibold text-slate-600">Background</span>
+                                    {[
+                                        ["box", "White box - only as big as the signature"],
+                                        ["none", "None (see-through)"],
+                                        ["pasted", "As in the code"],
+                                    ].map(([v, n]) => (
+                                        <button key={v} type="button" onClick={() => set("signature_bg", v)} className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${data.signature_bg === v ? "bg-violet-600 text-white ring-violet-600" : "bg-white text-slate-600 ring-slate-300 hover:bg-slate-100"}`}>
+                                            {n}
+                                        </button>
+                                    ))}
+                                </div>
+                                {data.signature_bg === "box" && (
+                                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                                        <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                                            Colour
+                                            <input type="color" value={data.signature_bg_color} onChange={(e) => set("signature_bg_color", e.target.value)} className="h-7 w-9 cursor-pointer rounded border border-slate-300 bg-white p-0.5" aria-label="Box colour" />
+                                            <button type="button" onClick={() => set("signature_bg_color", "#ffffff")} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-300">White</button>
+                                        </label>
+                                        <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                                            Space around
+                                            <input type="range" min={0} max={40} step={1} value={data.signature_bg_padding} onChange={(e) => set("signature_bg_padding", Number(e.target.value))} aria-label="Space around" className="w-28 accent-violet-600" />
+                                            <span className="w-9 text-violet-700">{data.signature_bg_padding}px</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                                            Round corners
+                                            <input type="range" min={0} max={30} step={1} value={data.signature_bg_radius} onChange={(e) => set("signature_bg_radius", Number(e.target.value))} aria-label="Round corners" className="w-24 accent-violet-600" />
+                                            <span className="w-9 text-violet-700">{data.signature_bg_radius}px</span>
+                                        </label>
+                                    </div>
+                                )}
+                                <p className="text-[11px] text-slate-500">
+                                    {data.signature_bg === "box"
+                                        ? "The white is only behind the name, logo and details; around it the receiver's own mailbox colour shows. Extra white from the code is removed."
+                                        : data.signature_bg === "none"
+                                          ? "No background at all - the signature sits on the receiver's mailbox colour (dark text can be hard to read in dark mode)."
+                                          : "Sent exactly as in the pasted code."}{" "}
+                                    A white box inside the logo picture itself cannot be removed here.
+                                </p>
+                            </div>
                             <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-1">
                                 <span className="text-[11px] font-semibold text-slate-500">Preview - this is how receivers see it, on a mailbox that is</span>
                                 {[
@@ -109,7 +143,7 @@ function SignatureBox({ data, set, error }) {
                                     </button>
                                 ))}
                             </div>
-                            <iframe title="Signature preview" sandbox="" srcDoc={sigDoc(`<style>html,body{background:${back}}</style><div style="margin-bottom:8px;color:${back === "#1f1f1f" ? "#e8e8e8" : "#333"}">Hello, this is a sample mail.</div>${scaleHtml(data.signature_transparent ? seeThroughHtml(shown) : shown, data.signature_scale)}`)} className="h-56 w-full rounded-b-lg" style={{ background: back }} />
+                            <iframe title="Signature preview" sandbox="" srcDoc={sigDoc(`<style>html,body{background:${back}}</style><div style="margin-bottom:8px;color:${back === "#1f1f1f" ? "#e8e8e8" : "#333"}">Hello, this is a sample mail.</div>${scaleHtml(data.signature_bg === "box" ? boxHtml(shown, data.signature_bg_color, data.signature_bg_padding, data.signature_bg_radius) : data.signature_bg === "none" ? seeThroughHtml(shown) : shown, data.signature_scale)}`)} className="h-56 w-full rounded-b-lg" style={{ background: back }} />
                         </div>
                     )}
                 </>
@@ -129,6 +163,10 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
         sig_mode: account?.signature_html ? "html" : "text",
         signature_scale: account?.signature_scale ?? 100,
         signature_transparent: account?.signature_transparent ?? false,
+        signature_bg: account?.signature_bg ?? "box",
+        signature_bg_color: account?.signature_bg_color ?? "#ffffff",
+        signature_bg_padding: account?.signature_bg_padding ?? 12,
+        signature_bg_radius: account?.signature_bg_radius ?? 8,
         status: account?.status ?? "active",
         user_ids: account?.user_ids ?? preset?.user_ids ?? [],
         is_private: account?.is_private ?? preset?.is_private ?? false,
@@ -142,7 +180,7 @@ function AccountForm({ people, account = null, onDone, preset = null }) {
         setBusy(true);
         /* W104: pictures without a size get their real size, so the Size setting works on them too */
         const code = data.sig_mode === "html" ? await fixPictureSizes(data.signature_html) : "";
-        const sig = { signature: data.signature, signature_html: code, signature_scale: data.signature_scale, signature_transparent: data.signature_transparent ? 1 : 0 };
+        const sig = { signature: data.signature, signature_html: code, signature_scale: data.signature_scale, signature_transparent: data.signature_bg === "none" ? 1 : 0, signature_bg: data.signature_bg, signature_bg_color: data.signature_bg_color, signature_bg_padding: data.signature_bg_padding, signature_bg_radius: data.signature_bg_radius };
         const { sig_mode, ...rest } = data;
         const payload = account ? { display_name: data.display_name, password: data.password || null, ...sig, status: data.status, user_ids: data.user_ids, is_private: data.is_private, aliases: data.aliases.filter((a) => a.address?.trim()) } : { ...rest, ...sig, aliases: data.aliases.filter((a) => a.address?.trim()) };
         router.post(account ? `/admin/mail-accounts/${account.id}` : "/admin/mail-accounts", payload, { preserveScroll: true, onSuccess: onDone, onFinish: () => setBusy(false) });
