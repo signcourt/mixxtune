@@ -90,11 +90,15 @@ export default function Show({
     };
     const [selected, setSelected] = useState([]);
 
-    const [bulkStatus, setBulkStatus] = useState("processing");
-
+    /*
+     * W99 MIXXTUNE_DELIVERY_BULK: tick stores (or use the quick picks), then one button per action.
+     * Each action is sent only for the ticked stores that can take it; the rest are left as they are
+     * (for example "Mark Delivered" on 20 ticked stores of which 2 are already delivered changes 18).
+     */
+    const [bulk, setBulk] = useState(null);
     const [bulkNote, setBulkNote] = useState("");
-
     const [bulkError, setBulkError] = useState("");
+    const [bulkRef, setBulkRef] = useState("");
 
     const [processing, setProcessing] = useState(false);
 
@@ -106,37 +110,34 @@ export default function Show({
         [deliveries, selected],
     );
 
-    const availableBulkStatuses = useMemo(() => {
-        if (selectedDeliveries.length === 0) {
-            return [];
-        }
+    /* every action at least one ticked store can take, with the stores that can take it */
+    const bulkOptions = useMemo(() => {
+        const order = ["processing", "delivered", "live", "takedown_requested", "taken_down", "failed"];
 
-        const [first, ...rest] = selectedDeliveries;
-
-        const firstActions = transitionMap[first.status] ?? [];
-
-        return firstActions.filter((status) =>
-            rest.every((delivery) =>
-                (transitionMap[delivery.status] ?? []).includes(status),
-            ),
-        );
+        return order
+            .map((status) => ({
+                status,
+                ids: selectedDeliveries.filter((d) => (transitionMap[d.status] ?? []).includes(status)).map((d) => d.id),
+            }))
+            .filter((o) => o.ids.length > 0);
     }, [selectedDeliveries]);
 
-    const hasValidBulkAction = availableBulkStatuses.length > 0;
+    const countBy = useMemo(() => {
+        const c = {};
+        deliveries.forEach((d) => {
+            c[d.status] = (c[d.status] ?? 0) + 1;
+        });
+        return c;
+    }, [deliveries]);
 
-    useEffect(() => {
-        if (availableBulkStatuses.length === 0) {
-            if (bulkStatus !== "") {
-                setBulkStatus("");
-            }
+    const pickStatus = (status) => setSelected(deliveries.filter((d) => d.status === status).map((d) => d.id));
 
-            return;
-        }
-
-        if (!availableBulkStatuses.includes(bulkStatus)) {
-            setBulkStatus(availableBulkStatuses[0]);
-        }
-    }, [availableBulkStatuses, bulkStatus]);
+    const openBulk = (option) => {
+        setBulkNote("");
+        setBulkError("");
+        setBulkRef("");
+        setBulk(option);
+    };
 
     const toggleAll = () => {
         setSelected(allSelected ? [] : deliveries.map((item) => item.id));
@@ -151,7 +152,7 @@ export default function Show({
     };
 
     const bulkUpdate = () => {
-        if (selected.length === 0) {
+        if (!bulk || bulk.ids.length === 0) {
             return;
         }
 
@@ -160,21 +161,20 @@ export default function Show({
         router.patch(
             `/admin/distribution/${release.id}/bulk`,
             {
-                delivery_ids: selected,
-
-                status: bulkStatus,
-
-                delivery_note: bulkNote,
-
-                error_message: bulkStatus === "failed" ? bulkError : null,
+                delivery_ids: bulk.ids,
+                status: bulk.status,
+                delivery_note: bulkNote.trim() || null,
+                error_message: bulk.status === "failed" ? bulkError.trim() : null,
+                external_reference: bulkRef.trim() || null,
             },
             {
                 preserveScroll: true,
 
-                onSuccess: () => {
-                    setSelected([]);
-                    setBulkNote("");
-                    setBulkError("");
+                onSuccess: (page) => {
+                    if (!page.props?.errors || Object.keys(page.props.errors).length === 0) {
+                        setBulk(null);
+                        setSelected([]);
+                    }
                 },
 
                 onFinish: () => setProcessing(false),
@@ -319,73 +319,107 @@ export default function Show({
                     ))}
                 </div>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 className="text-lg font-semibold text-slate-900">
-                        Bulk Update
-                    </h2>
-
-                    <div className="mt-4 grid gap-3 lg:grid-cols-4">
-                        <select
-                            value={bulkStatus}
-                            onChange={(event) =>
-                                setBulkStatus(event.target.value)
-                            }
-                            className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        >
-                            {availableBulkStatuses.length > 0 ? (
-                                availableBulkStatuses.map((status) => (
-                                    <option key={status} value={status}>
-                                        {statusLabels[status] ??
-                                            status.replaceAll("_", " ")}
-                                    </option>
-                                ))
-                            ) : (
-                                <option value="">
+                {deliveries.length > 0 && (
+                    <section className="sticky top-2 z-30 rounded-2xl border border-violet-200 bg-white p-5 shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h2 className="text-lg font-semibold text-slate-900">Bulk action</h2>
+                                <p className="mt-0.5 text-sm text-slate-500">
                                     {selected.length === 0
-                                        ? "Select DSPs first"
-                                        : "No common valid action"}
-                                </option>
+                                        ? "Tick stores below (or pick a group here), then choose what to do with all of them at once."
+                                        : `${selected.length} of ${deliveries.length} stores ticked.`}
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <span className="font-semibold text-slate-500">Tick:</span>
+                                <QuickPick onClick={() => setSelected(deliveries.map((d) => d.id))} active={allSelected}>
+                                    All ({deliveries.length})
+                                </QuickPick>
+                                {["pending", "processing", "delivered", "live", "failed", "takedown_requested"].map((s) =>
+                                    countBy[s] ? (
+                                        <QuickPick key={s} onClick={() => pickStatus(s)}>
+                                            {(statusLabels[s] ?? "Pending")} ({countBy[s]})
+                                        </QuickPick>
+                                    ) : null,
+                                )}
+                                {selected.length > 0 && (
+                                    <QuickPick onClick={() => setSelected([])}>Clear</QuickPick>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            {selected.length === 0 && <span className="text-sm text-slate-400">No stores ticked yet.</span>}
+                            {bulkOptions.map((option) => {
+                                const skipped = selected.length - option.ids.length;
+
+                                return (
+                                    <button
+                                        key={option.status}
+                                        type="button"
+                                        disabled={processing}
+                                        onClick={() => openBulk(option)}
+                                        title={skipped > 0 ? `${skipped} ticked store(s) cannot take this step and are left as they are` : undefined}
+                                        className={`rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-50 ${
+                                            option.status === "failed"
+                                                ? "border border-red-200 text-red-700 hover:bg-red-50"
+                                                : option.status === "delivered" || option.status === "live"
+                                                  ? "bg-violet-600 text-white hover:bg-violet-700"
+                                                  : "border border-slate-300 text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        {actionLabel(option.status)} · {option.ids.length}
+                                        {skipped > 0 && <span className="ml-1 font-normal opacity-75">(skip {skipped})</span>}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
+
+                {bulk && (
+                    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 p-4">
+                        <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+                            <h3 className="text-lg font-bold text-slate-900">
+                                {actionLabel(bulk.status)} · {bulk.ids.length} {bulk.ids.length === 1 ? "store" : "stores"}
+                            </h3>
+                            <p className="mt-1 text-sm text-slate-500">{release.title}</p>
+                            <div className="mt-3 max-h-32 overflow-y-auto rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                                {deliveries.filter((d) => bulk.ids.includes(d.id)).map((d) => d.store?.name || "Store").join(", ")}
+                            </div>
+                            {selected.length > bulk.ids.length && (
+                                <p className="mt-2 text-xs text-slate-500">
+                                    {selected.length - bulk.ids.length} other ticked store(s) cannot take this step and stay as they are.
+                                </p>
                             )}
-                        </select>
-
-                        <input
-                            value={bulkNote}
-                            onChange={(event) =>
-                                setBulkNote(event.target.value)
-                            }
-                            placeholder="Delivery note"
-                            className="rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                        />
-
-                        <input
-                            value={bulkError}
-                            onChange={(event) =>
-                                setBulkError(event.target.value)
-                            }
-                            disabled={bulkStatus !== "failed"}
-                            placeholder="Failure reason"
-                            className="rounded-xl border border-slate-300 px-4 py-3 text-sm disabled:bg-slate-100"
-                        />
-
-                        <button
-                            type="button"
-                            disabled={
-                                processing ||
-                                selected.length === 0 ||
-                                !hasValidBulkAction ||
-                                !availableBulkStatuses.includes(bulkStatus) ||
-                                (bulkStatus === "failed" &&
-                                    bulkError.trim().length < 3)
-                            }
-                            onClick={bulkUpdate}
-                            className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {processing
-                                ? "Updating..."
-                                : `Update ${selected.length} Selected`}
-                        </button>
+                            {["live", "takedown_requested", "taken_down"].includes(bulk.status) && (
+                                <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">A 6-digit code is e-mailed to you before this is saved.</p>
+                            )}
+                            {bulk.status === "failed" && (
+                                <label className="mt-3 block text-sm font-semibold text-slate-700">Failure reason (required)
+                                    <textarea value={bulkError} onChange={(e) => setBulkError(e.target.value)} rows={2} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal" />
+                                </label>
+                            )}
+                            <label className="mt-3 block text-sm font-semibold text-slate-700">Store reference / link (optional, same for all)
+                                <input value={bulkRef} onChange={(e) => setBulkRef(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal" />
+                            </label>
+                            <label className="mt-3 block text-sm font-semibold text-slate-700">Note (optional)
+                                <textarea value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} rows={2} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-normal" />
+                            </label>
+                            <div className="mt-4 flex justify-end gap-2">
+                                <button type="button" disabled={processing} onClick={() => setBulk(null)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cancel</button>
+                                <button
+                                    type="button"
+                                    disabled={processing || (bulk.status === "failed" && bulkError.trim().length < 3)}
+                                    onClick={bulkUpdate}
+                                    className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                                >
+                                    {processing ? "Saving…" : `Yes, ${actionLabel(bulk.status).toLowerCase()} for ${bulk.ids.length}`}
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </section>
+                )}
 
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="border-b border-slate-200 px-5 py-4">
@@ -575,5 +609,17 @@ export default function Show({
                 </section>
             </div>
         </PanelLayout>
+    );
+}
+
+function QuickPick({ children, onClick, active = false }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`rounded-full border px-3 py-1.5 font-semibold ${active ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`}
+        >
+            {children}
+        </button>
     );
 }
