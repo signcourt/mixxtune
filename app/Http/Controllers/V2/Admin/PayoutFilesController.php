@@ -80,6 +80,8 @@ class PayoutFilesController extends Controller
                 $problem = 'Bank account / IFSC missing';
             } elseif ($profile->kyc_status !== 'verified') {
                 $problem = 'KYC not verified ('.($profile->kyc_status ?: 'pending').')';
+            } elseif (\App\Models\Finance\BankPayout::query()->where('withdrawal_id', $withdrawal->id)->whereNotIn('status', \App\Models\Finance\BankPayout::FAILED)->exists()) {
+                $problem = 'Being paid / paid through Razorpay'; /* W115 */
             } elseif ($until = $bankGuard->holdUntil($profile)) {
                 $problem = 'Bank details changed recently - on hold until '
                     .$until->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A');
@@ -93,6 +95,24 @@ class PayoutFilesController extends Controller
                 $problem = 'Net amount is zero';
             }
 
+            /* W115: lock the request and check again just before it goes into the file, then remember it */
+            $earlierFile = null;
+            if (!$problem) {
+                $earlierFile = $withdrawal->metadata['bank_file_at'] ?? null;
+                $ok = \Illuminate\Support\Facades\DB::transaction(function () use ($withdrawal, $request) {
+                    $row = WithdrawalRequest::query()->whereKey($withdrawal->id)->lockForUpdate()->first();
+                    if (!$row || $row->status !== 'approved' || \App\Models\Finance\BankPayout::query()->where('withdrawal_id', $row->id)->whereNotIn('status', \App\Models\Finance\BankPayout::FAILED)->exists()) {
+                        return false;
+                    }
+                    $row->forceFill(['metadata' => array_merge($row->metadata ?? [], ['bank_file_at' => now()->toIso8601String(), 'bank_file_by' => $request->user()->id])])->saveQuietly();
+
+                    return true;
+                });
+                if (!$ok) {
+                    $problem = 'Changed meanwhile (being paid through Razorpay)';
+                }
+            }
+
             $check[] = [
                 $withdrawal->withdrawal_number,
                 $withdrawal->user?->name,
@@ -103,7 +123,7 @@ class PayoutFilesController extends Controller
                 $calc['tds_amount'] ?? 0,
                 $calc['net'] ?? 0,
                 $calc ? PayoutDeductionService::reasonText($calc['tds_reason']) : '',
-                $problem ? 'NOT IN FILE: '.$problem : 'In upload file',
+                $problem ? 'NOT IN FILE: '.$problem : ($earlierFile ? 'In upload file - ALSO in an earlier file ('.\Illuminate\Support\Carbon::parse($earlierFile)->timezone('Asia/Kolkata')->format('d M, h:i A').'): do not pay it twice' : 'In upload file'),
             ];
 
             if ($problem) {

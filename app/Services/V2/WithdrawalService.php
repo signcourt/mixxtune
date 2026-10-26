@@ -484,7 +484,9 @@ class WithdrawalService
             $withdrawal->refresh();
 
             abort_unless(
-                in_array($withdrawal->status, ['pending', 'approved', 'processing'], true),
+                in_array($withdrawal->status, ['pending', 'approved', 'processing'], true)
+                    /* W115: never while Razorpay is paying it or has paid it */
+                    && !\App\Models\Finance\BankPayout::query()->where('withdrawal_id', $withdrawal->id)->whereNotIn('status', \App\Models\Finance\BankPayout::FAILED)->exists(),
                 422,
                 'This request was changed by someone else (now '.$withdrawal->status.'). Reload the page.'
             );
@@ -936,7 +938,8 @@ class WithdrawalService
         WithdrawalRequest $withdrawal,
         User $admin,
         string $paymentReference,
-        ?string $note = null
+        ?string $note = null,
+        bool $alreadySentByGateway = false
     ): WithdrawalRequest {
         abort_unless(
             in_array(
@@ -951,14 +954,18 @@ class WithdrawalService
             'Withdrawal must be approved first.'
         );
 
-        /* MIXXTUNE_BANK_CHANGE_PROTECTION_V1: 48h hold after a bank change + KYC must be verified. */
-        app(\App\Services\V2\BankChangeGuard::class)->assertPayoutAllowed((int) $withdrawal->user_id);
+        /* MIXXTUNE_BANK_CHANGE_PROTECTION_V1: 48h hold after a bank change + KYC must be verified.
+           W115: not when the bank has already paid through Razorpay (that was checked before sending) - it must be booked. */
+        if (!$alreadySentByGateway) {
+            app(\App\Services\V2\BankChangeGuard::class)->assertPayoutAllowed((int) $withdrawal->user_id);
+        }
 
         return DB::transaction(function () use (
             $withdrawal,
             $admin,
             $paymentReference,
-            $note
+            $note,
+            $alreadySentByGateway
         ) {
             /* MIXXTUNE_WITHDRAWALS_V2: lock the request and check again (never pay twice) */
             WithdrawalRequest::query()->whereKey($withdrawal->id)->lockForUpdate()->first();
@@ -968,6 +975,13 @@ class WithdrawalService
                 in_array($withdrawal->status, ['approved', 'processing'], true),
                 422,
                 'This request was changed by someone else (now '.$withdrawal->status.'). Reload the page.'
+            );
+            /* W115: by hand only when Razorpay is not paying it; from Razorpay only when it is */
+            $gatewayRunning = \App\Models\Finance\BankPayout::query()->where('withdrawal_id', $withdrawal->id)->whereNotIn('status', \App\Models\Finance\BankPayout::FAILED)->exists();
+            abort_if(
+                $alreadySentByGateway ? $withdrawal->status !== 'processing' : ($withdrawal->status === 'processing' || $gatewayRunning),
+                422,
+                $alreadySentByGateway ? 'This request is not waiting for a Razorpay payment.' : 'This request is being paid through Razorpay - it cannot be marked paid by hand.'
             );
 
             $wallet = DB::table('wallets')

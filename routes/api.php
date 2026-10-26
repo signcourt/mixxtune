@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
 
+/* W115 MIXXTUNE_RAZORPAY_PAYOUTS: RazorpayX payout status (checked by signature, no login) */
+Route::post('/webhooks/razorpayx', \App\Http\Controllers\V2\RazorpayWebhookController::class)->middleware('throttle:600,1,rzp-webhook')->name('webhooks.razorpayx');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);

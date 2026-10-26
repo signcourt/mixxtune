@@ -513,6 +513,17 @@ const adminNavigation = (
                               label: 'Adjustments',
                               href: '/super-admin/finance/adjustments',
                           },
+                          /* W115 MIXXTUNE_RAZORPAY_PAYOUTS + MIXXTUNE_STAFF_SALARY */
+                          {
+                              id: 'financial-razorpay',
+                              label: 'Razorpay Payouts',
+                              href: '/admin/razorpay',
+                          },
+                          {
+                              id: 'financial-salaries',
+                              label: 'Staff & Salary',
+                              href: '/admin/salaries',
+                          },
                       ]
                     : []),
                 {

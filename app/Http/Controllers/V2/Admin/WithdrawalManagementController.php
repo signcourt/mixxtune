@@ -53,7 +53,8 @@ class WithdrawalManagementController extends Controller
             $financialAccess->applyFinancialOwnerScope($builder, $request->user());
 
             if ($forStatus !== 'all') {
-                $builder->where('status', $forStatus);
+                /* W115: "Approved - to pay" also shows the ones being paid through Razorpay */
+                $forStatus === 'approved' ? $builder->whereIn('status', ['approved', 'processing']) : $builder->where('status', $forStatus);
             }
 
             if ($month !== '') {
@@ -138,6 +139,16 @@ class WithdrawalManagementController extends Controller
                 'paid' => $w->paid_at?->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A'),
                 'rejected' => $w->rejected_at?->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A'),
             ]);
+            /* W115: the last Razorpay payment of this request */
+            $bp = \App\Models\Finance\BankPayout::query()->where('withdrawal_id', $w->id)->latest('id')->first();
+            $w->setAttribute('razorpay', $bp ? [
+                'status' => $bp->status,
+                'open' => $bp->isOpen(),
+                'amount' => $bp->rupees(),
+                'utr' => $bp->utr,
+                'reason' => $bp->failure_reason,
+                'at' => $bp->created_at?->copy()->timezone('Asia/Kolkata')->format('d M, h:i A'),
+            ] : null);
             $w->setAttribute('waiting_days', $w->status === 'pending' && $w->requested_at ? (int) $w->requested_at->diffInDays(now()) : null);
 
             return $w;
@@ -149,6 +160,13 @@ class WithdrawalManagementController extends Controller
             'counts' => $counts,
             'totals' => $totals,
             'withdrawals' => $page,
+
+            /* W115 MIXXTUNE_RAZORPAY_PAYOUTS */
+            'razorpay' => [
+                'can' => $role === 'super_admin',
+                'ready' => app(\App\Services\V2\Payouts\RazorpayX::class)->ready(),
+                'live' => app(\App\Services\V2\Payouts\RazorpayX::class)->live(),
+            ],
 
             /* MIXXTUNE_PAYOUT_FILES_V1 */
             'payoutTools' => [
@@ -595,6 +613,7 @@ class WithdrawalManagementController extends Controller
             'Financial object outside assigned scope.'
         );
 
+        $this->assertNoRazorpayRunning($withdrawal);
         $before = \App\Services\V2\FinanceAudit::pick($withdrawal, ['id', 'withdrawal_number', 'user_id', 'amount', 'currency', 'status', 'payment_method', 'payment_reference']);
 
         $service
@@ -721,6 +740,7 @@ class WithdrawalManagementController extends Controller
 
         $before = \App\Services\V2\FinanceAudit::pick($withdrawal, ['id', 'withdrawal_number', 'user_id', 'amount', 'currency', 'status', 'payment_method', 'payment_reference']);
 
+        $this->assertNoRazorpayRunning($withdrawal);
         $service->reject(
             $withdrawal,
             $request->user(),
@@ -789,6 +809,7 @@ class WithdrawalManagementController extends Controller
             ],
         ]);
 
+        $this->assertNoRazorpayRunning($withdrawal);
         /* MIXXTUNE_TWO_STEP_ACTIONS_V1: e-mailed code before money is marked as sent. */
         app(\App\Services\V2\BankChangeGuard::class)->assertPayoutAllowed((int) $withdrawal->user_id);
         app(\App\Services\V2\ActionOtpGuard::class)->require(
@@ -1072,6 +1093,60 @@ class WithdrawalManagementController extends Controller
         }
 
         return [null, null];
+    }
+
+    /* W115: Approve (if pending) and send the net amount to the owner's bank through RazorpayX (NEFT) */
+    public function approvePay(
+        Request $request,
+        WithdrawalRequest $withdrawal,
+        PermissionService $permissions,
+        \App\Services\V2\Payouts\BankPayoutService $payouts
+    ): RedirectResponse {
+        abort_unless($permissions->role($request->user()) === 'super_admin', 403, 'Only a Super Admin can send money through Razorpay.');
+        $validated = $request->validate(['admin_note' => ['nullable', 'string', 'max:2000'], 'not_in_bank_file' => ['nullable', 'boolean']]);
+        abort_unless(in_array($withdrawal->status, ['pending', 'approved'], true), 422, 'Only a pending or approved request can be paid.');
+        $inFile = $withdrawal->metadata['bank_file_at'] ?? null;
+        if ($inFile && !$request->boolean('not_in_bank_file')) {
+            return back()->withErrors(['razorpay' => 'This request was put in an Axis bank file ('.\Illuminate\Support\Carbon::parse($inFile)->timezone('Asia/Kolkata')->format('d M, h:i A').'). If it was paid there, use Mark Paid with that UTR. Only if it was NOT paid through the bank file, tick "not paid through the Axis file" and press again.']);
+        }
+        if (!app(\App\Services\V2\Payouts\RazorpayX::class)->ready()) {
+            return back()->withErrors(['razorpay' => 'Razorpay is not connected or switched off (Financial → Razorpay Payouts).']);
+        }
+        app(\App\Services\V2\BankChangeGuard::class)->assertPayoutAllowed((int) $withdrawal->user_id);
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            $request->user(),
+            'withdrawal.razorpay:'.$withdrawal->id,
+            'approve withdrawal #'.$withdrawal->id.' and send the money through Razorpay'
+        );
+        $wasPending = $withdrawal->status === 'pending';
+        $p = $payouts->payWithdrawal($withdrawal, $request->user(), $validated['admin_note'] ?? null, $request->boolean('not_in_bank_file'));
+        if ($inFile) {
+            \App\Services\V2\FinanceAudit::log('payout.bank_file_override', 'Withdrawal '.$withdrawal->withdrawal_number.' was in an Axis bank file; '.$request->user()->name.' confirmed it was not paid there and sent it through Razorpay.', ['id' => $withdrawal->id], $withdrawal);
+        }
+        if ($wasPending) {
+            $this->tellOwner($withdrawal, 'withdrawal.approved', 'Withdrawal approved',
+                'Your withdrawal '.($withdrawal->withdrawal_number ?: '').' of '.self::inr($withdrawal->amount).' was approved and the money is on its way to your bank account.');
+        }
+
+        $text = match (true) {
+            $p->status === 'processed' => 'Paid - UTR '.$p->utr.'.',
+            in_array($p->status, \App\Models\Finance\BankPayout::FAILED, true) => 'Razorpay did NOT send it: '.$p->failure_reason.' The request is back in Approved.',
+            $p->status === 'error' => 'Sent to Razorpay, but no clear answer yet - the panel asks again every 5 minutes (it never pays twice).',
+            $p->status === 'queued' => 'Sent to Razorpay - waiting: the RazorpayX balance is too low. Add money there and it goes out by itself.',
+            $p->status === 'pending' => 'Sent to Razorpay - waiting for approval in the RazorpayX dashboard.',
+            default => '₹'.number_format($p->rupees(), 2).' sent to Razorpay ('.$p->mode.'). It shows "Paid" with the UTR as soon as the bank confirms.',
+        };
+
+        return in_array($p->status, \App\Models\Finance\BankPayout::FAILED, true)
+            ? back()->withErrors(['razorpay' => $text])
+            : back()->with('success', $text);
+    }
+
+    private function assertNoRazorpayRunning(WithdrawalRequest $withdrawal): void
+    {
+        if ($withdrawal->status === 'processing' || \App\Models\Finance\BankPayout::query()->where('withdrawal_id', $withdrawal->id)->whereNotIn('status', \App\Models\Finance\BankPayout::FAILED)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['razorpay' => 'This request is being paid through Razorpay right now - wait for the answer (Financial → Razorpay Payouts → Check now).']);
+        }
     }
 
     private function authorizeAdmin(

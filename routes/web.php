@@ -2078,6 +2078,28 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.admin.withdrawals.paid');
 
+/* W115 MIXXTUNE_RAZORPAY_PAYOUTS + MIXXTUNE_STAFF_SALARY (Super Admin only; checked in the controllers) */
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('/admin/withdrawals/{withdrawal}/razorpay-pay', [\App\Http\Controllers\V2\Admin\WithdrawalManagementController::class, 'approvePay'])->middleware('throttle:30,1,wd-razorpay')->name('v2.admin.withdrawals.razorpay-pay');
+
+    Route::get('/admin/razorpay', [\App\Http\Controllers\V2\Admin\RazorpayPayoutController::class, 'index'])->name('v2.admin.razorpay.index');
+    Route::post('/admin/razorpay/settings', [\App\Http\Controllers\V2\Admin\RazorpayPayoutController::class, 'save'])->middleware('throttle:20,1,rzp-settings')->name('v2.admin.razorpay.save');
+    Route::post('/admin/razorpay/test', [\App\Http\Controllers\V2\Admin\RazorpayPayoutController::class, 'test'])->middleware('throttle:10,1,rzp-test')->name('v2.admin.razorpay.test');
+    Route::post('/admin/razorpay/payouts/{payout}/check', [\App\Http\Controllers\V2\Admin\RazorpayPayoutController::class, 'check'])->whereNumber('payout')->middleware('throttle:30,1,rzp-check')->name('v2.admin.razorpay.check');
+    Route::post('/admin/razorpay/payouts/{payout}/close', [\App\Http\Controllers\V2\Admin\RazorpayPayoutController::class, 'closeNotPaid'])->whereNumber('payout')->middleware('throttle:10,1,rzp-close')->name('v2.admin.razorpay.close');
+
+    Route::get('/admin/salaries', [\App\Http\Controllers\V2\Admin\PayrollController::class, 'index'])->name('v2.admin.salaries.index');
+    Route::post('/admin/staff', [\App\Http\Controllers\V2\Admin\PayrollController::class, 'storeStaff'])->middleware('throttle:30,1,staff-save')->name('v2.admin.staff.store');
+    Route::post('/admin/staff/{staff}', [\App\Http\Controllers\V2\Admin\PayrollController::class, 'updateStaff'])->whereNumber('staff')->middleware('throttle:30,1,staff-save')->name('v2.admin.staff.update');
+    Route::post('/admin/salaries/runs', [\App\Http\Controllers\V2\Admin\PayrollController::class, 'createRun'])->middleware('throttle:10,1,salary-run')->name('v2.admin.salaries.create');
+    Route::get('/admin/salaries/{run}', [\App\Http\Controllers\V2\Admin\PayrollController::class, 'showRun'])->whereNumber('run')->name('v2.admin.salaries.show');
+    Route::delete('/admin/salaries/{run}', [\App\Http\Controllers\V2\Admin\PayrollController::class, 'deleteRun'])->whereNumber('run')->middleware('throttle:10,1,salary-run')->name('v2.admin.salaries.delete');
+    Route::post('/admin/salaries/{run}/approve', [\App\Http\Controllers\V2\Admin\PayrollController::class, 'approve'])->whereNumber('run')->middleware('throttle:10,1,salary-run')->name('v2.admin.salaries.approve');
+    Route::post('/admin/salaries/{run}/pay', [\App\Http\Controllers\V2\Admin\PayrollController::class, 'pay'])->whereNumber('run')->middleware('throttle:10,1,salary-pay')->name('v2.admin.salaries.pay');
+    Route::post('/admin/salaries/items/{item}', [\App\Http\Controllers\V2\Admin\PayrollController::class, 'updateItem'])->whereNumber('item')->middleware('throttle:120,1,salary-item')->name('v2.admin.salaries.item');
+    Route::post('/admin/salaries/items/{item}/paid', [\App\Http\Controllers\V2\Admin\PayrollController::class, 'markPaid'])->whereNumber('item')->middleware('throttle:30,1,salary-paid')->name('v2.admin.salaries.item-paid');
+});
+
 
 Route::middleware(['auth', 'verified'])
     ->get(

@@ -63,3 +63,8 @@ Schedule::command('backups:check --quiet-ok')
     ->dailyAt('09:10')
     ->timezone('Asia/Kolkata')
     ->withoutOverlapping(30);
+
+/* W115 MIXXTUNE_RAZORPAY_PAYOUTS: follow bank transfers that Razorpay has not finished (also if a webhook was missed) */
+Schedule::command('payouts:sync')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(15);

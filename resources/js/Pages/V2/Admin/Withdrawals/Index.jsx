@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import { AlertTriangle, CheckCircle2, Download, FileText, Search } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, FileText, Landmark, Loader2, Search, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
@@ -31,8 +31,9 @@ const REJECT_REASONS = [
 
 const inr = (v) => "₹" + new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v || 0));
 
-export default function Index({ role = "admin", withdrawals = {}, counts = {}, totals = {}, filters = {}, payoutTools = {} }) {
+export default function Index({ role = "admin", withdrawals = {}, counts = {}, totals = {}, filters = {}, payoutTools = {}, razorpay = {} }) {
     const flash = usePage().props?.flash ?? {};
+    const pageErrors = usePage().props?.errors ?? {};
     const rows = withdrawals.data ?? [];
     const status = filters.status ?? "pending";
     const [search, setSearch] = useState(filters.search || "");
@@ -61,6 +62,25 @@ export default function Index({ role = "admin", withdrawals = {}, counts = {}, t
             {flash.success && (
                 <div className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
                     <CheckCircle2 className="h-4 w-4" /> {flash.success}
+                </div>
+            )}
+            {pageErrors.razorpay && (
+                <div className="mb-4 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                    <AlertTriangle className="h-4 w-4 shrink-0" /> {pageErrors.razorpay}
+                </div>
+            )}
+            {/* W115 MIXXTUNE_RAZORPAY_PAYOUTS */}
+            {razorpay.can && (
+                <div className={`mb-4 flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-3 text-sm ${razorpay.ready ? "border-violet-200 bg-violet-50 text-violet-900" : "border-slate-200 bg-white text-slate-600"}`}>
+                    <Zap className="h-4 w-4 shrink-0" />
+                    {razorpay.ready ? (
+                        <span>
+                            <b>Razorpay is connected{razorpay.live ? "" : " (TEST mode - no real money)"}.</b> "Approve &amp; Pay" sends the net amount to the owner's bank by NEFT; it turns "Paid" with the UTR by itself. Use one way per request - do not also put it in an Axis file.
+                        </span>
+                    ) : (
+                        <span>Razorpay is not connected yet - pay by Axis file + Mark Paid as before.</span>
+                    )}
+                    <Link href="/admin/razorpay" className="ml-auto font-semibold text-violet-700 underline">Razorpay Payouts</Link>
                 </div>
             )}
 
@@ -141,7 +161,7 @@ export default function Index({ role = "admin", withdrawals = {}, counts = {}, t
                     </div>
                 ) : (
                     <div className="space-y-3 p-3">
-                        {rows.map((w) => <WithdrawalCard key={w.id} w={w} />)}
+                        {rows.map((w) => <WithdrawalCard key={w.id} w={w} razorpay={razorpay} />)}
                     </div>
                 )}
 
@@ -166,13 +186,17 @@ function Info({ label, value, mono = false }) {
     );
 }
 
-function WithdrawalCard({ w }) {
+function WithdrawalCard({ w, razorpay = {} }) {
     const [open, setOpen] = useState(false);
     const [note, setNote] = useState("");
     const [utr, setUtr] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
-    const actionable = ["pending", "approved", "processing"].includes(w.status);
+    const [notInFile, setNotInFile] = useState(false);
+    const rz = w.razorpay;
+    const rzRunning = Boolean(rz?.open);
+    const actionable = ["pending", "approved", "processing"].includes(w.status) && !rzRunning;
+    const canRazorpay = razorpay.can && razorpay.ready && ["pending", "approved"].includes(w.status) && w.ready;
 
     const send = (method, url, payload, confirmText) => {
         if (confirmText && !window.confirm(confirmText)) return;
@@ -229,6 +253,17 @@ function WithdrawalCard({ w }) {
                 </div>
             )}
 
+            {rz && (rzRunning || w.status !== "paid") && (
+                <div className={`mx-4 mb-3 flex items-start gap-2 rounded-xl px-3 py-2 text-xs ${rzRunning ? "bg-violet-50 text-violet-800" : rz.status === "processed" ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>
+                    {rzRunning ? <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" /> : <Landmark className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+                    <span>
+                        <b>Razorpay {inr(rz.amount)} · {rz.status}</b> ({rz.at})
+                        {rzRunning && " - the bank is paying; it turns Paid with the UTR by itself."}
+                        {rz.reason && ` · ${rz.reason}`}
+                    </span>
+                </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2 px-4 pb-4 sm:grid-cols-4">
                 <Info label="KYC" value={w.kyc_status} />
                 <Info label="Account" value={`${w.payout_profile?.masked_bank_account ?? "—"}${w.ifsc ? ` · ${w.ifsc}` : ""}`} mono />
@@ -254,7 +289,7 @@ function WithdrawalCard({ w }) {
                 )}
                 {actionable && !open && (
                     <button type="button" onClick={() => setOpen(true)} className="h-9 rounded-lg bg-violet-600 px-4 text-xs font-semibold text-white">
-                        {w.status === "pending" ? "Approve / Reject" : "Mark Paid / Reject"}
+                        {canRazorpay ? (w.status === "pending" ? "Approve & Pay / Reject" : "Pay / Reject") : w.status === "pending" ? "Approve / Reject" : "Mark Paid / Reject"}
                     </button>
                 )}
             </div>
@@ -276,11 +311,34 @@ function WithdrawalCard({ w }) {
                     <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Note (needed to reject — the owner sees it)" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
 
                     {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</div>}
+                    {canRazorpay && w.metadata?.bank_file_at && (
+                        <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                            <input type="checkbox" checked={notInFile} onChange={(e) => setNotInFile(e.target.checked)} className="mt-0.5" />
+                            <span>This request was put in an Axis bank file. Tick only if it was <b>not</b> paid through that file - otherwise use Mark Paid with the bank's UTR.</span>
+                        </label>
+                    )}
 
                     <div className="flex flex-wrap gap-2">
+                        {canRazorpay && (
+                            <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                    send(
+                                        "post",
+                                        `/admin/withdrawals/${w.id}/razorpay-pay`,
+                                        { admin_note: note, not_in_bank_file: notInFile ? 1 : 0 },
+                                        `${w.status === "pending" ? "Approve and send" : "Send"} ${inr(d?.net ?? w.amount)} to ${w.holder || "the owner"} (${w.payout_profile?.masked_bank_account ?? ""} · ${w.ifsc ?? ""}) by NEFT through Razorpay${razorpay.live ? "" : " (TEST mode)"}?\n\nThe money leaves the RazorpayX account right away.`,
+                                    )
+                                }
+                                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                            >
+                                <Zap className="h-4 w-4" /> {w.status === "pending" ? "Approve & Pay" : "Pay"} via Razorpay
+                            </button>
+                        )}
                         {w.status === "pending" && (
                             <button type="button" disabled={busy} onClick={() => send("post", `/admin/withdrawals/${w.id}/approve`, { admin_note: note })} className="h-10 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
-                                Approve
+                                {canRazorpay ? "Approve only" : "Approve"}
                             </button>
                         )}
                         {["approved", "processing"].includes(w.status) && (

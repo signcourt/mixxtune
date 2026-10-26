@@ -133,6 +133,18 @@ class InvoiceGenerationService
                 $profile
             );
 
+            /* W115: paid through Razorpay - the document shows exactly what was worked out and sent then */
+            $sentDeduction = \Illuminate\Support\Facades\Schema::hasTable('bank_payouts')
+                ? DB::table('bank_payouts')->where('withdrawal_id', $withdrawal->id)->where('status', 'processed')->orderByDesc('id')->value('deduction')
+                : null;
+            $sentDeduction = $sentDeduction ? json_decode((string) $sentDeduction, true) : null;
+            if (is_array($sentDeduction) && isset($sentDeduction['net'], $sentDeduction['tds_amount'], $sentDeduction['gst_amount'], $sentDeduction['gst_percent'], $sentDeduction['tds_percent'])) {
+                foreach (['gst_percent', 'gst_amount', 'tds_percent', 'tds_amount', 'net'] as $k) {
+                    $deduction[$k] = $sentDeduction[$k];
+                }
+                $deduction['total'] = $sentDeduction['total'] ?? round($subtotal + (float) $sentDeduction['gst_amount'], 2);
+            }
+
             $gstPercentage = $deduction['gst_percent'];
             $tdsPercentage = $deduction['tds_percent'];
             $gstAmount = $deduction['gst_amount'];
