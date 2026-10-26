@@ -224,7 +224,18 @@ class MailController extends Controller
         $html = preg_replace('#<(script|iframe|object|embed|form|meta|link|base)\b[^>]*>(.*?</\1>)?#si', '', $html);
         $html = preg_replace('/\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
         $html = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $html);
-        $doc = '<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{font-family:Arial,sans-serif;font-size:14px;color:#111;margin:12px;word-wrap:break-word}img{max-width:100%;height:auto}</style></head><body>'.$html.'</body></html>';
+        /* W114 MIXXTUNE_MAIL_NIGHT: with the panel in night mode the mail is shown dark too (colours turned
+           round, pictures kept as they are); "Original colours" in the reader shows it as sent */
+        $night = $request->boolean('night')
+            ? 'html{background:#e2e9f8;filter:invert(1) hue-rotate(180deg);min-height:100%}img,video,picture,svg,[background],[style*="background-image"],[style*="background:url"]{filter:invert(1) hue-rotate(180deg)}'
+            : '';
+        if ($night !== '') {
+            /* white boxes inside the mail would turn black; they take the page colour instead */
+            $white = '(?:#fff(?:fff)?|white|rgba?\(\s*255\s*,\s*255\s*,\s*255\s*(?:,\s*1(?:\.0+)?\s*)?\))(?![0-9a-f])';
+            $html = preg_replace('/(\bbgcolor\s*=\s*["\']?)'.$white.'/i', '$1transparent', $html);
+            $html = preg_replace('/(background(?:-color)?\s*:\s*)'.$white.'/i', '$1transparent', $html);
+        }
+        $doc = '<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{font-family:Arial,sans-serif;font-size:14px;color:#111;margin:12px;word-wrap:break-word}img{max-width:100%;height:auto}'.$night.'</style></head><body>'.$html.'</body></html>';
 
         return response($doc, 200, [
             'Content-Type' => 'text/html; charset=UTF-8',

@@ -19,6 +19,17 @@ const when = (v, long = false) => {
     if (!long && d.toDateString() === today.toDateString()) return new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }).format(d);
     return new Intl.DateTimeFormat("en-IN", long ? { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true } : { day: "2-digit", month: "short" }).format(d);
 };
+/* W114: the panel's night mode (html.mt-night, set by the sun / moon switch) */
+function useNight() {
+    const read = () => typeof document !== "undefined" && document.documentElement.classList.contains("mt-night");
+    const [night, setNight] = useState(read);
+    useEffect(() => {
+        const o = new MutationObserver(() => setNight(read()));
+        o.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+        return () => o.disconnect();
+    }, []);
+    return night;
+}
 const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
 const linkHref = (v) => {
@@ -407,6 +418,9 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
     const [draft, setDraft] = useState(null);
     const [busy, setBusy] = useState(false);
     const [plain, setPlain] = useState(false);
+    const night = useNight();
+    const [origColours, setOrigColours] = useState(false);
+    const darkMail = night && !origColours;
     const rows = messages?.data ?? [];
     /* W113: ticked mails (many at once, like Gmail) */
     const [sel, setSel] = useState(() => new Set());
@@ -747,11 +761,20 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                                     <button type="button" onClick={forward} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                                         <CornerUpRight size={14} /> Forward
                                     </button>
-                                    {open.has_html && open.text && (
-                                        <button type="button" onClick={() => setPlain(!plain)} className="ml-auto text-xs font-semibold text-violet-700">
-                                            {plain ? "Show formatted" : "Show plain text"}
-                                        </button>
-                                    )}
+                                    {(open.has_html && open.text) || (night && open.has_html && !plain) ? (
+                                        <span className="ml-auto flex items-center gap-3">
+                                            {night && open.has_html && !plain && (
+                                                <button type="button" onClick={() => setOrigColours(!origColours)} title="Night mode: the mail is shown dark. Original colours shows it as it was sent." className="text-xs font-semibold text-violet-700">
+                                                    {origColours ? "Dark view" : "Original colours"}
+                                                </button>
+                                            )}
+                                            {open.has_html && open.text && (
+                                                <button type="button" onClick={() => setPlain(!plain)} className="text-xs font-semibold text-violet-700">
+                                                    {plain ? "Show formatted" : "Show plain text"}
+                                                </button>
+                                            )}
+                                        </span>
+                                    ) : null}
                                 </div>
                             </div>
                             {open.attachments?.length > 0 && (
@@ -765,7 +788,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                             )}
                             <div className="min-h-[50vh] flex-1">
                                 {open.has_html && !plain ? (
-                                    <iframe key={open.id} title="Mail" src={`/mail/messages/${open.id}/html`} sandbox="allow-popups allow-popups-to-escape-sandbox" className="h-[70vh] w-full rounded-b-2xl bg-white" />
+                                    <iframe key={`${open.id}-${darkMail ? "n" : "d"}`} title="Mail" src={`/mail/messages/${open.id}/html${darkMail ? "?night=1" : ""}`} sandbox="allow-popups allow-popups-to-escape-sandbox" className={`block h-[70vh] w-full rounded-b-2xl ${darkMail ? "bg-[#111827]" : origColours && night ? "mt-keep-white bg-[#ffffff]" : "bg-white"}`} />
                                 ) : (
                                     <pre className="whitespace-pre-wrap break-words px-5 py-4 font-sans text-sm leading-relaxed text-slate-800">{open.text || "(empty)"}</pre>
                                 )}

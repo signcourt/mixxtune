@@ -247,6 +247,18 @@ class PanelMailTest extends TestCase
         $this->assertStringNotContainsString('<script', $html->getContent());
         $this->assertStringNotContainsString('onclick', $html->getContent());
         $this->assertStringContainsString("default-src 'none'", $html->headers->get('Content-Security-Policy'));
+        /* W114: night mode shows the mail dark, pictures kept as they are */
+        $this->assertStringNotContainsString('invert(1)', $html->getContent());
+        $dark = $this->actingAs($mine)->get("/mail/messages/{$file->id}/html?night=1")->assertOk()->getContent();
+        $this->assertStringContainsString('html{background:#e2e9f8;filter:invert(1) hue-rotate(180deg)', $dark);
+        $this->assertStringContainsString('<b>team</b>', $dark);
+        $file->forceFill(['body_html' => '<table bgcolor="#FFFFFF" style="background: #fff;color:#111"><tr><td style="background-color:rgb(255, 255, 255)">x</td><td style="background:#fff0f0">y</td></tr></table>'])->save();
+        $dark = $this->actingAs($mine)->get("/mail/messages/{$file->id}/html?night=1")->getContent();
+        $this->assertStringContainsString('bgcolor="transparent"', $dark);
+        $this->assertStringContainsString('background: transparent;', $dark);
+        $this->assertStringContainsString('background-color:transparent', $dark);
+        $this->assertStringContainsString('background:#fff0f0', $dark);
+        $this->assertStringContainsString('bgcolor="#FFFFFF"', $this->actingAs($mine)->get("/mail/messages/{$file->id}/html")->getContent());
         $this->actingAs($mine)->get("/mail/attachments/{$att->id}")->assertOk()->assertDownload('report.pdf');
         $this->actingAs($mine)->get('/mail?q=payment')->assertInertia(fn (Assert $p) => $p->where('messages.total', 1));
 
