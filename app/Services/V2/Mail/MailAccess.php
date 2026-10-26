@@ -95,7 +95,7 @@ class MailAccess
         return [
             'accounts' => $ids->count(),
             'mine' => $own->count(),
-            'unread' => $badgeIds->isEmpty() ? 0 : DB::table('mail_messages')->whereIn('mail_account_id', $badgeIds)->where('folder', 'inbox')->where('seen', false)->count(),
+            'unread' => $badgeIds->isEmpty() ? 0 : DB::table('mail_messages')->whereIn('mail_account_id', $badgeIds)->where('folder', 'inbox')->where('seen', false)->where(fn ($w) => $w->whereNull('snooze_until')->orWhere('snooze_until', '<=', now()))->count(),
         ];
     }
 }

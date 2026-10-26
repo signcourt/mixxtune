@@ -8,6 +8,7 @@ use App\Models\Mail\MailAttachment;
 use App\Models\Mail\MailMessage;
 use App\Services\V2\AuditLogService;
 use App\Services\V2\Mail\MailAccess;
+use App\Services\V2\Mail\MailActions;
 use App\Services\V2\Mail\MailConnector;
 use App\Services\V2\Mail\MailSender;
 use App\Services\V2\Mail\MailSync;
@@ -57,8 +58,11 @@ class MailController extends Controller
         $mine = $access->assignedIds($request->user());
         $current = $accounts->firstWhere('id', (int) $request->query('account')) ?? $accounts->first(fn ($a) => $mine->contains((int) $a->id)) ?? $accounts->first();
         /* W110: also Starred (inbox + sent) and Drafts (own drafts only) */
-        $folder = in_array($request->query('folder'), ['sent', 'drafts', 'starred'], true) ? $request->query('folder') : 'inbox';
+        $folder = in_array($request->query('folder'), ['sent', 'drafts', 'starred', 'snoozed', 'archive', 'spam', 'trash'], true) ? $request->query('folder') : 'inbox';
         $me = (int) $request->user()->id;
+        if ($current) {
+            MailActions::wake((int) $current->id); /* W113 */
+        }
         $search = trim((string) $request->query('q', ''));
 
         $list = null;
@@ -66,9 +70,14 @@ class MailController extends Controller
         if ($current) {
             $q = MailMessage::query()->where('mail_account_id', $current->id);
             if ($folder === 'starred') {
-                $q->whereIn('folder', ['inbox', 'sent'])->where('starred', true);
+                $q->whereIn('folder', ['inbox', 'sent', 'archive'])->where('starred', true);
             } elseif ($folder === 'drafts') {
                 $q->where('folder', 'drafts')->where('sent_by', $me);
+            } elseif ($folder === 'snoozed') {
+                $q->where('folder', 'inbox')->whereNotNull('snooze_until')->where('snooze_until', '>', now());
+            } elseif ($folder === 'inbox') {
+                /* W113: snoozed mails are hidden until their time; woken ones sit at the top */
+                $q->where('folder', 'inbox')->where(fn ($w) => $w->whereNull('snooze_until')->orWhere('snooze_until', '<=', now()));
             } else {
                 $q->where('folder', $folder);
             }
@@ -76,8 +85,17 @@ class MailController extends Controller
                 $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $search).'%';
                 $q->where(fn ($w) => $w->where('subject', 'like', $like)->orWhere('from_email', 'like', $like)->orWhere('from_name', 'like', $like)->orWhere('snippet', 'like', $like)->orWhere('to', 'like', $like));
             }
-            $list = $q->orderByDesc('sent_at')->orderByDesc('id')
-                ->paginate(30, ['id', 'subject', 'from_name', 'from_email', 'to', 'sent_at', 'snippet', 'seen', 'starred', 'has_attachments', 'folder'])
+            if ($folder === 'snoozed') {
+                $q->orderBy('snooze_until');
+            } elseif ($folder === 'trash') {
+                $q->orderByDesc('trashed_at');
+            } elseif ($folder === 'inbox') {
+                $q->orderByRaw('COALESCE(woke_at, sent_at) DESC');
+            } else {
+                $q->orderByDesc('sent_at');
+            }
+            $list = $q->orderByDesc('id')
+                ->paginate(30, ['id', 'subject', 'from_name', 'from_email', 'to', 'sent_at', 'snippet', 'seen', 'starred', 'has_attachments', 'folder', 'orig_folder', 'snooze_until', 'woke_at', 'trashed_at'])
                 ->withQueryString()
                 ->through(fn (MailMessage $m) => [
                     'id' => $m->id,
@@ -85,6 +103,10 @@ class MailController extends Controller
                     'who' => $m->folder === 'drafts' ? ($this->people($m->to ?? []) ?: '(no address yet)') : ($m->folder === 'sent' ? $this->people($m->to ?? []) : ($m->from_name ?: $m->from_email)),
                     'folder' => $m->folder,
                     'starred' => (bool) $m->starred,
+                    'orig_folder' => $m->orig_folder,
+                    'snooze_until' => optional($m->snooze_until)->toIso8601String(),
+                    'woke' => $m->woke_at !== null,
+                    'trashed_at' => optional($m->trashed_at)->toIso8601String(),
                     'snippet' => $m->snippet,
                     'at' => optional($m->sent_at)->toIso8601String(),
                     'seen' => (bool) $m->seen,
@@ -96,12 +118,13 @@ class MailController extends Controller
                 if ($msg) {
                     if (!$msg->seen) {
                         $msg->forceFill(['seen' => true])->save();
-                        if ($msg->uid && $msg->folder === 'inbox') {
-                            $uid = $msg->uid;
-                            dispatch(function () use ($current, $uid) {
+                        $loc = in_array($msg->folder, ['inbox', 'archive', 'spam'], true) ? MailActions::location($current, $msg) : null; /* W113: where it is now */
+                        if ($loc) {
+                            [$box, $uid] = $loc;
+                            dispatch(function () use ($current, $uid, $box) {
                                 try {
                                     $imap = app(MailConnector::class)->imap($current);
-                                    $imap->select('INBOX');
+                                    $imap->select($box);
                                     $imap->addFlags($uid, '\\Seen');
                                     $imap->logout();
                                 } catch (Throwable) {
@@ -127,6 +150,9 @@ class MailController extends Controller
                         'html' => !empty($msg->body_html) && strlen((string) $msg->body_html) <= 600000 ? SignatureHtml::clean(preg_replace('/\bsrc=(["\'])cid:[^"\']*\1/i', '', (string) $msg->body_html)) : null,
                         'folder' => $msg->folder,
                         'starred' => (bool) $msg->starred,
+                        'seen' => true,
+                        'orig_folder' => $msg->orig_folder,
+                        'snooze_until' => optional($msg->snooze_until)->toIso8601String(),
                         'attachments' => $msg->attachments()->where('inline', false)->get(['id', 'filename', 'mime', 'size']),
                     ];
                     /* W110: a draft opens again in the Write window */
@@ -167,7 +193,7 @@ class MailController extends Controller
                 'signature' => $a->signature,
                 'signature_html' => SignatureHtml::forAccount($a),
                 'is_private' => (bool) $a->is_private,
-                'unread' => MailMessage::query()->where('mail_account_id', $a->id)->where('folder', 'inbox')->where('seen', false)->count(),
+                'unread' => MailMessage::query()->where('mail_account_id', $a->id)->where('folder', 'inbox')->where('seen', false)->where(fn ($w) => $w->whereNull('snooze_until')->orWhere('snooze_until', '<=', now()))->count(),
                 'last_synced_at' => optional($a->last_synced_at)->toIso8601String(),
                 'last_error' => $a->last_error,
             ])->values(),
@@ -178,8 +204,12 @@ class MailController extends Controller
             'open' => $open,
             'counts' => $current ? [
                 'drafts' => MailMessage::query()->where('mail_account_id', $current->id)->where('folder', 'drafts')->where('sent_by', $me)->count(),
-                'starred' => MailMessage::query()->where('mail_account_id', $current->id)->whereIn('folder', ['inbox', 'sent'])->where('starred', true)->count(),
-            ] : ['drafts' => 0, 'starred' => 0],
+                'starred' => MailMessage::query()->where('mail_account_id', $current->id)->whereIn('folder', ['inbox', 'sent', 'archive'])->where('starred', true)->count(),
+                'snoozed' => MailMessage::query()->where('mail_account_id', $current->id)->where('folder', 'inbox')->where('snooze_until', '>', now())->count(),
+                'spam' => MailMessage::query()->where('mail_account_id', $current->id)->where('folder', 'spam')->where('seen', false)->count(),
+                'trash' => MailMessage::query()->where('mail_account_id', $current->id)->where('folder', 'trash')->count(),
+            ] : ['drafts' => 0, 'starred' => 0, 'snoozed' => 0, 'spam' => 0, 'trash' => 0],
+            'trashDays' => MailActions::TRASH_DAYS,
             'isSuperAdmin' => $access->isSuperAdmin($request->user()),
         ]);
     }
@@ -305,11 +335,11 @@ class MailController extends Controller
         abort_if($message->folder === 'drafts', 422, 'A draft cannot be starred.');
         $on = $request->boolean('starred');
         $message->forceFill(['starred' => $on])->save();
-        if ($message->uid && in_array($message->folder, ['inbox', 'sent'], true)) {
-            $account = MailAccount::query()->find($message->mail_account_id);
-            $box = $message->folder === 'inbox' ? 'INBOX' : (string) $account?->sent_folder;
-            $uid = (int) $message->uid;
-            if ($account && $box !== '') {
+        $account = MailAccount::query()->find($message->mail_account_id);
+        $loc = $account ? MailActions::location($account, $message) : null; /* W113: wherever the mail is now */
+        if ($loc && $message->folder !== 'trash') {
+            [$box, $uid] = $loc;
+            if ($box !== '') {
                 dispatch(function () use ($account, $box, $uid, $on) {
                     try {
                         $imap = app(MailConnector::class)->imap($account);
@@ -436,5 +466,53 @@ class MailController extends Controller
             ->map(fn ($r) => ['email' => $r['email'], 'name' => $r['name'], 'sent' => $r['sent'], 'last' => $r['last'] ? date('c', $r['last']) : null]);
 
         return response()->json(['contacts' => $list]);
+    }
+    /* W113: one or many mails - Trash, put back, delete for ever, Archive, Spam, read / unread, Snooze */
+    public function act(Request $request, int $account, MailAccess $access, MailActions $actions, AuditLogService $audit): RedirectResponse
+    {
+        $acc = $this->account($request, $access, $account);
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:200'],
+            'ids.*' => ['integer'],
+            'action' => ['required', Rule::in(MailActions::ACTIONS)],
+            'until' => ['required_if:action,snooze', 'nullable', 'date', 'after:now', 'before:'.now()->addYear()->toIso8601String()],
+        ], ['until.after' => 'Pick a time in the future.', 'until.required_if' => 'Pick when the mail should come back.']);
+        $me = (int) $request->user()->id;
+        $messages = MailMessage::query()->where('mail_account_id', $acc->id)->whereIn('id', array_map('intval', $data['ids']))
+            ->where(fn ($w) => $w->where('folder', '!=', 'drafts')->orWhere('sent_by', $me))->get();
+        $until = !empty($data['until']) ? \Illuminate\Support\Carbon::parse($data['until']) : null;
+        $r = $actions->apply($acc, $messages, $data['action'], $until);
+        if (in_array($data['action'], ['trash', 'delete_forever', 'spam', 'archive'], true) && $r['done'] > 0) {
+            $audit->record('mail.'.$data['action'], 'mail', $r['done'].' mail(s) of '.$acc->address.': '.$data['action'].'.', [], ['ids' => $messages->pluck('id')->all()], null, $request);
+        }
+        $n = $r['done'];
+        $msg = match ($data['action']) {
+            'trash' => "{$n} mail(s) moved to Trash (kept ".MailActions::TRASH_DAYS.' days).',
+            'restore' => "{$n} mail(s) put back.",
+            'delete_forever' => "{$n} mail(s) deleted for ever.",
+            'archive' => "{$n} mail(s) archived.",
+            'inbox', 'not_spam' => "{$n} mail(s) moved to the Inbox.",
+            'spam' => "{$n} mail(s) moved to Spam.",
+            'read' => "{$n} mail(s) marked as read.",
+            'unread' => "{$n} mail(s) marked as unread.",
+            'snooze' => "{$n} mail(s) snoozed until ".$until?->timezone('Asia/Kolkata')->format('d M, h:i A').'.',
+            'unsnooze' => "{$n} mail(s) back in the Inbox.",
+        };
+        if ($r['skipped'] > 0 && $n === 0) {
+            $msg = 'Nothing changed - this cannot be done here.';
+        }
+
+        return back()->with('success', $msg);
+    }
+
+    /* W113: Trash - delete everything in it now */
+    public function emptyTrash(Request $request, int $account, MailAccess $access, MailActions $actions, AuditLogService $audit): RedirectResponse
+    {
+        $acc = $this->account($request, $access, $account);
+        $all = MailMessage::query()->where('mail_account_id', $acc->id)->where('folder', 'trash')->limit(2000)->get();
+        $r = $actions->apply($acc, $all, 'delete_forever');
+        $audit->record('mail.trash_emptied', 'mail', 'Trash of '.$acc->address.' emptied ('.$r['done'].' mails).', [], ['count' => $r['done']], null, $request);
+
+        return redirect('/mail?account='.$acc->id.'&folder=trash')->with('success', "Trash emptied - {$r['done']} mail(s) deleted for ever.");
     }
 }

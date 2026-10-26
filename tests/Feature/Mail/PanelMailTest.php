@@ -29,11 +29,54 @@ class FakeImap extends ImapClient
     /* W110: flags per folder / uid that the server gives, and every +/- flag change */
     public static array $flagsOf = [];
     public static array $flagLog = [];
+    /* W113: Trash / Junk / Archive folders, moves and deletes at the server */
+    public static bool $special = false;
+    public static bool $copyUid = true;
+    public static array $ops = [];
+    public static int $nextUid = 100;
     private string $sel = 'INBOX';
 
     public function listFolders(): array
     {
-        return [['name' => 'INBOX', 'flags' => '\\HasNoChildren'], ['name' => 'INBOX.Sent', 'flags' => '\\HasNoChildren \\Sent']];
+        $list = [['name' => 'INBOX', 'flags' => '\\HasNoChildren'], ['name' => 'INBOX.Sent', 'flags' => '\\HasNoChildren \\Sent']];
+        if (self::$special) {
+            $list[] = ['name' => 'INBOX.Trash', 'flags' => '\\HasNoChildren \\Trash'];
+            $list[] = ['name' => 'INBOX.Junk', 'flags' => '\\HasNoChildren'];
+            $list[] = ['name' => 'Archive', 'flags' => '\\HasNoChildren'];
+        }
+
+        return $list;
+    }
+
+    public function move(int $uid, string $dest): ?int
+    {
+        $raw = self::$folders[$this->sel][$uid] ?? null;
+        if ($raw === null) {
+            return null;
+        }
+        unset(self::$folders[$this->sel][$uid]);
+        $new = self::$nextUid++;
+        self::$folders[$dest][$new] = $raw;
+        self::$ops[] = ['move', $this->sel, $uid, $dest, $new];
+
+        return self::$copyUid ? $new : null;
+    }
+
+    public function uidByMessageId(string $messageId): ?int
+    {
+        foreach (self::$folders[$this->sel] ?? [] as $u => $raw) {
+            if (str_contains($raw, $messageId)) {
+                return $u;
+            }
+        }
+
+        return null;
+    }
+
+    public function deleteForever(int $uid): void
+    {
+        unset(self::$folders[$this->sel][$uid]);
+        self::$ops[] = ['delete', $this->sel, $uid];
     }
 
     public function select(string $folder, bool $readOnly = false): array
@@ -127,6 +170,10 @@ class PanelMailTest extends TestCase
         FakeImap::$flagged = [];
         FakeImap::$flagsOf = [];
         FakeImap::$flagLog = [];
+        FakeImap::$special = false;
+        FakeImap::$copyUid = true;
+        FakeImap::$ops = [];
+        FakeImap::$nextUid = 100;
         FakeTransport::$sent = [];
         FakeConnector::$loginWorks = true;
         $this->app->instance(MailConnector::class, new FakeConnector());
@@ -705,5 +752,98 @@ class PanelMailTest extends TestCase
         $this->assertNotContains('noreply@shop.example', $emails);
         $outsider = $this->user('admin');
         $this->actingAs($outsider)->getJson("/mail/accounts/{$a->id}/contacts")->assertForbidden();
+    }
+
+    public function test_trash_archive_spam_unread_and_snooze_like_gmail(): void
+    {
+        FakeImap::$special = true;
+        $mine = $this->user('admin');
+        $other = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'manager1@mixxtune.com', 'username' => 'manager1@mixxtune.com', 'password' => 'x', 'status' => 'active', 'sent_folder' => 'INBOX.Sent']);
+        $a->users()->sync([$mine->id]);
+        $mail = fn (string $s, string $id) => "Message-ID: <{$id}@example.com>\r\n".$this->mail($s, 'Saras <saras@example.com>', "Content-Type: text/plain\r\n\r\nBody of {$s}");
+        FakeImap::$folders['INBOX'] = [1 => $mail('One', 'm1'), 2 => $mail('Two', 'm2'), 3 => $mail('Three', 'm3'), 4 => $mail('Four', 'm4'), 5 => $mail('Five', 'm5')];
+        $this->artisan('mail:sync')->assertExitCode(0);
+        $id = fn (string $s) => MailMessage::query()->where('subject', $s)->value('id');
+        $row = fn (string $s) => MailMessage::query()->where('subject', $s)->first();
+        $act = fn (array $ids, string $action, array $more = []) => $this->actingAs($mine)->post("/mail/accounts/{$a->id}/act", ['ids' => $ids, 'action' => $action] + $more);
+
+        /* Delete two at once -> Trash (panel + Hostinger Trash folder) */
+        $act([$id('One'), $id('Two')], 'trash')->assertRedirect()->assertSessionHas('success', '2 mail(s) moved to Trash (kept 30 days).');
+        $this->assertSame('trash', $row('One')->folder);
+        $this->assertSame('inbox', $row('One')->orig_folder);
+        $this->assertNotNull($row('One')->trashed_at);
+        $this->assertSame('INBOX.Trash', $row('One')->server_folder);
+        $this->assertArrayNotHasKey(1, FakeImap::$folders['INBOX']);
+        $this->assertCount(2, FakeImap::$folders['INBOX.Trash']);
+        $this->actingAs($mine)->get("/mail?account={$a->id}")->assertInertia(fn (Assert $p) => $p->where('messages.total', 3)->where('counts.trash', 2));
+        $this->actingAs($mine)->get("/mail?account={$a->id}&folder=trash")->assertInertia(fn (Assert $p) => $p->where('messages.total', 2)->where('trashDays', 30)->where('messages.data.0.orig_folder', 'inbox'));
+
+        /* Put back: back in the Inbox, and the next read of the mailbox does not make a copy */
+        $act([$id('One')], 'restore')->assertSessionHas('success', '1 mail(s) put back.');
+        $this->assertSame('inbox', $row('One')->folder);
+        $this->assertSame('INBOX', $row('One')->server_folder);
+        $this->artisan('mail:sync')->assertExitCode(0);
+        $this->assertSame(1, MailMessage::query()->where('subject', 'One')->count());
+
+        /* without COPYUID the new number is found by Message-ID */
+        FakeImap::$copyUid = false;
+        $act([$id('Three')], 'archive')->assertSessionHas('success', '1 mail(s) archived.');
+        $this->assertSame('archive', $row('Three')->folder);
+        $this->assertSame('Archive', $row('Three')->server_folder);
+        $this->assertSame(array_key_first(FakeImap::$folders['Archive']), (int) $row('Three')->server_uid);
+        FakeImap::$copyUid = true;
+        $act([$id('Three')], 'archive')->assertSessionHas('success', 'Nothing changed - this cannot be done here.');
+        $act([$id('Three')], 'inbox');
+        $this->assertSame('inbox', $row('Three')->folder);
+        $this->artisan('mail:sync')->assertExitCode(0);
+        $this->assertSame(1, MailMessage::query()->where('subject', 'Three')->count());
+
+        /* Spam and Not spam; Delete for ever only from Trash / Spam */
+        $act([$id('Four')], 'spam')->assertSessionHas('success', '1 mail(s) moved to Spam.');
+        $this->assertSame('INBOX.Junk', $row('Four')->server_folder);
+        $act([$id('Four')], 'not_spam');
+        $this->assertSame('inbox', $row('Four')->folder);
+        $act([$id('Four')], 'delete_forever')->assertSessionHas('success', 'Nothing changed - this cannot be done here.');
+        $this->assertNotNull($row('Four'));
+        $act([$id('Two')], 'delete_forever')->assertSessionHas('success', '1 mail(s) deleted for ever.');
+        $this->assertNull($row('Two'));
+        $this->assertCount(0, FakeImap::$folders['INBOX.Trash']);
+
+        /* Mark as unread / read (flag at the server too) */
+        $act([$id('Five')], 'unread');
+        $this->assertFalse($row('Five')->seen);
+        $this->assertContains(['INBOX', 5, '-', '\\Seen'], FakeImap::$flagLog);
+        $act([$id('Five')], 'read');
+        $this->assertTrue($row('Five')->seen);
+
+        /* Snooze: hidden from the Inbox and its count, shown under Snoozed, back on top when the time comes */
+        $act([$id('Five')], 'snooze', ['until' => now()->subMinute()->toIso8601String()])->assertSessionHasErrors('until');
+        $act([$id('Five')], 'snooze', ['until' => now()->addHours(3)->toIso8601String()])->assertSessionHasNoErrors();
+        $act([$id('Five')], 'unread'); /* One, Three, Four are new; Five is new too but hidden while snoozed */
+        $this->actingAs($mine)->get("/mail?account={$a->id}")->assertInertia(fn (Assert $p) => $p->where('messages.total', 3)->where('counts.snoozed', 1)->where('accounts.0.unread', 3));
+        $this->actingAs($mine)->get("/mail?account={$a->id}&folder=snoozed")->assertInertia(fn (Assert $p) => $p->where('messages.total', 1)->where('messages.data.0.subject', 'Five'));
+        $this->travel(4)->hours();
+        $this->actingAs($mine)->get("/mail?account={$a->id}")->assertInertia(fn (Assert $p) => $p->where('messages.total', 4)->where('messages.data.0.subject', 'Five')->where('messages.data.0.woke', true)->where('counts.snoozed', 0));
+        $this->assertFalse($row('Five')->seen);
+        $this->travelBack();
+
+        /* Empty Trash, and Trash older than 30 days goes by itself */
+        $act([$id('One')], 'trash');
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/trash/empty")->assertSessionHas('success', 'Trash emptied - 1 mail(s) deleted for ever.');
+        $this->assertNull($row('One'));
+        $act([$id('Three')], 'trash');
+        MailMessage::query()->whereKey($id('Three'))->update(['trashed_at' => now()->subDays(31)]);
+        $this->artisan('mail:sync')->assertExitCode(0);
+        $this->assertNull($row('Three'));
+        $this->assertContains('delete', array_column(FakeImap::$ops, 0));
+
+        /* a draft is simply discarded; someone without the mailbox cannot touch it */
+        $d = $this->actingAs($mine)->postJson("/mail/accounts/{$a->id}/drafts", ['subject' => 'Later'])->json('id');
+        $act([$d], 'trash');
+        $this->assertNull(MailMessage::query()->find($d));
+        $this->actingAs($other)->post("/mail/accounts/{$a->id}/act", ['ids' => [$id('Four')], 'action' => 'trash'])->assertForbidden();
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/act", ['ids' => [$id('Four')], 'action' => 'explode'])->assertSessionHasErrors('action');
+        $this->assertSame('inbox', $row('Four')->folder);
     }
 }

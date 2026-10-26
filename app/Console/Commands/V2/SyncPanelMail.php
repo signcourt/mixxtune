@@ -5,6 +5,7 @@ namespace App\Console\Commands\V2;
 use App\Models\Mail\MailAccount;
 use App\Models\Mail\MailMessage;
 use App\Models\User;
+use App\Services\V2\Mail\MailActions;
 use App\Services\V2\Mail\MailSync;
 use App\Services\V2\StaffAlerts;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,10 @@ class SyncPanelMail extends Command
                         report($e);
                     }
                 }
-                $this->line("{$account->address}: {$n['inbox']} new in inbox, {$n['sent']} new in sent");
+                /* W113: snoozed mails whose time has come, and Trash older than 30 days */
+                $woke = MailActions::wake((int) $account->id);
+                $purged = app(MailActions::class)->purgeTrash($account);
+                $this->line("{$account->address}: {$n['inbox']} new in inbox, {$n['sent']} new in sent".($woke ? ", {$woke} back from snooze" : '').($purged ? ", {$purged} old trash deleted" : ''));
             } catch (Throwable $e) {
                 $account->forceFill(['last_error' => mb_substr($e->getMessage(), 0, 1000)])->save();
                 $this->warn("{$account->address}: ".$e->getMessage());

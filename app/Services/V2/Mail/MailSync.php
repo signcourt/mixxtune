@@ -101,7 +101,7 @@ class MailSync
             usort($rows, fn ($a, $b) => $a['uid'] <=> $b['uid']);
             foreach ($rows as $row) {
                 try {
-                    if ($this->store($account, $kind, $row, in_array($row['uid'], $big, true))) {
+                    if ($this->store($account, $kind, $row, in_array($row['uid'], $big, true), $name)) {
                         $count++;
                     }
                 } catch (Throwable $e) {
@@ -118,17 +118,29 @@ class MailSync
         return $count;
     }
 
-    private function store(MailAccount $account, string $kind, array $row, bool $headersOnly): bool
+    private function store(MailAccount $account, string $kind, array $row, bool $headersOnly, ?string $box = null): bool
     {
         if (MailMessage::query()->where('mail_account_id', $account->id)->where('folder', $kind)->where('uid', $row['uid'])->exists()) {
             return false;
         }
+        /* W113: a mail the panel itself moved back into this folder at Hostinger is already here */
+        if ($box && MailMessage::query()->where('mail_account_id', $account->id)->where('server_folder', $box)->where('server_uid', $row['uid'])->exists()) {
+            return false;
+        }
         $m = $this->parser->parse((string) $row['raw']);
+        if ($box && $m['message_id']) {
+            $moved = MailMessage::query()->where('mail_account_id', $account->id)->where('server_folder', $box)->where('message_id', mb_substr($m['message_id'], 0, 500))->first();
+            if ($moved) {
+                $moved->forceFill(['server_uid' => $row['uid']])->save();
+
+                return false;
+            }
+        }
         $seen = in_array('\\Seen', $row['flags'], true);
 
         /* a mail sent from the panel is already here (no uid yet): just link it */
         if ($kind === 'sent' && $m['message_id']) {
-            $own = MailMessage::query()->where('mail_account_id', $account->id)->where('folder', 'sent')->whereNull('uid')->where('message_id', $m['message_id'])->first();
+            $own = MailMessage::query()->where('mail_account_id', $account->id)->whereIn('folder', ['sent', 'trash', 'archive'])->whereNull('uid')->where('message_id', $m['message_id'])->first(); /* W113: also when already moved to Trash */
             if ($own) {
                 $own->forceFill(['uid' => $row['uid']])->save();
 

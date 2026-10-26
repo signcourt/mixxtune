@@ -164,6 +164,55 @@ class ImapClient
         $this->command("UID STORE {$uid} -FLAGS.SILENT ({$flags})");
     }
 
+    /*
+     * W113: move one mail to another folder of the mailbox. Returns its new UID there when the
+     * server tells it (UIDPLUS COPYUID); UID MOVE first, COPY + \\Deleted + EXPUNGE as fallback.
+     */
+    public function move(int $uid, string $dest): ?int
+    {
+        $r = $this->command("UID MOVE {$uid} ".self::quote($dest), false);
+        if ($r['status'] !== 'OK') {
+            $r = $this->command("UID COPY {$uid} ".self::quote($dest));
+            $this->command("UID STORE {$uid} +FLAGS.SILENT (\\Deleted)");
+            $e = $this->command("UID EXPUNGE {$uid}", false);
+            if ($e['status'] !== 'OK') {
+                $this->command('EXPUNGE');
+            }
+        }
+        $all = $r['text'].' '.implode(' ', array_column($r['untagged'], 'text'));
+
+        return preg_match('/COPYUID\s+\d+\s+\S+\s+(\d+)/i', $all, $m) ? (int) $m[1] : null;
+    }
+
+    /* W113: the UID of a mail in the selected folder, found by its Message-ID */
+    public function uidByMessageId(string $messageId): ?int
+    {
+        $id = trim($messageId);
+        if ($id === '') {
+            return null;
+        }
+        $r = $this->command('UID SEARCH HEADER Message-ID '.self::quote($id), false);
+        foreach ($r['untagged'] as $u) {
+            if (preg_match('/^\*\s+SEARCH\s+([\d\s]+)$/i', trim($u['text']), $m)) {
+                $ids = preg_split('/\s+/', trim($m[1]), -1, PREG_SPLIT_NO_EMPTY);
+
+                return $ids ? (int) end($ids) : null;
+            }
+        }
+
+        return null;
+    }
+
+    /* W113: delete one mail for ever (in the selected folder) */
+    public function deleteForever(int $uid): void
+    {
+        $this->command("UID STORE {$uid} +FLAGS.SILENT (\\Deleted)");
+        $e = $this->command("UID EXPUNGE {$uid}", false);
+        if ($e['status'] !== 'OK') {
+            $this->command('EXPUNGE');
+        }
+    }
+
     public function append(string $folder, string $raw, string $flags = '\\Seen'): void
     {
         $raw = preg_replace("/(?<!\r)\n/", "\r\n", $raw);

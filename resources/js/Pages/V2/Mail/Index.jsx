@@ -1,9 +1,10 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import { ALargeSmall, ArrowLeft, ChevronDown, CornerUpLeft, CornerUpRight, FileText, ImagePlus, Inbox, Link2, Mail, Maximize2, Minimize2, Minus, Paperclip, PenLine, PenSquare, RefreshCw, ReplyAll, Search, Send, Smile, Star, Trash2, X } from "lucide-react";
+import { ALargeSmall, ArrowLeft, CheckSquare, ChevronDown, Clock, CornerUpLeft, CornerUpRight, FileText, ImagePlus, Inbox, Link2, Mail, Maximize2, Minimize2, Minus, Paperclip, PenLine, PenSquare, RefreshCw, ReplyAll, Search, Send, Smile, Square, Star, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 import AddressInput from "@/V2/Shared/Mail/AddressInput";
+import { MailButtons, MoreFolders, untilText } from "@/V2/Shared/Mail/MailActionsUi";
 import { EMOJI, Editor, esc, shrinkImage, textToHtml, Toolbar, useRich } from "@/V2/Shared/Mail/RichEditor";
 
 /*
@@ -399,7 +400,7 @@ function Compose({ account, draft, onClose }) {
     );
 }
 
-export default function MailIndex({ role = "admin", accounts = [], current = null, folder = "inbox", search = "", messages = null, open = null, isSuperAdmin = false, counts = { drafts: 0, starred: 0 } }) {
+export default function MailIndex({ role = "admin", accounts = [], current = null, folder = "inbox", search = "", messages = null, open = null, isSuperAdmin = false, counts = { drafts: 0, starred: 0 }, trashDays = 30 }) {
     const { flash = {}, errors = {} } = usePage().props;
     const account = accounts.find((a) => a.id === current) ?? null;
     const [q, setQ] = useState(search);
@@ -407,6 +408,51 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
     const [busy, setBusy] = useState(false);
     const [plain, setPlain] = useState(false);
     const rows = messages?.data ?? [];
+    /* W113: ticked mails (many at once, like Gmail) */
+    const [sel, setSel] = useState(() => new Set());
+    const [askEmpty, setAskEmpty] = useState(false);
+    const pageKey = `${current}|${folder}|${search}|${messages?.current_page ?? 1}`;
+    useEffect(() => {
+        setSel(new Set());
+        setAskEmpty(false);
+    }, [pageKey]);
+    useEffect(() => {
+        setSel((s) => {
+            const ids = new Set(rows.map((m) => m.id));
+            const next = new Set([...s].filter((id) => ids.has(id)));
+            return next.size === s.size ? s : next;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [messages]);
+    const picked = rows.filter((m) => sel.has(m.id));
+    const tick = (id) =>
+        setSel((s) => {
+            const n = new Set(s);
+            n.has(id) ? n.delete(id) : n.add(id);
+            return n;
+        });
+    const tickAll = () => setSel(picked.length === rows.length ? new Set() : new Set(rows.map((m) => m.id)));
+    /* do one action on one or many mails; a mail open in the reader that leaves the list closes */
+    const act = (items, action, until) => {
+        if (!account || items.length === 0) return;
+        const ids = items.map((m) => m.id);
+        const closeOpen = open && ids.includes(open.id) && action !== "read";
+        router.post(
+            `/mail/accounts/${account.id}/act`,
+            { ids, action, until },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSel(new Set());
+                    if (closeOpen) go({ m: undefined });
+                },
+            },
+        );
+    };
+    const emptyTrash = () => {
+        setAskEmpty(false);
+        router.post(`/mail/accounts/${account.id}/trash/empty`, {}, { preserveScroll: true });
+    };
 
     useEffect(() => setPlain(false), [open?.id]);
     /* W110: a draft opens again in the Write window */
@@ -449,7 +495,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
             note: open.attachments?.length ? "The attachments of the original mail go along - remove any you do not want to send." : null,
         });
 
-    const listTitle = useMemo(() => ({ sent: "Sent", drafts: "Drafts", starred: "Starred" })[folder] ?? "Inbox", [folder]);
+    const listTitle = useMemo(() => ({ sent: "Sent", drafts: "Drafts", starred: "Starred", snoozed: "Snoozed", archive: "Archive", spam: "Spam", trash: "Trash" })[folder] ?? "Inbox", [folder]);
 
     if (accounts.length === 0) {
         return (
@@ -475,9 +521,11 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
         <PanelLayout role={role} title="Mail" subtitle={account ? `${account.display_name ? `${account.display_name} · ` : ""}${account.address}` : ""}>
             <Head title={`${listTitle} - Mail`} />
 
-            {(flash.success || errors.mail || errors.send) && (
-                <div className={`mb-3 rounded-xl px-4 py-2.5 text-sm font-semibold ${flash.success && !errors.mail && !errors.send ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{errors.mail || errors.send || flash.success}</div>
-            )}
+            {(() => {
+                const bad = errors.mail || errors.send || errors.until || errors.ids || errors.action;
+                if (!flash.success && !bad) return null;
+                return <div className={`mb-3 rounded-xl px-4 py-2.5 text-sm font-semibold ${bad ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{bad || flash.success}</div>;
+            })()}
 
             <div className="flex flex-wrap items-center gap-2">
                 {/* W100: own mailbox first; a Super Admin also sees the team mailboxes */}
@@ -517,6 +565,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                             {(key === "drafts" || key === "starred") && counts[key] > 0 && <span className={`text-[11px] font-bold ${folder === key ? "text-violet-100" : "text-slate-400"}`}>{counts[key]}</span>}
                         </button>
                     ))}
+                    <MoreFolders folder={folder} counts={counts} onGo={(key) => router.get("/mail", { account: current, folder: key })} />
                 </div>
                 <form onSubmit={(e) => { e.preventDefault(); go({ q: q || undefined, m: undefined, page: undefined }); }} className="relative min-w-[180px] flex-1">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -536,19 +585,66 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
             )}
 
             <div className="mt-3 grid min-h-[60vh] gap-3 lg:grid-cols-[380px_minmax(0,1fr)]">
-                <section className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${open ? "hidden lg:block" : ""}`}>
+                <section className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${open ? "hidden lg:block" : ""}`}>
+                    {/* W113: tick all + the buttons for the ticked mails */}
+                    {rows.length > 0 && (
+                        <div className="flex min-h-[44px] flex-wrap items-center gap-1 rounded-t-2xl border-b border-slate-100 bg-slate-50/60 px-2 py-1">
+                            <button type="button" onClick={tickAll} title={picked.length === rows.length ? "Untick all" : "Tick all on this page"} aria-label="Tick all" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100">
+                                {picked.length === rows.length ? <CheckSquare size={18} className="text-violet-600" /> : picked.length > 0 ? <CheckSquare size={18} className="text-violet-400" /> : <Square size={18} />}
+                            </button>
+                            {picked.length > 0 ? (
+                                <>
+                                    <span className="mr-1 text-xs font-semibold text-slate-600">{picked.length} ticked</span>
+                                    <MailButtons items={picked} act={(a, until) => act(picked, a, until)} />
+                                </>
+                            ) : (
+                                <span className="text-xs text-slate-400">Tick mails to delete, archive, snooze… many at once</span>
+                            )}
+                        </div>
+                    )}
+                    {folder === "trash" && rows.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+                            <span>Mails in Trash are deleted for ever after {trashDays} days.</span>
+                            {askEmpty ? (
+                                <span className="ml-auto inline-flex items-center gap-1 font-semibold">
+                                    Delete all for ever?
+                                    <button type="button" onClick={emptyTrash} className="rounded bg-red-600 px-2 py-0.5 text-white">Yes</button>
+                                    <button type="button" onClick={() => setAskEmpty(false)} className="rounded border border-amber-300 bg-white px-2 py-0.5">No</button>
+                                </span>
+                            ) : (
+                                <button type="button" onClick={() => setAskEmpty(true)} className="ml-auto font-bold text-red-700 hover:underline">
+                                    Empty Trash now
+                                </button>
+                            )}
+                        </div>
+                    )}
                     {rows.length === 0 ? (
-                        <p className="px-5 py-16 text-center text-sm text-slate-500">{search ? "Nothing found." : { sent: "No sent mail yet.", drafts: "No drafts. A mail you start writing is kept here until it is sent.", starred: "No starred mail. Press the star on a mail to keep it here." }[folder] ?? "No mail yet."}</p>
+                        <p className="px-5 py-16 text-center text-sm text-slate-500">
+                            {search
+                                ? "Nothing found."
+                                : {
+                                      sent: "No sent mail yet.",
+                                      drafts: "No drafts. A mail you start writing is kept here until it is sent.",
+                                      starred: "No starred mail. Press the star on a mail to keep it here.",
+                                      snoozed: "No snoozed mail. Press the clock on a mail to hide it until later.",
+                                      archive: "Nothing archived. Archive takes a mail out of the Inbox but keeps it.",
+                                      spam: "No spam. Hooray!",
+                                      trash: `Trash is empty. Deleted mails stay here for ${trashDays} days.`,
+                                  }[folder] ?? "No mail yet."}
+                        </p>
                     ) : (
                         <ul className="divide-y divide-slate-100">
                             {rows.map((m) => (
-                                <li key={m.id} className={`flex items-stretch ${open?.id === m.id ? "bg-violet-50" : ""}`}>
-                                    {m.folder !== "drafts" ? (
-                                        <button type="button" onClick={() => star(m, !m.starred)} title={m.starred ? "Starred - click to remove the star" : "Star this mail"} aria-label={m.starred ? "Remove star" : "Star"} aria-pressed={m.starred} className="shrink-0 pl-3 pr-1 text-slate-300 hover:text-amber-500">
+                                <li key={m.id} className={`group relative flex items-stretch ${open?.id === m.id ? "bg-violet-50" : sel.has(m.id) ? "bg-sky-50" : ""}`}>
+                                    <button type="button" onClick={() => tick(m.id)} aria-label={sel.has(m.id) ? "Untick" : "Tick"} aria-pressed={sel.has(m.id)} className="shrink-0 pl-2.5 pr-0.5 text-slate-300 hover:text-slate-600">
+                                        {sel.has(m.id) ? <CheckSquare size={17} className="text-violet-600" /> : <Square size={17} />}
+                                    </button>
+                                    {m.folder !== "drafts" && m.folder !== "trash" && m.folder !== "spam" ? (
+                                        <button type="button" onClick={() => star(m, !m.starred)} title={m.starred ? "Starred - click to remove the star" : "Star this mail"} aria-label={m.starred ? "Remove star" : "Star"} aria-pressed={m.starred} className="shrink-0 pl-1.5 pr-1 text-slate-300 hover:text-amber-500">
                                             <Star size={17} className={m.starred ? "fill-amber-400 text-amber-500" : ""} />
                                         </button>
                                     ) : (
-                                        <span className="w-3 shrink-0" />
+                                        <span className="w-6 shrink-0" />
                                     )}
                                     <button type="button" onClick={() => go({ m: m.id })} className="block min-w-0 flex-1 py-3 pl-1 pr-4 text-left hover:bg-slate-50">
                                         <div className="flex items-center justify-between gap-2">
@@ -557,14 +653,30 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                                                 {folder === "starred" && m.folder === "sent" && <span className="mr-1 text-slate-400">To:</span>}
                                                 {m.who || "—"}
                                             </span>
-                                            <span className="shrink-0 text-[11px] text-slate-400">{when(m.at)}</span>
+                                            <span className="shrink-0 text-[11px] text-slate-400 lg:group-hover:invisible">{when(m.at)}</span>
                                         </div>
                                         <div className={`flex items-center gap-1 truncate text-sm ${m.seen ? "text-slate-600" : "font-bold text-slate-900"}`}>
                                             {m.has_attachments && <Paperclip size={12} className="shrink-0 text-slate-400" />}
                                             <span className="truncate">{m.subject}</span>
                                         </div>
                                         <div className="truncate text-xs text-slate-400">{m.snippet}</div>
+                                        {(m.snooze_until || m.woke || (folder !== m.folder && ["archive", "trash", "spam"].includes(m.folder))) && (
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                {m.snooze_until && new Date(m.snooze_until) > new Date() && (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                                                        <Clock size={10} /> until {untilText(m.snooze_until)}
+                                                    </span>
+                                                )}
+                                                {m.woke && folder === "inbox" && <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-800"><Clock size={10} /> back from snooze</span>}
+                                                {folder !== m.folder && ["archive", "trash", "spam"].includes(m.folder) && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold capitalize text-slate-600">{m.folder}</span>}
+                                            </div>
+                                        )}
+                                        {folder === "trash" && m.trashed_at && <div className="mt-0.5 text-[10px] text-slate-400">Deleted {when(m.trashed_at)} · from {m.orig_folder || "inbox"}</div>}
                                     </button>
+                                    {/* W113: quick buttons when the mouse is on the row (like Gmail) */}
+                                    <div className="absolute right-2 top-1.5 hidden rounded-full bg-white/95 shadow-sm ring-1 ring-slate-200 lg:group-hover:flex">
+                                        <MailButtons quick align="right" items={[m]} act={(a, until) => act([m], a, until)} btn="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" />
+                                    </div>
                                 </li>
                             ))}
                         </ul>
@@ -593,9 +705,19 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                     ) : (
                         <article className="flex h-full flex-col">
                             <div className="border-b border-slate-100 px-5 py-4">
-                                <button type="button" onClick={() => go({ m: undefined })} className="mb-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 lg:hidden">
-                                    <ArrowLeft size={14} /> Back
-                                </button>
+                                {/* W113: Archive / Spam / Delete / Unread / Snooze for the open mail */}
+                                <div className="-mx-2 mb-2 flex flex-wrap items-center gap-1 border-b border-slate-100 pb-2">
+                                    <button type="button" onClick={() => go({ m: undefined })} title="Back to the list" aria-label="Back" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100">
+                                        <ArrowLeft size={17} />
+                                    </button>
+                                    <MailButtons items={[open]} act={(a, until) => act([open], a, until)} />
+                                    {open.folder !== "inbox" && open.folder !== "sent" && <span className="ml-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold capitalize text-slate-600">{open.folder}</span>}
+                                    {open.snooze_until && new Date(open.snooze_until) > new Date() && (
+                                        <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                                            <Clock size={11} /> Snoozed until {untilText(open.snooze_until)}
+                                        </span>
+                                    )}
+                                </div>
                                 <h2 className="break-words text-lg font-bold text-slate-950">{open.subject}</h2>
                                 <div className="mt-2 flex flex-wrap items-start justify-between gap-2 text-sm">
                                     <div className="min-w-0">
@@ -608,7 +730,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                                     </div>
                                     <span className="flex items-center gap-2 text-xs text-slate-400">
                                         {when(open.at, true)}
-                                        {open.folder !== "drafts" && (
+                                        {!["drafts", "trash", "spam"].includes(open.folder) && (
                                             <button type="button" onClick={() => star(open, !open.starred)} title={open.starred ? "Starred - click to remove the star" : "Star this mail"} aria-label={open.starred ? "Remove star" : "Star"} aria-pressed={open.starred} className="rounded-full p-1 hover:bg-amber-50">
                                                 <Star size={18} className={open.starred ? "fill-amber-400 text-amber-500" : "text-slate-400"} />
                                             </button>

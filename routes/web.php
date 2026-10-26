@@ -3081,10 +3081,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/mail/attachments/{attachment}', [\App\Http\Controllers\V2\MailController::class, 'attachment'])->whereNumber('attachment')->name('v2.mail.attachment');
     Route::post('/mail/accounts/{account}/refresh', [\App\Http\Controllers\V2\MailController::class, 'refresh'])->whereNumber('account')->middleware('throttle:20,1')->name('v2.mail.refresh');
     /* W110: star, drafts, address suggestions */
-    Route::post('/mail/messages/{message}/star', [\App\Http\Controllers\V2\MailController::class, 'star'])->whereNumber('message')->middleware('throttle:120,1')->name('v2.mail.star');
-    Route::post('/mail/accounts/{account}/drafts', [\App\Http\Controllers\V2\MailController::class, 'saveDraft'])->whereNumber('account')->middleware('throttle:120,1')->name('v2.mail.drafts.save');
-    Route::post('/mail/drafts/{message}/delete', [\App\Http\Controllers\V2\MailController::class, 'deleteDraft'])->whereNumber('message')->middleware('throttle:60,1')->name('v2.mail.drafts.delete');
-    Route::get('/mail/accounts/{account}/contacts', [\App\Http\Controllers\V2\MailController::class, 'contacts'])->whereNumber('account')->middleware('throttle:60,1')->name('v2.mail.contacts');
+    Route::post('/mail/messages/{message}/star', [\App\Http\Controllers\V2\MailController::class, 'star'])->whereNumber('message')->middleware('throttle:120,1,mail-star')->name('v2.mail.star');
+    Route::post('/mail/accounts/{account}/drafts', [\App\Http\Controllers\V2\MailController::class, 'saveDraft'])->whereNumber('account')->middleware('throttle:120,1,mail-draft')->name('v2.mail.drafts.save');
+    Route::post('/mail/drafts/{message}/delete', [\App\Http\Controllers\V2\MailController::class, 'deleteDraft'])->whereNumber('message')->middleware('throttle:60,1,mail-draft-del')->name('v2.mail.drafts.delete');
+    Route::get('/mail/accounts/{account}/contacts', [\App\Http\Controllers\V2\MailController::class, 'contacts'])->whereNumber('account')->middleware('throttle:60,1,mail-contacts')->name('v2.mail.contacts');
+    /* W113: Trash / Archive / Spam / read-unread / Snooze, for one or many mails */
+    Route::post('/mail/accounts/{account}/act', [\App\Http\Controllers\V2\MailController::class, 'act'])->whereNumber('account')->middleware('throttle:120,1,mail-act')->name('v2.mail.act');
+    Route::post('/mail/accounts/{account}/trash/empty', [\App\Http\Controllers\V2\MailController::class, 'emptyTrash'])->whereNumber('account')->middleware('throttle:10,1,mail-empty')->name('v2.mail.trash.empty');
     Route::post('/mail/accounts/{account}/send', [\App\Http\Controllers\V2\MailController::class, 'send'])->whereNumber('account')->middleware('throttle:30,1')->name('v2.mail.send');
     Route::get('/admin/mail-accounts', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'index'])->name('v2.admin.mail-accounts.index');
     Route::post('/admin/mail-accounts', [\App\Http\Controllers\V2\Admin\MailAccountController::class, 'store'])->middleware('throttle:20,1')->name('v2.admin.mail-accounts.store');
