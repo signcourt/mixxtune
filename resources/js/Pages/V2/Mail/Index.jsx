@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 import AddressInput from "@/V2/Shared/Mail/AddressInput";
-import { MailButtons, MoreFolders, untilText } from "@/V2/Shared/Mail/MailActionsUi";
+import { MailButtons, MoreFolders, ScheduleMenu, untilText } from "@/V2/Shared/Mail/MailActionsUi";
 import { EMOJI, Editor, esc, shrinkImage, textToHtml, Toolbar, useRich } from "@/V2/Shared/Mail/RichEditor";
 
 /*
@@ -153,7 +153,7 @@ function Compose({ account, draft, onClose }) {
         onClose(true);
     };
 
-    const send = async () => {
+    const send = async (sendAt = null) => {
         if (busy || !canSend) return;
         setBusy(true);
         await chain.current;
@@ -161,7 +161,7 @@ function Compose({ account, draft, onClose }) {
         const el = rich.ref.current;
         router.post(
             `/mail/accounts/${account.id}/send`,
-            { from, to, cc, bcc, subject, body: (el?.innerText ?? text).replace(/\u00a0/g, " "), html: el?.innerHTML ?? html, signature: sigOn ? 1 : 0, files, reply_to_id: draft.reply_to_id ?? "", forward_of: draft.forward_of ?? "", keep_attachments: kept.map((a) => a.id), draft_id: draftId.current ?? "" },
+            { from, to, cc, bcc, subject, body: (el?.innerText ?? text).replace(/\u00a0/g, " "), html: el?.innerHTML ?? html, signature: sigOn ? 1 : 0, files, reply_to_id: draft.reply_to_id ?? "", forward_of: draft.forward_of ?? "", keep_attachments: kept.map((a) => a.id), draft_id: draftId.current ?? "", send_at: sendAt ?? "" },
             {
                 forceFormData: true,
                 preserveScroll: true,
@@ -204,7 +204,7 @@ function Compose({ account, draft, onClose }) {
         sync();
     };
 
-    const err = errors.to || errors.to_list || errors["to_list.0"] || errors.cc_list || errors["cc_list.0"] || errors.bcc_list || errors["bcc_list.0"] || errors.from || errors.subject || errors.body || errors.html || errors.files || errors["files.0"] || errors.send;
+    const err = errors.send_at || errors.to || errors.to_list || errors["to_list.0"] || errors.cc_list || errors["cc_list.0"] || errors.bcc_list || errors["bcc_list.0"] || errors.from || errors.subject || errors.body || errors.html || errors.files || errors["files.0"] || errors.send;
     const big = mode === "max";
     const small = mode === "min";
     const icon = "rounded p-1 text-slate-600 hover:bg-slate-200";
@@ -338,9 +338,13 @@ function Compose({ account, draft, onClose }) {
                         )}
                         {tools && <Toolbar rich={rich} />}
                         <div className="relative flex items-center gap-1">
-                            <button type="button" onClick={send} disabled={!canSend} title="Send (Ctrl+Enter)" className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-6 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
-                                <Send size={15} /> {busy ? "Sending..." : "Send"}
-                            </button>
+                            <div className="inline-flex overflow-visible rounded-full bg-violet-600 text-white">
+                                <button type="button" onClick={() => send()} disabled={!canSend} title="Send (Ctrl+Enter)" className="inline-flex items-center gap-2 rounded-l-full py-2 pl-6 pr-4 text-sm font-semibold hover:bg-violet-700 disabled:opacity-50">
+                                    <Send size={15} /> {busy ? "Sending..." : "Send"}
+                                </button>
+                                {/* W117: Schedule send */}
+                                <ScheduleMenu disabled={!canSend} onPick={(iso) => send(iso)} />
+                            </div>
                             <button type="button" onClick={() => setTools(!tools)} className={tool(tools)} title="Formatting options" aria-label="Formatting options">
                                 <ALargeSmall size={19} />
                             </button>
@@ -509,7 +513,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
             note: open.attachments?.length ? "The attachments of the original mail go along - remove any you do not want to send." : null,
         });
 
-    const listTitle = useMemo(() => ({ sent: "Sent", drafts: "Drafts", starred: "Starred", snoozed: "Snoozed", archive: "Archive", spam: "Spam", trash: "Trash" })[folder] ?? "Inbox", [folder]);
+    const listTitle = useMemo(() => ({ sent: "Sent", drafts: "Drafts", starred: "Starred", snoozed: "Snoozed", scheduled: "Scheduled", archive: "Archive", spam: "Spam", trash: "Trash" })[folder] ?? "Inbox", [folder]);
 
     if (accounts.length === 0) {
         return (
@@ -641,6 +645,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                                       drafts: "No drafts. A mail you start writing is kept here until it is sent.",
                                       starred: "No starred mail. Press the star on a mail to keep it here.",
                                       snoozed: "No snoozed mail. Press the clock on a mail to hide it until later.",
+                                      scheduled: "No scheduled mail. In the Write window press the small arrow next to Send.",
                                       archive: "Nothing archived. Archive takes a mail out of the Inbox but keeps it.",
                                       spam: "No spam. Hooray!",
                                       trash: `Trash is empty. Deleted mails stay here for ${trashDays} days.`,
@@ -653,7 +658,7 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                                     <button type="button" onClick={() => tick(m.id)} aria-label={sel.has(m.id) ? "Untick" : "Tick"} aria-pressed={sel.has(m.id)} className="shrink-0 pl-2.5 pr-0.5 text-slate-300 hover:text-slate-600">
                                         {sel.has(m.id) ? <CheckSquare size={17} className="text-violet-600" /> : <Square size={17} />}
                                     </button>
-                                    {m.folder !== "drafts" && m.folder !== "trash" && m.folder !== "spam" ? (
+                                    {!["drafts", "trash", "spam", "scheduled"].includes(m.folder) ? (
                                         <button type="button" onClick={() => star(m, !m.starred)} title={m.starred ? "Starred - click to remove the star" : "Star this mail"} aria-label={m.starred ? "Remove star" : "Star"} aria-pressed={m.starred} className="shrink-0 pl-1.5 pr-1 text-slate-300 hover:text-amber-500">
                                             <Star size={17} className={m.starred ? "fill-amber-400 text-amber-500" : ""} />
                                         </button>
@@ -674,8 +679,13 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                                             <span className="truncate">{m.subject}</span>
                                         </div>
                                         <div className="truncate text-xs text-slate-400">{m.snippet}</div>
-                                        {(m.snooze_until || m.woke || (folder !== m.folder && ["archive", "trash", "spam"].includes(m.folder))) && (
+                                        {(m.snooze_until || m.woke || m.scheduled_at || (folder !== m.folder && ["archive", "trash", "spam"].includes(m.folder))) && (
                                             <div className="mt-1 flex flex-wrap gap-1">
+                                                {m.scheduled_at && (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-800">
+                                                        <Clock size={10} /> sends {untilText(m.scheduled_at)}
+                                                    </span>
+                                                )}
                                                 {m.snooze_until && new Date(m.snooze_until) > new Date() && (
                                                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
                                                         <Clock size={10} /> until {untilText(m.snooze_until)}
@@ -709,6 +719,45 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                 <section className={`min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm ${open ? "" : "hidden lg:block"}`}>
                     {!open ? (
                         <p className="px-5 py-24 text-center text-sm text-slate-400">Choose a mail to read it.</p>
+                    ) : open.folder === "scheduled" ? (
+                        /* W117: a scheduled mail - when it goes, Send now / Cancel */
+                        <article className="flex h-full flex-col">
+                            <div className="border-b border-slate-100 px-5 py-4">
+                                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                                    <Clock size={16} className="shrink-0" />
+                                    <span>
+                                        Will be sent <b>{untilText(open.scheduled?.at)}</b>
+                                        {open.scheduled?.error && <span className="block text-xs text-red-700">Last try failed: {open.scheduled.error} - trying again.</span>}
+                                    </span>
+                                    <span className="ml-auto flex gap-2">
+                                        <button type="button" onClick={() => window.confirm("Send this mail now?") && router.post(`/mail/scheduled/${open.id}/now`, {}, { preserveScroll: true })} className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white">
+                                            Send now
+                                        </button>
+                                        <button type="button" onClick={() => window.confirm(`Do not send it - put it back in Drafts?${open.scheduled?.files?.length ? " Attachments added in the Write window are not kept in drafts." : ""}`) && router.post(`/mail/scheduled/${open.id}/cancel`, {}, { preserveScroll: true })} className="rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-semibold text-sky-900">
+                                            Cancel send
+                                        </button>
+                                    </span>
+                                </div>
+                                <h2 className="break-words text-lg font-bold text-slate-950">{open.subject}</h2>
+                                <div className="mt-1 break-words text-xs text-slate-500">From: {open.from_email} · To: {open.to || "—"}{open.cc ? ` · Cc: ${open.cc}` : ""}{open.bcc ? ` · Bcc: ${open.bcc}` : ""}</div>
+                                {open.scheduled?.files?.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {open.scheduled.files.map((f) => (
+                                            <span key={f.name} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                                                <Paperclip size={13} /> {f.name} <span className="font-normal text-slate-400">{size(f.size)}</span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="min-h-[40vh] flex-1">
+                                {open.has_html ? (
+                                    <iframe key={`${open.id}-${darkMail ? "n" : "d"}`} title="Mail" src={`/mail/messages/${open.id}/html${darkMail ? "?night=1" : ""}`} sandbox="allow-popups allow-popups-to-escape-sandbox" className={`block h-[60vh] w-full rounded-b-2xl ${darkMail ? "bg-[#111827]" : "bg-white"}`} />
+                                ) : (
+                                    <pre className="whitespace-pre-wrap break-words px-5 py-4 font-sans text-sm leading-relaxed text-slate-800">{open.text || "(empty)"}</pre>
+                                )}
+                            </div>
+                        </article>
                     ) : open.folder === "drafts" ? (
                         <div className="px-5 py-20 text-center">
                             <p className="text-sm text-slate-500">This draft opens in the Write window.</p>

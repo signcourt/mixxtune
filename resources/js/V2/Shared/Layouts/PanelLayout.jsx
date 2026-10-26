@@ -6,6 +6,7 @@ import Sidebar from "@/V2/Shared/Navigation/Sidebar";
 import ImpersonationBanner from "@/V2/Shared/Components/ImpersonationBanner";
 import MaintenanceExperience from "@/V2/Shared/Maintenance/MaintenanceExperience";
 import BankChangeOtpPrompt from "@/V2/Shared/Components/BankChangeOtpPrompt";
+import ApprovalNotice from "@/V2/Shared/Components/ApprovalNotice";
 import HighlightNoticeBanner from "@/V2/Shared/Components/HighlightNoticeBanner";
 import DayNightSwitch from "@/V2/Shared/Components/DayNightSwitch";
 
@@ -482,6 +483,7 @@ export default function PanelLayout({
                     <main className="p-5 lg:p-7">
                         {/* MIXXTUNE_BANK_CHANGE_PROTECTION_V1 */}
                         <BankChangeOtpPrompt />
+                        <ApprovalNotice />
                         {/* MIXXTUNE_NOTIFY_TARGETED_V1 */}
                         <HighlightNoticeBanner />
                         <MaintenanceExperience

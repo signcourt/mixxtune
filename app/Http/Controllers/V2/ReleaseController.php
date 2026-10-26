@@ -1815,12 +1815,14 @@ class ReleaseController extends Controller
             ]
         );
 
+        /* W119 MIXXTUNE_NEW_RELEASE_UI_N6: show the release with "sent for review" and what happens next */
         return redirect()
-            ->route('v2.releases.index')
+            ->route('v2.releases.show', $release)
             ->with(
                 'success',
                 "Release '{$release->title}' submitted for review."
-            );
+            )
+            ->with('submitted', true);
     }
 
     private function validateDraft(

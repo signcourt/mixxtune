@@ -1469,6 +1469,9 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.admin.identifiers.upc.bulk');
 
+/* W116 MIXXTUNE_CODE_LISTS: upload the UPC / ISRC codes allotted to Mixx Tune */
+Route::middleware(['auth', 'verified'])->post('/admin/identifiers/lists', [\App\Http\Controllers\V2\Admin\IdentifierController::class, 'uploadList'])->middleware('throttle:20,1,code-lists')->name('v2.admin.identifiers.lists');
+
 
 Route::middleware(['auth', 'verified'])
     ->get(
@@ -2077,6 +2080,13 @@ Route::middleware(['auth', 'verified'])
         [\App\Http\Controllers\V2\Admin\WithdrawalManagementController::class, 'markPaid']
     )
     ->name('v2.admin.withdrawals.paid');
+
+/* W118 MIXXTUNE_MAKER_CHECKER: Administration -> Second approval */
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/admin/approvals', [\App\Http\Controllers\V2\Admin\ApprovalController::class, 'index'])->name('v2.admin.approvals.index');
+    Route::post('/admin/approvals/switch', [\App\Http\Controllers\V2\Admin\ApprovalController::class, 'toggle'])->middleware('throttle:10,1,approvals-switch')->name('v2.admin.approvals.switch');
+    Route::post('/admin/approvals/{approval}', [\App\Http\Controllers\V2\Admin\ApprovalController::class, 'decide'])->whereNumber('approval')->middleware('throttle:30,1,approvals-decide')->name('v2.admin.approvals.decide');
+});
 
 /* W115 MIXXTUNE_RAZORPAY_PAYOUTS + MIXXTUNE_STAFF_SALARY (Super Admin only; checked in the controllers) */
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -3108,6 +3118,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/mail/drafts/{message}/delete', [\App\Http\Controllers\V2\MailController::class, 'deleteDraft'])->whereNumber('message')->middleware('throttle:60,1,mail-draft-del')->name('v2.mail.drafts.delete');
     Route::get('/mail/accounts/{account}/contacts', [\App\Http\Controllers\V2\MailController::class, 'contacts'])->whereNumber('account')->middleware('throttle:60,1,mail-contacts')->name('v2.mail.contacts');
     /* W113: Trash / Archive / Spam / read-unread / Snooze, for one or many mails */
+    /* W117: Schedule send - Cancel (back to Drafts) / Send now */
+    Route::post('/mail/scheduled/{message}/{what}', [\App\Http\Controllers\V2\MailController::class, 'scheduled'])->whereNumber('message')->whereIn('what', ['cancel', 'now'])->middleware('throttle:30,1,mail-scheduled')->name('v2.mail.scheduled');
     Route::post('/mail/accounts/{account}/act', [\App\Http\Controllers\V2\MailController::class, 'act'])->whereNumber('account')->middleware('throttle:120,1,mail-act')->name('v2.mail.act');
     Route::post('/mail/accounts/{account}/trash/empty', [\App\Http\Controllers\V2\MailController::class, 'emptyTrash'])->whereNumber('account')->middleware('throttle:10,1,mail-empty')->name('v2.mail.trash.empty');
     Route::post('/mail/accounts/{account}/send', [\App\Http\Controllers\V2\MailController::class, 'send'])->whereNumber('account')->middleware('throttle:30,1')->name('v2.mail.send');

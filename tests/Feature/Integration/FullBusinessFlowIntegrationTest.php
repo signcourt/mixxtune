@@ -178,7 +178,7 @@ class FullBusinessFlowIntegrationTest extends TestCase
                 )
             )
             ->assertRedirect(
-                route('v2.releases.index')
+                route('v2.releases.show', $release) /* W119: N6 after submit */
             );
 
         $release->refresh();

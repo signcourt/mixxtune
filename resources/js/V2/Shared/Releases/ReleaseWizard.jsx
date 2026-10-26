@@ -7,13 +7,12 @@ import {
 } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
-import ReleaseHelpfulTip from '@/V2/Shared/Releases/V4/ReleaseHelpfulTip';
 import ReleaseCoverArtCard from '@/V2/Shared/Releases/V4/ReleaseCoverArtCard';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import ReleaseDetailsStep from '@/V2/Shared/Releases/Steps/ReleaseDetailsStep';
-import TrackManager from '@/V2/Shared/Releases/Steps/TrackManager';
+import TrackManager, { trackMissingLabels } from '@/V2/Shared/Releases/Steps/TrackManager';
 import TerritoryStep from '@/V2/Shared/Releases/Steps/TerritoryStep';
-import ReviewStep from '@/V2/Shared/Releases/Steps/ReviewStep';
+import ReviewStep, { reviewChecks } from '@/V2/Shared/Releases/Steps/ReviewStep';
 
 
 const RELEASES_BASE_PATH =
@@ -521,6 +520,13 @@ export default function ReleaseWizard({
     };
 
     const submitForReview = () => {
+        /* W119: the top-bar Submit follows the same checklist as the one beside the review */
+        if (release?.id && !reviewChecks({ release, artist, label, distributionStores }).allPassed) {
+            window.alert('Complete all items of the checklist before submitting.');
+
+            return;
+        }
+
         if (!release?.id) {
             setSaveState('error');
 
@@ -634,7 +640,16 @@ export default function ReleaseWizard({
         );
     };
 
+    /* W119: step 3 "Save & review →" runs the territory save (same request as before) */
+    const territory = useRef(null);
+
     const nextStep = () => {
+        if (currentStep === 3 && territory.current?.save) {
+            territory.current.save();
+
+            return;
+        }
+
         if (currentStep === 1) {
             submitDraft({
                 step: 2,
@@ -688,6 +703,7 @@ export default function ReleaseWizard({
                             </div>
                             <p className="mt-0.5 text-xs text-slate-500">
                                 {typeLabel(data.release_type)}
+                                {currentStep >= 3 && Array.isArray(release?.tracks) ? ` · ${release.tracks.length} track${release.tracks.length === 1 ? '' : 's'}` : ''}
                                 {' · '}
                                 {adminEdit ? statusLabel(release?.status) : 'Draft'}
                                 {' · '}
@@ -759,15 +775,15 @@ export default function ReleaseWizard({
                         )}
 
                         {currentStep > 1 && (
-                            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                            <>
                                 {currentStep === 2 && (
                                     release?.id ? (
                                         <TrackManager
                                             release={release}
                                             onMascotEvent={handleMascotEvent}
                                             onSaved={() => {
+                                                /* W119: stay on the track list after saving a track */
                                                 setMascotEvent(null);
-                                                setCurrentStep(3);
                                             }}
                                         />
                                     ) : (
@@ -781,6 +797,9 @@ export default function ReleaseWizard({
                                             release={release}
                                             distributionStores={distributionStores}
                                             onMascotEvent={handleMascotEvent}
+                                            registerSave={(api) => {
+                                                territory.current = api;
+                                            }}
                                             onSaved={() => {
                                                 setMascotEvent(null);
                                                 setCurrentStep(4);
@@ -806,11 +825,11 @@ export default function ReleaseWizard({
                                         <StepPlaceholder title="Review & Publish" description="Save the release before reviewing it." />
                                     )
                                 )}
-                            </section>
+                            </>
                         )}
                     </main>
 
-                    {currentStep < LAST_STEP && (
+                    {(currentStep === 1 || currentStep === 2) && (
                         <aside className="flex min-w-0 max-w-full flex-[1_1_300px] flex-col gap-4 lg:max-w-[360px]">
                             {currentStep === 1 ? (
                                 <>
@@ -823,7 +842,12 @@ export default function ReleaseWizard({
                                     <StepChecklist items={detailsChecklist(data)} />
                                 </>
                             ) : (
-                                <ReleaseHelpfulTip currentStep={currentStep} />
+                                <>
+                                    <StepChecklist items={tracksChecklist(release)} />
+                                    <section className="rounded-2xl border border-slate-200 bg-white p-5 text-xs leading-relaxed text-slate-600 shadow-sm">
+                                        WAV only, 16 or 24-bit, 44.1 or 48 kHz. Fill the credits (lyricist and composer) for every song - stores in India need them.
+                                    </section>
+                                </>
                             )}
                         </aside>
                     )}
@@ -851,7 +875,7 @@ export default function ReleaseWizard({
                         onSaveDraft={saveDraft}
                         onNext={nextStep}
                         onSubmit={submitForReview}
-                        nextText={['', 'Continue to tracks →', 'Continue to territories →', 'Continue to review →'][currentStep] || null}
+                        nextText={['', 'Continue to tracks →', 'Continue to territories →', 'Save & review →'][currentStep] || null}
                     />
                 </div>
             </div>
@@ -1026,6 +1050,23 @@ function detailsChecklist(data) {
         { label: data.generate_upc === false ? 'Your UPC (12 or 13 digits)' : 'UPC: added by Mixx Tune', done: upcOk },
         { label: 'Cover art 3000 × 3000', done: Boolean(data.artwork || data.artwork_preview) },
     ];
+}
+
+/* W119: N2 "This step" - tracks */
+function tracksChecklist(release) {
+    const tracks = Array.isArray(release?.tracks) ? release.tracks : [];
+    const items = [
+        { label: 'At least one track', done: tracks.length > 0 },
+        { label: 'WAV for every track', done: tracks.length > 0 && tracks.every((t) => Boolean(t.audio_path)) },
+    ];
+    const missing = tracks.filter((t) => trackMissingLabels(t).length > 0);
+    if (missing.length === 0) {
+        items.push({ label: 'Credits for every track', done: tracks.length > 0 });
+    } else {
+        missing.slice(0, 6).forEach((t) => items.push({ label: `Credits for track ${t.track_number || tracks.indexOf(t) + 1}`, done: false }));
+    }
+
+    return items;
 }
 
 function StepChecklist({ title = 'This step', items = [] }) {

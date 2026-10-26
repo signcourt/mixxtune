@@ -224,6 +224,31 @@ class IsrcService
             ]);
         }
 
+        /* W116 MIXXTUNE_CODE_LISTS: when Mixx Tune has uploaded its ISRC list, the next free code from it is used */
+        $pool = app(IdentifierPool::class);
+        if ($pool->hasIsrc()) {
+            return DB::transaction(function () use ($track, $user, $notes, $pool) {
+                $locked = Track::query()->whereKey($track->id)->lockForUpdate()->firstOrFail();
+                if ($locked->isrc) {
+                    throw ValidationException::withMessages(['isrc' => 'This track already has an ISRC.']);
+                }
+                $record = $pool->takeIsrc();
+                if (!$record) {
+                    throw ValidationException::withMessages(['isrc' => 'No free ISRC left in the list - upload more (ISRC & UPC -> Code lists).']);
+                }
+                $record->forceFill(['status' => 'assigned', 'track_id' => $locked->id, 'assigned_by' => $user->id, 'assigned_at' => now(), 'notes' => $notes])->save();
+                $locked->update(['isrc' => $record->code, 'isrc_is_auto_generated' => true, 'isrc_assigned_at' => now(), 'isrc_assigned_by' => $user->id, 'updated_by' => $user->id]);
+                $this->log($record->code, 'list_assigned', $user, $locked, $notes);
+                $fresh = $locked->fresh(['release']);
+                if ($fresh->release) {
+                    $this->notifications->identifierAssigned($fresh->release, 'isrc', $fresh->isrc);
+                    $this->audit->identifierAssigned($fresh->release, 'isrc', $fresh->isrc, $fresh, $user);
+                }
+
+                return $fresh;
+            });
+        }
+
         $countryCode = strtoupper(
             trim($countryCode)
         );

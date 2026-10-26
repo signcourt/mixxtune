@@ -109,6 +109,10 @@ class IdentifierController extends Controller
 
                 'scope' => $scope,
                 'q' => $q,
+
+                /* W116 MIXXTUNE_CODE_LISTS */
+                'codeLists' => app(\App\Services\V2\IdentifierPool::class)->stats(),
+                'canUploadLists' => $permissions->role($request->user()) === 'super_admin',
             ]
         );
     }
@@ -530,5 +534,38 @@ class IdentifierController extends Controller
 
             'releases' => $assigned,
         ]);
+    }
+
+    /* W116 MIXXTUNE_CODE_LISTS: upload the UPC / ISRC codes allotted to Mixx Tune (Super Admin) */
+    public function uploadList(Request $request, PermissionService $permissions, \App\Services\V2\IdentifierPool $pool): \Illuminate\Http\RedirectResponse
+    {
+        abort_unless($permissions->role($request->user()) === 'super_admin', 403, 'Only a Super Admin can upload code lists.');
+        $data = $request->validate([
+            'type' => ['required', 'in:upc,isrc'],
+            'how' => ['required', 'in:file,text,range'],
+            'file' => ['required_if:how,file', 'nullable', 'file', 'max:20480', 'mimes:xlsx,xls,ods,csv,txt'],
+            'text' => ['required_if:how,text', 'nullable', 'string', 'max:2000000'],
+            'range_first' => ['required_if:how,range', 'nullable', 'string', 'max:30'],
+            'range_last' => ['required_if:how,range', 'nullable', 'string', 'max:30'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ], ['file.mimes' => 'Excel (.xlsx / .xls), .csv or .txt only.']);
+        [$raw, $source] = match ($data['how']) {
+            'file' => [$pool->readFile($request->file('file')), $request->file('file')->getClientOriginalName()],
+            'text' => [$pool->splitText((string) $data['text']), 'pasted list'],
+            'range' => [$pool->range($data['type'], (string) $data['range_first'], (string) $data['range_last']), 'range '.$data['range_first'].' - '.$data['range_last']],
+        };
+        $r = $pool->import($data['type'], $raw, $request->user(), $source, $data['note'] ?? null);
+        $T = strtoupper($data['type']);
+        $msg = $r['added'].' '.$T.' added to the list.';
+        $skip = array_filter([
+            $r['skipped_double'] ? $r['skipped_double'].' already in the list' : null,
+            $r['skipped_used'] ? $r['skipped_used'].' already on a '.($data['type'] === 'upc' ? 'release' : 'track') : null,
+            $r['invalid'] ? $r['invalid'].' not valid (e.g. '.implode(', ', $r['invalid_examples']).')' : null,
+        ]);
+        if ($skip) {
+            $msg .= ' Left out: '.implode('; ', $skip).'.';
+        }
+
+        return back()->with($r['added'] > 0 ? 'success' : 'error', $msg);
     }
 }

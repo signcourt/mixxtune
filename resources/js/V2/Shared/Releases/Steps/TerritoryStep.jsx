@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 /*
  * W64 MIXXTUNE_TERRITORIES_V2
@@ -40,6 +40,7 @@ export default function TerritoryStep({
     distributionStores = [],
     onSaved = () => {},
     onMascotEvent = () => {},
+    registerSave = null,
 }) {
     const allCodes = useMemo(() => COUNTRIES.map((c) => c.code), []);
 
@@ -119,82 +120,59 @@ export default function TerritoryStep({
     };
 
     const excluded = allCodes.length - selected.size;
+    /* W119 MIXXTUNE_NEW_RELEASE_UI_N4: the wizard's "Save & review →" runs this same save */
+    useEffect(() => {
+        if (registerSave) registerSave({ save, processing });
+    });
+    const exceptNames = !worldwide && excluded > 0 && excluded <= 5
+        ? COUNTRIES.filter((c) => !selected.has(c.code)).map((c) => c.name).join(', ')
+        : null;
+    const qbtn = 'h-[30px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50';
 
     return (
-        <div className="space-y-5">
-            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 className="text-xl font-semibold text-slate-900">Territories</h2>
-                    <p className="mt-1 text-sm text-slate-500">Where listeners can find this release. Worldwide is recommended.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    {saved && <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Saved</span>}
-                    <button
-                        type="button"
-                        onClick={save}
-                        disabled={processing}
-                        className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
-                    >
-                        {processing ? 'Saving...' : 'Save & continue'}
-                    </button>
-                </div>
-            </div>
-
+        <div className="space-y-4">
             {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>}
 
-            <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                    type="button"
-                    onClick={setWorldwide}
-                    aria-pressed={worldwide}
-                    className={`flex items-center gap-4 rounded-2xl border p-4 text-left transition ${worldwide ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-100' : 'border-slate-200 bg-white hover:border-violet-300'}`}
-                >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-2xl shadow-sm" aria-hidden="true">🌍</span>
-                    <span className="min-w-0">
-                        <span className="block font-semibold text-slate-900">Worldwide</span>
-                        <span className="block text-sm text-slate-500">All {allCodes.length} countries and regions</span>
-                    </span>
-                    <span className={`ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs ${worldwide ? 'border-violet-600 bg-violet-600 text-white' : 'border-slate-300 text-transparent'}`}>✓</span>
-                </button>
-
-                <div className={`flex items-center gap-4 rounded-2xl border p-4 ${!worldwide ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-100' : 'border-slate-200 bg-white'}`}>
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-lg font-bold text-violet-700 shadow-sm">{selected.size}</span>
-                    <span className="min-w-0">
-                        <span className="block font-semibold text-slate-900">
-                            {worldwide ? 'Leave some countries out?' : excluded > 0 && selected.size > allCodes.length / 2 ? `Worldwide except ${excluded}` : `${selected.size} countries selected`}
+            <section className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <label className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3.5 ${worldwide ? 'border-violet-600 bg-violet-50' : 'border-slate-200 bg-white'}`}>
+                    <input type="checkbox" checked={worldwide} onChange={(e) => (e.target.checked ? setWorldwide() : clearAll())} className="h-4 w-4 rounded border-slate-300 text-violet-600" />
+                    <span>
+                        <span className="block text-sm font-bold text-slate-900"><span aria-hidden="true">🌍</span> Worldwide</span>
+                        <span className="block text-xs text-slate-500">
+                            {worldwide ? `All ${allCodes.length} countries · recommended` : exceptNames ? `Worldwide except ${exceptNames}` : `${selected.size} of ${allCodes.length} countries`}
                         </span>
-                        <span className="block text-sm text-slate-500">{worldwide ? 'Untick them in the list below' : 'Press Worldwide to select every country again'}</span>
                     </span>
-                </div>
-            </div>
+                </label>
+                <p className="min-w-0 flex-[1_1_240px] text-xs text-slate-600">
+                    Untick a country below to leave it out. {Array.isArray(release?.stores) && release.stores.length > 0 ? `The ${release.stores.length} stores chosen earlier are kept.` : `All ${distributionStores.length} active stores are used automatically.`}
+                    {saved && <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">Saved</span>}
+                </p>
+            </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-3.5 flex flex-wrap items-center gap-2">
                     <input
                         type="search"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search country"
                         aria-label="Search country"
-                        className="h-11 w-full rounded-xl border border-slate-300 px-4 text-sm outline-none focus:border-violet-500 lg:w-72"
+                        className="h-[30px] w-full max-w-[260px] rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-violet-500"
                     />
-                    <div className="flex flex-1 flex-wrap items-center gap-2">
-                        <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Quick</span>
-                        <button type="button" onClick={() => onlyThese(['IN'])} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">{flag('IN')} Only India</button>
-                        <button type="button" onClick={() => onlyThese(QUICK)} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">South Asia + top markets</button>
-                        <button type="button" onClick={setWorldwide} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Select all</button>
-                        <button type="button" onClick={clearAll} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50">Clear</button>
-                    </div>
-                    <span className="text-xs font-semibold text-slate-500">{selected.size} of {allCodes.length}</span>
+                    <button type="button" onClick={() => onlyThese(['IN'])} className={qbtn}>{flag('IN')} Only India</button>
+                    <button type="button" onClick={() => onlyThese(QUICK)} className={qbtn}>South Asia + top markets</button>
+                    <button type="button" onClick={setWorldwide} className={qbtn}>Select all</button>
+                    <button type="button" onClick={clearAll} className={`${qbtn} text-rose-700`}>Clear</button>
+                    <span className="ml-auto text-xs font-semibold text-slate-600">{selected.size} of {allCodes.length}</span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                     {shown.map((c) => {
                         const on = selected.has(c.code);
                         return (
                             <label
                                 key={c.code}
-                                className={`flex min-h-[36px] cursor-pointer items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition ${on ? 'border-violet-200 bg-violet-50/60 text-slate-800' : 'border-slate-200 bg-white text-slate-400'}`}
+                                className={`flex h-8 cursor-pointer items-center gap-2 rounded-[7px] border px-2 text-xs transition ${on ? 'border-violet-200 bg-violet-50/60 text-slate-800' : 'border-slate-200 bg-white text-slate-400'}`}
                                 title={c.name}
                             >
                                 <input type="checkbox" checked={on} onChange={() => toggle(c.code)} className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-violet-600" />
@@ -206,10 +184,6 @@ export default function TerritoryStep({
                     {shown.length === 0 && <div className="col-span-full py-8 text-center text-sm text-slate-500">No country matches “{search}”.</div>}
                 </div>
             </section>
-
-            <p className="text-xs text-slate-500">
-                Stores: {Array.isArray(release?.stores) && release.stores.length > 0 ? `${release.stores.length} chosen earlier` : `all ${distributionStores.length} active stores`} — Mixx Tune manages store delivery.
-            </p>
         </div>
     );
 }

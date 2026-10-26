@@ -1,4 +1,4 @@
-import { AlarmClockOff, Archive, ChevronDown, Clock, Inbox, Mail, MailOpen, OctagonAlert, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
+import { AlarmClockOff, Archive, CalendarClock, ChevronDown, ChevronUp, Clock, Inbox, Mail, MailOpen, OctagonAlert, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 /*
@@ -138,6 +138,7 @@ export function MailButtons({ items, act, quick = false, align = "left", btn = "
 export function MoreFolders({ folder, counts, onGo }) {
     const [open, setOpen, box] = usePop();
     const list = [
+        ["scheduled", "Scheduled", CalendarClock, counts.scheduled],
         ["snoozed", "Snoozed", Clock, counts.snoozed],
         ["archive", "Archive", Archive, null],
         ["spam", "Spam", OctagonAlert, counts.spam],
@@ -166,6 +167,57 @@ export function MoreFolders({ folder, counts, onGo }) {
                             {c > 0 && <span className="ml-auto text-[11px] font-bold text-slate-400">{c}</span>}
                         </button>
                     ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* W117: "Schedule send" - the small arrow next to Send, like Gmail */
+export function scheduleChoices(now = new Date()) {
+    const out = [];
+    out.push(["Tomorrow morning", at(now, 1, 8)]);
+    out.push(["Tomorrow afternoon", at(now, 1, 13)]);
+    const day = now.getDay();
+    const monday = at(now, ((8 - day) % 7) || 7, 8);
+    if (monday.getTime() !== out[0][1].getTime()) out.push(["Monday morning", monday]);
+    return out;
+}
+
+export function ScheduleMenu({ onPick, disabled }) {
+    const [open, setOpen, box] = usePop();
+    const [custom, setCustom] = useState("");
+    const local = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const pick = (d) => {
+        setOpen(false);
+        onPick(d.toISOString());
+    };
+    const soon = new Date(Date.now() + 3 * 60000);
+
+    return (
+        <div ref={box} className="relative">
+            <button type="button" disabled={disabled} onClick={() => setOpen(!open)} title="Schedule send" aria-label="Schedule send" aria-expanded={open} className="inline-flex h-full items-center rounded-r-full border-l border-violet-400/60 px-2.5 hover:bg-violet-700 disabled:opacity-50">
+                <ChevronUp size={15} />
+            </button>
+            {open && (
+                <div className="absolute bottom-full left-0 z-50 mb-2 w-72 rounded-xl border border-slate-200 bg-white py-1 text-left text-slate-800 shadow-xl">
+                    <p className="px-3 pb-1 pt-1.5 text-[11px] font-bold uppercase text-slate-400">Schedule send</p>
+                    {scheduleChoices().map(([n, d]) => (
+                        <button key={n} type="button" onClick={() => pick(d)} className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-sm hover:bg-slate-50">
+                            <span>{n}</span>
+                            <span className="text-xs text-slate-500">{fmt(d)}</span>
+                        </button>
+                    ))}
+                    <div className="mt-1 border-t border-slate-100 px-3 pb-2 pt-2">
+                        <label className="block text-[11px] font-semibold text-slate-500">
+                            Pick date and time
+                            <input type="datetime-local" value={custom} min={local(soon)} onChange={(e) => setCustom(e.target.value)} className="mt-1 h-8 w-full rounded-md border border-slate-300 px-2 text-sm font-normal text-slate-800" />
+                        </label>
+                        <button type="button" disabled={!custom || new Date(custom) <= soon} onClick={() => pick(new Date(custom))} className="mt-2 w-full rounded-md bg-violet-600 py-1.5 text-xs font-semibold text-white disabled:opacity-40">
+                            Schedule send
+                        </button>
+                        <p className="mt-1.5 text-[10px] text-slate-400">It waits in "Scheduled" (More) and goes out by itself. Your computer can be off.</p>
+                    </div>
                 </div>
             )}
         </div>

@@ -68,3 +68,8 @@ Schedule::command('backups:check --quiet-ok')
 Schedule::command('payouts:sync')
     ->everyFiveMinutes()
     ->withoutOverlapping(15);
+
+/* W117 MIXXTUNE_MAIL_SCHEDULE_SEND: send the scheduled mails whose time has come */
+Schedule::command('mail:send-scheduled')
+    ->everyMinute()
+    ->withoutOverlapping(10);

@@ -1,5 +1,5 @@
 import { Link, router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { COUNTRIES } from '@/V2/Shared/Releases/Steps/TerritoryStep';
 
 /*
@@ -32,43 +32,16 @@ const formatDate = (value) => {
     }).format(date);
 };
 
-export default function ReviewStep({
-    release,
-    adminEdit = false,
-    artist = null,
-    label = null,
-    distributionStores = [],
-    onEditStep = () => {},
-    onMascotEvent = () => {},
-}) {
-    const [submitting, setSubmitting] =
-        useState(false);
-
-    const tracks = Array.isArray(
-        release?.tracks
-    )
-        ? release.tracks
-        : [];
-
+/* W119: the same checks for the Submit in the checklist and the Submit in the top bar */
+export function reviewChecks({ release, artist = null, label = null, distributionStores = [] }) {
+    const tracks = Array.isArray(release?.tracks) ? release.tracks : [];
     const selectedStoreIds = Array.isArray(
         release?.stores
     )
         ? release.stores.map(Number)
         : [];
 
-    const selectedStores = useMemo(
-        () =>
-            distributionStores.filter(
-                (store) =>
-                    selectedStoreIds.includes(
-                        Number(store.id)
-                    )
-            ),
-        [
-            distributionStores,
-            selectedStoreIds.join(','),
-        ]
-    );
+    const selectedStores = (distributionStores ?? []).filter((store) => selectedStoreIds.includes(Number(store.id)));
 
     const isArtistAccount =
         Boolean(artist?.id) &&
@@ -189,9 +162,29 @@ export default function ReviewStep({
         },
     ];
 
-    const allPassed = checks.every(
-        (check) => check.passed
-    );
+
+    return { checks, allPassed: checks.every((c) => c.passed), selectedStores, effectiveSelectedStores, isArtistAccount };
+}
+
+export default function ReviewStep({
+    release,
+    adminEdit = false,
+    artist = null,
+    label = null,
+    distributionStores = [],
+    onEditStep = () => {},
+    onMascotEvent = () => {},
+}) {
+    const [submitting, setSubmitting] =
+        useState(false);
+
+    const tracks = Array.isArray(
+        release?.tracks
+    )
+        ? release.tracks
+        : [];
+
+    const { checks, allPassed, selectedStores, effectiveSelectedStores, isArtistAccount } = reviewChecks({ release, artist, label, distributionStores });
 
     const submitForReview = () => {
         if (!release?.id || submitting) {
@@ -259,47 +252,143 @@ export default function ReviewStep({
 
     const artwork = release?.artwork_path ? `/storage/${release.artwork_path}` : null;
 
+    const typeName = release?.release_type ? ({ single: 'Single', ep: 'EP', album: 'Album' }[String(release.release_type).toLowerCase()] ?? release.release_type) : 'Not provided';
+    const featuring = Array.isArray(release?.featuring_artists) && release.featuring_artists.length
+        ? release.featuring_artists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean).join(', ')
+        : release?.featuring_artist_name || '—';
+    const line = (sign, year, owner) => (owner ? `${sign} ${year ? `${year} ` : ''}${owner}` : 'Not provided');
+    const excludedNames = !isWorldwide && territoryCodes.length > COUNTRIES.length / 2
+        ? COUNTRIES.filter((c) => !territoryCodes.includes(c.code)).map((c) => c.name)
+        : [];
+    const pct = Math.round((doneCount / checks.length) * 100);
+
+    /* W119 MIXXTUNE_NEW_RELEASE_UI_N5: main column + checklist with Submit on the side (as N1) */
     return (
-        <div className="space-y-6">
-            <section className="flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-5 lg:flex-row lg:items-center">
-                {artwork ? (
-                    <img src={artwork} alt="" className="h-28 w-28 shrink-0 rounded-xl border border-slate-200 object-cover" />
-                ) : (
-                    <button type="button" onClick={() => onEditStep(1)} className="flex h-28 w-28 shrink-0 items-center justify-center rounded-xl border border-dashed border-rose-300 bg-rose-50 text-center text-xs font-semibold text-rose-700">
-                        Add cover art
-                    </button>
-                )}
-
-                <div className="min-w-0 flex-1">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-violet-600">Review &amp; Publish</div>
-                    <h2 className="mt-1 break-words text-2xl font-bold text-slate-900">{release?.title || 'Untitled release'}</h2>
-                    <div className="mt-1 text-sm text-slate-600">
-                        {release?.primary_artist_name || artist?.stage_name || 'No artist'}
-                        {labelName ? ` · ${labelName}` : ''}
+        <div className="flex flex-wrap items-start gap-5">
+            <div className="min-w-0 flex-[999_1_640px] space-y-4">
+                <section className="flex flex-wrap items-center gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    {artwork ? (
+                        <img src={artwork} alt="" className="h-[110px] w-[110px] shrink-0 rounded-[10px] border border-slate-200 object-cover" />
+                    ) : (
+                        <button type="button" onClick={() => onEditStep(1)} className="flex h-[110px] w-[110px] shrink-0 items-center justify-center rounded-[10px] border border-dashed border-rose-300 bg-rose-50 text-center text-xs font-semibold text-rose-700">
+                            Add cover art
+                        </button>
+                    )}
+                    <div className="min-w-0 flex-[1_1_240px]">
+                        <h2 className="break-words text-[22px] font-bold text-slate-900">{release?.title || 'Untitled release'}</h2>
+                        <div className="mt-0.5 text-[13px] text-slate-600">
+                            {release?.primary_artist_name || artist?.stage_name || 'No artist'}
+                            {labelName ? ` · ${labelName}` : ''}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-semibold">
+                            {[
+                                typeName !== 'Not provided' ? typeName : null,
+                                release?.digital_release_date ? formatDate(release.digital_release_date) : null,
+                                release?.language,
+                                release?.primary_genre,
+                                `${tracks.length} track${tracks.length === 1 ? '' : 's'}`,
+                            ].filter(Boolean).map((t) => (
+                                <span key={t} className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{t}</span>
+                            ))}
+                        </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                        {[
-                            release?.release_type ? String(release.release_type).toUpperCase() === 'EP' ? 'EP' : String(release.release_type).charAt(0).toUpperCase() + String(release.release_type).slice(1) : null,
-                            release?.digital_release_date ? formatDate(release.digital_release_date) : null,
-                            release?.language,
-                            release?.primary_genre,
-                            `${tracks.length} track${tracks.length === 1 ? '' : 's'}`,
-                        ].filter(Boolean).map((t) => (
-                            <span key={t} className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{t}</span>
+                </section>
+
+                <ReviewCard title="Release details" onEdit={() => onEditStep(1)}>
+                    <div className="grid gap-x-6 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                        <Info label={isArtistAccount ? 'Artist account' : 'Catalogue label'} value={isArtistAccount ? (artist?.stage_name || release?.primary_artist_name || 'Not provided') : (labelName || 'Not provided')} warn={!isArtistAccount && !labelName} />
+                        <Info label="Type" value={typeName} />
+                        <Info label="Primary artist" value={release?.primary_artist_name || artist?.stage_name || 'Not provided'} />
+                        <Info label="Featuring" value={featuring} />
+                        <Info label="Genre" value={[release?.primary_genre, release?.sub_genre].filter(Boolean).join(' / ') || 'Not provided'} />
+                        <Info label="Language" value={release?.language || 'Not provided'} />
+                        <Info label="Release date" value={formatDate(release?.digital_release_date)} />
+                        <Info label="Production year" value={release?.copyright_year || release?.phonographic_year || 'Not provided'} />
+                        <Info label="C line" value={line('©', release?.copyright_year, release?.copyright_owner)} />
+                        <Info label="P line" value={line('℗', release?.phonographic_year, release?.phonographic_owner)} />
+                        <Info label="UPC · Catalog no." value={`${release?.upc || 'At approval'} · ${release?.catalog_number || 'Not provided'}`} warn={!release?.catalog_number} />
+                        <Info label="Timezone · Pre-order" value={`${release?.release_timezone || 'Asia/Kolkata'} · ${release?.pre_order ? 'On' : 'Off'}`} />
+                    </div>
+                </ReviewCard>
+
+                <ReviewCard title={`Tracks (${tracks.length})`} onEdit={() => onEditStep(2)}>
+                    {tracks.length === 0 ? (
+                        <EmptyMessage text="No tracks added yet - press Edit to upload the audio." />
+                    ) : (
+                        <div>
+                            {tracks.map((track, index) => (
+                                <div key={track.id} className="flex flex-wrap items-center gap-2.5 border-t border-slate-100 py-2.5 text-[13px] first:border-t-0">
+                                    <span className="w-5 font-bold text-slate-700">{index + 1}</span>
+                                    <div className="min-w-0 flex-[1_1_220px] truncate">
+                                        <span className="font-semibold text-slate-900">{track.title}{track.version ? ` (${track.version})` : ''}</span>
+                                        <span className="text-slate-500"> · {[track.is_instrumental ? 'Instrumental' : track.author_name, track.composer_name].map((v) => v || '—').join(' / ')}</span>
+                                    </div>
+                                    {((!track.is_instrumental && !String(track.author_name ?? '').trim()) || !String(track.composer_name ?? '').trim()) && (
+                                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">Lyricist / composer missing</span>
+                                    )}
+                                    <span className="text-xs text-slate-500">{track.isrc || 'ISRC at approval'}</span>
+                                    <span className={`text-xs font-semibold ${track.audio_path ? 'text-emerald-700' : 'text-rose-700'}`}>{track.audio_path ? 'WAV ✓' : 'WAV missing'}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </ReviewCard>
+
+                <ReviewCard title="Where it goes" onEdit={() => onEditStep(3)}>
+                    <div className="grid gap-x-6 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="min-w-0 sm:col-span-2">
+                            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Territories</div>
+                            {isWorldwide ? (
+                                <div className="mt-1 text-[13px] font-semibold text-slate-900">🌍 Worldwide · all countries</div>
+                            ) : excludedNames.length > 0 ? (
+                                <div className="mt-1 text-[13px] font-semibold text-slate-900">🌍 Worldwide except {excludedNames.slice(0, 8).join(', ')}{excludedNames.length > 8 ? ` +${excludedNames.length - 8} more` : ''}</div>
+                            ) : (
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                    {territoryList.slice(0, 24).map((c) => (
+                                        <span key={c.code} className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs text-slate-700" title={c.name}>
+                                            <span aria-hidden="true">{c.flag}</span>{c.name}
+                                        </span>
+                                    ))}
+                                    {territoryList.length > 24 && <span className="text-xs font-semibold text-slate-500">+{territoryList.length - 24} more</span>}
+                                    {territoryList.length === 0 && <span className="text-sm font-semibold text-rose-700">No country selected</span>}
+                                </div>
+                            )}
+                        </div>
+                        <div className="min-w-0">
+                            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Stores</div>
+                            <div className="mt-1 text-[13px] font-semibold text-slate-900" title={effectiveSelectedStores.map((st) => st.name).join(', ')}>
+                                {selectedStores.length > 0 ? `${selectedStores.length} stores` : `All ${effectiveSelectedStores.length} active stores`}
+                            </div>
+                        </div>
+                    </div>
+                </ReviewCard>
+            </div>
+
+            <aside className="flex min-w-0 max-w-full flex-[1_1_300px] flex-col gap-4 lg:sticky lg:top-36 lg:max-w-[360px]">
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-slate-900">Checklist</h3>
+                        <span className={`text-xs font-semibold ${allPassed ? 'text-emerald-700' : 'text-slate-500'}`}>{doneCount} / {checks.length}</span>
+                    </div>
+                    <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-emerald-100">
+                        <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                    <ul className="mt-2">
+                        {checks.map((check) => (
+                            <li key={check.label} className="flex items-center gap-2 border-b border-slate-100 py-2 text-xs last:border-b-0">
+                                <span aria-hidden="true" className={check.passed ? 'font-bold text-emerald-700' : 'font-bold text-amber-700'}>{check.passed ? '✓' : '○'}</span>
+                                <span className={`min-w-0 flex-1 ${check.passed ? 'text-slate-600' : 'font-semibold text-slate-900'}`}>{check.label}</span>
+                                <span className="sr-only">{check.passed ? '(done)' : '(missing)'}</span>
+                                {!check.passed && check.step && (
+                                    <button type="button" onClick={() => onEditStep(check.step)} className="rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-50">
+                                        Fix
+                                    </button>
+                                )}
+                            </li>
                         ))}
-                    </div>
-                </div>
-
-                <div className={`w-full shrink-0 rounded-xl border p-4 lg:w-72 ${allPassed ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
-                    <div className={`text-sm font-bold ${allPassed ? 'text-emerald-900' : 'text-amber-900'}`}>
-                        {allPassed ? 'Ready to submit' : `${checks.length - doneCount} thing${checks.length - doneCount === 1 ? '' : 's'} to fix`}
-                    </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
-                        <div className={`h-full rounded-full ${allPassed ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${Math.round((doneCount / checks.length) * 100)}%` }} />
-                    </div>
-                    <div className="mt-1 text-xs text-slate-600">{doneCount} of {checks.length} checks done</div>
+                    </ul>
                     {adminEdit ? (
-                        <Link href={`/releases/${release.id}`} className="mt-3 block w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-emerald-700">
+                        <Link href={`/releases/${release.id}`} className="mt-3 block w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-emerald-700">
                             Done · changes are saved
                         </Link>
                     ) : (
@@ -307,119 +396,16 @@ export default function ReviewStep({
                             type="button"
                             onClick={submitForReview}
                             disabled={!allPassed || submitting}
-                            className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="mt-3 h-11 w-full rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {submitting ? 'Submitting...' : 'Submit for Review'}
+                            {submitting ? 'Submitting...' : allPassed ? 'Submit for review' : `${checks.length - doneCount} thing${checks.length - doneCount === 1 ? '' : 's'} to fix first`}
                         </button>
                     )}
-                </div>
-            </section>
-
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-                <div className="min-w-0 space-y-6">
-                    <ReviewCard title="Release Details" onEdit={() => onEditStep(1)}>
-                        <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-                            <Info label="Title" value={release?.title || 'Not provided'} />
-                            <Info label="Type" value={release?.release_type ? ({ single: 'Single', ep: 'EP', album: 'Album' }[String(release.release_type).toLowerCase()] ?? release.release_type) : 'Not provided'} />
-                            <Info label="Primary artist" value={release?.primary_artist_name || artist?.stage_name || 'Not provided'} />
-                            <Info label={isArtistAccount ? 'Artist account' : 'Label'} value={isArtistAccount ? (artist?.stage_name || release?.primary_artist_name || 'Not provided') : (labelName || 'Not provided')} warn={!isArtistAccount && !labelName} />
-                            <Info label="Catalogue no." value={release?.catalog_number || 'Not provided'} />
-                            <Info label="UPC" value={release?.upc || 'Given at approval'} />
-                            <Info label="Release date" value={formatDate(release?.digital_release_date)} />
-                            <Info label="Language" value={release?.language || 'Not provided'} />
-                            <Info label="Genre" value={[release?.primary_genre, release?.sub_genre].filter(Boolean).join(' / ') || 'Not provided'} />
-                        </div>
-                    </ReviewCard>
-
-                    <ReviewCard title="Tracks" badge={`${tracks.length} track${tracks.length === 1 ? '' : 's'}`} onEdit={() => onEditStep(2)}>
-                        {tracks.length === 0 ? (
-                            <EmptyMessage text="No tracks added yet - press ✎ to upload the audio." />
-                        ) : (
-                            <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
-                                {tracks.map((track, index) => (
-                                    <div key={track.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-semibold text-slate-700">{index + 1}</span>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="truncate text-sm font-semibold text-slate-900">
-                                                {track.title}
-                                                {track.version ? ` (${track.version})` : ''}
-                                            </div>
-                                            <div className="truncate text-xs text-slate-500">{track.primary_artist_name || '—'}</div>
-                                        </div>
-                                        {((!track.is_instrumental && !String(track.author_name ?? '').trim()) || !String(track.composer_name ?? '').trim()) && (
-                                            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Lyricist / composer missing</span>
-                                        )}
-                                        <span className="text-xs font-medium text-slate-600">{track.isrc || 'ISRC at approval'}</span>
-                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${track.audio_path ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                                            {track.audio_path ? 'Audio ✓' : 'Audio missing'}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </ReviewCard>
-
-                    <ReviewCard title="Where it goes" onEdit={() => onEditStep(3)}>
-                        <div className="grid gap-5 sm:grid-cols-2">
-                            <div>
-                                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Territories</div>
-                                {isWorldwide ? (
-                                    <div className="mt-1 text-sm font-semibold text-slate-900">🌍 Worldwide · all countries</div>
-                                ) : (
-                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                        {territoryList.slice(0, 24).map((c) => (
-                                            <span key={c.code} className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs text-slate-700" title={c.name}>
-                                                <span aria-hidden="true">{c.flag}</span>{c.name}
-                                            </span>
-                                        ))}
-                                        {territoryList.length > 24 && <span className="text-xs font-semibold text-slate-500">+{territoryList.length - 24} more</span>}
-                                        {territoryList.length === 0 && <span className="text-sm font-semibold text-rose-700">No country selected</span>}
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Stores</div>
-                                <div className="mt-1 text-sm font-semibold text-slate-900">
-                                    {selectedStores.length > 0 ? `${selectedStores.length} stores` : `All ${effectiveSelectedStores.length} active stores`}
-                                </div>
-                                <div className="mt-1 text-xs leading-5 text-slate-500">
-                                    {effectiveSelectedStores.slice(0, 8).map((st) => st.name).join(', ')}
-                                    {effectiveSelectedStores.length > 8 ? ` +${effectiveSelectedStores.length - 8} more` : ''}
-                                </div>
-                            </div>
-                            <Info label="Timezone" value={release?.release_timezone || 'Asia/Kolkata'} />
-                            <Info label="Pre-order" value={release?.pre_order ? 'On' : 'Off'} />
-                        </div>
-                    </ReviewCard>
-                </div>
-
-                <aside className="space-y-4 xl:sticky xl:top-28 xl:self-start">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <div className="flex items-center justify-between gap-3">
-                            <h3 className="font-semibold text-slate-900">Checklist</h3>
-                            <span className="text-xs font-semibold text-slate-500">{doneCount}/{checks.length}</span>
-                        </div>
-                        <ul className="mt-3 divide-y divide-slate-100">
-                            {checks.map((check) => (
-                                <li key={check.label} className="flex items-center gap-3 py-2">
-                                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${check.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                                        {check.passed ? '✓' : '!'}
-                                    </span>
-                                    <span className={`min-w-0 flex-1 text-sm ${check.passed ? 'text-slate-600' : 'font-semibold text-slate-900'}`}>{check.label}</span>
-                                    {!check.passed && check.step && (
-                                        <button type="button" onClick={() => onEditStep(check.step)} className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-50">
-                                            Fix
-                                        </button>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                    <p className="px-1 text-xs leading-5 text-slate-500">
-                        After you submit, the Mixx Tune team checks the release. If something needs changing it comes back to you with a note; once approved it gets its UPC / ISRC and goes to the stores.
-                    </p>
-                </aside>
-            </div>
+                </section>
+                <p className="px-1 text-xs leading-5 text-slate-500">
+                    After you submit, the Mixx Tune team checks the release. If something needs changing it comes back to you with a note; once approved it gets its UPC / ISRC and goes to the stores.
+                </p>
+            </aside>
         </div>
     );
 }
@@ -431,10 +417,10 @@ function ReviewCard({
     children,
 }) {
     return (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="mb-4 flex items-center justify-between gap-4">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-4">
                 <div className="flex min-w-0 items-center gap-3">
-                    <h3 className="truncate font-semibold text-slate-900">
+                    <h3 className="truncate text-sm font-bold text-slate-900">
                         {title}
                     </h3>
 
@@ -449,7 +435,7 @@ function ReviewCard({
                     type="button"
                     onClick={onEdit}
                     aria-label={`Edit ${title}`}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-violet-50"
+                    className="text-xs font-semibold text-violet-700 hover:underline"
                 >
                     Edit
                 </button>
@@ -463,11 +449,11 @@ function ReviewCard({
 function Info({ label, value, warn = false }) {
     return (
         <div className="min-w-0">
-            <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
                 {label}
             </div>
 
-            <div className={`mt-1 break-words text-sm font-semibold ${warn ? 'text-rose-700' : 'text-slate-900'}`}>
+            <div className={`mt-0.5 break-words text-[13px] font-semibold ${warn ? 'text-rose-700' : 'text-slate-900'}`}>
                 {value}
             </div>
         </div>

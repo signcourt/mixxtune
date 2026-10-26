@@ -20,6 +20,9 @@ use Illuminate\Validation\ValidationException;
  */
 class ActionOtpGuard
 {
+    /** @var array<string, bool> W118: scopes whose second approval was used in this request */
+    private static array $approvedThisRequest = [];
+
     public const UNLOCK_MINUTES = 10;
 
     public const OTP_MINUTES = 10;
@@ -65,10 +68,17 @@ class ActionOtpGuard
             return;
         }
 
+        /* W118 MIXXTUNE_MAKER_CHECKER: when "Second approval" is ON, another Super Admin must have said yes first */
+        $approvalId = isset(self::$approvedThisRequest[$scope]) ? null : app(MakerChecker::class)->require($actor, $scope, $what);
+
         $key = $this->unlockKey($actor, $scope);
 
         if (isset(self::$usedThisRequest[$key]) || $this->cache()->get($key)) {
             $this->markUsed($key);
+            if ($approvalId) {
+                app(MakerChecker::class)->used($approvalId, $actor);
+                self::$approvedThisRequest[$scope] = true;
+            }
 
             return;
         }
@@ -95,6 +105,7 @@ class ActionOtpGuard
                 }
 
                 self::$usedThisRequest = [];
+                self::$approvedThisRequest = [];
                 self::$terminatingRegistered = false;
             });
         }

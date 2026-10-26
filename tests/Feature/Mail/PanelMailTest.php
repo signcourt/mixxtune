@@ -858,4 +858,55 @@ class PanelMailTest extends TestCase
         $this->actingAs($mine)->post("/mail/accounts/{$a->id}/act", ['ids' => [$id('Four')], 'action' => 'explode'])->assertSessionHasErrors('action');
         $this->assertSame('inbox', $row('Four')->folder);
     }
+
+    public function test_schedule_send_cancel_and_send_now(): void
+    {
+        $mine = $this->user('admin');
+        $other = $this->user('admin');
+        $a = MailAccount::query()->create(['address' => 'manager1@mixxtune.com', 'username' => 'manager1@mixxtune.com', 'password' => 'x', 'status' => 'active', 'sent_folder' => 'INBOX.Sent']);
+        $a->users()->sync([$mine->id, $other->id]);
+        $at = now()->addHours(3);
+
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'saras@example.com', 'subject' => 'Later', 'body' => 'x', 'send_at' => now()->subMinute()->toIso8601String()])->assertSessionHasErrors('send_at');
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('rates.pdf', '%PDF-1.4 test');
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'saras@example.com', 'cc' => 'b@example.com', 'subject' => 'Contract later', 'body' => 'Hello Saras', 'html' => 'Hello <b>Saras</b>', 'files' => [$file], 'send_at' => $at->toIso8601String()])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertSame([], FakeTransport::$sent);
+        $m = MailMessage::query()->where('folder', 'scheduled')->firstOrFail();
+        $this->assertSame((int) $mine->id, (int) $m->sent_by);
+        $this->assertCount(1, $m->draft['files']);
+        Storage::disk('local')->assertExists($m->draft['files'][0]['path']);
+
+        /* only the writer sees it; not sent before its time */
+        $this->actingAs($mine)->get("/mail?account={$a->id}&folder=scheduled")->assertInertia(fn (Assert $p) => $p->where('messages.total', 1)->where('counts.scheduled', 1)->where('messages.data.0.subject', 'Contract later'));
+        $this->actingAs($other)->get("/mail?account={$a->id}&folder=scheduled")->assertInertia(fn (Assert $p) => $p->where('messages.total', 0));
+        $this->actingAs($other)->post("/mail/scheduled/{$m->id}/now")->assertNotFound();
+        $this->artisan('mail:send-scheduled')->assertExitCode(0);
+        $this->assertSame([], FakeTransport::$sent);
+
+        /* at its time it goes, with the attachment, as a normal sent mail */
+        $this->travel(4)->hours();
+        $this->artisan('mail:send-scheduled')->assertExitCode(0);
+        $this->assertCount(1, FakeTransport::$sent);
+        $this->assertStringContainsString('rates.pdf', FakeTransport::$sent[0]);
+        $this->assertStringContainsString('Cc: b@example.com', FakeTransport::$sent[0]);
+        $this->assertNull(MailMessage::query()->find($m->id));
+        $this->assertSame(1, MailMessage::query()->where('folder', 'sent')->where('subject', 'Contract later')->count());
+        $this->assertSame([], Storage::disk('local')->allFiles('mail-scheduled'));
+        $this->artisan('mail:send-scheduled')->assertExitCode(0);
+        $this->assertCount(1, FakeTransport::$sent); /* only once */
+        $this->travelBack();
+
+        /* cancel -> back to Drafts; send now */
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'subject' => 'Second', 'body' => 'y', 'send_at' => now()->addDay()->toIso8601String()]);
+        $s2 = MailMessage::query()->where('folder', 'scheduled')->firstOrFail();
+        $this->actingAs($mine)->post("/mail/scheduled/{$s2->id}/cancel")->assertRedirect();
+        $this->assertSame('drafts', $s2->fresh()->folder);
+        $this->assertNull($s2->fresh()->scheduled_at);
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/send", ['to' => 'x@example.com', 'subject' => 'Third', 'body' => 'y', 'send_at' => now()->addDay()->toIso8601String()]);
+        $s3 = MailMessage::query()->where('folder', 'scheduled')->firstOrFail();
+        $this->actingAs($mine)->post("/mail/scheduled/{$s3->id}/now")->assertSessionHasNoErrors();
+        $this->assertCount(2, FakeTransport::$sent);
+        $this->actingAs($mine)->post("/mail/accounts/{$a->id}/act", ['ids' => [$s2->id], 'action' => 'trash'])->assertSessionHasNoErrors();
+    }
 }

@@ -14,6 +14,9 @@ class UpcService
 {
     public const MANUAL_ONLY = 'UPC is not made automatically. Enter the UPC allotted to Mixx Tune: ISRC & UPC -> Pending UPC -> Enter UPC.';
 
+    /* W116 */
+    public const NO_LIST = 'No free UPC in the list. Upload the UPCs allotted to Mixx Tune (ISRC & UPC -> Code lists), or use Enter UPC.';
+
     public function __construct(
         private readonly NotificationService $notifications,
         private readonly ReleaseAuditService $audit
@@ -186,15 +189,6 @@ class UpcService
             ]);
         }
 
-        /*
-         * W82 MIXXTUNE_UPC_MANUAL_ONLY: UPCs are never made up from a prefix.
-         * Mixx Tune types the UPC allotted to it (ISRC & UPC -> Pending UPC ->
-         * Enter UPC); an owner who has a UPC types it on the release.
-         */
-        throw ValidationException::withMessages([
-            'upc' => self::MANUAL_ONLY,
-        ]);
-
         /* W58: never invent codes for old catalogue */
         if (\App\Support\LegacyRelease::is($release)) {
             throw ValidationException::withMessages([
@@ -202,141 +196,30 @@ class UpcService
             ]);
         }
 
-        $prefix = $this->normalise(
-            $prefix
-        );
-
-        if (
-            strlen($prefix) < 6
-            || strlen($prefix) > 10
-        ) {
-            throw ValidationException::withMessages([
-                'prefix' =>
-                    'UPC prefix must contain 6 to 10 digits.',
-            ]);
-        }
-
-        return DB::transaction(function () use (
-            $release,
-            $user,
-            $prefix,
-            $notes
-        ) {
-            $last = UpcCode::query()
-                ->where(
-                    'prefix',
-                    $prefix
-                )
-                ->lockForUpdate()
-                ->orderByDesc('id')
-                ->value('code');
-
-            $bodyLength = 11;
-
-            $lastSequence = $last
-                ? (int) substr(
-                    $last,
-                    strlen($prefix),
-                    $bodyLength
-                        - strlen($prefix)
-                )
-                : 0;
-
-            $sequence =
-                $lastSequence + 1;
-
-            $sequenceLength =
-                $bodyLength
-                - strlen($prefix);
-
-            $body =
-                $prefix
-                . str_pad(
-                    (string) $sequence,
-                    $sequenceLength,
-                    '0',
-                    STR_PAD_LEFT
-                );
-
-            $code =
-                $body
-                . $this->calculateCheckDigit(
-                    $body
-                );
-
-            /* W58: skip numbers already on a release (e.g. typed in by hand) */
-            while (Release::query()->where('upc', $code)->exists()) {
-                $sequence++;
-                if (strlen((string) $sequence) > $sequenceLength) {
-                    throw ValidationException::withMessages([
-                        'upc' => 'No free UPC left for prefix '.$prefix.'.',
-                    ]);
-                }
-                $body = $prefix.str_pad((string) $sequence, $sequenceLength, '0', STR_PAD_LEFT);
-                $code = $body.$this->calculateCheckDigit($body);
+        /*
+         * W116 MIXXTUNE_CODE_LISTS (replaces W82 "manual only"): a UPC is never made up - it is the next
+         * free one from the list of UPCs allotted to Mixx Tune (ISRC & UPC -> Code lists -> Upload).
+         */
+        return DB::transaction(function () use ($release, $user, $notes) {
+            $locked = Release::query()->whereKey($release->id)->lockForUpdate()->firstOrFail();
+            if ($locked->upc) {
+                throw ValidationException::withMessages(['upc' => 'This release already has a UPC.']);
             }
-
-            $record = UpcCode::query()->create([
-                'public_id' =>
-                    (string) Str::ulid(),
-
-                'code' =>
-                    $code,
-
-                'prefix' =>
-                    $prefix,
-
-                'status' =>
-                    'assigned',
-
-                'release_id' =>
-                    $release->id,
-
-                'assigned_by' =>
-                    $user->id,
-
-                'assigned_at' =>
-                    now(),
-
-                'notes' =>
-                    $notes,
-            ]);
-
-            $release->update([
+            $record = app(IdentifierPool::class)->takeUpc();
+            if (!$record) {
+                throw ValidationException::withMessages(['upc' => self::NO_LIST]);
+            }
+            $record->forceFill(['status' => 'assigned', 'release_id' => $locked->id, 'assigned_by' => $user->id, 'assigned_at' => now(), 'notes' => $notes])->save();
+            $locked->update([
                 'upc' => $record->code,
                 'upc_assigned_at' => now(),
-                'upc_assigned_by' =>
-                    $user->id,
-                'updated_by' =>
-                    $user->id,
+                'upc_assigned_by' => $user->id,
+                'updated_by' => $user->id,
             ]);
-
-            $this->log(
-                $record->code,
-                'auto_generated',
-                $user,
-                $release,
-                $notes
-            );
-
-            $freshRelease =
-                $release->fresh();
-
-            $this->notifications
-                ->identifierAssigned(
-                    $freshRelease,
-                    'upc',
-                    $freshRelease->upc
-                );
-
-            $this->audit
-                ->identifierAssigned(
-                    $freshRelease,
-                    'upc',
-                    $freshRelease->upc,
-                    null,
-                    $user
-                );
+            $this->log($record->code, 'list_assigned', $user, $locked, $notes);
+            $freshRelease = $locked->fresh();
+            $this->notifications->identifierAssigned($freshRelease, 'upc', $freshRelease->upc);
+            $this->audit->identifierAssigned($freshRelease, 'upc', $freshRelease->upc, null, $user);
 
             return $freshRelease;
         });

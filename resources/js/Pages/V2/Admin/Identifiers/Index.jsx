@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 
@@ -40,7 +40,11 @@ export default function Index({
     pendingUpc = {},
     scope = 'new',
     q = '',
+    codeLists = null,
+    canUploadLists = false,
 }) {
+    const upcFree = codeLists?.upc?.available ?? 0;
+    const isrcFree = codeLists?.isrc?.available ?? 0;
     /* W58: new releases vs old catalogue (codes only typed in), search */
     const isOld = scope === 'old';
     const [search, setSearch] = useState(q);
@@ -275,6 +279,9 @@ export default function Index({
                     </div>
                 )}
 
+                {/* W116 MIXXTUNE_CODE_LISTS */}
+                {codeLists && <CodeLists lists={codeLists} canUpload={canUploadLists} />}
+
                 <Section
                     title="Pending ISRC"
                     description={`${pendingIsrc?.total ?? 0} tracks waiting for ISRC`}
@@ -483,7 +490,22 @@ export default function Index({
 
                 <Section
                     title="Pending UPC"
-                    description={`${pendingUpc?.total ?? 0} releases waiting for UPC · type the UPC allotted to Mixx Tune (it is checked: 12 or 13 digits, correct last digit, not used before)`}
+                    description={`${pendingUpc?.total ?? 0} releases waiting for UPC · ${upcFree > 0 ? `${upcFree} free UPC in the list - Generate takes the next one` : 'type the UPC allotted to Mixx Tune (it is checked: 12 or 13 digits, correct last digit, not used before), or upload the UPC list above'}`}
+                    action={
+                        upcFree > 0 ? (
+                            <button
+                                type="button"
+                                disabled={isOld || busy || selectedReleases.length === 0}
+                                onClick={() =>
+                                    window.confirm(`Give the next ${selectedReleases.length} free UPC(s) from the list to the selected release(s)? A UPC is permanent once given.`) &&
+                                    runAction('/admin/identifiers/upc/bulk-generate', { release_ids: selectedReleases })
+                                }
+                                className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                            >
+                                Generate Selected UPC
+                            </button>
+                        ) : null
+                    }
                 >
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[980px]">
@@ -608,9 +630,15 @@ export default function Index({
                                                             type="button"
                                                             disabled={busy || isOld}
                                                             onClick={() => {
+                                                                if (upcFree > 0) {
+                                                                    if (window.confirm(`Give the next free UPC from the list (${codeLists?.upc?.next}) to "${release.title}"? A UPC is permanent once given.`)) {
+                                                                        runAction(`/admin/releases/${release.id}/upc/generate`);
+                                                                    }
+                                                                    return;
+                                                                }
                                                                 setNotice('');
                                                                 setError('');
-                                                                setInfo(`Generate UPC for "${release.title}" starts working once the list of UPCs allotted to Mixx Tune is uploaded - then the next free UPC is filled in by itself. Until then use Enter UPC.`);
+                                                                setInfo(`No UPC in the list yet. Upload the UPCs allotted to Mixx Tune in "Code lists" above - then Generate fills in the next free one. Until then use Enter UPC.`);
                                                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                                                             }}
                                                             className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-40"
@@ -888,5 +916,129 @@ function Pagination({ links = [] }) {
                 />
             ))}
         </div>
+    );
+}
+
+/* W116 MIXXTUNE_CODE_LISTS: the UPC / ISRC codes allotted to Mixx Tune */
+function CodeLists({ lists, canUpload }) {
+    const { flash = {}, errors = {} } = usePage().props;
+    const [open, setOpen] = useState(false);
+    const form = useForm({ type: 'upc', how: 'file', file: null, text: '', range_first: '', range_last: '', note: '' });
+    const submit = (e) => {
+        e.preventDefault();
+        form.post('/admin/identifiers/lists', { forceFormData: true, preserveScroll: true, onSuccess: () => form.reset('file', 'text', 'range_first', 'range_last', 'note') });
+    };
+    const err = (k) => form.errors[k] || errors[k];
+    const box = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm';
+
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 className="text-base font-bold text-slate-900">Code lists</h2>
+                    <p className="mt-0.5 text-sm text-slate-500">The UPC / ISRC codes allotted to Mixx Tune. "Generate" takes the next free one from here - a code is never made up.</p>
+                </div>
+                {canUpload && (
+                    <button type="button" onClick={() => setOpen(!open)} className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white">
+                        {open ? 'Close' : 'Upload a list'}
+                    </button>
+                )}
+            </div>
+
+            {(flash.success || flash.error) && (
+                <div className={`mt-3 rounded-xl px-3 py-2 text-sm font-medium ${flash.error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{flash.error || flash.success}</div>
+            )}
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {[['upc', 'UPC'], ['isrc', 'ISRC']].map(([k, t]) => (
+                    <div key={k} className="rounded-xl bg-slate-50 px-4 py-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t} free in the list</div>
+                        <div className={`mt-1 text-2xl font-black ${lists[k].available ? 'text-slate-900' : 'text-slate-400'}`}>{lists[k].available.toLocaleString('en-IN')}</div>
+                        <div className="text-xs text-slate-500">
+                            {lists[k].available ? <>next: <span className="font-mono">{lists[k].next}</span> · </> : k === 'upc' ? 'no list yet - Enter UPC by hand · ' : 'no list yet - Generate uses the old way (IN-MXT-yy) · '}
+                            {lists[k].used_from_list} given out from lists
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {open && canUpload && (
+                <form onSubmit={submit} className="mt-4 space-y-3 rounded-xl border border-violet-200 bg-violet-50/40 p-4">
+                    <div className="flex flex-wrap gap-2">
+                        {[['upc', 'UPC'], ['isrc', 'ISRC']].map(([k, t]) => (
+                            <button key={k} type="button" onClick={() => form.setData('type', k)} className={`rounded-lg px-4 py-1.5 text-sm font-semibold ${form.data.type === k ? 'bg-violet-600 text-white' : 'border border-slate-300 bg-white text-slate-600'}`}>
+                                {t}
+                            </button>
+                        ))}
+                        <span className="mx-2 self-center text-slate-300">|</span>
+                        {[['file', 'Excel / CSV / txt file'], ['text', 'Paste codes'], ['range', 'First - last (range)']].map(([k, t]) => (
+                            <button key={k} type="button" onClick={() => form.setData('how', k)} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${form.data.how === k ? 'bg-slate-900 text-white' : 'border border-slate-300 bg-white text-slate-600'}`}>
+                                {t}
+                            </button>
+                        ))}
+                    </div>
+                    {form.data.how === 'file' && (
+                        <label className="block text-sm">
+                            <span className="text-xs font-semibold text-slate-600">File - every cell / line is read; headers like "UPC" are skipped</span>
+                            <input type="file" accept=".xlsx,.xls,.ods,.csv,.txt" onChange={(e) => form.setData('file', e.target.files?.[0] ?? null)} className="mt-1 block w-full text-sm" />
+                            {err('file') && <span className="mt-1 block text-xs font-semibold text-red-600">{err('file')}</span>}
+                        </label>
+                    )}
+                    {form.data.how === 'text' && (
+                        <label className="block text-sm">
+                            <span className="text-xs font-semibold text-slate-600">One code per line (or separated by commas)</span>
+                            <textarea rows={6} value={form.data.text} onChange={(e) => form.setData('text', e.target.value)} className={`mt-1 font-mono ${box}`} placeholder={form.data.type === 'upc' ? '8901234567890' : 'IN-ABC-26-00001'} />
+                            {err('text') && <span className="mt-1 block text-xs font-semibold text-red-600">{err('text')}</span>}
+                        </label>
+                    )}
+                    {form.data.how === 'range' && (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {[['range_first', 'First code'], ['range_last', 'Last code']].map(([k, t]) => (
+                                <label key={k} className="block text-sm">
+                                    <span className="text-xs font-semibold text-slate-600">{t}</span>
+                                    <input value={form.data[k]} onChange={(e) => form.setData(k, e.target.value)} className={`mt-1 font-mono ${box}`} placeholder={form.data.type === 'upc' ? '890123456000x' : 'IN-ABC-26-00001'} />
+                                    {err(k) && <span className="mt-1 block text-xs font-semibold text-red-600">{err(k)}</span>}
+                                </label>
+                            ))}
+                            <p className="text-[11px] text-slate-500 sm:col-span-2">{form.data.type === 'upc' ? 'Every UPC from the first to the last; the last digit (check digit) of each is worked out.' : 'Same country, registrant and year; only the last 5 digits run from first to last.'}</p>
+                        </div>
+                    )}
+                    <input value={form.data.note} onChange={(e) => form.setData('note', e.target.value)} placeholder="Note (e.g. GS1 allotment letter of 27 Oct)" maxLength={500} className={box} />
+                    <p className="text-[11px] text-slate-500">Checked before saving: UPC 12/13 digits with the right last digit, ISRC like IN-ABC-26-00001. Codes already in the list, or already on a release / track, are left out and counted.</p>
+                    <button type="submit" disabled={form.processing} className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                        {form.processing ? 'Checking...' : `Add ${form.data.type.toUpperCase()} codes`}
+                    </button>
+                </form>
+            )}
+
+            {lists.batches?.length > 0 && (
+                <div className="mt-4 overflow-x-auto">
+                    <table className="w-full min-w-[560px] text-left text-sm">
+                        <thead className="text-[11px] uppercase tracking-wide text-slate-400">
+                            <tr>
+                                <th className="py-1.5 pr-3">Uploaded</th>
+                                <th className="py-1.5 pr-3">Type</th>
+                                <th className="py-1.5 pr-3">From</th>
+                                <th className="py-1.5 pr-3 text-right">Added</th>
+                                <th className="py-1.5 pr-3 text-right">Left out</th>
+                                <th className="py-1.5 text-right">Still free</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {lists.batches.map((b) => (
+                                <tr key={b.id}>
+                                    <td className="py-1.5 pr-3 text-xs text-slate-500">{b.at}{b.by ? ` · ${b.by}` : ''}</td>
+                                    <td className="py-1.5 pr-3 font-semibold uppercase">{b.type}</td>
+                                    <td className="max-w-[220px] truncate py-1.5 pr-3 text-slate-700">{b.source}</td>
+                                    <td className="py-1.5 pr-3 text-right">{b.added}</td>
+                                    <td className="py-1.5 pr-3 text-right text-slate-500">{b.skipped}</td>
+                                    <td className="py-1.5 text-right font-semibold">{b.left}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </section>
     );
 }

@@ -780,7 +780,7 @@ export default function TrackManager({
         }
 
         if (!checkForm()) {
-            const box = event.currentTarget?.closest?.('.mixx-v6-track-modal');
+            const box = event.currentTarget?.closest?.('[data-track-modal]');
             if (box) box.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
@@ -974,489 +974,344 @@ export default function TrackManager({
         );
     };
 
+    /* W119 MIXXTUNE_NEW_RELEASE_UI_N2_N3: track list (N2) and track window (N3) - same fields and saving */
+    const fmtLen = (sec) => {
+        const n = Math.round(Number(sec) || 0);
+        return n > 0 ? `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}` : '';
+    };
+    const trackLen = (t) => t?.audio_duration_seconds ?? t?.duration_seconds ?? null;
+    const totalSec = tracks.reduce((a, t) => a + (Number(trackLen(t)) || 0), 0);
+    const editLen = fmtLen(trackLen(editingTrack));
+    const editFile = uploadFileName || data.audio?.name || editingTrack?.audio_original_name || '';
+    const wavOk = bgUpload.status === 'done' || Boolean(editingTrack?.audio_path) || data.audio instanceof File;
+    const dropFile = (file) => {
+        if (!file) return;
+        addTrack();
+        chooseAudio(file);
+    };
+    const card = 'rounded-2xl border border-slate-200 bg-white shadow-sm';
+    const btn2 = 'h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50';
+
     return (
-        <div className="mixx-v6-track-manager">
+        <div className="space-y-4">
             <TrackUploadOverlay
                 visible={uploading}
                 fileName={uploadFileName}
                 progress={uploadProgress}
             />
 
-            <div className="mixx-v6-track-toolbar">
-                <h2>Tracks</h2>
-
-                <button
-                    type="button"
-                    onClick={addTrack}
-                    className="mixx-v6-add-track"
-                >
-                    <span>＋</span>
-                    Add Track
-                </button>
-            </div>
-
-            {tracks.length === 0 && (
-                <div className="mixx-v6-track-empty">
-                    <div className="mixx-v6-empty-icon">
-                        ♪
-                    </div>
-
-                    <h3>No tracks added yet</h3>
-
-                    <p>
-                        Add your first master track to this release.
-                    </p>
+            <label
+                className="flex cursor-pointer flex-wrap items-center gap-4 rounded-2xl border-2 border-dashed border-violet-300 bg-violet-50/50 p-5"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    dropFile(e.dataTransfer?.files?.[0] ?? null);
+                }}
+            >
+                <input type="file" accept=".wav,audio/wav,audio/x-wav" className="hidden" onChange={(e) => { dropFile(e.target.files?.[0] ?? null); e.target.value = ''; }} />
+                <div className="min-w-0 flex-[1_1_240px]">
+                    <div className="text-sm font-bold text-slate-900">Add a track</div>
+                    <div className="mt-0.5 text-xs text-slate-600">Drop the WAV master here (max {audioMaxMb} MB). The details window opens next.</div>
                 </div>
-            )}
+                <button type="button" onClick={(e) => { e.preventDefault(); addTrack(); }} className="h-10 rounded-lg bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700">
+                    + Add track
+                </button>
+            </label>
 
-            {tracks.length > 0 && (
-                <div className="mixx-v6-track-list">
-                    {tracks.map(
-                        (track, index) => (
-                            <div
-                                key={track.id}
-                                className="mixx-v6-track-row"
-                            >
-                                <div className="mixx-v6-track-index">
-                                    {index + 1}
-                                </div>
+            <section className={`${card} overflow-hidden`}>
+                <div className="flex items-center justify-between px-4 py-3.5">
+                    <h2 className="text-sm font-bold text-slate-900">Tracks ({tracks.length})</h2>
+                    {totalSec > 0 && <span className="text-xs text-slate-500">Total {fmtLen(totalSec)}</span>}
+                </div>
 
+                {tracks.length === 0 ? (
+                    <div className="border-t border-slate-100 px-5 py-10 text-center">
+                        <div className="text-3xl text-violet-400" aria-hidden="true">♪</div>
+                        <h3 className="mt-2 text-sm font-bold text-slate-800">No tracks added yet</h3>
+                        <p className="mt-1 text-xs text-slate-500">Add your first master track to this release.</p>
+                    </div>
+                ) : (
+                    tracks.map((track, index) => {
+                        const missing = trackMissingLabels(track);
+                        const line = [track.primary_artist_name, track.author_name ? `Lyrics ${track.author_name}` : null, track.composer_name ? `Music ${track.composer_name}` : null].filter(Boolean).join(' · ');
+
+                        return (
+                            <div key={track.id} className="flex flex-wrap items-center gap-3 border-t border-slate-100 px-4 py-3 text-[13px]">
+                                <span className="w-[18px] text-slate-500">{index + 1}</span>
                                 <button
                                     type="button"
-                                    onClick={() =>
-                                        toggleTrackPlayback(track)
-                                    }
+                                    onClick={() => toggleTrackPlayback(track)}
                                     disabled={!track.audio_path}
-                                    title={
-                                        playingTrackId === track.id
-                                            ? 'Pause track'
-                                            : 'Play track'
-                                    }
-                                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm font-black transition ${
-                                        playingTrackId === track.id
-                                            ? 'border-violet-600 bg-violet-600 text-white'
-                                            : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
-                                    } ${
-                                        !track.audio_path
-                                            ? 'cursor-not-allowed opacity-30'
-                                            : ''
-                                    }`}
+                                    title={playingTrackId === track.id ? 'Pause track' : 'Play track'}
+                                    aria-label={playingTrackId === track.id ? 'Pause track' : 'Play track'}
+                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-black transition ${playingTrackId === track.id ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'} ${!track.audio_path ? 'cursor-not-allowed opacity-30' : ''}`}
                                 >
-                                    {playingTrackId === track.id
-                                        ? '❚❚'
-                                        : '▶'}
+                                    {playingTrackId === track.id ? '❚❚' : '▶'}
                                 </button>
-
-                                <div className="mixx-v6-track-main">
-                                    <strong>
+                                <div className="min-w-0 flex-[1_1_200px]">
+                                    <div className="truncate font-semibold text-slate-900">
                                         {track.title}
-                                    </strong>
-
-                                    <span>
-                                        {
-                                            track.primary_artist_name
-                                        }
-                                        {' · '}
-                                        {track.isrc
-                                            || 'ISRC Pending'}
-                                    </span>
+                                        {track.version ? <span className="font-normal text-slate-500"> ({track.version})</span> : null}
+                                        {trackLen(track) ? <span className="ml-1.5 text-xs font-normal text-slate-400">{fmtLen(trackLen(track))}</span> : null}
+                                    </div>
+                                    {line && <div className="truncate text-xs text-slate-500">{line}</div>}
                                 </div>
-
-                                <div className="mixx-v6-track-file">
-                                    {track.audio_original_name
-                                        || 'No WAV'}
-                                </div>
-
-                                <div className="mixx-v6-track-actions">
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            editTrack(track)
-                                        }
-                                    >
-                                        Edit
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        className="danger"
-                                        onClick={() =>
-                                            deleteTrack(track)
-                                        }
-                                    >
-                                        Delete
-                                    </button>
+                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${track.audio_path ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700'}`} title={track.audio_original_name || ''}>
+                                    {track.audio_path ? 'WAV ✓' : 'No WAV'}
+                                </span>
+                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${missing.length ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                    {missing.length ? `${missing.join(', ')} missing` : 'Details ✓'}
+                                </span>
+                                <span className="text-xs text-slate-500">{track.isrc || 'ISRC at approval'}</span>
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => editTrack(track)} className={btn2}>Edit</button>
+                                    <button type="button" onClick={() => deleteTrack(track)} className={`${btn2} text-rose-700`}>Delete</button>
                                 </div>
                             </div>
-                        )
-                    )}
-                </div>
-            )}
+                        );
+                    })
+                )}
+            </section>
 
             {formVisible && (
-                <div
-                    className="mixx-v6-modal-shell"
-                    role="dialog"
-                    aria-modal="true"
-                >
-                    <div
-                        className="mixx-v6-modal-backdrop"
-                        onClick={closeForm}
-                    />
+                <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/55 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label="Track details">
+                    <div className="fixed inset-0" onClick={closeForm} aria-hidden="true" />
 
-                    <div className="mixx-v6-track-modal">
-                        <div className="mixx-v6-modal-header">
-                            <div>
-                                <span className="mixx-v6-modal-eyebrow">
-                                    {editingTrack
-                                        ? 'EDIT TRACK'
-                                        : 'NEW TRACK'}
-                                </span>
-
-                                <h2>
-                                    {modalStage === 'upload'
-                                        ? 'Upload Track'
-                                        : 'Track Details'}
-                                </h2>
-
-                                <p>
-                                    {modalStage === 'upload'
-                                        ? 'Upload your WAV master before entering metadata.'
-                                        : 'Complete the metadata for this recording.'}
-                                </p>
-                            </div>
-
+                    <div data-track-modal className="relative flex w-full max-w-[880px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-3.5">
                             <button
                                 type="button"
-                                onClick={closeForm}
-                                className="mixx-v6-modal-close"
+                                onClick={() => editingTrack && toggleTrackPlayback(editingTrack)}
+                                disabled={!editingTrack?.audio_path}
+                                aria-label="Play track"
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-black text-white disabled:opacity-30"
                             >
-                                ×
+                                {editingTrack && playingTrackId === editingTrack.id ? '❚❚' : '▶'}
                             </button>
-                        </div>
-
-                        <div className="mixx-v6-modal-steps">
-                            <div
-                                className={
-                                    modalStage === 'upload'
-                                        ? 'active'
-                                        : 'complete'
-                                }
-                            >
-                                <span>1</span>
-                                Upload WAV
+                            <div className="min-w-0 flex-1">
+                                <h2 className="text-[15px] font-bold text-slate-900">{modalStage === 'upload' ? (editingTrack ? 'Track file' : 'Add a track') : 'Track details'}</h2>
+                                <p className="truncate text-xs text-slate-500">
+                                    {modalStage === 'upload'
+                                        ? `WAV master · 16 or 24-bit · 44.1 or 48 kHz · max ${audioMaxMb} MB`
+                                        : [editFile || null, editLen || null, wavOk ? 'WAV ✓' : null].filter(Boolean).join(' · ')}
+                                    {modalStage === 'details' && !editingTrack && (
+                                        <>
+                                            {' · '}
+                                            <button type="button" onClick={() => setModalStage('upload')} className="font-semibold text-violet-700 underline">Replace file</button>
+                                        </>
+                                    )}
+                                </p>
                             </div>
-
-                            <div
-                                className={
-                                    modalStage === 'details'
-                                        ? 'active'
-                                        : ''
-                                }
-                            >
-                                <span>2</span>
-                                Track Details
-                            </div>
+                            <button type="button" onClick={closeForm} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full text-xl text-slate-500 hover:bg-slate-100">×</button>
                         </div>
 
                         {modalStage === 'upload' && (
-                            <div className="mixx-v6-upload-stage">
-                                <label className="mixx-v6-upload-box">
-                                    <input
-                                        type="file"
-                                        accept=".wav,audio/wav,audio/x-wav"
-                                        className="hidden"
-                                        onChange={(event) =>
-                                            chooseAudio(
-                                                event.target
-                                                    .files?.[0]
-                                                ?? null
-                                            )
-                                        }
-                                    />
-
-                                    <div className="mixx-v6-upload-symbol">
-                                        ⇧
-                                    </div>
-
-                                    <h3>
-                                        {data.audio?.name
-                                            ?? editingTrack
-                                                ?.audio_original_name
-                                            ?? 'Upload WAV Master'}
-                                    </h3>
-
-                                    <p>
-                                        Drag & drop or click to browse
-                                    </p>
-
-                                    <span>
-                                        WAV only · Maximum {audioMaxMb} MB
-                                    </span>
+                            <div className="space-y-4 px-5 py-5">
+                                <label
+                                    className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-300 bg-violet-50/50 px-6 py-10 text-center"
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => { e.preventDefault(); chooseAudio(e.dataTransfer?.files?.[0] ?? null); }}
+                                >
+                                    <input type="file" accept=".wav,audio/wav,audio/x-wav" className="hidden" onChange={(event) => chooseAudio(event.target.files?.[0] ?? null)} />
+                                    <span className="text-3xl text-violet-500" aria-hidden="true">⇧</span>
+                                    <span className="mt-2 text-sm font-bold text-slate-900">{data.audio?.name ?? editingTrack?.audio_original_name ?? 'Drop the WAV master here'}</span>
+                                    <span className="mt-1 text-xs text-slate-500">or click to choose · WAV only · max {audioMaxMb} MB</span>
                                 </label>
-
                                 {data.audio && (
-                                    <div className="mixx-v6-selected-file">
-                                        <div>
-                                            <strong>
-                                                {data.audio.name}
-                                            </strong>
-
-                                            <span>
-                                                {(
-                                                    data.audio.size
-                                                    / 1024
-                                                    / 1024
-                                                ).toFixed(2)}
-                                                {' MB'}
-                                            </span>
-                                        </div>
-
+                                    <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800">
+                                        <span className="truncate font-semibold">{data.audio.name} · {(data.audio.size / 1024 / 1024).toFixed(2)} MB</span>
                                         <span>✓ Ready</span>
                                     </div>
                                 )}
-
-                                <div className="mixx-v6-upload-footer">
-                                    <button
-                                        type="button"
-                                        onClick={closeForm}
-                                        className="mixx-v6-secondary-button"
-                                    >
-                                        Cancel
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={continueToDetails}
-                                        className="mixx-v6-primary-button"
-                                    >
-                                        Continue to Track Details
-                                        <span>→</span>
-                                    </button>
+                                <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                                    <button type="button" onClick={closeForm} className="h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700">Cancel</button>
+                                    <button type="button" onClick={continueToDetails} className="h-10 rounded-lg bg-violet-600 px-4 text-sm font-semibold text-white">Continue to track details →</button>
                                 </div>
                             </div>
                         )}
 
                         {modalStage === 'details' && (
-                            <form
-                                onSubmit={submitTrack}
-                                className="mixx-v6-details-form"
-                                noValidate
-                            >
-                                {/* W87: WAV upload status while the details are filled */}
-                                {bgUpload.status !== 'idle' && (
-                                    <div className={`mb-4 rounded-xl border px-3.5 py-2.5 text-xs ${bgUpload.status === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700' : bgUpload.status === 'done' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-violet-200 bg-violet-50 text-violet-800'}`}>
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <span className="min-w-0 truncate font-semibold">
-                                                {bgUpload.status === 'uploading' && `Uploading ${uploadFileName} · ${bgUpload.progress}% - fill in the details meanwhile`}
-                                                {bgUpload.status === 'done' && `WAV uploaded ✓ ${uploadFileName}`}
-                                                {bgUpload.status === 'error' && bgUpload.error}
-                                            </span>
-                                            {bgUpload.status === 'error' && (
-                                                <button type="button" onClick={() => data.audio instanceof File ? startBackgroundUpload(data.audio) : setModalStage('upload')} className="rounded-lg bg-white px-2.5 py-1 font-bold text-rose-700 ring-1 ring-rose-200">
-                                                    Try again
-                                                </button>
+                            <form onSubmit={submitTrack} noValidate className="flex flex-col">
+                                <div className="px-5 py-4">
+                                    {/* W87: WAV upload status while the details are filled */}
+                                    {bgUpload.status !== 'idle' && (
+                                        <div className={`mb-4 rounded-xl border px-3.5 py-2.5 text-xs ${bgUpload.status === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700' : bgUpload.status === 'done' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-violet-200 bg-violet-50 text-violet-800'}`}>
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <span className="min-w-0 truncate font-semibold">
+                                                    {bgUpload.status === 'uploading' && `Uploading ${uploadFileName} · ${bgUpload.progress}% - fill in the details meanwhile`}
+                                                    {bgUpload.status === 'done' && `WAV uploaded ✓ ${uploadFileName}`}
+                                                    {bgUpload.status === 'error' && bgUpload.error}
+                                                </span>
+                                                {bgUpload.status === 'error' && (
+                                                    <button type="button" onClick={() => data.audio instanceof File ? startBackgroundUpload(data.audio) : setModalStage('upload')} className="rounded-lg bg-white px-2.5 py-1 font-bold text-rose-700 ring-1 ring-rose-200">
+                                                        Try again
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {bgUpload.status === 'uploading' && (
+                                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-violet-100">
+                                                    <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${bgUpload.progress}%` }} />
+                                                </div>
                                             )}
                                         </div>
-                                        {bgUpload.status === 'uploading' && (
-                                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-violet-100">
-                                                <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${bgUpload.progress}%` }} />
+                                    )}
+
+                                    <div className="grid grid-cols-1 gap-x-3.5 gap-y-2.5 sm:grid-cols-2">
+                                        <Field label="Track title" required error={err('title')}>
+                                            <input className={inputClass} value={data.title} onChange={(e) => setField('title', e.target.value)} placeholder="Song name, no “feat.” or “Official”" />
+                                        </Field>
+                                        <Field label="Version" hint="Only if it is not the original">
+                                            <input className={inputClass} value={data.version} onChange={(e) => setField('version', e.target.value)} placeholder="Remix, Lofi, Acoustic…" />
+                                        </Field>
+                                        <Field label="Primary artist / singer" required error={err('primary_artist_name')}>
+                                            <MultiNameInput suggestions={nameSuggestions} value={data.primary_artist_name} onChange={(v) => setField('primary_artist_name', v)} max={3} noun="artist" />
+                                        </Field>
+                                        <Field label="Featuring artist" error={err('featuring_artist_name')}>
+                                            <MultiNameInput suggestions={nameSuggestions} value={data.featuring_artist_name} onChange={(v) => setField('featuring_artist_name', v)} max={5} noun="artist" placeholder="None" />
+                                        </Field>
+                                        <Field label="Lyricist / writer" required={!data.is_instrumental} error={err('author_name')} hint={data.is_instrumental ? 'Not needed for an instrumental' : null}>
+                                            <MultiNameInput suggestions={nameSuggestions} value={data.author_name} onChange={(v) => setField('author_name', v)} max={5} noun="lyricist" disabled={Boolean(data.is_instrumental)} />
+                                        </Field>
+                                        <Field label="Composer" required error={err('composer_name')}>
+                                            <MultiNameInput suggestions={nameSuggestions} value={data.composer_name} onChange={(v) => setField('composer_name', v)} max={5} noun="composer" />
+                                        </Field>
+                                    </div>
+
+                                    <div className="mt-3 flex flex-wrap items-start gap-x-5 gap-y-2 text-xs font-semibold text-violet-700">
+                                        {previousTrack && (
+                                            <button type="button" onClick={copyCredits} className="hover:underline">
+                                                Copy credits from track {previousTrack.track_number || ''}
+                                            </button>
+                                        )}
+                                        <details className="min-w-0 flex-1 basis-full sm:basis-auto" open={moreCreditsFilled > 0}>
+                                            <summary className="cursor-pointer list-none hover:underline">
+                                                + Producer, music director, arranger, publisher, ℗ line{moreCreditsFilled > 0 ? ` · ${moreCreditsFilled} filled` : ''}
+                                            </summary>
+                                            <div className="mt-3 grid gap-2.5 font-normal text-slate-800 sm:grid-cols-2">
+                                                {[
+                                                    ['producer_name', 'Producer'],
+                                                    ['music_director_name', 'Music director'],
+                                                    ['arranger_name', 'Arranger'],
+                                                    ['publisher_name', 'Publisher'],
+                                                ].map(([key, label]) => (
+                                                    <Field key={key} label={label} error={err(key)}>
+                                                        <input className={inputClass} value={data[key] ?? ''} onChange={(e) => setField(key, e.target.value)} />
+                                                    </Field>
+                                                ))}
+                                                <Field label="℗ line" hint="e.g. 2026 Mixx Tune Entertainment" error={err('p_line')}>
+                                                    <input className={inputClass} value={data.p_line ?? ''} onChange={(e) => setField('p_line', e.target.value)} />
+                                                </Field>
+                                            </div>
+                                        </details>
+                                    </div>
+
+                                    <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-slate-100 pt-4 lg:grid-cols-4">
+                                        <Field label="Track type">
+                                            <select className={inputClass} value={data.track_type} onChange={(e) => setField('track_type', e.target.value)}>
+                                                {trackTypes.map(([value, label]) => (
+                                                    <option key={value} value={value}>{label}</option>
+                                                ))}
+                                            </select>
+                                        </Field>
+                                        <Field label="Explicit lyrics">
+                                            <select className={inputClass} value={data.parental_advisory} onChange={(e) => setField('parental_advisory', e.target.value)}>
+                                                {parentalOptions.map(([value, label]) => (
+                                                    <option key={value} value={value}>{label}</option>
+                                                ))}
+                                            </select>
+                                        </Field>
+                                        <Field label="Instrumental" hint="No vocals">
+                                            <select className={inputClass} value={data.is_instrumental ? 'yes' : 'no'} onChange={(e) => setField('is_instrumental', e.target.value === 'yes')}>
+                                                <option value="no">No</option>
+                                                <option value="yes">Yes</option>
+                                            </select>
+                                        </Field>
+                                        <Field label="Made with AI" hint="Any AI voice or music">
+                                            <select className={inputClass} value={data.contains_ai_generated_content ? 'yes' : 'no'} onChange={(e) => setField('contains_ai_generated_content', e.target.value === 'yes')}>
+                                                <option value="no">No</option>
+                                                <option value="yes">Yes</option>
+                                            </select>
+                                        </Field>
+                                        <Field label="Genre" required error={err('genre')}>
+                                            <SearchableTrackSelect value={data.genre} options={TRACK_GENRES} placeholder="Select genre" onChange={(value) => setField('genre', value)} />
+                                        </Field>
+                                        <Field label="Sub genre" required error={err('sub_genre')}>
+                                            <SearchableTrackSelect value={data.sub_genre} options={TRACK_SUB_GENRES} placeholder="Select sub genre" onChange={(value) => setField('sub_genre', value)} />
+                                        </Field>
+                                        <Field label="Language" required error={err('language')}>
+                                            <SearchableTrackSelect
+                                                value={data.language}
+                                                options={TRACK_LANGUAGES}
+                                                placeholder="Select language"
+                                                onChange={(value) => {
+                                                    setData((d) => ({ ...d, language: value, title_language: value, lyrics_language: value }));
+                                                }}
+                                            />
+                                        </Field>
+                                        <div className="hidden lg:block" />
+                                        <Field label="Track number" required error={err('track_number')}>
+                                            <input type="number" min="1" className={inputClass} value={data.track_number ?? ''} onChange={(e) => setField('track_number', e.target.value === '' ? '' : Number(e.target.value))} />
+                                        </Field>
+                                        <Field label="Recording year" required error={err('release_year')}>
+                                            <input type="number" min="1900" max={new Date().getFullYear() + 1} className={inputClass} value={data.release_year ?? ''} onChange={(e) => setField('release_year', e.target.value === '' ? '' : Number(e.target.value))} />
+                                        </Field>
+                                        <Field label="Disc number">
+                                            <input type="number" min="1" className={inputClass} value={data.disc_number ?? 1} onChange={(e) => setField('disc_number', e.target.value === '' ? 1 : Number(e.target.value))} />
+                                        </Field>
+                                        <Field label="Generate ISRC" required>
+                                            <select
+                                                className={inputClass}
+                                                value={data.isrc_is_auto_generated ? 'yes' : 'no'}
+                                                onChange={(e) =>
+                                                    e.target.value === 'yes'
+                                                        ? setData((d) => ({ ...d, isrc_is_auto_generated: true, isrc: editingTrack?.isrc && !editingTrack?.isrc_is_auto_generated ? '' : d.isrc }))
+                                                        : setField('isrc_is_auto_generated', false)
+                                                }
+                                            >
+                                                <option value="yes">Yes</option>
+                                                <option value="no">No - I have one</option>
+                                            </select>
+                                        </Field>
+                                        {!data.isrc_is_auto_generated && (
+                                            <div className="col-span-2">
+                                                <Field label="ISRC" required error={err('isrc')} hint="12 characters, e.g. INA1C2600001">
+                                                    <input className={`${inputClass} font-mono uppercase`} value={data.isrc ?? ''} onChange={(e) => setField('isrc', e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))} placeholder="INXXX2600001" />
+                                                </Field>
                                             </div>
                                         )}
                                     </div>
-                                )}
 
-                                {/* W65 MIXXTUNE_TRACK_FORM_V2: song first, then credits, genre, codes, lyrics */}
-                                <SectionTitle
-                                    number="01"
-                                    title="Song"
-                                    subtitle="Name and artists exactly as they should appear in stores."
-                                />
-
-                                <div className="mixx-v6-form-grid">
-                                    <Field label="Track title" required error={err('title')}>
-                                        <input className={inputClass} value={data.title} onChange={(e) => setField('title', e.target.value)} placeholder="Song name, no “feat.” or “Official”" />
-                                    </Field>
-
-                                    <Field label="Version" hint="Only if it is not the original">
-                                        <input className={inputClass} value={data.version} onChange={(e) => setField('version', e.target.value)} placeholder="Remix, Lofi, Acoustic…" />
-                                    </Field>
-
-                                    <Field label="Primary artist / singer" required error={err('primary_artist_name')}>
-                                        <MultiNameInput suggestions={nameSuggestions} value={data.primary_artist_name} onChange={(v) => setField('primary_artist_name', v)} max={3} noun="artist" />
-                                    </Field>
-
-                                    <Field label="Featuring artist" error={err('featuring_artist_name')}>
-                                        <MultiNameInput suggestions={nameSuggestions} value={data.featuring_artist_name} onChange={(v) => setField('featuring_artist_name', v)} max={5} noun="artist" placeholder="Leave empty if none" />
-                                    </Field>
-                                </div>
-
-                                <div className="mb-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-                                    <Field label="Track type">
-                                        <select className={inputClass} value={data.track_type} onChange={(e) => setField('track_type', e.target.value)}>
-                                            {trackTypes.map(([value, label]) => (
-                                                <option key={value} value={value}>{label}</option>
-                                            ))}
-                                        </select>
-                                    </Field>
-
-                                    <Field label="Explicit lyrics">
-                                        <select className={inputClass} value={data.parental_advisory} onChange={(e) => setField('parental_advisory', e.target.value)}>
-                                            {parentalOptions.map(([value, label]) => (
-                                                <option key={value} value={value}>{label}</option>
-                                            ))}
-                                        </select>
-                                    </Field>
-
-                                    <Toggle label="Instrumental" hint="No vocals" checked={Boolean(data.is_instrumental)} onChange={(v) => setField('is_instrumental', v)} />
-                                    <Toggle label="Made with AI" hint="Any AI voice or music" checked={Boolean(data.contains_ai_generated_content)} onChange={(v) => setField('contains_ai_generated_content', v)} />
-                                </div>
-
-                                <div className="mixx-v6-section-title">
-                                    <span>02</span>
-                                    <div className="flex-1">
-                                        <h3>Credits</h3>
-                                        <p>Writers and makers of the song. Stores in India require both.</p>
-                                    </div>
-                                    {previousTrack && (
-                                        <button type="button" onClick={copyCredits} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100">
-                                            Copy from track {previousTrack.track_number || ''}
-                                        </button>
+                                    {!data.is_instrumental && (
+                                        <details className="mt-4 border-t border-slate-100 pt-3" open={Boolean(data.lyrics)}>
+                                            <summary className="cursor-pointer list-none text-xs font-semibold text-violet-700 hover:underline">
+                                                + Lyrics (optional){data.lyrics ? ` · ${String(data.lyrics).split('\n').filter(Boolean).length} lines` : ''}
+                                            </summary>
+                                            <textarea
+                                                className={`${inputClass} mt-3 min-h-52 resize-y`}
+                                                value={data.lyrics}
+                                                onChange={(e) => setField('lyrics', e.target.value)}
+                                                placeholder="Full lyrics, one line per line. Used by Apple Music, Spotify and Instagram."
+                                            />
+                                        </details>
                                     )}
                                 </div>
 
-                                <div className="mixx-v6-form-grid">
-                                    <Field label="Lyricist / writer" required={!data.is_instrumental} error={err('author_name')} hint={data.is_instrumental ? 'Not needed for an instrumental' : null}>
-                                        <MultiNameInput suggestions={nameSuggestions} value={data.author_name} onChange={(v) => setField('author_name', v)} max={5} noun="lyricist" disabled={Boolean(data.is_instrumental)} />
-                                    </Field>
-
-                                    <Field label="Composer" required error={err('composer_name')}>
-                                        <MultiNameInput suggestions={nameSuggestions} value={data.composer_name} onChange={(v) => setField('composer_name', v)} max={5} noun="composer" />
-                                    </Field>
-                                </div>
-
-                                <details className="mb-4 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2" open={moreCreditsFilled > 0}>
-                                    <summary className="cursor-pointer text-xs font-semibold text-slate-700">
-                                        More credits (optional){moreCreditsFilled > 0 ? ` · ${moreCreditsFilled} filled` : ''}
-                                    </summary>
-                                    <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
-                                        {[
-                                            ['producer_name', 'Producer'],
-                                            ['music_director_name', 'Music director'],
-                                            ['arranger_name', 'Arranger'],
-                                            ['publisher_name', 'Publisher'],
-                                        ].map(([key, label]) => (
-                                            <Field key={key} label={label} error={err(key)}>
-                                                <input className={inputClass} value={data[key] ?? ''} onChange={(e) => setField(key, e.target.value)} />
-                                            </Field>
-                                        ))}
-                                        <Field label="℗ line" hint="e.g. 2026 Mixx Tune Entertainment" error={err('p_line')}>
-                                            <input className={inputClass} value={data.p_line ?? ''} onChange={(e) => setField('p_line', e.target.value)} />
-                                        </Field>
-                                    </div>
-                                </details>
-
-                                <SectionTitle
-                                    number="03"
-                                    title="Genre & language"
-                                    subtitle="Filled from the release - change only if this track is different. Title and lyrics use the same language."
-                                />
-
-                                <div className="mixx-v6-form-grid">
-                                    <Field label="Genre" required error={err('genre')}>
-                                        <SearchableTrackSelect value={data.genre} options={TRACK_GENRES} placeholder="Select genre" onChange={(value) => setField('genre', value)} />
-                                    </Field>
-
-                                    <Field label="Sub genre" required error={err('sub_genre')}>
-                                        <SearchableTrackSelect value={data.sub_genre} options={TRACK_SUB_GENRES} placeholder="Select sub genre" onChange={(value) => setField('sub_genre', value)} />
-                                    </Field>
-
-                                    <Field label="Language" required error={err('language')}>
-                                        <SearchableTrackSelect
-                                            value={data.language}
-                                            options={TRACK_LANGUAGES}
-                                            placeholder="Select language"
-                                            onChange={(value) => {
-                                                setData((d) => ({ ...d, language: value, title_language: value, lyrics_language: value }));
-                                            }}
-                                        />
-                                    </Field>
-
-                                </div>
-
-                                {/* W68: plain fields, no heading; ISRC is a simple Yes / No */}
-                                <div className="mb-4 grid gap-2.5 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-4">
-                                    <Field label="Track number" required error={err('track_number')}>
-                                        <input type="number" min="1" className={inputClass} value={data.track_number ?? ''} onChange={(e) => setField('track_number', e.target.value === '' ? '' : Number(e.target.value))} />
-                                    </Field>
-
-                                    <Field label="Recording year" required error={err('release_year')}>
-                                        <input type="number" min="1900" max={new Date().getFullYear() + 1} className={inputClass} value={data.release_year ?? ''} onChange={(e) => setField('release_year', e.target.value === '' ? '' : Number(e.target.value))} />
-                                    </Field>
-
-                                    <Field label="Disc number">
-                                        <input type="number" min="1" className={inputClass} value={data.disc_number ?? 1} onChange={(e) => setField('disc_number', e.target.value === '' ? 1 : Number(e.target.value))} />
-                                    </Field>
-
-                                    <Field label="Generate ISRC" required>
-                                        <select
-                                            className={inputClass}
-                                            value={data.isrc_is_auto_generated ? 'yes' : 'no'}
-                                            onChange={(e) =>
-                                                e.target.value === 'yes'
-                                                    ? setData((d) => ({ ...d, isrc_is_auto_generated: true, isrc: editingTrack?.isrc && !editingTrack?.isrc_is_auto_generated ? '' : d.isrc }))
-                                                    : setField('isrc_is_auto_generated', false)
-                                            }
-                                        >
-                                            <option value="yes">Yes</option>
-                                            <option value="no">No - I have one</option>
-                                        </select>
-                                    </Field>
-
-                                    {!data.isrc_is_auto_generated && (
-                                        <div className="sm:col-span-2 lg:col-span-2">
-                                            <Field label="ISRC" required error={err('isrc')} hint="12 characters, e.g. INA1C2600001">
-                                                <input className={`${inputClass} font-mono uppercase`} value={data.isrc ?? ''} onChange={(e) => setField('isrc', e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))} placeholder="INXXX2600001" />
-                                            </Field>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {!data.is_instrumental && (
-                                    <details className="mb-4 rounded-lg border border-slate-200 px-3 py-2" open={Boolean(data.lyrics)}>
-                                        <summary className="cursor-pointer text-xs font-semibold text-slate-700">
-                                            Lyrics (optional){data.lyrics ? ` · ${String(data.lyrics).split('\n').filter(Boolean).length} lines` : ''}
-                                        </summary>
-                                        <textarea
-                                            className={`${inputClass} mt-3 min-h-52 resize-y`}
-                                            value={data.lyrics}
-                                            onChange={(e) => setField('lyrics', e.target.value)}
-                                            placeholder="Full lyrics, one line per line. Used by Apple Music, Spotify and Instagram."
-                                        />
-                                    </details>
-                                )}
-
-                                {missingList.length > 0 && (
-                                    <div className="mixx-v6-error-summary">
-                                        Please fill: {missingList.join(', ')}.
-                                    </div>
-                                )}
-
-                                <div className="mixx-v6-modal-footer">
+                                <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+                                    <span className="min-w-0 flex-1 text-xs font-semibold text-amber-700">
+                                        {missingList.length > 0 ? `Fill: ${missingList.join(', ')}` : ''}
+                                    </span>
                                     {!editingTrack && (
-                                        <button type="button" onClick={() => setModalStage('upload')} className="mixx-v6-secondary-button">
-                                            ← Back to WAV
+                                        <button type="button" onClick={() => setModalStage('upload')} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700">
+                                            ← WAV
                                         </button>
                                     )}
-
-                                    <button type="button" onClick={closeForm} className="mixx-v6-secondary-button">
+                                    <button type="button" onClick={closeForm} className="h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700">
                                         Cancel
                                     </button>
-
-                                    <button type="submit" disabled={processing || bgUpload.status === 'uploading'} className="mixx-v6-primary-button">
+                                    <button type="submit" disabled={processing || bgUpload.status === 'uploading'} className="h-10 rounded-lg bg-violet-600 px-5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
                                         {bgUpload.status === 'uploading'
                                             ? `WAV uploading ${bgUpload.progress}%…`
-                                            : processing ? 'Saving Track...' : editingTrack ? 'Update Track' : 'Save Track'}
+                                            : processing ? 'Saving track...' : editingTrack ? 'Update track' : 'Save track'}
                                     </button>
                                 </div>
                             </form>
@@ -1742,4 +1597,15 @@ function CheckBox({
             />
         </label>
     );
+}
+
+/* W119: what a saved track still needs (same rules as the server check and the Review checklist) */
+export function trackMissingLabels(track) {
+    const has = (v) => String(v ?? '').replace(/[,\s]/g, '') !== '';
+    const out = [];
+    if (!has(track?.title)) out.push('Title');
+    if (!has(track?.primary_artist_name)) out.push('Primary artist');
+    if (!track?.is_instrumental && !has(track?.author_name)) out.push('Lyricist');
+    if (!has(track?.composer_name)) out.push(out.length ? 'composer' : 'Composer');
+    return out;
 }

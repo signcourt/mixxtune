@@ -58,7 +58,7 @@ class MailController extends Controller
         $mine = $access->assignedIds($request->user());
         $current = $accounts->firstWhere('id', (int) $request->query('account')) ?? $accounts->first(fn ($a) => $mine->contains((int) $a->id)) ?? $accounts->first();
         /* W110: also Starred (inbox + sent) and Drafts (own drafts only) */
-        $folder = in_array($request->query('folder'), ['sent', 'drafts', 'starred', 'snoozed', 'archive', 'spam', 'trash'], true) ? $request->query('folder') : 'inbox';
+        $folder = in_array($request->query('folder'), ['sent', 'drafts', 'scheduled', 'starred', 'snoozed', 'archive', 'spam', 'trash'], true) ? $request->query('folder') : 'inbox';
         $me = (int) $request->user()->id;
         if ($current) {
             MailActions::wake((int) $current->id); /* W113 */
@@ -71,8 +71,8 @@ class MailController extends Controller
             $q = MailMessage::query()->where('mail_account_id', $current->id);
             if ($folder === 'starred') {
                 $q->whereIn('folder', ['inbox', 'sent', 'archive'])->where('starred', true);
-            } elseif ($folder === 'drafts') {
-                $q->where('folder', 'drafts')->where('sent_by', $me);
+            } elseif ($folder === 'drafts' || $folder === 'scheduled') {
+                $q->where('folder', $folder)->where('sent_by', $me); /* W117: own scheduled mails only, like drafts */
             } elseif ($folder === 'snoozed') {
                 $q->where('folder', 'inbox')->whereNotNull('snooze_until')->where('snooze_until', '>', now());
             } elseif ($folder === 'inbox') {
@@ -87,6 +87,8 @@ class MailController extends Controller
             }
             if ($folder === 'snoozed') {
                 $q->orderBy('snooze_until');
+            } elseif ($folder === 'scheduled') {
+                $q->orderBy('scheduled_at');
             } elseif ($folder === 'trash') {
                 $q->orderByDesc('trashed_at');
             } elseif ($folder === 'inbox') {
@@ -95,12 +97,13 @@ class MailController extends Controller
                 $q->orderByDesc('sent_at');
             }
             $list = $q->orderByDesc('id')
-                ->paginate(30, ['id', 'subject', 'from_name', 'from_email', 'to', 'sent_at', 'snippet', 'seen', 'starred', 'has_attachments', 'folder', 'orig_folder', 'snooze_until', 'woke_at', 'trashed_at'])
+                ->paginate(30, ['id', 'subject', 'from_name', 'from_email', 'to', 'sent_at', 'snippet', 'seen', 'starred', 'has_attachments', 'folder', 'orig_folder', 'snooze_until', 'woke_at', 'trashed_at', 'scheduled_at'])
                 ->withQueryString()
                 ->through(fn (MailMessage $m) => [
                     'id' => $m->id,
                     'subject' => $m->subject ?: '(no subject)',
-                    'who' => $m->folder === 'drafts' ? ($this->people($m->to ?? []) ?: '(no address yet)') : ($m->folder === 'sent' ? $this->people($m->to ?? []) : ($m->from_name ?: $m->from_email)),
+                    'scheduled_at' => optional($m->scheduled_at)->toIso8601String(),
+                    'who' => in_array($m->folder, ['drafts', 'scheduled'], true) ? ($this->people($m->to ?? []) ?: '(no address yet)') : ($m->folder === 'sent' ? $this->people($m->to ?? []) : ($m->from_name ?: $m->from_email)),
                     'folder' => $m->folder,
                     'starred' => (bool) $m->starred,
                     'orig_folder' => $m->orig_folder,
@@ -114,7 +117,7 @@ class MailController extends Controller
                 ]);
 
             if ($request->query('m')) {
-                $msg = MailMessage::query()->where('mail_account_id', $current->id)->where(fn ($w) => $w->where('folder', '!=', 'drafts')->orWhere('sent_by', $me))->find((int) $request->query('m'));
+                $msg = MailMessage::query()->where('mail_account_id', $current->id)->where('folder', '!=', 'sending')->where(fn ($w) => $w->whereNotIn('folder', ['drafts', 'scheduled'])->orWhere('sent_by', $me))->find((int) $request->query('m'));
                 if ($msg) {
                     if (!$msg->seen) {
                         $msg->forceFill(['seen' => true])->save();
@@ -155,6 +158,15 @@ class MailController extends Controller
                         'snooze_until' => optional($msg->snooze_until)->toIso8601String(),
                         'attachments' => $msg->attachments()->where('inline', false)->get(['id', 'filename', 'mime', 'size']),
                     ];
+                    /* W117: a scheduled mail shows when it goes out (Cancel / Send now) */
+                    if ($msg->folder === 'scheduled') {
+                        $sd = $msg->draft ?? [];
+                        $open['scheduled'] = [
+                            'at' => optional($msg->scheduled_at)->toIso8601String(),
+                            'files' => collect($sd['files'] ?? [])->map(fn ($f) => ['name' => $f['name'], 'size' => $f['size']])->values(),
+                            'error' => $sd['error'] ?? null,
+                        ];
+                    }
                     /* W110: a draft opens again in the Write window */
                     if ($msg->folder === 'drafts') {
                         $d = $msg->draft ?? [];
@@ -204,11 +216,12 @@ class MailController extends Controller
             'open' => $open,
             'counts' => $current ? [
                 'drafts' => MailMessage::query()->where('mail_account_id', $current->id)->where('folder', 'drafts')->where('sent_by', $me)->count(),
+                'scheduled' => MailMessage::query()->where('mail_account_id', $current->id)->where('folder', 'scheduled')->where('sent_by', $me)->count(),
                 'starred' => MailMessage::query()->where('mail_account_id', $current->id)->whereIn('folder', ['inbox', 'sent', 'archive'])->where('starred', true)->count(),
                 'snoozed' => MailMessage::query()->where('mail_account_id', $current->id)->where('folder', 'inbox')->where('snooze_until', '>', now())->count(),
                 'spam' => MailMessage::query()->where('mail_account_id', $current->id)->where('folder', 'spam')->where('seen', false)->count(),
                 'trash' => MailMessage::query()->where('mail_account_id', $current->id)->where('folder', 'trash')->count(),
-            ] : ['drafts' => 0, 'starred' => 0, 'snoozed' => 0, 'spam' => 0, 'trash' => 0],
+            ] : ['drafts' => 0, 'scheduled' => 0, 'starred' => 0, 'snoozed' => 0, 'spam' => 0, 'trash' => 0],
             'trashDays' => MailActions::TRASH_DAYS,
             'isSuperAdmin' => $access->isSuperAdmin($request->user()),
         ]);
@@ -296,7 +309,11 @@ class MailController extends Controller
             'keep_attachments' => ['nullable', 'array', 'max:20'],
             'keep_attachments.*' => ['integer'],
             'draft_id' => ['nullable', 'integer'],
+            /* W117: Schedule send */
+            'send_at' => ['nullable', 'date', 'after:'.now()->addMinute()->toIso8601String(), 'before:'.now()->addYear()->toIso8601String()],
         ], [
+            'send_at.after' => 'Pick a time at least 2 minutes from now.',
+            'send_at.before' => 'A mail can be scheduled at most one year ahead.',
             'to_list.*.email' => 'One of the "To" addresses is not a valid e-mail address.',
             'cc_list.*.email' => 'One of the "Cc" addresses is not a valid e-mail address.',
             'bcc_list.*.email' => 'One of the "Bcc" addresses is not a valid e-mail address.',
@@ -324,6 +341,17 @@ class MailController extends Controller
         if (!empty($data['reply_to_id'])) {
             $reply = MailMessage::query()->where('mail_account_id', $acc->id)->find((int) $data['reply_to_id']);
         }
+        /* W117: Schedule send - kept in "Scheduled", sent by mail:send-scheduled at that time */
+        if (!empty($data['send_at'])) {
+            $at = \Illuminate\Support\Carbon::parse($data['send_at']);
+            $sch = app(\App\Services\V2\Mail\MailScheduler::class)->schedule($acc, $request->user(), $data, $files, $at);
+            if (!empty($data['draft_id'])) {
+                MailMessage::query()->where('mail_account_id', $acc->id)->where('folder', 'drafts')->where('sent_by', $request->user()->id)->whereKey((int) $data['draft_id'])->delete();
+            }
+            $audit->record('mail.scheduled', 'mail', 'Mail scheduled from '.($data['from'] ?? $acc->address).' to '.implode(', ', $data['to_list']).' for '.$at->copy()->timezone('Asia/Kolkata')->format('d M Y, h:i A').'.', [], ['subject' => $data['subject'], 'to' => $data['to_list'], 'at' => $at->toIso8601String()], $sch, $request);
+
+            return redirect('/mail?account='.$acc->id.'&folder=scheduled&m='.$sch->id)->with('success', 'Scheduled for '.$at->copy()->timezone('Asia/Kolkata')->format('D d M, h:i A').' (India time).');
+        }
         try {
             $msg = $sender->send($acc, $request->user(), ['to' => $data['to_list'], 'cc' => $data['cc_list'] ?? [], 'bcc' => $data['bcc_list'] ?? [], 'from' => $data['from'] ?? null, 'subject' => $data['subject'], 'body' => (string) ($data['body'] ?? ''), 'html' => $data['html'] ?? null, 'signature' => !array_key_exists('signature', $data) || $data['signature'] === null || (bool) $data['signature']], $files, $reply, $carried);
         } catch (Throwable $e) {
@@ -343,7 +371,7 @@ class MailController extends Controller
     public function star(Request $request, MailMessage $message, MailAccess $access): RedirectResponse
     {
         $this->message($request, $access, $message);
-        abort_if($message->folder === 'drafts', 422, 'A draft cannot be starred.');
+        abort_if(in_array($message->folder, ['drafts', 'scheduled', 'sending'], true), 422, 'A draft cannot be starred.');
         $on = $request->boolean('starred');
         $message->forceFill(['starred' => $on])->save();
         $account = MailAccount::query()->find($message->mail_account_id);
@@ -490,7 +518,7 @@ class MailController extends Controller
         ], ['until.after' => 'Pick a time in the future.', 'until.required_if' => 'Pick when the mail should come back.']);
         $me = (int) $request->user()->id;
         $messages = MailMessage::query()->where('mail_account_id', $acc->id)->whereIn('id', array_map('intval', $data['ids']))
-            ->where(fn ($w) => $w->where('folder', '!=', 'drafts')->orWhere('sent_by', $me))->get();
+            ->whereNotIn('folder', ['scheduled', 'sending'])->where(fn ($w) => $w->where('folder', '!=', 'drafts')->orWhere('sent_by', $me))->get();
         $until = !empty($data['until']) ? \Illuminate\Support\Carbon::parse($data['until']) : null;
         $r = $actions->apply($acc, $messages, $data['action'], $until);
         if (in_array($data['action'], ['trash', 'delete_forever', 'spam', 'archive'], true) && $r['done'] > 0) {
@@ -525,5 +553,22 @@ class MailController extends Controller
         $audit->record('mail.trash_emptied', 'mail', 'Trash of '.$acc->address.' emptied ('.$r['done'].' mails).', [], ['count' => $r['done']], null, $request);
 
         return redirect('/mail?account='.$acc->id.'&folder=trash')->with('success', "Trash emptied - {$r['done']} mail(s) deleted for ever.");
+    }
+
+    /* W117: a scheduled mail - back to Drafts, or send it now */
+    public function scheduled(Request $request, MailMessage $message, string $what, MailAccess $access, \App\Services\V2\Mail\MailScheduler $scheduler): RedirectResponse
+    {
+        $this->message($request, $access, $message);
+        abort_unless($message->folder === 'scheduled' && (int) $message->sent_by === (int) $request->user()->id, 404);
+        if ($what === 'cancel') {
+            $d = $scheduler->cancel($message);
+
+            return redirect('/mail?account='.$d->mail_account_id.'&folder=drafts&m='.$d->id)->with('success', 'Not sent - it is back in Drafts.'.(!empty(($message->draft ?? [])['files']) ? ' Attachments added in the Write window are not kept in drafts - add them again.' : ''));
+        }
+        $r = $scheduler->sendOne((int) $message->id);
+
+        return $r === true
+            ? redirect('/mail?account='.$message->mail_account_id.'&folder=sent')->with('success', 'Mail sent.')
+            : back()->withErrors(['send' => $r === null ? 'It is being sent right now.' : 'The mail was NOT sent: '.((MailMessage::query()->find($message->id)?->draft ?? [])['error'] ?? 'error').' It will be tried again in 5 minutes.']);
     }
 }

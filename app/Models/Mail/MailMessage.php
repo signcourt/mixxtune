@@ -11,7 +11,7 @@ class MailMessage extends Model
         'mail_account_id', 'folder', 'uid', 'message_id', 'in_reply_to', 'references_header', 'subject',
         'from_name', 'from_email', 'to', 'cc', 'bcc', 'reply_to', 'sent_at', 'snippet', 'body_text', 'body_html',
         'has_attachments', 'seen', 'starred', 'draft', 'size', 'sent_by',
-        'orig_folder', 'trashed_at', 'snooze_until', 'woke_at', 'server_folder', 'server_uid',
+        'orig_folder', 'trashed_at', 'snooze_until', 'scheduled_at', 'woke_at', 'server_folder', 'server_uid',
     ];
 
     protected $casts = [
@@ -22,6 +22,7 @@ class MailMessage extends Model
         'starred' => 'boolean',
         'trashed_at' => 'datetime',
         'snooze_until' => 'datetime',
+        'scheduled_at' => 'datetime',
         'woke_at' => 'datetime',
         'reply_to' => 'array',
         'sent_at' => 'datetime',

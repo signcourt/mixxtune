@@ -54,6 +54,8 @@ class HandleInertiaRequests extends Middleware
                 /* W59: one-time values the user pages show (were never sent, so a reset password was lost) */
                 'temporary_password' => fn () => $request->session()->get('temporary_password'),
                 'invitation_link' => fn () => $request->session()->get('invitation_link'),
+                /* W119: the "sent for review" page after Submit (N6) */
+                'submitted' => fn () => (bool) $request->session()->get('submitted'),
             ],
             'impersonation' => fn () => [
                 'active' => $request->session()->has(

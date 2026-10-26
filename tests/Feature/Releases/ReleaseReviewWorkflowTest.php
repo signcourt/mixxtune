@@ -191,7 +191,7 @@ class ReleaseReviewWorkflowTest extends TestCase
                 $this->submitUrl($release)
             )
             ->assertRedirect(
-                route('v2.releases.index')
+                route('v2.releases.show', $release) /* W119: N6 after submit */
             );
 
         return $release->fresh();
@@ -326,7 +326,7 @@ class ReleaseReviewWorkflowTest extends TestCase
             );
 
         $response->assertRedirect(
-            route('v2.releases.index')
+            route('v2.releases.show', $release) /* W119: N6 after submit */
         );
 
         $release->refresh();
@@ -770,7 +770,7 @@ class ReleaseReviewWorkflowTest extends TestCase
                 $this->submitUrl($release)
             )
             ->assertRedirect(
-                route('v2.releases.index')
+                route('v2.releases.show', $release) /* W119: N6 after submit */
             );
 
         $release->refresh();

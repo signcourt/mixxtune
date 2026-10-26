@@ -553,6 +553,11 @@ const adminNavigation = (
                           id: 'administration-mail-accounts',
                           label: 'Email accounts',
                           href: '/admin/mail-accounts',
+                      }, {
+                          /* W118 MIXXTUNE_MAKER_CHECKER */
+                          id: 'administration-approvals',
+                          label: 'Second approval',
+                          href: '/admin/approvals',
                       }]
                     : []),
                 {
