@@ -84,7 +84,7 @@ const FEATURES = [
     ["mtg-fly-l", "Store distribution", "Follow every release store by store, from processing to delivered to live.", "M12 2v20M2 12h20M5 5l14 14M19 5L5 19", "167,139,250"],
     ["mtg-reveal", "100% Transparent", "No hidden charges. Ever. Every play, every rupee and every deduction is visible in your panel.", "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", "125,211,252"],
     ["mtg-fly-r", "Analytics", "See earnings by store, country, track and month in clear charts.", "M3 3v18h18M7 15l4-4 3 3 5-6", "240,171,252"],
-    ["mtg-fly-l", "Wallet & bank payouts", "Royalties land in your wallet. Withdraw by bank transfer with TDS shown clearly.", "M3 7h18v12H3zM3 7l2-3h14l2 3M16 13h2", "252,211,77"],
+    ["mtg-fly-l", "Wallet & bank payouts", "Royalties land in your wallet, and your payment goes straight to your bank account.", "M3 7h18v12H3zM3 7l2-3h14l2 3M16 13h2", "252,211,77"],
     ["mtg-reveal", "Label & sub-label splits", "Each label and sub-label keeps its own agreed revenue share.", "M12 3v6M12 9l-6 6M12 9l6 6M6 15v6M18 15v6", "167,139,250"],
     ["mtg-fly-r", "Secure by design", "E-mail codes on login and money actions, verified KYC before any payout.", "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4", "125,211,252"],
 ];
@@ -93,7 +93,7 @@ const PAY = [
     ["mtg-pc1 mtg-fly-l", "#7DD3FC", "M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h6", "1 · Store reports arrive", "The stores send their monthly reports for every play."],
     ["mtg-pc2 mtg-fly-l", "#A78BFA", "M4 12l5 5L20 6", "2 · Checked line by line", "Every play is matched to your track, label and agreed share."],
     ["mtg-pc3 mtg-fly-r", "#F0ABFC", "M4 20V10M10 20V4M16 20v-7M22 20H2", "3 · Published to you", "Your wallet is credited and the statement PDF is ready."],
-    ["mtg-pc4 mtg-fly-r", "#FCD34D", "M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 21h18", "4 · Paid to your bank", "Withdraw to your verified bank account, with TDS shown clearly."],
+    ["mtg-pc4 mtg-fly-r", "#FCD34D", "M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 21h18", "4 · Paid to your bank", "Your payment goes straight into your bank account, without any hassle."],
 ];
 
 function PayCard({ cls, color, icon, title, text }) {
