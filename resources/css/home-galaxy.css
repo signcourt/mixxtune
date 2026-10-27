@@ -41,8 +41,9 @@
 .mtg-stream-layer{display:none}
 
 @supports (animation-timeline: scroll()){
-  .mtg-galaxy{animation:mtg-galaxy-out linear both;animation-timeline:scroll(root);animation-range:0 110vh}
-  @keyframes mtg-galaxy-out{to{transform:scale(2.3) rotate(30deg);opacity:0;filter:blur(8px)}}
+  /* W122: the store orbit stays sharp until its centre reaches the middle of the screen, then slowly blurs away going up */
+  .mtg-galaxy{animation:mtg-galaxy-out linear both;animation-timeline:view();animation-range:cover 50% exit 100%}
+  @keyframes mtg-galaxy-out{0%{transform:none;opacity:1;filter:none}35%{filter:blur(1px)}100%{transform:scale(1.8) rotate(24deg);opacity:0;filter:blur(6px)}}
   .mtg-herocopy{animation:mtg-copy-out linear both;animation-timeline:scroll(root);animation-range:0 75vh}
   @keyframes mtg-copy-out{to{transform:translateY(-120px) scale(.92);opacity:0}}
   .mtg-stars-far{animation:mtg-par-far linear both;animation-timeline:scroll(root)}
