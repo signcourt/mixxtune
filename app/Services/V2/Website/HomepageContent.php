@@ -56,13 +56,41 @@ class HomepageContent
                     ['id' => 'name', 'label' => 'Full name', 'type' => 'text', 'required' => true, 'show' => true, 'options' => [], 'hint' => ''],
                     ['id' => 'phone', 'label' => 'Phone / WhatsApp', 'type' => 'phone', 'required' => true, 'show' => true, 'options' => [], 'hint' => ''],
                     ['id' => 'email', 'label' => 'Email', 'type' => 'email', 'required' => false, 'show' => true, 'options' => [], 'hint' => ''],
-                    ['id' => 'role', 'label' => 'I am joining as', 'type' => 'select', 'required' => true, 'show' => true, 'options' => ['Music label', 'Artist', 'Manager', 'Other'], 'hint' => ''],
+                    ['id' => 'role', 'label' => 'I am joining as', 'type' => 'select', 'required' => true, 'show' => true, 'options' => ['Music label', 'Artist', 'Other'], 'hint' => ''],
                     ['id' => 'brand', 'label' => 'Label or artist name', 'type' => 'text', 'required' => false, 'show' => true, 'options' => [], 'hint' => ''],
                     ['id' => 'city', 'label' => 'City / State', 'type' => 'text', 'required' => false, 'show' => true, 'options' => [], 'hint' => ''],
                     ['id' => 'message', 'label' => 'Tell us about your music', 'type' => 'textarea', 'required' => false, 'show' => true, 'options' => [], 'hint' => ''],
                 ],
             ],
         ];
+    }
+
+    /*
+     * W126 MIXXTUNE_JOIN_NO_MANAGER (owner, 27 Oct): "I am joining as" is only Music label / Artist / Other.
+     * Takes "Manager" out of the published Join form too (when it was published with it). Returns true when changed.
+     */
+    public function removeManagerChoice(?int $userId = null): bool
+    {
+        $saved = $this->settings->get(self::KEY);
+        if (!is_array($saved) || !is_array(data_get($saved, 'join.fields'))) {
+            return false;
+        }
+        $changed = false;
+        foreach ($saved['join']['fields'] as $i => $f) {
+            if (($f['id'] ?? null) === 'role' && is_array($f['options'] ?? null)) {
+                $kept = array_values(array_filter($f['options'], fn ($o) => strcasecmp(trim((string) $o), 'Manager') !== 0));
+                if ($kept !== array_values($f['options'])) {
+                    $saved['join']['fields'][$i]['options'] = $kept;
+                    $changed = true;
+                }
+            }
+        }
+        if ($changed) {
+            $this->settings->set(self::KEY, $saved, 'website', 'json', $userId);
+            \Illuminate\Support\Facades\Cache::forget('system_setting:'.self::KEY);
+        }
+
+        return $changed;
     }
 
     /* the published content, always complete and clean */
