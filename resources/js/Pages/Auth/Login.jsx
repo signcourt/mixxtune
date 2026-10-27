@@ -155,17 +155,17 @@ export default function Login({
             </form>
 
             {/* MIXXTUNE_LEGACY_DASHBOARD_LINK_V1: plain external link only.
-                The old WordPress dashboard (backstagemixtune.com) stays a separate site;
-                no login sharing, nothing is activated from here. */}
-            <div className="mt-6 rounded-lg border border-gray-200 px-4 py-3 text-center text-sm text-gray-600">
-                Old earnings &amp; statements?{' '}
+                The old WordPress dashboard (backstagemixxtune.com) stays a separate site;
+                no login sharing, nothing is activated from here.
+                W125: right spelling (double x) and only the words "Old dashboard". */}
+            <div className="mt-6 rounded-lg border border-gray-200 px-4 py-3 text-center text-sm">
                 <a
-                    href="https://backstagemixtune.com"
+                    href="https://backstagemixxtune.com/"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-semibold text-indigo-600 hover:underline"
                 >
-                    Open old dashboard ↗
+                    Old dashboard
                 </a>
             </div>
         </GuestLayout>
