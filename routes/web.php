@@ -2088,6 +2088,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/admin/approvals/{approval}', [\App\Http\Controllers\V2\Admin\ApprovalController::class, 'decide'])->whereNumber('approval')->middleware('throttle:30,1,approvals-decide')->name('v2.admin.approvals.decide');
 });
 
+/* W120 MIXXTUNE_RELEASE_TRASH: Super Admin delete -> Trash (90 days) -> Restore / Delete forever */
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/admin/release-trash', [\App\Http\Controllers\V2\Admin\ReleaseTrashController::class, 'index'])->name('v2.admin.release-trash.index');
+    Route::post('/admin/releases/{release}/trash', [\App\Http\Controllers\V2\Admin\ReleaseTrashController::class, 'trash'])->middleware('throttle:30,1,release-trash')->name('v2.admin.releases.trash');
+    Route::post('/admin/release-trash/{row}/restore', [\App\Http\Controllers\V2\Admin\ReleaseTrashController::class, 'restore'])->whereNumber('row')->middleware('throttle:30,1,release-restore')->name('v2.admin.release-trash.restore');
+    Route::post('/admin/release-trash/{row}/purge', [\App\Http\Controllers\V2\Admin\ReleaseTrashController::class, 'purge'])->whereNumber('row')->middleware('throttle:30,1,release-purge')->name('v2.admin.release-trash.purge');
+});
+
 /* W115 MIXXTUNE_RAZORPAY_PAYOUTS + MIXXTUNE_STAFF_SALARY (Super Admin only; checked in the controllers) */
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/admin/withdrawals/{withdrawal}/razorpay-pay', [\App\Http\Controllers\V2\Admin\WithdrawalManagementController::class, 'approvePay'])->middleware('throttle:30,1,wd-razorpay')->name('v2.admin.withdrawals.razorpay-pay');

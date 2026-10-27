@@ -116,6 +116,12 @@ const releaseChildren = (
                 href: routes.releasesRejected,
                 queryStatus: 'rejected',
             },
+            /* W120 MIXXTUNE_RELEASE_TRASH */
+            ...(role === 'super_admin' ? [{
+                id: 'releases-trash',
+                label: 'Trash',
+                href: '/admin/release-trash',
+            }] : []),
         ];
     }
 

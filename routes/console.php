@@ -73,3 +73,8 @@ Schedule::command('payouts:sync')
 Schedule::command('mail:send-scheduled')
     ->everyMinute()
     ->withoutOverlapping(10);
+
+/* W120 MIXXTUNE_RELEASE_TRASH: releases in the Trash for 90 days are removed for good */
+Schedule::command('releases:purge-trash')
+    ->dailyAt('03:30')
+    ->withoutOverlapping(60);

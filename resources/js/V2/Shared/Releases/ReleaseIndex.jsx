@@ -1,3 +1,4 @@
+import ReleaseDeleteButton from '@/V2/Shared/Releases/ReleaseDeleteButton';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 
 import {
@@ -561,6 +562,7 @@ export default function ReleaseIndex({
                                 basePath={basePath}
                                 variant="card"
                                 ownerView={ownerView}
+                                superAdmin={role === 'super_admin'}
                             />
                         ))}
                     </section>
@@ -598,6 +600,7 @@ export default function ReleaseIndex({
                                                     basePath
                                                 }
                                                 ownerView={ownerView}
+                                                superAdmin={role === 'super_admin'}
                                             />
                                         )
                                     )}
@@ -790,6 +793,7 @@ function ReleaseRow({
     basePath,
     variant = 'row',
     ownerView = false,
+    superAdmin = false,
 }) {
     const status =
         shownStatus(release.status, ownerView);
@@ -918,6 +922,7 @@ function ReleaseRow({
                                     <PencilIcon />
                                 </Link>
                             )}
+                            {superAdmin && !isDraft && <ReleaseDeleteButton release={release} compact />}
                             {isDraft && (
                                 <button type="button" onClick={deleteDraft} aria-label="Delete draft" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600">
                                     <TrashIcon />
@@ -1073,6 +1078,9 @@ function ReleaseRow({
                             <PencilIcon />
                         </Link>
                     )}
+
+                    {/* W120 MIXXTUNE_RELEASE_TRASH: Super Admin can delete any sent release (-> Trash) */}
+                    {superAdmin && !isDraft && <ReleaseDeleteButton release={release} compact />}
 
                     {isDraft && (
                         <button
