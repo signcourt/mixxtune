@@ -47,6 +47,63 @@ const formatDate = (value) => {
     return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
 };
 
+/* W118 MIXXTUNE_REVIEW_LIST_DETAILS: poster and the main release details right in the list */
+const artworkUrl = (path) => {
+    if (!path) return null;
+    const s = String(path);
+    if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('/')) return s;
+    return `/storage/${s}`;
+};
+
+const TYPE_NAMES = { single: 'Single', ep: 'EP', album: 'Album' };
+const ROLE_NAMES = { super_admin: 'Super Admin', admin: 'Manager', label: 'Label', artist: 'Artist' };
+
+const featuring = (r) => {
+    const list = Array.isArray(r.featuring_artists) ? r.featuring_artists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean) : [];
+    if (list.length) return list.join(', ');
+    return r.featuring_artist_name || '';
+};
+
+const territoryText = (r) => {
+    if (r.worldwide || !Array.isArray(r.territories) || r.territories.length === 0) return 'Worldwide';
+    return `${r.territories.length} countr${r.territories.length === 1 ? 'y' : 'ies'}`;
+};
+
+function Poster({ release, size = 'h-20 w-20' }) {
+    const [broken, setBroken] = useState(false);
+    const src = artworkUrl(release.artwork_url || release.artwork_path);
+    if (!src || broken) {
+        return (
+            <div className={`${size} grid shrink-0 place-items-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-[10px] font-semibold text-slate-400`}>
+                No poster
+            </div>
+        );
+    }
+
+    return (
+        <a href={src} target="_blank" rel="noreferrer" title="Open the poster" className="shrink-0">
+            <img src={src} alt={`Poster of ${release.title}`} loading="lazy" onError={() => setBroken(true)} className={`${size} rounded-xl border border-slate-200 object-cover shadow-sm`} />
+        </a>
+    );
+}
+
+function DetailChips({ release }) {
+    const items = [
+        TYPE_NAMES[release.release_type] || release.release_type,
+        [release.primary_genre, release.sub_genre].filter(Boolean).join(' / '),
+        release.language,
+        territoryText(release),
+    ].filter(Boolean);
+
+    return (
+        <div className="mt-1 flex flex-wrap gap-1">
+            {items.map((x, i) => (
+                <span key={`${x}-${i}`} className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{x}</span>
+            ))}
+        </div>
+    );
+}
+
 const daysSince = (value) => {
     if (!value) return null;
     const t = new Date(value).getTime();
@@ -125,17 +182,23 @@ export default function Index({ role = 'admin', releases = {}, counts = {}, filt
                         {rows.length === 0 && <Empty filters={filters} />}
                         {rows.map((r) => (
                             <div key={r.id} className="space-y-2 p-4">
-                                <div className="flex items-start justify-between gap-3">
-                                    <Link href={`/admin/release-reviews/${r.id}`} className="min-w-0">
-                                        <div className="truncate font-semibold text-slate-900">{r.title}</div>
-                                        <div className="truncate text-xs text-slate-500">{r.primary_artist_name || '—'} · {r.label_name || 'No label'}</div>
+                                <div className="flex items-start gap-3">
+                                    <Poster release={r} size="h-24 w-24" />
+                                    <Link href={`/admin/release-reviews/${r.id}`} className="min-w-0 flex-1">
+                                        <div className="font-semibold text-slate-900">{r.title}{r.version ? <span className="font-normal text-slate-500"> ({r.version})</span> : null}</div>
+                                        <div className="text-xs text-slate-600">{r.primary_artist_name || '—'}{featuring(r) ? ` feat. ${featuring(r)}` : ''}</div>
+                                        <div className="text-xs text-slate-500">{r.label_name || 'No label'}</div>
+                                        <DetailChips release={r} />
                                     </Link>
                                     <Waiting release={r} status={status} />
                                 </div>
-                                <div className="flex flex-wrap gap-x-3 text-xs text-slate-500">
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                                    <span>{r.catalog_number || 'No catalogue no.'}</span>
                                     <span>{r.tracks_count ?? 0} track(s)</span>
                                     <span>Release {formatDate(r.digital_release_date)}</span>
+                                    <span>UPC {r.upc || 'pending'}</span>
                                     <span>{dateLabel} {formatDateTime(r[dateKey] || r.updated_at)}</span>
+                                    {r.sent_by_name && <span>by {r.sent_by_name} ({ROLE_NAMES[r.sent_by_role] || r.sent_by_role})</span>}
                                 </div>
                                 <Actions release={r} status={status} />
                             </div>
@@ -147,7 +210,7 @@ export default function Index({ role = 'admin', releases = {}, counts = {}, filt
                         <table className="min-w-full">
                             <thead className="bg-slate-50">
                                 <tr>
-                                    {['Release', 'Artist / Label', 'Tracks', 'Release date', dateLabel, 'UPC', ''].map((h, i) => (
+                                    {['Release', 'Artist / Label', 'Tracks', 'Release date', dateLabel, 'UPC / Codes', ''].map((h, i) => (
                                         <th key={`${h}-${i}`} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
                                     ))}
                                 </tr>
@@ -161,17 +224,23 @@ export default function Index({ role = 'admin', releases = {}, counts = {}, filt
                                 {rows.map((r) => (
                                     <tr key={r.id} className="hover:bg-slate-50">
                                         <td className="px-5 py-3">
-                                            <Link href={`/admin/release-reviews/${r.id}`} className="group inline-block">
-                                                <div className="font-semibold text-slate-900 group-hover:text-violet-700">{r.title}</div>
-                                                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                                    <span>{r.catalog_number || 'No catalogue number'}</span>
-                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClasses[r.status] ?? 'bg-slate-100 text-slate-700'}`}>{String(r.status).replaceAll('_', ' ')}</span>
-                                                </div>
-                                            </Link>
+                                            <div className="flex items-start gap-3">
+                                                <Poster release={r} />
+                                                <Link href={`/admin/release-reviews/${r.id}`} className="group min-w-0">
+                                                    <div className="font-semibold text-slate-900 group-hover:text-violet-700">{r.title}{r.version ? <span className="font-normal text-slate-500"> ({r.version})</span> : null}</div>
+                                                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                                        <span>{r.catalog_number || 'No catalogue number'}</span>
+                                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClasses[r.status] ?? 'bg-slate-100 text-slate-700'}`}>{String(r.status).replaceAll('_', ' ')}</span>
+                                                    </div>
+                                                    <DetailChips release={r} />
+                                                </Link>
+                                            </div>
                                         </td>
                                         <td className="px-5 py-3">
                                             <div className="text-sm font-medium text-slate-700">{r.primary_artist_name || '—'}</div>
+                                            {featuring(r) && <div className="text-xs text-slate-500">feat. {featuring(r)}</div>}
                                             <div className="text-xs text-slate-500">{r.label_name || 'No label'}</div>
+                                            {r.sent_by_name && <div className="mt-1 text-[11px] text-slate-400">Sent by {r.sent_by_name} ({ROLE_NAMES[r.sent_by_role] || r.sent_by_role})</div>}
                                         </td>
                                         <td className="px-5 py-3 text-sm font-semibold text-slate-700">{r.tracks_count ?? 0}</td>
                                         <td className="whitespace-nowrap px-5 py-3 text-sm text-slate-600">{formatDate(r.digital_release_date)}</td>
@@ -179,7 +248,14 @@ export default function Index({ role = 'admin', releases = {}, counts = {}, filt
                                             {formatDateTime(r[dateKey] || r.updated_at)}
                                             <div><Waiting release={r} status={status} /></div>
                                         </td>
-                                        <td className="whitespace-nowrap px-5 py-3 text-sm text-slate-700">{r.upc || 'Pending'}</td>
+                                        <td className="whitespace-nowrap px-5 py-3 text-sm text-slate-700">
+                                            <div>{r.upc || 'UPC pending'}</div>
+                                            {(r.tracks_count ?? 0) > 0 && (
+                                                <div className={`text-xs ${Number(r.tracks_without_isrc ?? 0) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                                    {Number(r.tracks_without_isrc ?? 0) > 0 ? `ISRC missing on ${r.tracks_without_isrc}` : 'ISRC on all tracks'}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="px-5 py-3"><Actions release={r} status={status} /></td>
                                     </tr>
                                 ))}

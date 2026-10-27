@@ -1958,8 +1958,9 @@ class ReleaseController extends Controller
                 'date',
             ],
 
-            /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Release Rules > Minimum Days Before Release */
-            'digital_release_date' => $adminEdit
+            /* W118 MIXXTUNE_RELEASE_DATE_RULE: Super Admin / Manager may also pick a past date;
+               a label or artist today or later */
+            'digital_release_date' => ($adminEdit || \App\Services\V2\PlatformRules::staffDates($request->user()))
                 ? ['required', 'date']
                 : [
                 'required',

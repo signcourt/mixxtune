@@ -108,8 +108,9 @@ class ReleaseValidationService
                 $release->digital_release_date
             )->startOfDay();
 
-            /* MIXXTUNE_SETTINGS_WIRED_V1: Minimum Days Before Release */
-            if ($releaseDate->lt(PlatformRules::earliestReleaseDate())) {
+            /* W118 MIXXTUNE_RELEASE_DATE_RULE: a release made by a Super Admin / Manager may have a past date */
+            $maker = $release->created_by ? \App\Models\User::query()->find($release->created_by) : null;
+            if (!PlatformRules::staffDates($maker) && $releaseDate->toDateString() < PlatformRules::earliestReleaseDate()->toDateString()) {
                 $errors['release.digital_release_date'] =
                     PlatformRules::releaseDateMessage();
             }

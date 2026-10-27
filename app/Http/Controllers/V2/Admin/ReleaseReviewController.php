@@ -83,6 +83,10 @@ class ReleaseReviewController extends Controller
             ->select('releases.*')
             ->addSelect([
                 'label_name' => DB::table('labels')->select('name')->whereColumn('labels.id', 'releases.label_id')->limit(1),
+                /* W118 MIXXTUNE_REVIEW_LIST_DETAILS: who sent it, and how many tracks still have no ISRC */
+                'sent_by_name' => DB::table('users')->select('name')->whereColumn('users.id', 'releases.created_by')->limit(1),
+                'sent_by_role' => DB::table('users')->select('role')->whereColumn('users.id', 'releases.created_by')->limit(1),
+                'tracks_without_isrc' => DB::table('tracks')->selectRaw('count(*)')->whereColumn('tracks.release_id', 'releases.id')->whereNull('tracks.deleted_at')->where(fn ($q) => $q->whereNull('tracks.isrc')->orWhere('tracks.isrc', '')),
             ])
             ->withCount('tracks');
 

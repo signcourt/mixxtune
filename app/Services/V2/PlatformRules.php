@@ -49,15 +49,32 @@ class PlatformRules
         return self::int('upload.report_max_mb', 500, 1, 2048);
     }
 
-    /* Days between today and the earliest allowed release date (old rule "after today" = 1). */
+    /*
+     * W118 MIXXTUNE_RELEASE_DATE_RULE (owner, 27 Oct 2026): a label or artist may pick today or any
+     * later day - no minimum number of days any more (the old "Minimum days before release" setting
+     * is no longer used). Super Admin / Manager may pick any date, also a past one.
+     */
     public static function releaseMinDays(): int
     {
-        return self::int('release.minimum_days_ahead', 1, 0, 365);
+        return 0;
     }
 
+    /* today in India (the panel's day), as the earliest date a label / artist may pick */
     public static function earliestReleaseDate(): Carbon
     {
-        return now()->startOfDay()->addDays(self::releaseMinDays());
+        return Carbon::now('Asia/Kolkata')->startOfDay();
+    }
+
+    public static function staffDates(?\App\Models\User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        try {
+            return in_array(app(PermissionService::class)->role($user), ['super_admin', 'admin'], true);
+        } catch (Throwable) {
+            return in_array((string) $user->role, ['super_admin', 'admin'], true);
+        }
     }
 
     public static function requireArtwork(): bool

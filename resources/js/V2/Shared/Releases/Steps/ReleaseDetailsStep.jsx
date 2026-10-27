@@ -3,6 +3,9 @@ import {
     useRef,
     useState,
 } from 'react';
+import { usePage } from '@inertiajs/react';
+
+import DatePicker, { todayIso } from '@/V2/Shared/Components/DatePicker';
 
 const RELEASE_TYPES = [
     { value: 'single', label: 'Single' },
@@ -219,6 +222,8 @@ export default function ReleaseDetailsStep({
     availableArtists = [],
     artistNameSuggestions = [],
 }) {
+    const authRole = usePage().props?.auth?.role;
+    const staffDates = ['super_admin', 'admin'].includes(authRole) || ['super_admin', 'admin'].includes(role);
     const primaryArtists =
         Array.isArray(data.primary_artists)
         && data.primary_artists.length > 0
@@ -744,17 +749,21 @@ export default function ReleaseDetailsStep({
                     required
                     error={errors.digital_release_date}
                 >
-                    <input
-                        type="date"
-                        className={fieldClass}
+                    {/* W118 MIXXTUNE_RELEASE_DATE_RULE: Super Admin / Manager may pick any date (also past);
+                        a label or artist today or any later day - earlier days are faded and cannot be picked */}
+                    <DatePicker
                         value={
                             data.digital_release_date
                             ?? ''
                         }
-                        onChange={(event) =>
+                        min={staffDates ? null : todayIso()}
+                        hasError={Boolean(errors.digital_release_date)}
+                        placeholder="Pick the release date"
+                        note={staffDates ? 'As Super Admin / Manager you can also pick a past date (for old songs).' : 'Today or any later date.'}
+                        onChange={(iso) =>
                             setData(
                                 'digital_release_date',
-                                event.target.value
+                                iso
                             )
                         }
                     />

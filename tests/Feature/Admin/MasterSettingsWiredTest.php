@@ -69,8 +69,9 @@ class MasterSettingsWiredTest extends TestCase
         $this->assertSame(300, PlatformRules::audioMaxMb());
         $this->assertSame(20, PlatformRules::artworkMaxMb());
         $this->assertSame(500, PlatformRules::reportMaxMb());
-        $this->assertSame(1, PlatformRules::releaseMinDays());
-        $this->assertSame(now()->addDay()->toDateString(), PlatformRules::earliestReleaseDate()->toDateString());
+        /* W118: a label / artist may pick today or later - no minimum days */
+        $this->assertSame(0, PlatformRules::releaseMinDays());
+        $this->assertSame(\Illuminate\Support\Carbon::now('Asia/Kolkata')->toDateString(), PlatformRules::earliestReleaseDate()->toDateString());
         $this->assertTrue(PlatformRules::requireArtwork());
         $this->assertTrue(PlatformRules::allowExplicit());
         $this->assertSame('INV', PlatformRules::invoicePrefix());
@@ -89,7 +90,8 @@ class MasterSettingsWiredTest extends TestCase
         $this->assertSame(200, PlatformRules::audioMaxMb());
         $this->assertSame(10, PlatformRules::artworkMaxMb());
         $this->assertSame(100, PlatformRules::reportMaxMb());
-        $this->assertSame(now()->addDays(5)->toDateString(), PlatformRules::earliestReleaseDate()->toDateString());
+        /* W118: the old "minimum days" value no longer moves the earliest date */
+        $this->assertSame(\Illuminate\Support\Carbon::now('Asia/Kolkata')->toDateString(), PlatformRules::earliestReleaseDate()->toDateString());
         $this->assertFalse(PlatformRules::requireArtwork());
         $this->assertFalse(PlatformRules::allowExplicit());
         $this->assertSame('MXT', PlatformRules::invoicePrefix());

@@ -352,15 +352,11 @@ export default function Index({
 
                     <Card id="release" title="Release rules" description="Checked when a label or artist sends a release for review. Super Admin edits of old releases are not checked.">
                         <div className="grid gap-4 md:grid-cols-[minmax(0,16rem)_1fr]">
-                            <Field
-                                name="release.minimum_days_ahead"
-                                label="Minimum days before release"
-                                type="number"
-                                min={0}
-                                value={data.release.minimum_days_ahead}
-                                onChange={(v) => update("release", "minimum_days_ahead", Number(v))}
-                                hint="0 = today · 1 = from tomorrow (old rule) · 7 = one week"
-                            />
+                            {/* W118 MIXXTUNE_RELEASE_DATE_RULE: fixed rule, no minimum days any more */}
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+                                <div className="font-semibold text-slate-900">Release date</div>
+                                <p className="mt-1 text-xs leading-5 text-slate-600">Label / artist: today or any later date (earlier days are faded in the calendar). Super Admin / Manager: any date, also a past one for old songs.</p>
+                            </div>
                             <div className="grid gap-3 sm:grid-cols-3">
                                 <Toggle fill name="release.allow_explicit" label="Allow explicit content" checked={data.release.allow_explicit} onChange={(c) => update("release", "allow_explicit", c)} hint={`Off = labels / artists cannot tick "Explicit".`} />
                                 <Toggle fill name="release.require_artwork" label="Artwork required" checked={data.release.require_artwork} onChange={(c) => update("release", "require_artwork", c)} hint="Off = can be sent without a poster." />
