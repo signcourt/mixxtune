@@ -264,6 +264,41 @@ export default function Home({ content }) {
     const openJoin = useCallback(() => setJoinOpen(true), []);
     const closeJoin = useCallback(() => setJoinOpen(false), []);
 
+    /* W124: links inside the page scroll smoothly and the address stays plain mixxtune.com (no #royalties) */
+    useEffect(() => {
+        const clean = () => {
+            if (window.location.hash) window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+        };
+        const first = window.location.hash.slice(1);
+        if (first) {
+            const el = document.getElementById(first);
+            if (el) window.setTimeout(() => el.scrollIntoView(), 0);
+            clean();
+        }
+        const onClick = (e) => {
+            if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            const a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+            if (!a) return;
+            const el = document.getElementById(a.getAttribute("href").slice(1));
+            if (!el) return;
+            e.preventDefault();
+            let reduce = false;
+            try {
+                reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            } catch (err) {
+                reduce = false;
+            }
+            el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+            clean();
+        };
+        document.addEventListener("click", onClick);
+        window.addEventListener("hashchange", clean);
+        return () => {
+            document.removeEventListener("click", onClick);
+            window.removeEventListener("hashchange", clean);
+        };
+    }, []);
+
     const stream = useMemo(() => {
         const names = stores.slice(0, 5);
         const spots = [
