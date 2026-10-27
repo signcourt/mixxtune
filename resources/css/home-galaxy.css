@@ -1,0 +1,96 @@
+/* W121 MIXXTUNE_WEBSITE_HOMEPAGE - galaxy homepage: orbits, stars and scroll motion */
+.mtg-root{--r1:150px;--r2:235px;--r3:320px;--sys:720px;position:relative;overflow:clip;background:#06051A;color:#ECEAFF;font-family:'Inter',system-ui,sans-serif;min-height:100vh}
+.mtg-root *{box-sizing:border-box}
+.mtg-root a{color:#C9C3FF}
+.mtg-root a:hover{color:#FFFFFF}
+.mtg-display{font-family:'Unbounded','Inter',system-ui,sans-serif}
+@media (max-width:900px){.mtg-root{--r1:105px;--r2:160px;--r3:215px;--sys:470px}}
+@media (max-width:520px){.mtg-root{--r1:80px;--r2:122px;--r3:162px;--sys:350px}.mtg-navlinks{display:none !important}}
+@property --mtg-fill{syntax:'<angle>';inherits:false;initial-value:360deg}
+
+@keyframes mtg-spin{to{transform:rotate(360deg)}}
+@keyframes mtg-spin-r{to{transform:rotate(-360deg)}}
+@keyframes mtg-twinkle{0%,100%{opacity:.2}50%{opacity:1}}
+@keyframes mtg-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+@keyframes mtg-marquee{to{transform:translateX(-50%)}}
+@keyframes mtg-pulse{0%,100%{transform:scale(1);opacity:.55}50%{transform:scale(1.12);opacity:.9}}
+@keyframes mtg-bars{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+@keyframes mtg-eq{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.62)}}
+
+.mtg-orbit1{animation:mtg-spin 26s linear infinite}
+.mtg-orbit1 .mtg-chip{animation:mtg-spin-r 26s linear infinite}
+.mtg-orbit2{animation:mtg-spin-r 40s linear infinite}
+.mtg-orbit2 .mtg-chip{animation:mtg-spin 40s linear infinite}
+.mtg-orbit3{animation:mtg-spin 60s linear infinite}
+.mtg-orbit3 .mtg-chip{animation:mtg-spin-r 60s linear infinite}
+.mtg-moons{animation:mtg-spin 9s linear infinite}
+.mtg-star{animation:mtg-twinkle 4s ease-in-out infinite}
+.mtg-float{animation:mtg-float 7s ease-in-out infinite}
+.mtg-halo{animation:mtg-pulse 6s ease-in-out infinite}
+.mtg-track{animation:mtg-marquee 38s linear infinite}
+.mtg-bar{transform-origin:50% 100%;animation:mtg-bars 1.1s ease-in-out infinite}
+.mtg-eq{transform-box:fill-box;transform-origin:50% 50%;animation:mtg-eq 1.3s ease-in-out infinite}
+.mtg-planet{transition:border-color .3s,box-shadow .3s}
+.mtg-planet:hover{border-color:rgba(160,150,255,.6) !important;box-shadow:0 0 50px rgba(124,108,255,.35)}
+.mtg-btn{transition:transform .2s,box-shadow .2s;cursor:pointer;font-family:inherit}
+.mtg-btn:hover{transform:translateY(-2px)}
+.mtg-btn:focus-visible,.mtg-root a:focus-visible,.mtg-modal input:focus-visible,.mtg-modal select:focus-visible,.mtg-modal textarea:focus-visible{outline:3px solid #7DD3FC;outline-offset:2px}
+.mtg-ring-fill{background:conic-gradient(#7DD3FC var(--mtg-fill),rgba(201,195,255,.12) 0)}
+
+/* the royalty scene stays on screen while you scroll - only where the browser can animate it (Chrome, Edge, new Safari) */
+.mtg-stream-layer{display:none}
+
+@supports (animation-timeline: scroll()){
+  .mtg-galaxy{animation:mtg-galaxy-out linear both;animation-timeline:scroll(root);animation-range:0 110vh}
+  @keyframes mtg-galaxy-out{to{transform:scale(2.3) rotate(30deg);opacity:0;filter:blur(8px)}}
+  .mtg-herocopy{animation:mtg-copy-out linear both;animation-timeline:scroll(root);animation-range:0 75vh}
+  @keyframes mtg-copy-out{to{transform:translateY(-120px) scale(.92);opacity:0}}
+  .mtg-stars-far{animation:mtg-par-far linear both;animation-timeline:scroll(root)}
+  .mtg-stars-near{animation:mtg-par-near linear both;animation-timeline:scroll(root)}
+  @keyframes mtg-par-far{to{transform:translateY(-8%)}}
+  @keyframes mtg-par-near{to{transform:translateY(-22%)}}
+
+  .mtg-reveal{animation:mtg-rise linear both;animation-timeline:view();animation-range:entry 0% cover 30%}
+  @keyframes mtg-rise{from{opacity:0;transform:perspective(900px) translateZ(-420px) translateY(90px)}}
+  .mtg-fly-l{animation:mtg-fly-l linear both;animation-timeline:view();animation-range:entry 0% cover 32%}
+  .mtg-fly-r{animation:mtg-fly-r linear both;animation-timeline:view();animation-range:entry 0% cover 32%}
+  @keyframes mtg-fly-l{0%{opacity:0;transform:perspective(1000px) translateX(-60vw) rotateY(60deg) rotate(-14deg) scale(.4)}72%{opacity:1;transform:perspective(1000px) translateX(1.5vw) rotateY(-5deg) scale(1.04)}100%{opacity:1;transform:none}}
+  @keyframes mtg-fly-r{0%{opacity:0;transform:perspective(1000px) translateX(60vw) rotateY(-60deg) rotate(14deg) scale(.4)}72%{opacity:1;transform:perspective(1000px) translateX(-1.5vw) rotateY(5deg) scale(1.04)}100%{opacity:1;transform:none}}
+  .mtg-zoom{animation:mtg-zoom linear both;animation-timeline:view();animation-range:entry 0% cover 45%}
+  @keyframes mtg-zoom{from{opacity:0;transform:scale(.5);filter:blur(12px)}}
+  .mtg-warp{animation:mtg-warp linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
+  @keyframes mtg-warp{from{transform:rotate(-40deg) scale(.6)}to{transform:rotate(40deg) scale(1.25)}}
+
+  @keyframes mtg-stream{0%{opacity:0;transform:translate(var(--x),var(--y)) scale(.7) rotate(var(--rot))}12%{opacity:1}80%{opacity:1;transform:translate(calc(var(--x) * .18),calc(var(--y) * .18)) scale(.95) rotate(0deg)}100%{opacity:0;transform:translate(0,0) scale(.15)}}
+  @keyframes mtg-card-l{0%{opacity:0;transform:perspective(1100px) translate(-65vw,-12vh) rotateY(70deg) rotate(-18deg) scale(.35)}75%{opacity:1;transform:perspective(1100px) translate(1vw,0) rotateY(-6deg) scale(1.05)}100%{opacity:1;transform:none}}
+  @keyframes mtg-card-r{0%{opacity:0;transform:perspective(1100px) translate(65vw,12vh) rotateY(-70deg) rotate(18deg) scale(.35)}75%{opacity:1;transform:perspective(1100px) translate(-1vw,0) rotateY(6deg) scale(1.05)}100%{opacity:1;transform:none}}
+  @keyframes mtg-orb-in{from{opacity:0;transform:scale(.15) rotate(-120deg)}}
+  @keyframes mtg-fill{from{--mtg-fill:0deg}to{--mtg-fill:360deg}}
+  @keyframes mtg-paid{0%,70%{opacity:0;transform:translateY(10px) scale(.9)}100%{opacity:1;transform:none}}
+
+  @media (min-width:900px){
+    .mtg-pay{height:340vh;view-timeline-name:--mtgpay;view-timeline-axis:block}
+    .mtg-pay-stage{position:sticky;top:0;height:100vh}
+    .mtg-stream-layer{display:block}
+    .mtg-pay-head{animation:mtg-zoom linear both;animation-timeline:--mtgpay;animation-range:entry 40% contain 6%}
+    .mtg-orb{animation:mtg-orb-in linear both;animation-timeline:--mtgpay;animation-range:contain 0% contain 14%}
+    .mtg-ring-fill{animation:mtg-fill linear both;animation-timeline:--mtgpay;animation-range:contain 10% contain 88%}
+    .mtg-paid{animation:mtg-paid linear both;animation-timeline:--mtgpay;animation-range:contain 10% contain 90%}
+    .mtg-pc1{animation:mtg-card-l linear both;animation-timeline:--mtgpay;animation-range:contain 10% contain 28%}
+    .mtg-pc2{animation:mtg-card-l linear both;animation-timeline:--mtgpay;animation-range:contain 28% contain 46%}
+    .mtg-pc3{animation:mtg-card-r linear both;animation-timeline:--mtgpay;animation-range:contain 46% contain 64%}
+    .mtg-pc4{animation:mtg-card-r linear both;animation-timeline:--mtgpay;animation-range:contain 64% contain 82%}
+    .mtg-sc{animation:mtg-stream linear both;animation-timeline:--mtgpay}
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .mtg-root *{animation:none !important}
+  .mtg-sc{display:none}
+}
+
+.mtg-modal{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(4,3,18,.8);backdrop-filter:blur(6px)}
+.mtg-modal input,.mtg-modal select,.mtg-modal textarea{width:100%;border-radius:14px;border:1px solid rgba(201,195,255,.28);background:#0A0926;color:#FFFFFF;font-size:15px;font-family:inherit}
+.mtg-modal input,.mtg-modal select{height:48px;padding:0 14px}
+.mtg-modal textarea{padding:12px 14px;resize:vertical}
+.mtg-modal .mtg-err{border-color:#F87171}

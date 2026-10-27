@@ -189,6 +189,18 @@ class HandleInertiaRequests extends Middleware
                         return null;
                     }
                 },
+
+                /* W121 MIXXTUNE_WEBSITE_JOIN: new join requests waiting (Super Admin sidebar badge) */
+                'join_new' => function () use ($request, $permissionData) {
+                    if (!$request->user() || ($permissionData['role'] ?? null) !== 'super_admin') {
+                        return 0;
+                    }
+                    try {
+                        return \Illuminate\Support\Facades\DB::table('website_join_requests')->where('status', 'new')->count();
+                    } catch (\Throwable) {
+                        return 0;
+                    }
+                },
             ],
         ];
     }

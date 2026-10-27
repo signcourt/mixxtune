@@ -139,14 +139,12 @@ use Inertia\Inertia;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
-})->name('single.home');
+/* W121 MIXXTUNE_WEBSITE_HOMEPAGE: the galaxy homepage, words and Join form set in Website -> Homepage */
+Route::get('/', [\App\Http\Controllers\V2\Website\HomeController::class, 'index'])->name('single.home');
+
+/* W121 MIXXTUNE_WEBSITE_JOIN: the Join form on the homepage (no login) */
+/* limits (10 tries a minute, 30 forms a day per address) are in the controller, so the visitor sees a message in the form */
+Route::post('/join', [\App\Http\Controllers\V2\Website\HomeController::class, 'join'])->name('website.join');
 
 /*
 |--------------------------------------------------------------------------

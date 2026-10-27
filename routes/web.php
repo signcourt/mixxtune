@@ -3162,6 +3162,18 @@ Route::middleware(['auth', 'verified'])
         Route::put('panel-access', [\App\Http\Controllers\V2\Admin\PanelAccessController::class, 'update'])->middleware('throttle:30,1')->name('panel-access.update');
     });
 
+/* W121 MIXXTUNE_WEBSITE_HOMEPAGE + MIXXTUNE_WEBSITE_JOIN: Website -> Homepage / Join Requests (Super Admin; checked in the controller) */
+Route::middleware(['auth', 'verified'])
+    ->prefix('admin')
+    ->name('v2.admin.website.')
+    ->group(function () {
+        Route::get('website', [\App\Http\Controllers\V2\Admin\WebsiteController::class, 'homepage'])->name('homepage');
+        Route::post('website', [\App\Http\Controllers\V2\Admin\WebsiteController::class, 'publish'])->middleware('throttle:20,1,website-publish')->name('publish');
+        Route::get('join-requests', [\App\Http\Controllers\V2\Admin\WebsiteController::class, 'requests'])->name('join-requests');
+        Route::post('join-requests/{joinRequest}', [\App\Http\Controllers\V2\Admin\WebsiteController::class, 'update'])->whereNumber('joinRequest')->middleware('throttle:60,1,join-update')->name('join-requests.update');
+        Route::post('join-requests/{joinRequest}/notes', [\App\Http\Controllers\V2\Admin\WebsiteController::class, 'note'])->whereNumber('joinRequest')->middleware('throttle:60,1,join-note')->name('join-requests.note');
+    });
+
 /* W87 MIXXTUNE_BACKGROUND_WAV_UPLOAD: the WAV uploads while the track details are filled */
 Route::middleware(['auth', 'verified'])
     ->post(

@@ -692,6 +692,9 @@ function SidebarItem({
 
     const mailUnread = Number(usePage().props?.auth?.mail?.unread ?? 0);
     const badge = item.badgeKey === "notifications" ? notificationCount : item.badgeKey === "mail" ? mailUnread : 0;
+    /* W121 MIXXTUNE_WEBSITE_JOIN: new join requests on the Website group and its Join Requests item */
+    const joinNew = Number(usePage().props?.auth?.join_new ?? 0);
+    const groupBadge = item.children?.some((child) => child.badgeKey === "join") ? joinNew : 0;
 
     if (hasChildren) {
         return (
@@ -715,6 +718,12 @@ function SidebarItem({
                             <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">
                                 {item.label}
                             </span>
+
+                            {groupBadge > 0 && !open && (
+                                <span className="rounded-full bg-violet-500 px-2 py-0.5 text-[11px] font-bold text-white">
+                                    {groupBadge > 99 ? "99+" : groupBadge}
+                                </span>
+                            )}
 
                             <span
                                 className={[
@@ -760,6 +769,12 @@ function SidebarItem({
                                         <span className="truncate">
                                             {child.label}
                                         </span>
+
+                                        {child.badgeKey === "join" && joinNew > 0 && (
+                                            <span className="ml-auto rounded-full bg-violet-500 px-2 py-0.5 text-[11px] font-bold text-white">
+                                                {joinNew > 99 ? "99+" : joinNew}
+                                            </span>
+                                        )}
                                     </>
                                 );
 

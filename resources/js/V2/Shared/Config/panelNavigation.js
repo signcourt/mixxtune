@@ -8,6 +8,7 @@ import {
     ClipboardList,
     FileBarChart,
     FileText,
+    Globe2,
     Headphones,
     House,
     Landmark,
@@ -44,6 +45,7 @@ const icons = {
     mail: Mail,
     notifications: Bell,
     settings: Settings,
+    website: Globe2,
 
     artists: UsersRound,
     labels: Tags,
@@ -540,6 +542,27 @@ const adminNavigation = (
                 },
             ],
         },
+        /* W121 MIXXTUNE_WEBSITE_HOMEPAGE + MIXXTUNE_WEBSITE_JOIN */
+        ...(role === 'super_admin'
+            ? [{
+                  id: 'website',
+                  label: 'Website',
+                  icon: icons.website,
+                  children: [
+                      {
+                          id: 'website-homepage',
+                          label: 'Homepage',
+                          href: '/admin/website',
+                      },
+                      {
+                          id: 'website-join-requests',
+                          label: 'Join Requests',
+                          href: '/admin/join-requests',
+                          badgeKey: 'join',
+                      },
+                  ],
+              }]
+            : []),
         /* W95 MIXXTUNE_PANEL_MAIL */
         {
             id: 'mail',
