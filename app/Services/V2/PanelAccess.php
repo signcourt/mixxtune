@@ -57,7 +57,8 @@ class PanelAccess
             'labels' => ['Labels', 'Label list', ['labels.view'], ['admin' => true]],
             'artists' => ['Artists', 'Artist list', ['artists.view'], ['admin' => true]],
             'release_review' => ['Release review', 'Review, approve, reject, request changes, processing, audio checks', ['releases.review', 'releases.approve', 'releases.reject', 'releases.request_changes', 'releases.processing', 'audio_validation.view', 'audio_validation.run', 'audio_validation.override'], ['admin' => true]],
-            'create_release' => ['Create release', 'Create and edit releases', ['releases.create', 'releases.update'], ['admin' => true]],
+            /* W117 MIXXTUNE_MANAGER_SUBMIT: a Manager who makes a release for a label can also send it for review */
+            'create_release' => ['Create release', 'Create, edit and send releases for review', ['releases.create', 'releases.update', 'releases.submit'], ['admin' => true]],
             'distribution' => ['Distribution', 'Delivery to stores, retry, live, takedown', ['delivery.view', 'delivery.manage', 'delivery.retry', 'delivery.mark_delivered', 'delivery.mark_live', 'delivery.mark_failed', 'delivery.takedown'], ['admin' => true]],
             'identifiers' => ['ISRC & UPC', 'Assign and generate codes', ['identifiers.view', 'identifiers.assign', 'identifiers.generate', 'identifiers.bulk_assign', 'identifiers.unassign'], ['admin' => true]],
             'catalogue' => ['Catalogue', 'Catalogue, sync and export', ['catalogue.view', 'catalogue.manage', 'catalogue.sync', 'catalogue.export'], ['admin' => true]],
