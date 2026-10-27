@@ -33,6 +33,18 @@ const normaliseStatus = (status) =>
         .trim()
         .toLowerCase();
 
+/*
+ * W119 MIXXTUNE_OWNER_RELEASE_STATUS: a label / artist sees only the steps that matter to them.
+ * After approval the release shows "Processing" (approved, being delivered, delivered) until the team
+ * marks it Live. The store column is not shown to them.
+ */
+const OWNER_PROCESSING = ['approved', 'processing', 'delivered', 'failed'];
+const shownStatus = (status, ownerView) => {
+    const s = normaliseStatus(status);
+
+    return ownerView && OWNER_PROCESSING.includes(s) ? 'processing' : s;
+};
+
 const statusBorder = {
     draft: 'border-slate-200',
     submitted: 'border-blue-200',
@@ -175,6 +187,8 @@ export default function ReleaseIndex({
         );
 
 
+    const ownerView = role === 'label' || role === 'artist';
+
     /* MIXXTUNE_RELEASES_LIST_V2: clean header + one toolbar (status cards removed) */
     /* W63: the title follows the menu item (My Drafts, In Review ...) instead of always "All Releases" */
     const STATUS_TITLES = {
@@ -193,6 +207,7 @@ export default function ReleaseIndex({
         submitted: 'Sent for review - waiting for the Mixx Tune team.',
         changes_requested: 'The team asked for changes - open, fix and send again.',
         rejected: 'Not accepted - open a release to see the reason.',
+        ...(ownerView ? { processing: 'Approved - being sent to the stores. It turns Live when the team marks it live.', live: 'Live in the stores.' } : {}),
     };
     const pageTitle =
         STATUS_TITLES[filters.status]
@@ -322,13 +337,13 @@ export default function ReleaseIndex({
                             <option value="">Status: All</option>
                             <option value="draft">Draft</option>
                             <option value="submitted">In Review</option>
-                            <option value="approved">Approved</option>
+                            {!ownerView && <option value="approved">Approved</option>}
                             <option value="changes_requested">Changes Requested</option>
                             <option value="rejected">Rejected</option>
                             <option value="processing">Processing</option>
-                            <option value="delivered">Delivered</option>
+                            {!ownerView && <option value="delivered">Delivered</option>}
                             <option value="live">Live</option>
-                            <option value="failed">Failed</option>
+                            {!ownerView && <option value="failed">Failed</option>}
                         </select>
 
 
@@ -531,6 +546,7 @@ export default function ReleaseIndex({
                                 basePath={
                                     basePath
                                 }
+                                ownerView={ownerView}
                             />
                         ))}
                     </section>
@@ -544,6 +560,7 @@ export default function ReleaseIndex({
                                 release={release}
                                 basePath={basePath}
                                 variant="card"
+                                ownerView={ownerView}
                             />
                         ))}
                     </section>
@@ -557,7 +574,7 @@ export default function ReleaseIndex({
                                         <th className="px-5 py-3.5">Label</th>
                                         <th className="px-5 py-3.5">Release date</th>
                                         <th className="px-5 py-3.5">UPC</th>
-                                        <th className="px-5 py-3.5">Stores</th>
+                                        {!ownerView && <th className="px-5 py-3.5">Stores</th>}
                                         <th className="px-5 py-3.5">Status</th>
                                         <th className="px-5 py-3.5 text-right">
                                             <span className="sr-only">Actions</span>
@@ -580,6 +597,7 @@ export default function ReleaseIndex({
                                                 basePath={
                                                     basePath
                                                 }
+                                                ownerView={ownerView}
                                             />
                                         )
                                     )}
@@ -601,9 +619,10 @@ export default function ReleaseIndex({
 function ReleaseCard({
     release,
     basePath,
+    ownerView = false,
 }) {
     const status =
-        normaliseStatus(release.status);
+        shownStatus(release.status, ownerView);
 
     const isDraft =
         status === 'draft';
@@ -770,9 +789,10 @@ function ReleaseRow({
     release,
     basePath,
     variant = 'row',
+    ownerView = false,
 }) {
     const status =
-        normaliseStatus(release.status);
+        shownStatus(release.status, ownerView);
 
     const isDraft =
         status === 'draft';
@@ -885,7 +905,7 @@ function ReleaseRow({
                             <p className="truncate font-mono text-xs text-slate-600">
                                 {release.upc ? `UPC ${release.upc}` : 'UPC pending'}
                             </p>
-                            {storesTotal > 0 && (
+                            {!ownerView && storesTotal > 0 && (
                                 <p className="mt-0.5 text-xs text-slate-500">
                                     {storesLive} / {storesTotal} stores live
                                 </p>
@@ -998,6 +1018,7 @@ function ReleaseRow({
                 )}
             </td>
 
+            {!ownerView && (
             <td className="px-5 py-3">
                 {storesTotal > 0 ? (
                     <div className="w-32">
@@ -1025,6 +1046,7 @@ function ReleaseRow({
                     </span>
                 )}
             </td>
+            )}
 
             <td className="px-5 py-3">
                 <StatusPill status={status} />

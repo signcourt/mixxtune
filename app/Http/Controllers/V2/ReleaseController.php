@@ -637,10 +637,15 @@ class ReleaseController extends Controller
         }
 
         if ($filters['status'] !== '') {
-            $query->where(
-                'status',
-                $filters['status']
-            );
+            /* W119 MIXXTUNE_OWNER_RELEASE_STATUS: for a label / artist "Processing" = approved until Live */
+            if (in_array($role, ['label', 'artist'], true) && $filters['status'] === 'processing') {
+                $query->whereIn('status', ['approved', 'processing', 'delivered', 'failed']);
+            } else {
+                $query->where(
+                    'status',
+                    $filters['status']
+                );
+            }
         }
 
         match ($filters['sort']) {
