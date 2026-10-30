@@ -78,3 +78,8 @@ Schedule::command('mail:send-scheduled')
 Schedule::command('releases:purge-trash')
     ->dailyAt('03:30')
     ->withoutOverlapping(60);
+
+/* W127 MIXXTUNE_OFFICE: task reminders (due soon / overdue) */
+Schedule::command('office:reminders')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping(10);

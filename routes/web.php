@@ -2720,6 +2720,37 @@ Route::middleware(['auth', 'verified'])
 |
 */
 
+/* W127 MIXXTUNE_OFFICE: staff tasks + attendance */
+Route::middleware(['auth', 'verified'])->group(function () {
+    /* staff (and Super Admin / Manager, who also have a My Office) */
+    Route::get('/office', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'index'])->name('v2.office.index');
+    Route::post('/office/ping', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'ping'])->middleware('throttle:120,1,office-ping')->name('v2.office.ping');
+    Route::post('/office/clock-in', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'clockIn'])->name('v2.office.clock-in');
+    Route::post('/office/clock-out', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'clockOut'])->name('v2.office.clock-out');
+    Route::post('/office/break/start', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'startBreak'])->name('v2.office.break.start');
+    Route::post('/office/break/end', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'endBreak'])->name('v2.office.break.end');
+    Route::get('/office/summary', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'summary'])->name('v2.office.summary');
+    Route::post('/office/tasks/{task}/accept', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'accept'])->whereNumber('task')->name('v2.office.tasks.accept');
+    Route::post('/office/tasks/{task}/timer-start', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'startTimer'])->whereNumber('task')->name('v2.office.tasks.timer-start');
+    Route::post('/office/tasks/{task}/timer-pause', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'pauseTimer'])->whereNumber('task')->name('v2.office.tasks.timer-pause');
+    Route::post('/office/tasks/{task}/items/{item}', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'toggleItem'])->whereNumber('task')->whereNumber('item')->name('v2.office.tasks.item');
+    Route::post('/office/tasks/{task}/block', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'block'])->whereNumber('task')->name('v2.office.tasks.block');
+    Route::post('/office/tasks/{task}/submit', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'submit'])->whereNumber('task')->name('v2.office.tasks.submit');
+
+    /* Super Admin office */
+    Route::get('/office/admin', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'index'])->name('v2.office.admin.index');
+    Route::get('/office/admin/staff', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'staff'])->name('v2.office.admin.staff');
+    Route::post('/office/admin/staff', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'addStaff'])->middleware('throttle:30,1,office-staff')->name('v2.office.admin.staff.add');
+    Route::post('/office/admin/staff/{user}/roles', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'setStaffRoles'])->whereNumber('user')->name('v2.office.admin.staff.roles');
+    Route::get('/office/admin/library', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'library'])->name('v2.office.admin.library');
+    Route::post('/office/admin/roles', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'addRole'])->name('v2.office.admin.roles.add');
+    Route::post('/office/admin/templates', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'addTemplate'])->name('v2.office.admin.templates.add');
+    Route::post('/office/admin/assign', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'assign'])->middleware('throttle:60,1,office-assign')->name('v2.office.admin.assign');
+    Route::post('/office/admin/tasks/{task}/verify', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'verify'])->whereNumber('task')->name('v2.office.admin.verify');
+    Route::post('/office/admin/tasks/{task}/changes', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'requestChanges'])->whereNumber('task')->name('v2.office.admin.changes');
+    Route::get('/office/admin/report', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'report'])->name('v2.office.admin.report');
+});
+
 require __DIR__.'/single-domain.php';
 
 /*

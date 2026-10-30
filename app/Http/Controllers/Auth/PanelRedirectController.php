@@ -28,6 +28,9 @@ class PanelRedirectController extends Controller
         );
 
         return match ($role) {
+            /* W127 MIXXTUNE_OFFICE: office staff land on My Office */
+            'staff' => redirect('/office'),
+
             'artist' => redirect()->route(
                 'single.artist.dashboard'
             ),

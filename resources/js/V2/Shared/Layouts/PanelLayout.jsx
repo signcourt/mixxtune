@@ -9,6 +9,7 @@ import BankChangeOtpPrompt from "@/V2/Shared/Components/BankChangeOtpPrompt";
 import ApprovalNotice from "@/V2/Shared/Components/ApprovalNotice";
 import HighlightNoticeBanner from "@/V2/Shared/Components/HighlightNoticeBanner";
 import DayNightSwitch from "@/V2/Shared/Components/DayNightSwitch";
+import OfficeLogoutConfirm from "@/V2/Shared/Office/OfficeLogoutConfirm";
 
 export default function PanelLayout({
     role = null,
@@ -80,8 +81,16 @@ export default function PanelLayout({
         };
     }, []);
 
+    const [officeLogout, setOfficeLogout] = useState(false);
+
     const logout = () => {
         setProfileOpen(false);
+
+        /* W127 MIXXTUNE_OFFICE: staff must confirm the day summary before logout */
+        if (resolvedRole === "staff") {
+            setOfficeLogout(true);
+            return;
+        }
 
         router.post("/logout");
     };
@@ -484,6 +493,7 @@ export default function PanelLayout({
                         {/* MIXXTUNE_BANK_CHANGE_PROTECTION_V1 */}
                         <BankChangeOtpPrompt />
                         <ApprovalNotice />
+                        <OfficeLogoutConfirm open={officeLogout} onCancel={() => setOfficeLogout(false)} />
                         {/* MIXXTUNE_NOTIFY_TARGETED_V1 */}
                         <HighlightNoticeBanner />
                         <MaintenanceExperience

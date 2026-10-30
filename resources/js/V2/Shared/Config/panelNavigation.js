@@ -24,6 +24,8 @@ import {
     WalletCards,
     WalletMinimal,
     UserCog,
+    Briefcase,
+    Clock,
 } from 'lucide-react';
 
 import {
@@ -46,6 +48,8 @@ const icons = {
     notifications: Bell,
     settings: Settings,
     website: Globe2,
+    office: Briefcase,
+    myOffice: Clock,
 
     artists: UsersRound,
     labels: Tags,
@@ -625,8 +629,41 @@ const adminNavigation = (
         },
     );
 
+    /* W127 MIXXTUNE_OFFICE: staff tasks + attendance (Super Admin only) */
+    if (role === 'super_admin') {
+        items.push({
+            id: 'office',
+            label: 'Office',
+            icon: icons.office,
+            children: [
+                { id: 'office-overview', label: 'Overview', href: '/office/admin' },
+                { id: 'office-staff', label: 'Staff', href: '/office/admin/staff' },
+                { id: 'office-library', label: 'Roles & Templates', href: '/office/admin/library' },
+                { id: 'office-report', label: 'Time Report', href: '/office/admin/report' },
+                { id: 'office-mine', label: 'My Office', href: '/office' },
+            ],
+        });
+    }
+
     return items;
 };
+
+/* W127 MIXXTUNE_OFFICE: staff see only their office */
+const staffNavigation = () => [
+    {
+        id: 'my-office',
+        label: 'My Office',
+        icon: icons.office,
+        href: '/office',
+        exact: true,
+    },
+    {
+        id: 'notifications',
+        label: 'Notifications',
+        icon: icons.notifications,
+        href: '/notifications',
+    },
+];
 
 export const getPanelNavigation = (
     role = 'artist'
@@ -635,6 +672,10 @@ export const getPanelNavigation = (
         role === 'super-admin'
             ? 'super_admin'
             : role;
+
+    if (normalizedRole === 'staff') {
+        return staffNavigation();
+    }
 
     const routes = getPanelRoutes(
         normalizedRole
