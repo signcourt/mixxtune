@@ -48,11 +48,12 @@ class OfficeAdminController extends Controller
         $this->boss($request, $permissions);
         $date = Carbon::now(OfficeService::TZ)->toDateString();
         $staff = User::query()->where('role', 'staff')->orderBy('name')->get(['id', 'name']);
-        $att = Attendance::query()->where('work_date', $date)->get()->keyBy('user_id');
+        $att = Attendance::query()->whereDate('work_date', $date)->get()->keyBy('user_id');
 
         $board = $staff->map(function ($u) use ($att) {
             $a = $att->get($u->id);
-            $state = 'off'; /* off | working | idle | break */
+            /* W129: no login today = absent */
+            $state = 'absent'; /* absent | working | idle | break | done */
             if ($a && $a->clock_in_at && !$a->clock_out_at) {
                 $state = $a->on_break ? 'break' : (($a->last_ping_at && $a->last_ping_at->gt(now()->subMinutes(3))) ? 'working' : 'idle');
             } elseif ($a && $a->clock_out_at) {
@@ -80,6 +81,7 @@ class OfficeAdminController extends Controller
             'review' => $review,
             'counts' => [
                 'staff' => $staff->count(),
+                'absent' => $board->where('state', 'absent')->count(),
                 'open' => OfficeTask::query()->whereIn('status', OfficeTask::OPEN)->count(),
                 'review' => $review->count(),
                 'overdue' => OfficeTask::query()->whereIn('status', OfficeTask::OPEN)->whereNotNull('due_at')->where('due_at', '<', now())->count(),
@@ -340,7 +342,7 @@ class OfficeAdminController extends Controller
         $this->boss($request, $permissions);
         $date = Carbon::now(OfficeService::TZ)->toDateString();
         $staff = User::query()->where('role', 'staff')->orderBy('name')->get(['id', 'name']);
-        $att = \App\Models\Office\Attendance::query()->where('work_date', $date)->get()->keyBy('user_id');
+        $att = \App\Models\Office\Attendance::query()->whereDate('work_date', $date)->get()->keyBy('user_id');
 
         $rows = $staff->map(function ($u) use ($att) {
             $d = OfficeDevice::query()->where('user_id', $u->id)->where('approved', true)->orderByDesc('last_seen_at')->first();

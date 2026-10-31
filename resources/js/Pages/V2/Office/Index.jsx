@@ -9,7 +9,7 @@ const STATE = {
     idle: ['Idle', 'bg-amber-100 text-amber-700', '🟡'],
     break: ['Break', 'bg-blue-100 text-blue-700', '☕'],
     done: ['Clocked out', 'bg-slate-100 text-slate-500', '✔'],
-    off: ['Not in', 'bg-slate-100 text-slate-400', '⚫'],
+    absent: ['Absent (no login)', 'bg-rose-50 text-rose-600', '⚫'],
 };
 
 export default function Index({ board = [], review = [], counts = {} }) {
@@ -28,8 +28,9 @@ export default function Index({ board = [], review = [], counts = {} }) {
             <Head title="Office" />
             <PageMessages />
             <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
                     <Card label="Staff" value={counts.staff ?? 0} href="/office/admin/staff" />
+                    <Card label="Absent today" value={counts.absent ?? 0} />
                     <Card label="Open tasks" value={counts.open ?? 0} />
                     <Card label="Waiting for review" value={counts.review ?? 0} />
                     <Card label="Overdue" value={counts.overdue ?? 0} />

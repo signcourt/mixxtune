@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\EnsureAccountActive::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             \App\Http\Middleware\EnforceMaintenanceMode::class,
+            /* W129 MIXXTUNE_OFFICE_LOGIN: office staff stay inside My Office */
+            \App\Http\Middleware\OfficeStaffOnly::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 

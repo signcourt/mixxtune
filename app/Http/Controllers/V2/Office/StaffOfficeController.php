@@ -160,10 +160,22 @@ class StaffOfficeController extends Controller
         return $t;
     }
 
+    /* W129 MIXXTUNE_OFFICE_LOGIN: office staff must be clocked in to work on a task */
+    private function requireClockedIn(Request $request, PermissionService $permissions): void
+    {
+        if ($permissions->role($request->user()) !== 'staff') {
+            return; /* Super Admin / Manager may act without clocking in */
+        }
+        $a = $this->office->today($request->user());
+        abort_unless($a->clock_in_at && !$a->clock_out_at, 422, 'Clock in first — you are not clocked in.');
+    }
+
     public function accept(Request $request, int $task, PermissionService $permissions): RedirectResponse
     {
         $this->staff($request, $permissions);
-        $this->office->accept($request->user(), $this->myTask($request, $task));
+        $t = $this->myTask($request, $task);
+        $this->requireClockedIn($request, $permissions);
+        $this->office->accept($request->user(), $t);
 
         return back();
     }
@@ -171,7 +183,9 @@ class StaffOfficeController extends Controller
     public function startTimer(Request $request, int $task, PermissionService $permissions): RedirectResponse
     {
         $this->staff($request, $permissions);
-        $this->office->startTimer($request->user(), $this->myTask($request, $task));
+        $t = $this->myTask($request, $task);
+        $this->requireClockedIn($request, $permissions);
+        $this->office->startTimer($request->user(), $t);
 
         return back();
     }
@@ -188,6 +202,7 @@ class StaffOfficeController extends Controller
     {
         $this->staff($request, $permissions);
         $t = $this->myTask($request, $task);
+        $this->requireClockedIn($request, $permissions);
         $it = TaskChecklistItem::query()->where('task_id', $t->id)->findOrFail($item);
         $this->office->toggleItem($request->user(), $it, $request->boolean('done'));
 
@@ -197,8 +212,10 @@ class StaffOfficeController extends Controller
     public function block(Request $request, int $task, PermissionService $permissions): RedirectResponse
     {
         $this->staff($request, $permissions);
+        $t = $this->myTask($request, $task);
+        $this->requireClockedIn($request, $permissions);
         $data = $request->validate(['why' => ['required', 'string', 'max:1000']]);
-        $this->office->block($request->user(), $this->myTask($request, $task), $data['why']);
+        $this->office->block($request->user(), $t, $data['why']);
 
         return back()->with('success', 'The task is marked blocked and the office is told.');
     }
@@ -206,6 +223,8 @@ class StaffOfficeController extends Controller
     public function submit(Request $request, int $task, PermissionService $permissions): RedirectResponse
     {
         $this->staff($request, $permissions);
+        $t = $this->myTask($request, $task);
+        $this->requireClockedIn($request, $permissions);
         $data = $request->validate([
             'kind' => ['required', 'in:link,file,note,none'],
             'link' => ['nullable', 'url', 'max:1000'],
@@ -216,7 +235,7 @@ class StaffOfficeController extends Controller
         if ($data['kind'] === 'file' && $request->hasFile('file')) {
             $path = $request->file('file')->store('office/proofs/'.$task, 'public');
         }
-        $this->office->submit($request->user(), $this->myTask($request, $task), [
+        $this->office->submit($request->user(), $t, [
             'kind' => $data['kind'], 'link' => $data['link'] ?? null, 'note' => $data['note'] ?? null, 'path' => $path,
         ]);
 
