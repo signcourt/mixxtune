@@ -14,6 +14,16 @@ Route::post('/login', [AuthController::class, 'login']);
 /* W115 MIXXTUNE_RAZORPAY_PAYOUTS: RazorpayX payout status (checked by signature, no login) */
 Route::post('/webhooks/razorpayx', \App\Http\Controllers\V2\RazorpayWebhookController::class)->middleware('throttle:600,1,rzp-webhook')->name('webhooks.razorpayx');
 
+/* W128 MIXXTUNE_OFFICE_MONITOR: the desktop activity agent (device token, not a user session) */
+Route::prefix('office/agent')->group(function () {
+    Route::post('/pair', [\App\Http\Controllers\V2\Office\AgentController::class, 'pair'])->middleware('throttle:30,1,office-pair');
+    Route::middleware('office.agent')->group(function () {
+        Route::post('/heartbeat', [\App\Http\Controllers\V2\Office\AgentController::class, 'heartbeat'])->middleware('throttle:120,1,office-hb');
+        Route::post('/screenshot', [\App\Http\Controllers\V2\Office\AgentController::class, 'screenshot'])->middleware('throttle:60,1,office-shot');
+        Route::get('/settings', [\App\Http\Controllers\V2\Office\AgentController::class, 'settings']);
+    });
+});
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);

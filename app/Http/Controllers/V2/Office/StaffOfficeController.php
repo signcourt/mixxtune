@@ -5,7 +5,10 @@ namespace App\Http\Controllers\V2\Office;
 use App\Http\Controllers\Controller;
 use App\Models\Office\OfficeTask;
 use App\Models\Office\TaskChecklistItem;
+use App\Models\Office\OfficeDevice;
+use App\Services\V2\Office\OfficeMonitor;
 use App\Services\V2\Office\OfficeService;
+use App\Services\V2\Office\OfficeSettings;
 use App\Services\V2\PermissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -45,13 +48,31 @@ class StaffOfficeController extends Controller
             ->values()
             ->map(fn (OfficeTask $t) => $this->card($t));
 
+        $device = OfficeDevice::query()->where('user_id', $user->id)->where('approved', true)->orderByDesc('last_seen_at')->first();
+
         return Inertia::render('V2/Office/MyOffice', [
             'role' => $permissions->role($user),
             'attendance' => $this->att($a),
             'runningTaskId' => $this->office->runningTimerTaskId($user),
             'tasks' => $tasks,
             'summary' => $this->office->daySummary($user),
+            'monitoring' => OfficeSettings::monitoringEnabled(),
+            'device' => $device ? [
+                'platform' => $device->platform,
+                'name' => $device->device_name,
+                'online' => $device->last_seen_at && $device->last_seen_at->gt(now()->subMinutes(3)),
+                'screenshot_minutes' => OfficeSettings::screenshotMinutes(),
+            ] : null,
         ]);
+    }
+
+    /* W128 MIXXTUNE_OFFICE_MONITOR: staff connects this office computer (consent is shown in the UI) */
+    public function pairCode(Request $request, PermissionService $permissions, OfficeMonitor $monitor)
+    {
+        $this->staff($request, $permissions);
+        $data = $request->validate(['device_name' => ['nullable', 'string', 'max:190'], 'platform' => ['nullable', 'in:windows,mac']]);
+
+        return response()->json($monitor->makePairCode($request->user(), $data['device_name'] ?? null, $data['platform'] ?? null));
     }
 
     private function att($a): array

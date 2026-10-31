@@ -2736,6 +2736,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/office/tasks/{task}/items/{item}', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'toggleItem'])->whereNumber('task')->whereNumber('item')->name('v2.office.tasks.item');
     Route::post('/office/tasks/{task}/block', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'block'])->whereNumber('task')->name('v2.office.tasks.block');
     Route::post('/office/tasks/{task}/submit', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'submit'])->whereNumber('task')->name('v2.office.tasks.submit');
+    /* W128 MIXXTUNE_OFFICE_MONITOR: staff pairs this computer */
+    Route::post('/office/device/pair-code', [\App\Http\Controllers\V2\Office\StaffOfficeController::class, 'pairCode'])->middleware('throttle:20,1,office-pair-code')->name('v2.office.device.pair-code');
 
     /* Super Admin office */
     Route::get('/office/admin', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'index'])->name('v2.office.admin.index');
@@ -2749,6 +2751,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/office/admin/tasks/{task}/verify', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'verify'])->whereNumber('task')->name('v2.office.admin.verify');
     Route::post('/office/admin/tasks/{task}/changes', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'requestChanges'])->whereNumber('task')->name('v2.office.admin.changes');
     Route::get('/office/admin/report', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'report'])->name('v2.office.admin.report');
+    /* W128 MIXXTUNE_OFFICE_MONITOR */
+    Route::get('/office/admin/activity', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'activity'])->name('v2.office.admin.activity');
+    Route::get('/office/admin/settings', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'settings'])->name('v2.office.admin.settings');
+    Route::post('/office/admin/settings', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'saveSettings'])->name('v2.office.admin.settings.save');
+    Route::post('/office/admin/devices/{device}/rustdesk', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'setRustdesk'])->whereNumber('device')->name('v2.office.admin.devices.rustdesk');
+    Route::get('/office/admin/screenshot/{shot}', [\App\Http\Controllers\V2\Office\OfficeAdminController::class, 'screenshot'])->whereNumber('shot')->name('v2.office.admin.screenshot');
 });
 
 require __DIR__.'/single-domain.php';

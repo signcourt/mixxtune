@@ -26,7 +26,7 @@ const STATUS = {
     submitted: ['In review', 'bg-emerald-100 text-emerald-700'],
 };
 
-export default function MyOffice({ role = 'staff', attendance, tasks = [], runningTaskId = null, summary }) {
+export default function MyOffice({ role = 'staff', attendance, tasks = [], runningTaskId = null, summary, monitoring = false, device = null }) {
     const clockedIn = attendance.clocked_in;
     const onBreak = attendance.on_break;
     const [activeSecs, setActiveSecs] = useState(summary?.active_seconds || 0);
@@ -91,6 +91,8 @@ export default function MyOffice({ role = 'staff', attendance, tasks = [], runni
                     </div>
                 )}
 
+                {monitoring && <ConnectComputer device={device} />}
+
                 {/* tasks */}
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -106,6 +108,39 @@ export default function MyOffice({ role = 'staff', attendance, tasks = [], runni
                 </div>
             </div>
         </PanelLayout>
+    );
+}
+
+function ConnectComputer({ device }) {
+    const [code, setCode] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const make = () => {
+        setBusy(true);
+        axios.post('/office/device/pair-code', { platform: /Mac/.test(navigator.platform) ? 'mac' : 'windows', device_name: navigator.platform })
+            .then((r) => setCode(r.data.code)).catch(() => {}).finally(() => setBusy(false));
+    };
+    if (device?.online) {
+        return (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                ✔ This computer is connected{device.platform ? ` (${device.platform})` : ''}. Your active/idle time is being recorded during work hours. A screenshot is taken about every {device.screenshot_minutes} minutes — you will see a small note when it happens.
+            </div>
+        );
+    }
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="font-semibold text-slate-900">Connect this computer</div>
+            <p className="mt-1 text-sm text-slate-600">
+                Your office has turned on activity monitoring. Install the Mixx Tune Office app on this computer and enter the code below once. It records how long the keyboard/mouse is active or idle, the app in front, and a screenshot every few minutes — only during work hours. It never reads what you type, your passwords, camera or mic.
+            </p>
+            {!code ? (
+                <button onClick={make} disabled={busy} className="mt-3 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50">{busy ? '…' : 'Get connect code'}</button>
+            ) : (
+                <div className="mt-3 inline-flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5">
+                    <span className="font-mono text-xl font-bold tracking-widest text-violet-800">{code}</span>
+                    <span className="text-xs text-violet-700">enter this in the app · valid 15 min</span>
+                </div>
+            )}
+        </div>
     );
 }
 

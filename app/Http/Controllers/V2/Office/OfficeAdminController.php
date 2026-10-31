@@ -9,9 +9,14 @@ use App\Models\Office\OfficeTask;
 use App\Models\Office\TaskTemplate;
 use App\Models\User;
 use App\Services\V2\FinanceAudit;
+use App\Models\Office\OfficeDevice;
+use App\Models\Office\Screenshot;
 use App\Services\V2\Office\OfficeService;
+use App\Services\V2\Office\OfficeSettings;
 use App\Services\V2\PermissionService;
 use App\Services\V2\StaffAlerts;
+use App\Services\V2\SystemSettingService;
+use Illuminate\Validation\Rule as ValidationRule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -295,5 +300,94 @@ class OfficeAdminController extends Controller
             ]);
 
         return Inertia::render('V2/Office/Report', ['role' => 'super_admin', 'range' => $range, 'rows' => $rows]);
+    }
+
+    /* ---- W128 monitoring: settings ---- */
+
+    public function settings(Request $request, PermissionService $permissions): Response
+    {
+        $this->boss($request, $permissions);
+
+        return Inertia::render('V2/Office/Settings', ['role' => 'super_admin', 'settings' => OfficeSettings::all()]);
+    }
+
+    public function saveSettings(Request $request, PermissionService $permissions, SystemSettingService $settings): RedirectResponse
+    {
+        $this->boss($request, $permissions);
+        $data = $request->validate([
+            'monitoring_enabled' => ['required', 'boolean'],
+            'screenshot_minutes' => ['required', 'integer', 'min:1', 'max:120'],
+            'idle_minutes' => ['required', 'integer', 'min:1', 'max:180'],
+            'work_start' => ['required', 'date_format:H:i'],
+            'work_end' => ['required', 'date_format:H:i'],
+            'rustdesk_host' => ['nullable', 'string', 'max:190'],
+        ]);
+        $settings->set('office.monitoring_enabled', $data['monitoring_enabled'], 'office', 'boolean', $request->user()->id);
+        $settings->set('office.screenshot_minutes', $data['screenshot_minutes'], 'office', 'integer', $request->user()->id);
+        $settings->set('office.idle_minutes', $data['idle_minutes'], 'office', 'integer', $request->user()->id);
+        $settings->set('office.work_start', $data['work_start'], 'office', 'string', $request->user()->id);
+        $settings->set('office.work_end', $data['work_end'], 'office', 'string', $request->user()->id);
+        $settings->set('office.rustdesk_host', $data['rustdesk_host'] ?? '', 'office', 'string', $request->user()->id);
+        FinanceAudit::log('office.settings_saved', 'Office monitoring settings saved (monitoring '.($data['monitoring_enabled'] ? 'ON' : 'OFF').', screenshot every '.$data['screenshot_minutes'].' min, idle '.$data['idle_minutes'].' min).', []);
+
+        return back()->with('success', 'Settings saved.');
+    }
+
+    /* ---- W128 monitoring: live & activity ---- */
+
+    public function activity(Request $request, PermissionService $permissions): Response
+    {
+        $this->boss($request, $permissions);
+        $date = Carbon::now(OfficeService::TZ)->toDateString();
+        $staff = User::query()->where('role', 'staff')->orderBy('name')->get(['id', 'name']);
+        $att = \App\Models\Office\Attendance::query()->where('work_date', $date)->get()->keyBy('user_id');
+
+        $rows = $staff->map(function ($u) use ($att) {
+            $d = OfficeDevice::query()->where('user_id', $u->id)->where('approved', true)->orderByDesc('last_seen_at')->first();
+            $a = $att->get($u->id);
+            $online = $d && $d->last_seen_at && $d->last_seen_at->gt(now()->subMinutes(3));
+            $active = $online && $d->last_active_at && $d->last_active_at->gt(now()->subMinutes(2));
+
+            return [
+                'id' => $u->id, 'name' => $u->name,
+                'has_agent' => (bool) $d,
+                'platform' => $d?->platform,
+                'online' => $online,
+                'state' => !$d ? 'no_agent' : (!$online ? 'offline' : ($active ? 'active' : 'idle')),
+                'foreground_app' => $d?->foreground_app,
+                'last_active' => $d?->last_active_at?->timezone(OfficeService::TZ)->format('h:i A'),
+                'rustdesk_id' => $d?->rustdesk_id,
+                'device_id' => $d?->id,
+                'comp_active' => $this->hm((int) ($a->comp_active_seconds ?? 0)),
+                'comp_idle' => $this->hm((int) ($a->comp_idle_seconds ?? 0)),
+                'shots' => Screenshot::query()->where('user_id', $u->id)->where('work_date', Carbon::now(OfficeService::TZ)->toDateString())
+                    ->orderByDesc('id')->limit(8)->get()
+                    ->map(fn (Screenshot $s) => ['url' => '/office/admin/screenshot/'.$s->id, 'at' => $s->taken_at?->timezone(OfficeService::TZ)->format('h:i A'), 'app' => $s->foreground_app])->values(),
+            ];
+        });
+
+        return Inertia::render('V2/Office/Activity', [
+            'role' => 'super_admin',
+            'rows' => $rows,
+            'settings' => OfficeSettings::all(),
+        ]);
+    }
+
+    public function setRustdesk(Request $request, int $device, PermissionService $permissions): RedirectResponse
+    {
+        $this->boss($request, $permissions);
+        $data = $request->validate(['rustdesk_id' => ['nullable', 'string', 'max:40']]);
+        OfficeDevice::query()->findOrFail($device)->forceFill(['rustdesk_id' => $data['rustdesk_id'] ?? null])->save();
+
+        return back()->with('success', 'RustDesk ID saved.');
+    }
+
+    public function screenshot(Request $request, int $shot, PermissionService $permissions)
+    {
+        $this->boss($request, $permissions);
+        $s = Screenshot::query()->findOrFail($shot);
+        abort_unless(\Illuminate\Support\Facades\Storage::disk('local')->exists($s->path), 404);
+
+        return response()->file(\Illuminate\Support\Facades\Storage::disk('local')->path($s->path));
     }
 }

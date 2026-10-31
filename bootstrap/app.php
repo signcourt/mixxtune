@@ -22,6 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            /* W128 MIXXTUNE_OFFICE_MONITOR: the desktop agent's own token */
+            'office.agent' => \App\Http\Middleware\OfficeAgentToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

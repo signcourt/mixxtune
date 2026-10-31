@@ -101,6 +101,14 @@ class LoginEmailOtpController extends Controller
             )
         );
 
+        /* W128 MIXXTUNE_OFFICE_MONITOR: logging in is clocking in for office staff */
+        if ($role === 'staff') {
+            try {
+                app(\App\Services\V2\Office\OfficeService::class)->clockIn($user);
+            } catch (\Throwable) {
+            }
+        }
+
         $destination = match ($role) {
             'super_admin' =>
                 '/super-admin/dashboard',
@@ -110,6 +118,10 @@ class LoginEmailOtpController extends Controller
 
             'label' =>
                 '/label/dashboard',
+
+            /* W127 MIXXTUNE_OFFICE */
+            'staff' =>
+                '/office',
 
             default =>
                 '/artist/dashboard',

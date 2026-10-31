@@ -637,9 +637,11 @@ const adminNavigation = (
             icon: icons.office,
             children: [
                 { id: 'office-overview', label: 'Overview', href: '/office/admin' },
+                { id: 'office-activity', label: 'Live & Activity', href: '/office/admin/activity' },
                 { id: 'office-staff', label: 'Staff', href: '/office/admin/staff' },
                 { id: 'office-library', label: 'Roles & Templates', href: '/office/admin/library' },
                 { id: 'office-report', label: 'Time Report', href: '/office/admin/report' },
+                { id: 'office-settings', label: 'Settings', href: '/office/admin/settings' },
                 { id: 'office-mine', label: 'My Office', href: '/office' },
             ],
         });

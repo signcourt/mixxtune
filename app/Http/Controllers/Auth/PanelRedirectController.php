@@ -27,6 +27,14 @@ class PanelRedirectController extends Controller
             )
         );
 
+        /* W128 MIXXTUNE_OFFICE_MONITOR: logging in is clocking in for office staff */
+        if ($role === 'staff') {
+            try {
+                app(\App\Services\V2\Office\OfficeService::class)->clockIn($user);
+            } catch (\Throwable) {
+            }
+        }
+
         return match ($role) {
             /* W127 MIXXTUNE_OFFICE: office staff land on My Office */
             'staff' => redirect('/office'),

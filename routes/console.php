@@ -83,3 +83,8 @@ Schedule::command('releases:purge-trash')
 Schedule::command('office:reminders')
     ->everyFifteenMinutes()
     ->withoutOverlapping(10);
+
+/* W128 MIXXTUNE_OFFICE_MONITOR: idle alerts (uses the panel's "idle minutes" setting) */
+Schedule::command('office:idle-check')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10);
