@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\EnsureAccountActive::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
+            /* W135 MIXXTUNE_IDLE_LOGOUT: sign out after idle, then e-mail OTP again */
+            \App\Http\Middleware\EnforceIdleTimeout::class,
             \App\Http\Middleware\EnforceMaintenanceMode::class,
             /* W129 MIXXTUNE_OFFICE_LOGIN: office staff stay inside My Office */
             \App\Http\Middleware\OfficeStaffOnly::class,

@@ -10,6 +10,7 @@ import ApprovalNotice from "@/V2/Shared/Components/ApprovalNotice";
 import HighlightNoticeBanner from "@/V2/Shared/Components/HighlightNoticeBanner";
 import DayNightSwitch from "@/V2/Shared/Components/DayNightSwitch";
 import OfficeLogoutConfirm from "@/V2/Shared/Office/OfficeLogoutConfirm";
+import IdleLogout from "@/V2/Shared/Components/IdleLogout";
 
 export default function PanelLayout({
     role = null,
@@ -126,6 +127,7 @@ export default function PanelLayout({
 
     return (
         <>
+            <IdleLogout />
             {props.brand?.favicon_url && (
                 <Head>
                     <link

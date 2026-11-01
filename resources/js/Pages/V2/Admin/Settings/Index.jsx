@@ -85,6 +85,10 @@ export default function Index({
             report_max_mb: Number(getValue("upload", "report_max_mb", 500)),
         },
 
+        security: {
+            idle_minutes: Number(getValue("security", "idle_minutes", 30)),
+        },
+
         maintenance: {
             enabled: Boolean(
                 getValue("maintenance", "enabled", false),
@@ -285,6 +289,7 @@ export default function Index({
         ["company", "Company"],
         ["release", "Release rules"],
         ["upload", "Upload limits"],
+        ["security", "Security"],
         ["maintenance", "Maintenance"],
         ["finance", "Finance & tax"],
         ["payout", "Payout & reminders"],
@@ -387,6 +392,12 @@ export default function Index({
                                 </span>
                             ))}
                         </div>
+                    </Card>
+
+                    <Card id="security" title="Security" description="Auto sign-out when a dashboard is left idle. Signing back in goes through the e-mail OTP.">
+                        <Grid>
+                            <Field name="security.idle_minutes" label="Auto-logout after idle (minutes)" type="number" min={1} max={1440} value={data.security.idle_minutes} onChange={(v) => update("security", "idle_minutes", Number(v))} hint="No clicks / typing for this long signs the user out; they log in again with a fresh OTP. Applies to every dashboard." />
+                        </Grid>
                     </Card>
 
                     <Card

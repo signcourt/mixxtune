@@ -181,6 +181,11 @@ class HandleInertiaRequests extends Middleware
                         'isSuperAdmin'
                     ],
 
+                /* W135 MIXXTUNE_IDLE_LOGOUT: the frontend idle watcher reads this */
+                'idle_minutes' => fn () => $request->user()
+                    ? (int) app(\App\Services\V2\SystemSettingService::class)->get('security.idle_minutes', 30)
+                    : null,
+
                 /* W95 MIXXTUNE_PANEL_MAIL: mailboxes + unread mail for the sidebar */
                 'mail' => function () use ($request) {
                     try {

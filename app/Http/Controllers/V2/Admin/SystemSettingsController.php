@@ -167,6 +167,15 @@ class SystemSettingsController extends Controller
                 'boolean',
             ],
 
+            /* W135 MIXXTUNE_IDLE_LOGOUT: auto-logout after N minutes idle
+               (sometimes: a form that doesn't send it keeps the saved value) */
+            'security.idle_minutes' => [
+                'sometimes',
+                'integer',
+                'min:1',
+                'max:1440',
+            ],
+
             'upload.audio_max_mb' => [
                 'required',
                 'integer',
@@ -475,6 +484,11 @@ class SystemSettingsController extends Controller
                 'release.require_wav' => true,
             ],
 
+            /* W135 MIXXTUNE_IDLE_LOGOUT */
+            'security' => [
+                'security.idle_minutes' => 30,
+            ],
+
             'upload' => [
                 'upload.audio_max_mb' => 300,
                 'upload.artwork_max_mb' => 20,
@@ -543,6 +557,11 @@ class SystemSettingsController extends Controller
                 'allow_explicit' => 'boolean',
                 'require_artwork' => 'boolean',
                 'require_wav' => 'boolean',
+            ],
+
+            /* W135 MIXXTUNE_IDLE_LOGOUT */
+            'security' => [
+                'idle_minutes' => 'integer',
             ],
 
             'upload' => [
