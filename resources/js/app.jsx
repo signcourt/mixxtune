@@ -9,6 +9,7 @@ import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { DialogHost } from './ui/dialog';
+import GlobalLoader from '@/V2/Shared/Components/GlobalLoader';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -26,6 +27,7 @@ createInertiaApp({
             <>
                 <App {...props} />
                 <DialogHost />
+                <GlobalLoader />
             </>,
         );
     },
