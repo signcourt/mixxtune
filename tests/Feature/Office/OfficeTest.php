@@ -51,6 +51,9 @@ class OfficeTest extends TestCase
 
     public function test_full_office_flow_add_staff_assign_work_submit_verify_and_time(): void
     {
+        /* freeze the office day up front so attendance is all on one date (date-independent of the real clock) */
+        Carbon::setTestNow(Carbon::parse('2026-10-31 09:30:00', OfficeService::TZ));
+
         $boss = $this->super();
         $role = FunctionalRole::query()->create(['public_id' => (string) Str::ulid(), 'name' => 'Designer', 'slug' => 'designer-'.Str::random(4)]);
 

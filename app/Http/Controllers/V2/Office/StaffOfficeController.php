@@ -10,6 +10,7 @@ use App\Services\V2\Office\OfficeMonitor;
 use App\Services\V2\Office\OfficeService;
 use App\Services\V2\Office\OfficeSettings;
 use App\Services\V2\PermissionService;
+use App\Services\V2\StaffAlerts;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -216,6 +217,10 @@ class StaffOfficeController extends Controller
         $this->requireClockedIn($request, $permissions);
         $data = $request->validate(['why' => ['required', 'string', 'max:1000']]);
         $this->office->block($request->user(), $t, $data['why']);
+        try {
+            app(StaffAlerts::class)->bell(app(StaffAlerts::class)->superAdmins(), 'office.task_blocked', $request->user()->name.' is blocked: '.$t->title, $data['why'], '/office/admin', 'warning');
+        } catch (\Throwable) {
+        }
 
         return back()->with('success', 'The task is marked blocked and the office is told.');
     }
@@ -238,6 +243,10 @@ class StaffOfficeController extends Controller
         $this->office->submit($request->user(), $t, [
             'kind' => $data['kind'], 'link' => $data['link'] ?? null, 'note' => $data['note'] ?? null, 'path' => $path,
         ]);
+        try {
+            app(StaffAlerts::class)->bell(app(StaffAlerts::class)->superAdmins(), 'office.task_submitted', $request->user()->name.' sent for review: '.$t->title, 'Open Office to approve or ask for changes.', '/office/admin', 'info');
+        } catch (\Throwable) {
+        }
 
         return back()->with('success', 'Sent for review.');
     }

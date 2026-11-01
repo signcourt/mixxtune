@@ -40,6 +40,30 @@ class OfficeReminders extends Command
             $this->tell($alerts, $t, 'office.task_overdue', 'Overdue: '.$t->title, 'This task is past its time. Please update it.', 'warning');
             $n++;
         }
+
+        /* W130: a clocked-in staff member with no task -> tell the Super Admins (once a day) so work can be given */
+        $date = Carbon::now(OfficeService::TZ)->toDateString();
+        $supers = $alerts->superAdmins();
+        $clockedIn = \App\Models\Office\Attendance::query()->whereDate('work_date', $date)
+            ->whereNotNull('clock_in_at')->whereNull('clock_out_at')->pluck('user_id');
+        foreach ($clockedIn as $uid) {
+            $open = OfficeTask::query()->where('assigned_to', $uid)->whereIn('status', OfficeTask::OPEN)->count();
+            if ($open > 0) {
+                continue;
+            }
+            $already = \Illuminate\Support\Facades\DB::table('panel_notifications')->where('type', 'office.no_task')
+                ->whereDate('created_at', $date)->where('data', 'like', '%"free_user_id":'.(int) $uid.'%')->exists();
+            if ($already) {
+                continue;
+            }
+            $u = User::query()->find($uid);
+            try {
+                $alerts->bell($supers, 'office.no_task', ($u?->name ?? 'A staff member').' has no task', 'They are clocked in with nothing to do — give them a task.', '/office/admin/staff', 'warning', ['free_user_id' => (int) $uid]);
+            } catch (\Throwable) {
+            }
+            $n++;
+        }
+
         $this->info('Office reminders sent: '.$n);
 
         return self::SUCCESS;
