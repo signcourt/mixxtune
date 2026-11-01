@@ -58,6 +58,9 @@ export function reviewChecks({ release, artist = null, label = null, distributio
                       : []
               );
 
+    /* W132 MIXXTUNE_MEDIA_OPTIONAL: old catalogue (Admin flag) may be sent without WAV + poster */
+    const mediaOptional = Boolean(release?.media_optional);
+
     const checks = [
         {
             label: 'Release title',
@@ -105,10 +108,10 @@ export function reviewChecks({ release, artist = null, label = null, distributio
             step: 1,
         },
         {
-            label: 'Cover artwork',
+            label: mediaOptional ? 'Cover artwork (optional — old catalogue)' : 'Cover artwork',
             passed: Boolean(
                 release?.artwork_path
-            ),
+            ) || mediaOptional,
             step: 1,
         },
         {
@@ -117,15 +120,16 @@ export function reviewChecks({ release, artist = null, label = null, distributio
             step: 2,
         },
         {
-            label: 'WAV uploaded for every track',
+            label: mediaOptional ? 'WAV for every track (optional — old catalogue)' : 'WAV uploaded for every track',
             passed:
-                tracks.length > 0 &&
+                mediaOptional ||
+                (tracks.length > 0 &&
                 tracks.every(
                     (track) =>
                         Boolean(
                             track.audio_path
                         )
-                ),
+                )),
             step: 2,
         },
         /* W83: lyricist and composer are needed for every track */
