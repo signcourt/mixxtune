@@ -117,7 +117,8 @@ class ReleaseValidationService
         }
 
         /* MIXXTUNE_SETTINGS_WIRED_V1: Artwork Required */
-        if (!$release->artwork_path && PlatformRules::requireArtwork()) {
+        /* W131 MIXXTUNE_MEDIA_OPTIONAL: old catalogue (Admin flag) may have no poster */
+        if (!$release->artwork_path && PlatformRules::requireArtwork() && !$release->media_optional) {
             $errors['release.artwork'] =
                 'Cover artwork is required.';
         }
@@ -230,7 +231,8 @@ class ReleaseValidationService
                     "Track {$number} primary artist is required.";
             }
 
-            if (!$track->audio_path) {
+            /* W131 MIXXTUNE_MEDIA_OPTIONAL: old catalogue (Admin flag) may have no WAV */
+            if (!$track->audio_path && !$release->media_optional) {
                 $errors[
                     "tracks.{$track->id}.audio"
                 ] =

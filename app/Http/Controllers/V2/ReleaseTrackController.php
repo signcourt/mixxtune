@@ -47,10 +47,14 @@ class ReleaseTrackController extends Controller
             $release
         );
 
+        /* W131 MIXXTUNE_MEDIA_OPTIONAL: an Admin / Super Admin may add a track with no WAV on an old-catalogue release */
+        $mediaOptional = (bool) $release->media_optional
+            && in_array($permissions->role($request->user()), ['admin', 'super_admin'], true);
+
         $validated = $this->validateTrack(
             $request,
             null,
-            true
+            !$mediaOptional
         );
 
         $discNumber = (int) (
@@ -73,7 +77,7 @@ class ReleaseTrackController extends Controller
 
         /* W87: the WAV may already be uploaded in the background (token) */
         $audioFile = $this->takeAudio($request, $release);
-        abort_unless($audioFile, 422, 'Upload the WAV master first.');
+        abort_unless($audioFile || $mediaOptional, 422, 'Upload the WAV master first.');
 
         unset($validated['audio'], $validated['audio_upload_token']);
 
@@ -99,19 +103,19 @@ class ReleaseTrackController extends Controller
                 false,
 
             'audio_path' =>
-                $audioFile['path'],
+                $audioFile['path'] ?? null,
 
             'audio_original_name' =>
-                $audioFile['name'],
+                $audioFile['name'] ?? null,
 
             'audio_mime_type' =>
-                $audioFile['mime'],
+                $audioFile['mime'] ?? null,
 
             'audio_size_bytes' =>
-                $audioFile['size'],
+                $audioFile['size'] ?? null,
 
             'audio_validation_status' =>
-                'pending',
+                $audioFile ? 'pending' : 'skipped',
 
             'status' =>
                 $validated['status'] ?? 'draft',
@@ -139,10 +143,12 @@ class ReleaseTrackController extends Controller
                 Auth::id(),
         ]);
 
-        $audioValidator->validate(
-            $track,
-            $request->user()
-        );
+        if ($audioFile) {
+            $audioValidator->validate(
+                $track,
+                $request->user()
+            );
+        }
 
         $adminEditService = app(ReleaseAdminEditService::class);
 

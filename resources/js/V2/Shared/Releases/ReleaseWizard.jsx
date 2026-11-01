@@ -280,6 +280,9 @@ export default function ReleaseWizard({
                 ? `/storage/${release.artwork_path}`
                 : null,
 
+        /* W131 MIXXTUNE_MEDIA_OPTIONAL: old catalogue without WAV/poster (Admin / Super Admin only) */
+        media_optional: Boolean(release?.media_optional),
+
         wizard_step:
             Number(release?.wizard_step ?? 1),
 

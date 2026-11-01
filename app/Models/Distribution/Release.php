@@ -41,7 +41,7 @@ class Release extends Model
         'copyright_year',
         'phonographic_owner',
         'phonographic_year',
-        'artwork_path',
+        'artwork_path', 'media_optional',
         'status',
         'review_notes',
         'rejection_reason',
@@ -86,6 +86,7 @@ class Release extends Model
             'stores' => 'array',
             'territories' => 'array',
             'worldwide' => 'boolean',
+            'media_optional' => 'boolean',
             'pre_order' => 'boolean',
         ];
     }

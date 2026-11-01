@@ -293,6 +293,9 @@ export default function TrackManager({
 }) {
     /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Audio Maximum MB */
     const audioMaxMb = Number(usePage().props?.platformRules?.audio_max_mb) || 300;
+    /* W131 MIXXTUNE_MEDIA_OPTIONAL: Admin / Super Admin on an old-catalogue release may skip the WAV */
+    const authRole = usePage().props?.auth?.role;
+    const mediaOptional = Boolean(release?.media_optional) && ['admin', 'super_admin'].includes(authRole);
     /* W91: names already used on this account (from the release form data) */
     const nameSuggestions = usePage().props?.artistNameSuggestions ?? [];
 
@@ -694,7 +697,7 @@ export default function TrackManager({
         );
 
         setUploadFileName('');
-        setModalStage('upload');
+        setModalStage(mediaOptional ? 'details' : 'upload');
         setFormVisible(false);
     };
 
@@ -752,6 +755,7 @@ export default function TrackManager({
         if (
             !editingTrack
             && !(data.audio instanceof File)
+            && !mediaOptional
         ) {
             window.alert(
                 'Please select a WAV master first.'
@@ -769,7 +773,7 @@ export default function TrackManager({
         const hasAudio =
             data.audio instanceof File;
 
-        if (!editingTrack && !hasAudio) {
+        if (!editingTrack && !hasAudio && !mediaOptional) {
             setModalStage('upload');
 
             window.alert(

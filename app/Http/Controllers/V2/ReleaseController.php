@@ -825,6 +825,10 @@ class ReleaseController extends Controller
                 );
         }
 
+        /* W131 MIXXTUNE_MEDIA_OPTIONAL: only an Admin / Super Admin may save old catalogue without WAV + poster */
+        $mediaOptional = in_array($permissions->role($request->user()), ['admin', 'super_admin'], true)
+            && (bool) ($validated['media_optional'] ?? false);
+
         $catalogNumber =
             $this->generateCatalogNumber();
 
@@ -834,6 +838,7 @@ class ReleaseController extends Controller
             $artist,
             $label,
             $artworkPath,
+            $mediaOptional,
             $catalogNumber
         ) {
             return Release::query()->create([
@@ -929,6 +934,7 @@ class ReleaseController extends Controller
                     ] ?? null,
 
                 'artwork_path' => $artworkPath,
+                'media_optional' => $mediaOptional,
 
                 'status' => 'draft',
                 'wizard_step' => 1,
@@ -1500,6 +1506,12 @@ class ReleaseController extends Controller
                 $validated['artwork_path']
                 ?? $release->artwork_path,
 
+            /* W131 MIXXTUNE_MEDIA_OPTIONAL: only an Admin / Super Admin may change this; others keep it as-is */
+            'media_optional' =>
+                in_array($permissions->role($request->user()), ['admin', 'super_admin'], true)
+                    ? (bool) ($validated['media_optional'] ?? false)
+                    : (bool) $release->media_optional,
+
             'status' =>
                 $release->status,
 
@@ -2006,6 +2018,9 @@ class ReleaseController extends Controller
                 /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Upload Rules > Artwork Maximum MB */
                 'max:'.(\App\Services\V2\PlatformRules::artworkMaxMb() * 1024),
             ],
+
+            /* W131 MIXXTUNE_MEDIA_OPTIONAL (honoured only for Admin / Super Admin in store/update) */
+            'media_optional' => ['nullable', 'boolean'],
 
             'wizard_step' => [
                 'nullable',

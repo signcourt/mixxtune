@@ -769,6 +769,22 @@ export default function ReleaseDetailsStep({
                     />
                 </Field>
 
+                {/* W131 MIXXTUNE_MEDIA_OPTIONAL: Admin / Super Admin only — old catalogue without WAV & poster */}
+                {staffDates && (
+                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 md:col-span-2 xl:col-span-3">
+                        <input
+                            type="checkbox"
+                            checked={Boolean(data.media_optional)}
+                            onChange={(e) => setData('media_optional', e.target.checked)}
+                            className="mt-0.5 h-5 w-5 rounded border-slate-300 text-violet-600"
+                        />
+                        <span>
+                            <span className="text-sm font-semibold text-slate-900">Old catalogue — save without WAV &amp; poster</span>
+                            <span className="block text-xs leading-5 text-slate-600">Only you (Admin / Super Admin) see this. Turn it on for old releases where the audio or cover is not available — tracks can be saved and the release sent without the WAV master or artwork. Everything else is still filled in.</span>
+                        </span>
+                    </label>
+                )}
+
                 <Field
                     label="Production Year"
                     required
