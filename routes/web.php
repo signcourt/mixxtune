@@ -500,6 +500,23 @@ Route::middleware([
                 ]
             )->name('revenue-imports.destroy');
 
+            /* W137 MIXXTUNE_REPORT_COLUMN_PREFS: which columns labels/artists may see */
+            Route::post(
+                '/revenue-reports/columns/default',
+                [
+                    \App\Http\Controllers\Admin\RevenueImportController::class,
+                    'saveDefaultColumns',
+                ]
+            )->name('revenue-reports.columns.default');
+
+            Route::post(
+                '/revenue-reports/columns/label/{label}',
+                [
+                    \App\Http\Controllers\Admin\RevenueImportController::class,
+                    'saveLabelColumns',
+                ]
+            )->name('revenue-reports.columns.label');
+
 
             /*
              * Revenue Label Mapping

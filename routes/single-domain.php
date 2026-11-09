@@ -397,6 +397,22 @@ Route::middleware([
         'v2.label.revenue-sharing.index'
     );
 
+    /* W137 MIXXTUNE_REPORT_COLUMN_PREFS: the label's own revenue report (shared columns + earning) */
+    \Illuminate\Support\Facades\Route::get(
+        '/label/revenue-reports',
+        [\App\Http\Controllers\V2\Label\MyRevenueReportController::class, 'index']
+    )->name('v2.label.revenue-reports.index');
+
+    \Illuminate\Support\Facades\Route::get(
+        '/label/revenue-reports/{revenueImport}/export',
+        [\App\Http\Controllers\V2\Label\MyRevenueReportController::class, 'export']
+    )->name('v2.label.revenue-reports.export');
+
+    \Illuminate\Support\Facades\Route::get(
+        '/label/revenue-reports/{revenueImport}',
+        [\App\Http\Controllers\V2\Label\MyRevenueReportController::class, 'show']
+    )->name('v2.label.revenue-reports.show');
+
     \Illuminate\Support\Facades\Route::get(
         '/label/revenue-sharing/export',
         [

@@ -133,13 +133,101 @@ class RevenueImportController extends Controller
             ->with('success', 'Revenue report uploaded successfully.');
     }
 
-    public function show(RevenueImport $revenueImport)
+    public function show(RevenueImport $revenueImport, \App\Services\V2\ReportVisibilityService $vis)
     {
         $revenueImport->load('importer:id,name,email');
 
+        /* W137 MIXXTUNE_REPORT_COLUMN_PREFS: columns + current sharing settings for the picker */
+        $allColumns = $vis->allColumns($revenueImport);
+        $default = $vis->defaultPref();
+
+        /* labels that actually appear in this import (owners of its rows), for per-label overrides */
+        $labels = \App\Models\Finance\RevenueMatch::query()
+            ->whereIn('revenue_row_id', \App\Models\Finance\RevenueRow::query()
+                ->where('revenue_import_id', $revenueImport->id)->select('id'))
+            ->whereNotNull('label_id')
+            ->with('label:id,name')
+            ->get()
+            ->pluck('label')
+            ->filter()
+            ->unique('id')
+            ->values()
+            ->map(function ($label) {
+                $pref = \App\Models\Finance\ReportColumnPref::query()->where('label_id', $label->id)->first();
+
+                return [
+                    'id' => $label->id,
+                    'name' => $label->name,
+                    'has_override' => (bool) $pref,
+                    'columns' => $pref?->columns,
+                    'show_label_rate' => $pref ? (bool) $pref->show_label_rate : null,
+                    'show_earning' => $pref ? (bool) $pref->show_earning : null,
+                ];
+            });
+
         return Inertia::render('Admin/RevenueImports/Show', [
             'revenueImport' => $revenueImport,
+            'columnSettings' => [
+                'all_columns' => $allColumns,
+                'default' => [
+                    'columns' => $default->columns,       // null = all visible
+                    'show_label_rate' => (bool) $default->show_label_rate,
+                    'show_earning' => (bool) $default->show_earning,
+                ],
+                'labels' => $labels,
+            ],
         ]);
+    }
+
+    /* W137: save the default sharing template (which columns every label/artist may see). */
+    public function saveDefaultColumns(Request $request)
+    {
+        $data = $request->validate([
+            'columns' => ['nullable', 'array'],
+            'columns.*' => ['string'],
+            'show_label_rate' => ['required', 'boolean'],
+            'show_earning' => ['required', 'boolean'],
+        ]);
+
+        \App\Models\Finance\ReportColumnPref::query()->updateOrCreate(
+            ['label_id' => null],
+            [
+                'columns' => empty($data['columns']) ? null : array_values($data['columns']),
+                'show_label_rate' => $data['show_label_rate'],
+                'show_earning' => $data['show_earning'],
+            ]
+        );
+
+        return back()->with('success', 'Default report columns saved.');
+    }
+
+    /* W137: save or clear a single label's override. */
+    public function saveLabelColumns(Request $request, \App\Models\Core\Label $label)
+    {
+        $data = $request->validate([
+            'use_override' => ['required', 'boolean'],
+            'columns' => ['nullable', 'array'],
+            'columns.*' => ['string'],
+            'show_label_rate' => ['required', 'boolean'],
+            'show_earning' => ['required', 'boolean'],
+        ]);
+
+        if (!$data['use_override']) {
+            \App\Models\Finance\ReportColumnPref::query()->where('label_id', $label->id)->delete();
+
+            return back()->with('success', $label->name.' now uses the default columns.');
+        }
+
+        \App\Models\Finance\ReportColumnPref::query()->updateOrCreate(
+            ['label_id' => $label->id],
+            [
+                'columns' => empty($data['columns']) ? null : array_values($data['columns']),
+                'show_label_rate' => $data['show_label_rate'],
+                'show_earning' => $data['show_earning'],
+            ]
+        );
+
+        return back()->with('success', 'Columns saved for '.$label->name.'.');
     }
 
 
