@@ -1589,6 +1589,63 @@ class ReportImportController extends Controller
         );
     }
 
+    /**
+     * W142 (Wave B): edit one imported row's ISRC / names, then re-map + recalc.
+     * Allowed only before the report is approved or published.
+     */
+    public function updateRow(
+        Request $request,
+        ReportImport $reportImport,
+        \App\Models\Reports\ReportRow $row,
+        PermissionService $permissions,
+        ReportImportService $importer
+    ): RedirectResponse {
+        $role = $permissions->role($request->user());
+
+        abort_unless(
+            in_array($role, ['admin', 'super_admin'], true),
+            403,
+            'Admin access required.'
+        );
+
+        abort_unless(
+            (int) $row->report_import_id === (int) $reportImport->id,
+            404
+        );
+
+        $status = $reportImport->financial_status ?? 'review_pending';
+
+        if (in_array($status, ['approved_scheduled', 'published'], true)) {
+            return back()->withErrors([
+                'row' => 'This report is already approved or published - its rows can no longer be edited.',
+            ]);
+        }
+
+        $request->validate([
+            'isrc' => ['nullable', 'string', 'max:64'],
+            'track_title' => ['nullable', 'string', 'max:255'],
+            'track_artist' => ['nullable', 'string', 'max:255'],
+            'album_title' => ['nullable', 'string', 'max:255'],
+            'album_artist' => ['nullable', 'string', 'max:255'],
+            'label_name' => ['nullable', 'string', 'max:255'],
+            'upc' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        /* update only the fields the editor actually sent */
+        foreach (['isrc', 'track_title', 'track_artist', 'album_title', 'album_artist', 'label_name', 'upc'] as $field) {
+            if ($request->has($field)) {
+                $value = $request->input($field);
+                $row->{$field} = is_string($value) ? trim($value) : $value;
+            }
+        }
+
+        $row->save();
+
+        /* re-run the exact same ownership + earnings resolution the import uses */
+        $importer->remapRow($row);
+
+        return back()->with('success', 'Row updated and re-mapped.');
+    }
 
     public function update(
         Request $request,

@@ -1068,6 +1068,138 @@ class ReportImportService
         ]);
     }
 
+    /**
+     * W142 (Wave B): re-run the SAME ownership + earnings resolution as storeRow()
+     * on a single already-stored row after a Super Admin edits its ISRC/fields,
+     * then update that row's mapping + earnings columns. The review totals are
+     * computed on the fly from report_rows, so they refresh on the next load.
+     *
+     * IMPORTANT: this MUST stay in sync with storeRow()'s mapping/earnings logic.
+     * ReportRowRemapTest asserts a remapped row equals a freshly imported row for
+     * the same ISRC, so any divergence is caught by the test suite.
+     */
+    public function remapRow(ReportRow $row): void
+    {
+        $isrc = $row->isrc ? strtoupper(trim($row->isrc)) : null;
+        $upc = $this->normaliseUpc($row->upc);
+        $normalizedIsrc = $isrc ? strtoupper(preg_replace('/[^A-Z0-9]/i', '', $isrc)) : null;
+
+        $persistentRule = $normalizedIsrc
+            ? DB::table('revenue_mapping_rules')
+                ->where('identifier_type', 'isrc')
+                ->where('identifier_value', $normalizedIsrc)
+                ->first()
+            : null;
+
+        $trackMatches = $normalizedIsrc
+            ? Track::query()
+                ->whereNull('deleted_at')
+                ->whereRaw("{$this->normalizedIsrcSql()} = ?", [$normalizedIsrc])
+                ->get()
+            : collect();
+
+        $track = null;
+        $release = null;
+        $ownerType = null;
+        $ownerId = null;
+        $catalogueCandidates = [];
+
+        foreach ($trackMatches as $candidateTrack) {
+            $candidateRelease = $candidateTrack->release;
+            if (! $candidateRelease) {
+                continue;
+            }
+            $candidateOwner = app(CatalogueOwnershipService::class)->resolveReleaseOwner($candidateRelease);
+            $candidateOwnerType = ! empty($candidateOwner['type']) ? (string) $candidateOwner['type'] : null;
+            $candidateOwnerId = ! empty($candidateOwner['id']) ? (int) $candidateOwner['id'] : null;
+            if (! $candidateOwnerType || ! $candidateOwnerId) {
+                continue;
+            }
+            $ownerKey = $candidateOwnerType.':'.$candidateOwnerId;
+            $catalogueCandidates[$ownerKey] ??= [
+                'track' => $candidateTrack,
+                'release' => $candidateRelease,
+                'owner_type' => $candidateOwnerType,
+                'owner_id' => $candidateOwnerId,
+            ];
+        }
+
+        if (count($catalogueCandidates) === 1) {
+            $candidate = reset($catalogueCandidates);
+            $track = $candidate['track'];
+            $release = $candidate['release'];
+        }
+
+        if ($persistentRule) {
+            $ownerType = ! empty($persistentRule->owner_type) ? (string) $persistentRule->owner_type : null;
+            $ownerId = ! empty($persistentRule->owner_id) ? (int) $persistentRule->owner_id : null;
+            if (! empty($persistentRule->catalogue_label_id)) {
+                $release = (object) [
+                    'id' => ! empty($persistentRule->release_id) ? (int) $persistentRule->release_id : null,
+                    'label_id' => (int) $persistentRule->catalogue_label_id,
+                    'artist_id' => ! empty($persistentRule->artist_id) ? (int) $persistentRule->artist_id : null,
+                ];
+            }
+        } elseif (count($catalogueCandidates) === 1) {
+            $candidate = reset($catalogueCandidates);
+            $ownerType = $candidate['owner_type'];
+            $ownerId = $candidate['owner_id'];
+        }
+
+        $mappingStatus = (! empty($ownerType) && ! empty($ownerId)) ? 'mapped' : 'unmapped';
+
+        $collectedRevenue = $this->nullableNumber($row->collected_revenue);
+        $assignedRate = null;
+
+        if ($mappingStatus === 'mapped') {
+            if ($release?->label_id) {
+                $assignedRate = DB::table('labels')->where('id', (int) $release->label_id)->value('revenue_share_percentage');
+            } elseif ($release?->artist_id) {
+                $assignedRate = DB::table('artists')->where('id', (int) $release->artist_id)->value('revenue_share_percentage');
+            }
+            if ($assignedRate === null) {
+                if ($ownerType === 'label') {
+                    $assignedRate = DB::table('labels')->where('id', (int) $ownerId)->value('revenue_share_percentage');
+                } elseif ($ownerType === 'artist') {
+                    $assignedRate = DB::table('artists')->where('id', (int) $ownerId)->value('revenue_share_percentage');
+                }
+            }
+        }
+
+        if ($assignedRate !== null) {
+            $assignedRate = max(0.0, min(100.0, (float) $assignedRate));
+        }
+
+        if ($mappingStatus === 'mapped' && $collectedRevenue !== null && $assignedRate !== null) {
+            if ($collectedRevenue < 0) {
+                $effectiveLabelRate = 1.0;
+                $effectiveEarnings = round($collectedRevenue, 8);
+            } else {
+                $effectiveLabelRate = round($assignedRate / 100, 8);
+                $effectiveEarnings = round($collectedRevenue * $effectiveLabelRate, 8);
+            }
+        } else {
+            $effectiveLabelRate = 0.0;
+            $effectiveEarnings = 0.0;
+        }
+
+        $row->update([
+            'release_id' => $release?->id,
+            'track_id' => $track?->id,
+            'artist_id' => $release?->artist_id,
+            'label_id' => $release?->label_id,
+            'revenue_owner_type' => $ownerType,
+            'revenue_owner_id' => $ownerId,
+            'mapping_status' => $mappingStatus,
+            'mapped_at' => $mappingStatus === 'mapped' ? now() : null,
+            'isrc' => $isrc,
+            'upc' => $upc,
+            'label_rate' => $effectiveLabelRate,
+            'collected_revenue' => $collectedRevenue,
+            'earnings' => $effectiveEarnings,
+        ]);
+    }
+
     private function normalizeMappingText(
         ?string $value
     ): string {

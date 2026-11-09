@@ -1832,6 +1832,14 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.admin.reports.imports.update');
 
+/* W142 (Wave B): edit one report row (ISRC / names) then re-map + recalc */
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/admin/reports/imports/{reportImport}/rows/{row}',
+        [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'updateRow']
+    )
+    ->name('v2.admin.reports.imports.rows.update');
+
 Route::middleware(['auth', 'verified'])
     ->delete(
         '/admin/reports/imports/{reportImport}',

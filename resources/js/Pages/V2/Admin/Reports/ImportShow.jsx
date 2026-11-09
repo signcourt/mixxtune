@@ -88,6 +88,13 @@ export default function ImportShow({
             : ''
     );
 
+    /* W142 (Wave B): edit a row's ISRC / names, then re-map + recalc */
+    const [editRow, setEditRow] = useState(null);
+    const canEditRows = ![
+        'approved_scheduled',
+        'published',
+    ].includes(financialReview.financial_status || 'review_pending');
+
     const [reviewNote, setReviewNote] = useState(
         financialReview.review_note || ''
     );
@@ -924,6 +931,7 @@ export default function ImportShow({
                                         'Applied Rate',
                                         'Earnings',
                                         'Mapping',
+                                        'Edit',
                                     ].map((heading) => (
                                         <th
                                             key={heading}
@@ -1025,6 +1033,20 @@ export default function ImportShow({
                                                         'No Status'}
                                                 </span>
                                             </Cell>
+
+                                            <Cell>
+                                                {canEditRows ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditRow(row)}
+                                                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400">—</span>
+                                                )}
+                                            </Cell>
                                         </tr>
                                     )
                                 )}
@@ -1032,7 +1054,7 @@ export default function ImportShow({
                                 {(rows.data ?? []).length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan="15"
+                                            colSpan="16"
                                             className="px-6 py-14 text-center text-sm text-slate-500"
                                         >
                                             No report rows found for this import.
@@ -1051,7 +1073,86 @@ export default function ImportShow({
                     />
                 </section>
             </div>
+
+            {editRow && (
+                <RowEditModal
+                    imp={reportImport}
+                    row={editRow}
+                    onClose={() => setEditRow(null)}
+                />
+            )}
         </PanelLayout>
+    );
+}
+
+/* W142 (Wave B): edit one row's ISRC / names; server re-maps + recalculates earnings */
+function RowEditModal({ imp, row, onClose }) {
+    const [form, setForm] = useState({
+        isrc: row.isrc || '',
+        upc: row.upc || '',
+        track_title: row.track_title || '',
+        track_artist: row.track_artist || '',
+        album_title: row.album_title || '',
+        album_artist: row.album_artist || '',
+        label_name: row.label_name || '',
+    });
+    const [saving, setSaving] = useState(false);
+
+    const save = (e) => {
+        e.preventDefault();
+        setSaving(true);
+        router.patch(`/admin/reports/imports/${imp.id}/rows/${row.id}`, form, {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => setSaving(false),
+            onSuccess: () => onClose(),
+        });
+    };
+
+    const field = (key, label, mono) => (
+        <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-slate-600">{label}</span>
+            <input
+                value={form[key]}
+                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                className={`h-10 w-full rounded-lg border border-slate-300 px-3 text-sm ${mono ? 'font-mono' : ''}`}
+            />
+        </label>
+    );
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+            <form onSubmit={save} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-slate-900">Edit row</h3>
+                    <button type="button" onClick={onClose} className="text-sm font-semibold text-slate-500">
+                        Close
+                    </button>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                    Fix the ISRC or names. On save the row is re-mapped and its earnings recalculated — the totals above update too.
+                </p>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {field('isrc', 'ISRC', true)}
+                    {field('upc', 'UPC', true)}
+                    {field('track_title', 'Track title')}
+                    {field('track_artist', 'Track artist')}
+                    {field('album_title', 'Album title')}
+                    {field('album_artist', 'Album artist')}
+                    <div className="sm:col-span-2">{field('label_name', 'Label name')}</div>
+                </div>
+
+                <div className="mt-5 flex justify-end gap-2">
+                    <button type="button" onClick={onClose} className="h-10 rounded-xl border border-slate-300 px-4 text-sm font-semibold">
+                        Cancel
+                    </button>
+                    <button type="submit" disabled={saving} className="h-10 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white disabled:opacity-40">
+                        {saving ? 'Saving…' : 'Save & re-map'}
+                    </button>
+                </div>
+            </form>
+        </div>
     );
 }
 
