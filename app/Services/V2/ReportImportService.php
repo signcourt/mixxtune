@@ -221,34 +221,80 @@ class ReportImportService
     }
 
     /**
-     * W138/W139: Excel is accepted too. The row reader below is CSV-only
-     * (streaming fgetcsv). An .xlsx/.xls file is converted to a temporary
-     * CSV HERE IN THE WORKER (not in the web request), so a large upload
-     * never loads the whole workbook into the php-fpm process. Read-only
-     * mode keeps the conversion light; every column and row is preserved.
+     * W138/W139/W140: Excel is accepted too. The row reader below is CSV-only
+     * (streaming fgetcsv). An .xlsx/.xls file is converted to a temporary CSV
+     * HERE IN THE WORKER, in CHUNKS: a read filter materialises only a few
+     * thousand rows at a time, so even a huge report (which used to load its
+     * whole cell model and eat 6+ GB -> OOM) stays within a bounded budget.
+     * Every column and row is preserved.
      */
     private function excelToCsv(string $path): string
     {
+        /*
+         * CLI worker only: give the conversion headroom but a hard ceiling,
+         * so a pathological file fails cleanly (caught -> import marked failed)
+         * instead of being OOM-killed by the kernel.
+         */
+        $previousLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '1536M');
+
         $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);
 
         if (method_exists($reader, 'setReadDataOnly')) {
             $reader->setReadDataOnly(true);
         }
 
-        $spreadsheet = $reader->load($path);
+        $info = $reader->listWorksheetInfo($path);
+        $totalRows = (int) ($info[0]['totalRows'] ?? 0);
+        $lastColumn = $info[0]['lastColumnLetter'] ?? 'A';
+        $sheetName = $info[0]['worksheetName'] ?? null;
 
-        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Csv($spreadsheet);
-        $writer->setDelimiter(',');
-        $writer->setEnclosure('"');
-        $writer->setLineEnding("\n");
-        $writer->setUseBOM(false);
-        $writer->setSheetIndex($spreadsheet->getActiveSheetIndex());
+        if ($sheetName !== null && method_exists($reader, 'setLoadSheetsOnly')) {
+            $reader->setLoadSheetsOnly($sheetName);
+        }
+
+        $filter = new class implements \PhpOffice\PhpSpreadsheet\Reader\IReadFilter {
+            public int $from = 0;
+            public int $to = 0;
+
+            public function readCell($columnAddress, $row, $worksheetName = ''): bool
+            {
+                return $row >= $this->from && $row <= $this->to;
+            }
+        };
+        $reader->setReadFilter($filter);
 
         $tmp = tempnam(sys_get_temp_dir(), 'mtxls').'.csv';
-        $writer->save($tmp);
+        $out = fopen($tmp, 'w');
+        $chunk = 2000;
 
-        $spreadsheet->disconnectWorksheets();
-        unset($spreadsheet);
+        try {
+            for ($start = 1; $start <= $totalRows; $start += $chunk) {
+                $filter->from = $start;
+                $filter->to = min($start + $chunk - 1, $totalRows);
+
+                $spreadsheet = $reader->load($path);
+                $sheet = $spreadsheet->getActiveSheet();
+
+                for ($r = $filter->from; $r <= $filter->to; $r++) {
+                    $cells = [];
+                    foreach ($sheet->getRowIterator($r, $r) as $row) {
+                        $it = $row->getCellIterator('A', $lastColumn);
+                        $it->setIterateOnlyExistingCells(false);
+                        foreach ($it as $cell) {
+                            $cells[] = (string) $cell->getValue();
+                        }
+                    }
+                    fputcsv($out, $cells);
+                }
+
+                $spreadsheet->disconnectWorksheets();
+                unset($spreadsheet, $sheet);
+            }
+        } finally {
+            fclose($out);
+            ini_set('memory_limit', $previousLimit);
+        }
 
         return $tmp;
     }
