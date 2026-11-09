@@ -191,6 +191,25 @@ class ReportImportController extends Controller
         )->validate();
 
         /*
+         * W141: a very large Excel cannot be parsed safely - PhpSpreadsheet loads
+         * the whole workbook (shared strings included) into memory and can reach
+         * 6+ GB, OOM-killing the worker and, on a small server, the whole site.
+         * CSV streams row-by-row at constant memory, so CSV stays uncapped here;
+         * only an oversized Excel is blocked, with a clear pointer to CSV.
+         */
+        $excelMaxMb = 10;
+        $uploaded = $validated['report_file'];
+
+        if (
+            in_array(strtolower($uploaded->getClientOriginalExtension()), ['xlsx', 'xls'], true)
+            && $uploaded->getSize() > $excelMaxMb * 1024 * 1024
+        ) {
+            return back()->withErrors([
+                'report_file' => "This Excel file is larger than {$excelMaxMb} MB. A large Excel report can't be processed yet - please save it as CSV (in Excel: File -> Save As -> CSV) and upload the CSV instead.",
+            ]);
+        }
+
+        /*
          * Store file + audit record only.
          * Heavy CSV processing runs in the queue so the
          * browser request never waits for the full report.
