@@ -186,7 +186,9 @@ class ReportImportService
         User $user,
         string $reportingMonth
     ): ReportImport {
-        $storedPath = $this->storeReportFile($file);
+        /* W139: store the uploaded file as-is (CSV or Excel). A big Excel is
+           NOT loaded here in the web request - the worker converts it. */
+        $storedPath = $file->store('reports/imports', 'local');
 
         return ReportImport::query()->create([
             'public_id' =>
@@ -219,24 +221,21 @@ class ReportImportService
     }
 
     /**
-     * W138: store the uploaded report, accepting Excel too.
-     *
-     * The row reader below is CSV-only (fgetcsv). An .xlsx/.xls
-     * upload is converted to CSV here, once, at ingest - so the
-     * whole downstream pipeline stays unchanged and every column
-     * and row is preserved.
+     * W138/W139: Excel is accepted too. The row reader below is CSV-only
+     * (streaming fgetcsv). An .xlsx/.xls file is converted to a temporary
+     * CSV HERE IN THE WORKER (not in the web request), so a large upload
+     * never loads the whole workbook into the php-fpm process. Read-only
+     * mode keeps the conversion light; every column and row is preserved.
      */
-    private function storeReportFile(UploadedFile $file): string
+    private function excelToCsv(string $path): string
     {
-        $ext = strtolower($file->getClientOriginalExtension());
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);
 
-        if (! in_array($ext, ['xlsx', 'xls'], true)) {
-            return $file->store('reports/imports', 'local');
+        if (method_exists($reader, 'setReadDataOnly')) {
+            $reader->setReadDataOnly(true);
         }
 
-        $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load(
-            $file->getRealPath()
-        );
+        $spreadsheet = $reader->load($path);
 
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Csv($spreadsheet);
         $writer->setDelimiter(',');
@@ -248,11 +247,10 @@ class ReportImportService
         $tmp = tempnam(sys_get_temp_dir(), 'mtxls').'.csv';
         $writer->save($tmp);
 
-        $path = 'reports/imports/'.Str::ulid().'.csv';
-        Storage::disk('local')->put($path, file_get_contents($tmp));
-        @unlink($tmp);
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
 
-        return $path;
+        return $tmp;
     }
 
     /**
@@ -345,6 +343,14 @@ class ReportImportService
         string $path,
         ReportImport $import
     ): void {
+        $tmpCsv = null;
+
+        /* W139: an Excel upload is converted to a temp CSV here in the worker */
+        if (preg_match('/\.(xlsx|xls)$/i', $path)) {
+            $tmpCsv = $this->excelToCsv($path);
+            $path = $tmpCsv;
+        }
+
         $handle = fopen($path, 'r');
 
         if (!$handle) {
@@ -469,6 +475,10 @@ class ReportImportService
         }
 
         fclose($handle);
+
+        if ($tmpCsv !== null) {
+            @unlink($tmpCsv);
+        }
 
         $errorFilePath = null;
 

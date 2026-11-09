@@ -272,12 +272,26 @@ class RevenueImportController extends Controller
 
     private function countRows(string $filePath): int
     {
-        $spreadsheet = IOFactory::load($filePath);
-        $worksheet = $spreadsheet->getActiveSheet();
+        /*
+         * W139: count rows WITHOUT loading the whole workbook into memory.
+         * IOFactory::load() built the full cell model (~0.5 GB for a 90k-row
+         * file, several GB for a wide report) inside the web request and
+         * OOM-killed php-fpm -> 504. listWorksheetInfo() reads only the sheet
+         * dimensions (~24 MB), so the upload stays light.
+         */
+        try {
+            $reader = IOFactory::createReaderForFile($filePath);
 
-        return max(
-            0,
-            $worksheet->getHighestDataRow() - 1
-        );
+            if (method_exists($reader, 'setReadDataOnly')) {
+                $reader->setReadDataOnly(true);
+            }
+
+            $info = $reader->listWorksheetInfo($filePath);
+            $rows = (int) ($info[0]['totalRows'] ?? 0);
+        } catch (\Throwable $e) {
+            $rows = 0;
+        }
+
+        return max(0, $rows - 1);
     }
 }
