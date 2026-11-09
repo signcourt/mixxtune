@@ -64,7 +64,7 @@ class ReportImportsListTest extends TestCase
 
         $this->actingAs($this->super())
             ->post('/admin/reports/imports', ['reporting_month' => '2026-07', 'report_file' => $file])
-            ->assertSessionHasErrors(['report_file' => 'The file is bigger than '.$limit.' MB, the most this server accepts. Split the report into smaller CSV files (same reporting month) and upload each.']);
+            ->assertSessionHasErrors(['report_file' => 'The file is bigger than '.$limit.' MB, the most this server accepts. Split the report into smaller CSV or Excel files (same reporting month) and upload each.']);
     }
 
     private function toMb($v): int

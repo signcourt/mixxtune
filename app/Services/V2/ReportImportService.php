@@ -186,10 +186,7 @@ class ReportImportService
         User $user,
         string $reportingMonth
     ): ReportImport {
-        $storedPath = $file->store(
-            'reports/imports',
-            'local'
-        );
+        $storedPath = $this->storeReportFile($file);
 
         return ReportImport::query()->create([
             'public_id' =>
@@ -219,6 +216,43 @@ class ReportImportService
             'error_message' =>
                 null,
         ]);
+    }
+
+    /**
+     * W138: store the uploaded report, accepting Excel too.
+     *
+     * The row reader below is CSV-only (fgetcsv). An .xlsx/.xls
+     * upload is converted to CSV here, once, at ingest - so the
+     * whole downstream pipeline stays unchanged and every column
+     * and row is preserved.
+     */
+    private function storeReportFile(UploadedFile $file): string
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+
+        if (! in_array($ext, ['xlsx', 'xls'], true)) {
+            return $file->store('reports/imports', 'local');
+        }
+
+        $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load(
+            $file->getRealPath()
+        );
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Csv($spreadsheet);
+        $writer->setDelimiter(',');
+        $writer->setEnclosure('"');
+        $writer->setLineEnding("\n");
+        $writer->setUseBOM(false);
+        $writer->setSheetIndex($spreadsheet->getActiveSheetIndex());
+
+        $tmp = tempnam(sys_get_temp_dir(), 'mtxls').'.csv';
+        $writer->save($tmp);
+
+        $path = 'reports/imports/'.Str::ulid().'.csv';
+        Storage::disk('local')->put($path, file_get_contents($tmp));
+        @unlink($tmp);
+
+        return $path;
     }
 
     /**

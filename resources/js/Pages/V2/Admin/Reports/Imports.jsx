@@ -31,12 +31,16 @@ const stepOf = (i) => {
     return ["Waiting for review", "bg-amber-50 text-amber-800", false];
 };
 
-export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 0, settingLimitMb = 0 }) {
+export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 0, settingLimitMb = 0, monthMeta = {} }) {
     const page = usePage().props;
     const flash = page.flash ?? {};
     const pageErrors = page.errors ?? {};
     const limitMb = Number(uploadLimitMb) || Number(page.platformRules?.report_max_mb) || 100;
     const rows = imports.data ?? [];
+
+    /* W138: months already uploaded (blocked) + the next month to suggest */
+    const usedMonths = monthMeta.used ?? [];
+    const suggestedMonth = monthMeta.suggested ?? "";
 
     const [editing, setEditing] = useState(null);
     const [editMonth, setEditMonth] = useState("");
@@ -50,19 +54,25 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
         return () => window.clearInterval(t);
     }, [imports.data]);
 
-    const { data, setData, post, processing, errors, reset, progress } = useForm({ reporting_month: "", report_file: null });
+    const { data, setData, post, processing, errors, reset, progress } = useForm({ reporting_month: suggestedMonth, report_file: null });
+
+    /* keep the suggested month selected; after an upload the props reload and this advances it */
+    useEffect(() => {
+        if (suggestedMonth) setData("reporting_month", suggestedMonth);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [suggestedMonth]);
 
     const sameMonth = data.reporting_month ? rows.filter((i) => String(i.reporting_month || "").startsWith(data.reporting_month)) : [];
 
     const pickFile = (file) => {
         setFileError("");
         if (file && file.size > limitMb * 1048576) {
-            setFileError(`This file is ${mb(file.size)} MB - the server accepts up to ${limitMb} MB. Split it into smaller CSV files (same reporting month) and upload each.`);
+            setFileError(`This file is ${mb(file.size)} MB - the server accepts up to ${limitMb} MB. Split it into smaller CSV or Excel files (same reporting month) and upload each.`);
             setData("report_file", null);
             return;
         }
-        if (file && !/\.(csv|txt)$/i.test(file.name)) {
-            setFileError("Choose the report as a .csv file.");
+        if (file && !/\.(csv|txt|xlsx|xls)$/i.test(file.name)) {
+            setFileError("Choose the report as a .csv or Excel (.xlsx / .xls) file.");
             setData("report_file", null);
             return;
         }
@@ -72,7 +82,7 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
     const submit = (e) => {
         e.preventDefault();
         if (sameMonth.length && !window.confirm(`${monthName(data.reporting_month)} already has ${sameMonth.length} report(s). Upload this one too?\n(Exact duplicate rows are skipped automatically.)`)) return;
-        post("/admin/reports/imports", { forceFormData: true, preserveScroll: true, onSuccess: () => { reset(); const f = document.getElementById("report-file"); if (f) f.value = ""; } });
+        post("/admin/reports/imports", { forceFormData: true, preserveScroll: true, onSuccess: () => { setData("report_file", null); const f = document.getElementById("report-file"); if (f) f.value = ""; } });
     };
 
     const saveEdit = (e) => {
@@ -118,7 +128,7 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
 
                 <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <h2 className="text-base font-semibold text-slate-900">Upload a report (CSV)</h2>
+                        <h2 className="text-base font-semibold text-slate-900">Upload a report (CSV or Excel)</h2>
                         <span className="text-xs text-slate-500">
                             Up to <b>{limitMb} MB</b> per file{Number(settingLimitMb) > limitMb ? ` (Master Settings says ${settingLimitMb} MB, the server allows ${limitMb} MB)` : ""}
                         </span>
@@ -127,12 +137,12 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
                     <div className="mt-4 grid gap-4 md:grid-cols-[240px_minmax(0,1fr)]">
                         <label className="block">
                             <span className="mb-1.5 block text-sm font-semibold text-slate-700">Reporting month</span>
-                            <input type="month" required value={data.reporting_month} onChange={(e) => setData("reporting_month", e.target.value)} className="h-11 w-full rounded-xl border border-slate-300 px-3 text-sm" />
+                            <MonthPicker value={data.reporting_month} used={usedMonths} suggested={suggestedMonth} onChange={(m) => setData("reporting_month", m)} />
                             {errors.reporting_month && <span className="mt-1 block text-xs text-red-600">{errors.reporting_month}</span>}
                         </label>
                         <label className="block min-w-0">
                             <span className="mb-1.5 block text-sm font-semibold text-slate-700">Report file</span>
-                            <input id="report-file" type="file" accept=".csv,.txt" onChange={(e) => pickFile(e.target.files?.[0])} className="block w-full rounded-xl border border-slate-300 p-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold" />
+                            <input id="report-file" type="file" accept=".csv,.txt,.xlsx,.xls" onChange={(e) => pickFile(e.target.files?.[0])} className="block w-full rounded-xl border border-slate-300 p-2.5 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold" />
                             {data.report_file && <span className="mt-1 block text-xs text-slate-500">{data.report_file.name} · {mb(data.report_file.size)} MB</span>}
                             {(fileError || errors.report_file) && <span className="mt-1 block text-xs text-red-600">{fileError || errors.report_file}</span>}
                         </label>
@@ -263,5 +273,68 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
                 </div>
             )}
         </PanelLayout>
+    );
+}
+
+/* W138 MIXXTUNE_REPORT_MONTH_PICKER: already-uploaded months are blurred + not clickable;
+   the next month to do is shown "Suggested" and pre-selected. */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function MonthPicker({ value, used = [], suggested = "", onChange }) {
+    const [open, setOpen] = useState(false);
+    const usedSet = new Set(used);
+    const base = value || suggested || new Date().toISOString().slice(0, 7);
+    const [year, setYear] = useState(Number(String(base).slice(0, 4)) || new Date().getFullYear());
+    const nowKey = new Date().toISOString().slice(0, 7);
+    const key = (m) => `${year}-${String(m + 1).padStart(2, "0")}`;
+    const choose = (k) => { onChange(k); setOpen(false); };
+
+    return (
+        <div className="relative">
+            <button type="button" onClick={() => setOpen((o) => !o)} className="flex h-11 w-full items-center justify-between rounded-xl border border-slate-300 px-3 text-sm">
+                <span className={value ? "font-medium text-slate-800" : "text-slate-400"}>{value ? monthName(value) : "Select month"}</span>
+                <svg className="h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8l4 4 4-4" /></svg>
+            </button>
+
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+                    <div className="absolute z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                        <div className="flex items-center justify-between pb-2">
+                            <button type="button" onClick={() => setYear((y) => y - 1)} className="rounded-lg px-2.5 py-1 text-lg leading-none text-slate-500 hover:bg-slate-100" aria-label="Previous year">‹</button>
+                            <span className="text-sm font-bold text-slate-800">{year}</span>
+                            <button type="button" onClick={() => setYear((y) => y + 1)} className="rounded-lg px-2.5 py-1 text-lg leading-none text-slate-500 hover:bg-slate-100" aria-label="Next year">›</button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                            {MONTHS.map((label, m) => {
+                                const k = key(m);
+                                const isUsed = usedSet.has(k);
+                                const isSuggested = k === suggested;
+                                const isSelected = k === value;
+                                const cls = isUsed
+                                    ? "cursor-not-allowed text-slate-300 line-through opacity-50"
+                                    : isSelected
+                                        ? "bg-violet-600 text-white shadow-sm"
+                                        : isSuggested
+                                            ? "bg-violet-50 text-violet-700 ring-1 ring-violet-300 hover:bg-violet-100"
+                                            : "text-slate-700 hover:bg-slate-100";
+                                return (
+                                    <button key={k} type="button" disabled={isUsed} onClick={() => !isUsed && choose(k)} title={isUsed ? "Already uploaded — report done for this month" : isSuggested ? "Suggested — the next month to upload" : ""} className={`relative h-10 rounded-xl text-sm font-medium transition ${cls}`}>
+                                        {label}
+                                        {isSuggested && !isSelected && !isUsed && (
+                                            <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-violet-600 px-1.5 text-[9px] font-bold uppercase leading-4 text-white">Suggested</span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between">
+                            <button type="button" onClick={() => onChange("")} className="rounded-lg px-1.5 py-1 text-xs font-semibold text-slate-400 hover:text-slate-600">Clear</button>
+                            <button type="button" disabled={usedSet.has(nowKey)} onClick={() => { setYear(Number(nowKey.slice(0, 4))); choose(nowKey); }} className="rounded-lg px-1.5 py-1 text-xs font-semibold text-violet-600 hover:text-violet-700 disabled:opacity-40">This month</button>
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
     );
 }

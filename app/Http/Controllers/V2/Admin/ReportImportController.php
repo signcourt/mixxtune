@@ -75,8 +75,47 @@ class ReportImportController extends Controller
 
                 'uploadLimitMb' => $this->uploadLimitMb(),
                 'settingLimitMb' => \App\Services\V2\PlatformRules::reportMaxMb(),
+
+                /* W138: months already uploaded (blocked in the picker) + the next month to suggest */
+                'monthMeta' => $this->monthMeta(),
             ]
         );
+    }
+
+    /* W138 MIXXTUNE_REPORT_MONTH_PICKER: which months are done + which to suggest next */
+    private function monthMeta(): array
+    {
+        $used = ReportImport::query()
+            ->where('status', '!=', 'failed')
+            ->whereNotNull('reporting_month')
+            ->distinct()
+            ->pluck('reporting_month')
+            ->map(fn ($m) => substr((string) $m, 0, 7))
+            ->filter(fn ($m) => (bool) preg_match('/^\d{4}-\d{2}$/', $m))
+            ->unique()
+            ->values()
+            ->all();
+
+        $usedSet = array_flip($used);
+        $suggested = now()->startOfMonth();
+
+        if (! empty($used)) {
+            $max = max($used); // 'YYYY-MM' sorts chronologically
+            $suggested = \Illuminate\Support\Carbon::createFromFormat('Y-m', $max)
+                ->startOfMonth()
+                ->addMonth();
+        }
+
+        // never suggest a month that is already done
+        $guard = 0;
+        while (isset($usedSet[$suggested->format('Y-m')]) && $guard++ < 240) {
+            $suggested->addMonth();
+        }
+
+        return [
+            'used' => $used,
+            'suggested' => $suggested->format('Y-m'),
+        ];
     }
 
 
@@ -139,14 +178,15 @@ class ReportImportController extends Controller
                 'report_file' => [
                     'required',
                     'file',
-                    'mimes:csv,txt',
+                    /* W138: accept CSV and Excel (.xlsx/.xls); checked by real file extension */
+                    'extensions:csv,txt,xlsx,xls',
                     /* MIXXTUNE_SETTINGS_WIRED_V1: Master Settings > Upload Rules > Report Maximum MB */
                     'max:'.($this->uploadLimitMb() * 1024),
                 ],
             ],
             [
-                'report_file.max' => 'The file is bigger than '.$this->uploadLimitMb().' MB, the most this server accepts. Split the report into smaller CSV files (same reporting month) and upload each.',
-                'report_file.mimes' => 'Upload the report as a .csv file.',
+                'report_file.max' => 'The file is bigger than '.$this->uploadLimitMb().' MB, the most this server accepts. Split the report into smaller CSV or Excel files (same reporting month) and upload each.',
+                'report_file.extensions' => 'Upload the report as a .csv or Excel (.xlsx / .xls) file.',
             ]
         )->validate();
 
