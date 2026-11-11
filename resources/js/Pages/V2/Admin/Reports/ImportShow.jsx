@@ -5,6 +5,7 @@ import {
 
 import {
     ArrowLeft,
+    ArrowRight,
     Download,
     Search,
 } from 'lucide-react';
@@ -94,6 +95,20 @@ export default function ImportShow({
         'approved_scheduled',
         'published',
     ].includes(financialReview.financial_status || 'review_pending');
+
+    /* W144: jump straight to the mapping screen (super_admin only) */
+    const canMap = role === 'super_admin';
+    const unmappedRowCount = Number(
+        financialReview.unmapped_rows || 0
+    );
+
+    const mapUrl = (isrc) =>
+        `/super-admin/unmapped-revenue?report_import_id=${reportImport.id}` +
+        (isrc ? `&search=${encodeURIComponent(isrc)}` : '');
+
+    const rowNeedsMapping = (row) =>
+        String(row.mapping_status || '').toLowerCase() !== 'mapped' &&
+        Boolean(row.isrc);
 
     const [reviewNote, setReviewNote] = useState(
         financialReview.review_note || ''
@@ -515,6 +530,27 @@ export default function ImportShow({
                         />
                     </div>
 
+                    {canMap &&
+                        canEditRows &&
+                        unmappedRowCount > 0 && (
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4">
+                                <div className="text-sm text-violet-800">
+                                    {formatNumber(unmappedRowCount)}{' '}
+                                    rows are still unmapped. Map them to
+                                    their label / owner — earnings
+                                    recalculate automatically afterwards.
+                                </div>
+
+                                <a
+                                    href={mapUrl()}
+                                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+                                >
+                                    Map unmapped rows
+                                    <ArrowRight size={16} />
+                                </a>
+                            </div>
+                        )}
+
                     {role === 'super_admin' &&
                         !alreadyApproved &&
                         (missingRateLabels ?? []).length > 0 && (
@@ -931,7 +967,7 @@ export default function ImportShow({
                                         'Applied Rate',
                                         'Earnings',
                                         'Mapping',
-                                        'Edit',
+                                        'Actions',
                                     ].map((heading) => (
                                         <th
                                             key={heading}
@@ -1036,13 +1072,26 @@ export default function ImportShow({
 
                                             <Cell>
                                                 {canEditRows ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setEditRow(row)}
-                                                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                                                    >
-                                                        Edit
-                                                    </button>
+                                                    <div className="flex items-center gap-2">
+                                                        {canMap &&
+                                                            rowNeedsMapping(row) && (
+                                                                <a
+                                                                    href={mapUrl(row.isrc)}
+                                                                    title="Open the mapping screen for this ISRC"
+                                                                    className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700"
+                                                                >
+                                                                    Map
+                                                                </a>
+                                                            )}
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditRow(row)}
+                                                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                    </div>
                                                 ) : (
                                                     <span className="text-xs text-slate-400">—</span>
                                                 )}
