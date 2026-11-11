@@ -1541,23 +1541,27 @@ class ReportImportController extends Controller
                     'rr.revenue_owner_type',
                     'label'
                 )
+                /*
+                 * W151: a mapped label with NO owner user yet is allowed through
+                 * - the publisher holds that revenue as unclaimed
+                 * (owner_user_missing) and credits it once the owner account
+                 * exists. We still block when the label record is missing, or a
+                 * user IS linked but is missing / not active (the publisher
+                 * cannot safely hold or credit those).
+                 */
                 ->where(function ($query) {
                     $query
                         ->whereNull('financial_label.id')
-                        ->orWhereNull(
-                            'financial_label.user_id'
-                        )
-                        ->orWhereNull(
-                            'financial_user.id'
-                        )
-                        ->orWhereNull(
-                            'financial_user.account_status'
-                        )
-                        ->orWhere(
-                            'financial_user.account_status',
-                            '!=',
-                            'active'
-                        );
+                        ->orWhere(function ($linked) {
+                            $linked
+                                ->whereNotNull('financial_label.user_id')
+                                ->where(function ($u) {
+                                    $u
+                                        ->whereNull('financial_user.id')
+                                        ->orWhereNull('financial_user.account_status')
+                                        ->orWhere('financial_user.account_status', '!=', 'active');
+                                });
+                        });
                 })
                 ->count();
 
@@ -1587,23 +1591,20 @@ class ReportImportController extends Controller
                     'rr.revenue_owner_type',
                     'artist'
                 )
+                /* W151: same unclaimed-hold allowance as labels above. */
                 ->where(function ($query) {
                     $query
                         ->whereNull('financial_artist.id')
-                        ->orWhereNull(
-                            'financial_artist.user_id'
-                        )
-                        ->orWhereNull(
-                            'financial_user.id'
-                        )
-                        ->orWhereNull(
-                            'financial_user.account_status'
-                        )
-                        ->orWhere(
-                            'financial_user.account_status',
-                            '!=',
-                            'active'
-                        );
+                        ->orWhere(function ($linked) {
+                            $linked
+                                ->whereNotNull('financial_artist.user_id')
+                                ->where(function ($u) {
+                                    $u
+                                        ->whereNull('financial_user.id')
+                                        ->orWhereNull('financial_user.account_status')
+                                        ->orWhere('financial_user.account_status', '!=', 'active');
+                                });
+                        });
                 })
                 ->count();
 
