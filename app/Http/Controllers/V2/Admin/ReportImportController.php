@@ -60,6 +60,7 @@ class ReportImportController extends Controller
                             \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'publish_at') ? 'publish_at' : null,
                             \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'published_at') ? 'published_at' : null,
                             \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'review_earnings') ? 'review_earnings' : null,
+                            \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'expected_rows') ? 'expected_rows' : null,
                         ])))
                         ->selectRaw('SUBSTR(error_message, 1, 300) as error_short')
                         ->withCount([

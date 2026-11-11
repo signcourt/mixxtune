@@ -14,6 +14,7 @@ class ReportImport extends Model
         'status',
         'total_rows',
         'imported_rows',
+        'expected_rows',
         'duplicate_rows',
         'failed_rows',
         'error_file_path',

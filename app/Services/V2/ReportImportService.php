@@ -428,9 +428,21 @@ class ReportImportService
                 $headers
             );
 
+        /* W143: cheap one-pass count of the data rows so the UI can show real
+           progress (processed of expected). Streaming fgets - constant memory. */
+        $expected = 0;
+        if (($countHandle = fopen($path, 'r')) !== false) {
+            while (fgets($countHandle) !== false) {
+                $expected++;
+            }
+            fclose($countHandle);
+        }
+        $expected = max(0, $expected - 1); // minus the header row
+
         $import->update([
             'column_map' =>
                 $columnMap,
+            'expected_rows' => $expected,
         ]);
 
         $total = 0;

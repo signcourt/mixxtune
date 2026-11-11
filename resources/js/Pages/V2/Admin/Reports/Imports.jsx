@@ -195,16 +195,25 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
                                             </div>
                                             <div className="mt-0.5 truncate text-sm text-slate-700">{i.original_filename}</div>
                                             <div className="text-xs text-slate-500">
-                                                {num(i.total_rows)} rows · {num(i.imported_rows)} imported
+                                                {running && Number(i.expected_rows) > 0 ? (
+                                                    <span className="font-semibold text-violet-700">
+                                                        Reading… {num(i.total_rows)} of {num(i.expected_rows)} rows ({Math.min(100, Math.round((Number(i.total_rows) / Number(i.expected_rows)) * 100))}%)
+                                                    </span>
+                                                ) : (
+                                                    <>{num(i.total_rows)} rows · {num(i.imported_rows)} imported</>
+                                                )}
                                                 {Number(i.duplicate_rows) > 0 && <span title="Rows identical to rows already imported - skipped so nothing is counted twice"> · {num(i.duplicate_rows)} duplicate (skipped)</span>}
                                                 {Number(i.failed_rows) > 0 && <span className="text-red-600"> · {num(i.failed_rows)} failed</span>}
                                                 {i.review_earnings !== undefined && i.review_earnings !== null && Number(i.review_earnings) > 0 ? ` · earnings ${inr(i.review_earnings)}` : ""}
                                             </div>
                                             <div className="text-[11px] text-slate-400">uploaded {when(i.created_at)}</div>
-                                            {running && Number(i.total_rows) > 0 && (
+                                            {running && Number(i.expected_rows) > 0 && (
                                                 <div className="mt-1 h-1.5 w-56 overflow-hidden rounded-full bg-slate-100">
-                                                    <div className="h-full bg-violet-500" style={{ width: `${Math.min(100, (done / Number(i.total_rows)) * 100)}%` }} />
+                                                    <div className="h-full bg-violet-500 transition-all duration-500" style={{ width: `${Math.min(100, (Number(i.total_rows) / Number(i.expected_rows)) * 100)}%` }} />
                                                 </div>
+                                            )}
+                                            {running && !(Number(i.expected_rows) > 0) && (
+                                                <div className="mt-1 text-xs text-violet-700">Reading the file…</div>
                                             )}
                                             {i.status === "failed" && i.error_short && <div className="mt-1 break-words text-xs text-red-600">{i.error_short}</div>}
                                         </div>
