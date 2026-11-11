@@ -42,6 +42,27 @@ function formatRate(value) {
     return `${formatNumber(number * 100)}%`;
 }
 
+/* W152: show the scheduled-publish date in plain words (e.g. "12 Nov 2026")
+   instead of the raw ISO timestamp. Parsed from the YYYY-MM-DD part so the
+   calendar date never shifts with the time zone. */
+const PUBLISH_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatPublishDate(value) {
+    if (!value) {
+        return '—';
+    }
+
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+    if (!match) {
+        return String(value);
+    }
+
+    const [, year, month, day] = match;
+
+    return `${parseInt(day, 10)} ${PUBLISH_MONTHS[parseInt(month, 10) - 1]} ${year}`;
+}
+
 function statusClass(status) {
     const value = String(status || '').toLowerCase();
 
@@ -1059,7 +1080,7 @@ export default function ImportShow({
 
                             <div className="mt-1 text-sm text-blue-700">
                                 Scheduled publish:{' '}
-                                {financialReview.publish_at || '—'}
+                                {formatPublishDate(financialReview.publish_at)}
                             </div>
 
                             {financialReview.review_note && (
