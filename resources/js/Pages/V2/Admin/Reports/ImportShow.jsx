@@ -194,23 +194,29 @@ export default function ImportShow({
     const setSlotField = (index, field) =>
         setExportSlots((cur) =>
             cur.map((s, i) => {
-                if (i !== index) {
-                    return s;
+                if (i === index) {
+                    /* auto-fill the header with the field's label while the
+                       admin has not typed a custom one */
+                    const prevDefault = s.f ? EXPORT_COLUMN_LABEL[s.f] : '';
+                    const keepHeader = s.h !== '' && s.h !== prevDefault;
+
+                    return {
+                        f: field,
+                        h: keepHeader
+                            ? s.h
+                            : field
+                              ? EXPORT_COLUMN_LABEL[field]
+                              : '',
+                    };
                 }
 
-                /* auto-fill the header with the field's label while the admin
-                   has not typed a custom one */
-                const prevDefault = s.f ? EXPORT_COLUMN_LABEL[s.f] : '';
-                const keepHeader = s.h !== '' && s.h !== prevDefault;
+                /* W149: a field lives in only one slot - picking it here clears
+                   it from whatever slot held it before (a move, not a copy) */
+                if (field !== '' && s.f === field) {
+                    return { f: '', h: '' };
+                }
 
-                return {
-                    f: field,
-                    h: keepHeader
-                        ? s.h
-                        : field
-                          ? EXPORT_COLUMN_LABEL[field]
-                          : '',
-                };
+                return s;
             })
         );
 
@@ -1205,7 +1211,8 @@ export default function ImportShow({
                             <div className="mt-2 text-xs text-slate-500">
                                 For each slot (A, B, C …) pick which report field
                                 goes there and type the header name you want in
-                                the file. Set a slot to “— empty —” to skip it,
+                                the file. Choosing a field moves it here from any
+                                other slot. Set a slot to “— empty —” to skip it,
                                 or “+ Add column” for an extra one. This layout is
                                 remembered on this device and used as the default
                                 next time.
