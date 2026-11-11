@@ -847,18 +847,55 @@ class ReportImportController extends Controller
 
         $filters = $this->rowFilters($request);
 
-        $columns = [
-            'reporting_month', 'track_title', 'track_artist', 'album_title', 'album_artist',
-            'label_name', 'isrc', 'upc', 'platform', 'country_code', 'currency', 'cms',
-            'sale_type', 'sale_date', 'sale_month', 'streams', 'sale_units', 'label_rate',
-            'collected_revenue', 'earnings', 'mapping_status',
+        /*
+         * W146: the admin can pick which columns land in the CSV
+         * (?columns=track_title,isrc,...). Unknown keys are ignored and the
+         * canonical order below is always kept. With nothing valid selected we
+         * fall back to every column, so an empty/!broken request never yields
+         * an empty file.
+         */
+        $allColumns = [
+            'reporting_month' => 'Reporting Month',
+            'track_title' => 'Track',
+            'track_artist' => 'Artist',
+            'album_title' => 'Album',
+            'album_artist' => 'Album Artist',
+            'label_name' => 'Label',
+            'isrc' => 'ISRC',
+            'upc' => 'UPC',
+            'platform' => 'Platform',
+            'country_code' => 'Country',
+            'currency' => 'Currency',
+            'cms' => 'CMS',
+            'sale_type' => 'Sale Type',
+            'sale_date' => 'Sale Date',
+            'sale_month' => 'Sales Month',
+            'streams' => 'Streams',
+            'sale_units' => 'Units',
+            'label_rate' => 'Applied Rate',
+            'collected_revenue' => 'Collected Revenue',
+            'earnings' => 'Earnings',
+            'mapping_status' => 'Mapping',
         ];
 
-        $headers = [
-            'Reporting Month', 'Track', 'Artist', 'Album', 'Album Artist', 'Label', 'ISRC', 'UPC',
-            'Platform', 'Country', 'Currency', 'CMS', 'Sale Type', 'Sale Date', 'Sales Month',
-            'Streams', 'Units', 'Applied Rate', 'Collected Revenue', 'Earnings', 'Mapping',
-        ];
+        $requested = $request->query('columns');
+
+        if (is_string($requested)) {
+            $requested = array_filter(array_map('trim', explode(',', $requested)));
+        }
+
+        $requested = is_array($requested) ? $requested : [];
+
+        $columns = array_values(array_filter(
+            array_keys($allColumns),
+            fn ($key) => in_array($key, $requested, true)
+        ));
+
+        if (empty($columns)) {
+            $columns = array_keys($allColumns);
+        }
+
+        $headers = array_map(fn ($key) => $allColumns[$key], $columns);
 
         $query = $reportImport->rows()->select(array_merge(['id'], $columns));
         $this->applyRowFilters($query, $filters);

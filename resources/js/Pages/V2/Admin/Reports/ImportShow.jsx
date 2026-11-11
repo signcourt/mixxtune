@@ -108,6 +108,78 @@ export default function ImportShow({
     const setFilterField = (key, value) =>
         setFilterForm((current) => ({ ...current, [key]: value }));
 
+    /* W146: choose which columns go into the downloaded CSV. The choice is
+       remembered per browser, so it becomes the admin's default next time. */
+    const EXPORT_COLUMNS = [
+        ['reporting_month', 'Reporting Month'],
+        ['track_title', 'Track'],
+        ['track_artist', 'Artist'],
+        ['album_title', 'Album'],
+        ['album_artist', 'Album Artist'],
+        ['label_name', 'Label'],
+        ['isrc', 'ISRC'],
+        ['upc', 'UPC'],
+        ['platform', 'Platform'],
+        ['country_code', 'Country'],
+        ['currency', 'Currency'],
+        ['cms', 'CMS'],
+        ['sale_type', 'Sale Type'],
+        ['sale_date', 'Sale Date'],
+        ['sale_month', 'Sales Month'],
+        ['streams', 'Streams'],
+        ['sale_units', 'Units'],
+        ['label_rate', 'Applied Rate'],
+        ['collected_revenue', 'Collected Revenue'],
+        ['earnings', 'Earnings'],
+        ['mapping_status', 'Mapping'],
+    ];
+    const EXPORT_COLUMN_KEYS = EXPORT_COLUMNS.map(([key]) => key);
+    const EXPORT_STORAGE_KEY = 'mixxtune.reportExportColumns';
+
+    const loadExportColumns = () => {
+        try {
+            const raw = window.localStorage.getItem(EXPORT_STORAGE_KEY);
+            if (raw) {
+                const saved = JSON.parse(raw);
+                if (Array.isArray(saved)) {
+                    const keep = EXPORT_COLUMN_KEYS.filter((k) =>
+                        saved.includes(k)
+                    );
+                    if (keep.length) {
+                        return keep;
+                    }
+                }
+            }
+        } catch (e) {
+            /* storage unavailable / corrupt - fall back to all columns */
+        }
+        return [...EXPORT_COLUMN_KEYS];
+    };
+
+    const [exportCols, setExportCols] = useState(loadExportColumns);
+    const [showColumnPicker, setShowColumnPicker] = useState(false);
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(
+                EXPORT_STORAGE_KEY,
+                JSON.stringify(exportCols)
+            );
+        } catch (e) {
+            /* ignore storage failures */
+        }
+    }, [exportCols]);
+
+    const toggleExportCol = (key) =>
+        setExportCols((current) =>
+            EXPORT_COLUMN_KEYS.filter((k) =>
+                k === key ? !current.includes(key) : current.includes(k)
+            )
+        );
+
+    const setAllExportCols = (on) =>
+        setExportCols(on ? [...EXPORT_COLUMN_KEYS] : []);
+
     const [publishAt, setPublishAt] = useState(
         financialReview.publish_at
             ? String(financialReview.publish_at).slice(0, 10)
@@ -207,6 +279,19 @@ export default function ImportShow({
             }
         });
 
+        /* W146: only send the column list when it is a real subset; sending
+           all (or none) just lets the server fall back to every column. */
+        const selectedCols = EXPORT_COLUMN_KEYS.filter((k) =>
+            exportCols.includes(k)
+        );
+
+        if (
+            selectedCols.length > 0 &&
+            selectedCols.length < EXPORT_COLUMN_KEYS.length
+        ) {
+            query.columns = selectedCols.join(',');
+        }
+
         const qs = new URLSearchParams(query).toString();
 
         return (
@@ -214,6 +299,10 @@ export default function ImportShow({
             (qs ? `?${qs}` : '')
         );
     };
+
+    const exportColCount = EXPORT_COLUMN_KEYS.filter((k) =>
+        exportCols.includes(k)
+    ).length;
 
     const activeFilterCount = Object.keys(
         (() => {
@@ -944,15 +1033,89 @@ export default function ImportShow({
                             )}
                         </div>
 
-                        <a
-                            href={exportHref()}
-                            className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
-                            title="Download exactly the rows shown below (all applied filters) as a CSV"
-                        >
-                            <Download size={16} />
-                            Download filtered rows (CSV)
-                        </a>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setShowColumnPicker((v) => !v)
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                title="Choose which columns are included in the CSV"
+                            >
+                                Columns ({exportColCount}/{EXPORT_COLUMN_KEYS.length})
+                                <span className="text-xs text-slate-400">
+                                    {showColumnPicker ? '▲' : '▼'}
+                                </span>
+                            </button>
+
+                            {exportColCount === 0 ? (
+                                <span
+                                    className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-400"
+                                    title="Pick at least one column to download"
+                                >
+                                    <Download size={16} />
+                                    Download filtered rows (CSV)
+                                </span>
+                            ) : (
+                                <a
+                                    href={exportHref()}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                                    title="Download exactly the rows shown below (all applied filters), with the chosen columns, as a CSV"
+                                >
+                                    <Download size={16} />
+                                    Download filtered rows (CSV)
+                                </a>
+                            )}
+                        </div>
                     </div>
+
+                    {showColumnPicker && (
+                        <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <div className="text-xs font-semibold text-slate-600">
+                                    Columns in the download
+                                </div>
+                                <div className="flex gap-3 text-xs font-semibold">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAllExportCols(true)}
+                                        className="text-violet-600 hover:underline"
+                                    >
+                                        Select all
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAllExportCols(false)}
+                                        className="text-slate-500 hover:underline"
+                                    >
+                                        Clear all
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-4">
+                                {EXPORT_COLUMNS.map(([key, label]) => (
+                                    <label
+                                        key={key}
+                                        className="flex items-center gap-2 text-sm text-slate-700"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={exportCols.includes(key)}
+                                            onChange={() => toggleExportCol(key)}
+                                            className="h-4 w-4 rounded border-slate-300 text-violet-600"
+                                        />
+                                        {label}
+                                    </label>
+                                ))}
+                            </div>
+
+                            <div className="mt-2 text-xs text-slate-500">
+                                Your selection is remembered on this device and
+                                used as the default next time.
+                            </div>
+                        </div>
+                    )}
 
                     <div className="relative">
                         <Search
