@@ -73,7 +73,7 @@ class ReportImportExportColumnsTest extends TestCase
         $this->assertStringNotContainsString('Collected Revenue', $csv);
     }
 
-    public function test_export_ignores_unknown_columns_and_keeps_canonical_order(): void
+    public function test_export_respects_requested_column_order_and_drops_unknown(): void
     {
         [$super, $importId] = $this->seedImport();
 
@@ -84,10 +84,10 @@ class ReportImportExportColumnsTest extends TestCase
 
         $header = strtok($csv, "\n");
 
-        // ISRC comes before UPC in the canonical order, unknown key dropped
+        // W147: the admin's order is honoured (UPC before ISRC), unknown dropped
         $this->assertStringContainsString('ISRC', $header);
         $this->assertStringContainsString('UPC', $header);
-        $this->assertLessThan(strpos($header, 'UPC'), strpos($header, 'ISRC'));
+        $this->assertLessThan(strpos($header, 'ISRC'), strpos($header, 'UPC'));
         $this->assertStringNotContainsString('Label', $header);
         $this->assertStringNotContainsString('made_up', $header);
     }

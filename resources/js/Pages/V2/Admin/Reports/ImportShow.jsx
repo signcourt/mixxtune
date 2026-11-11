@@ -108,8 +108,9 @@ export default function ImportShow({
     const setFilterField = (key, value) =>
         setFilterForm((current) => ({ ...current, [key]: value }));
 
-    /* W146: choose which columns go into the downloaded CSV. The choice is
-       remembered per browser, so it becomes the admin's default next time. */
+    /* W146/W147: choose which columns go into the downloaded CSV AND arrange
+       their order. Both are remembered per browser, so they become the admin's
+       default next time. */
     const EXPORT_COLUMNS = [
         ['reporting_month', 'Reporting Month'],
         ['track_title', 'Track'],
@@ -134,51 +135,85 @@ export default function ImportShow({
         ['mapping_status', 'Mapping'],
     ];
     const EXPORT_COLUMN_KEYS = EXPORT_COLUMNS.map(([key]) => key);
-    const EXPORT_STORAGE_KEY = 'mixxtune.reportExportColumns';
+    const EXPORT_COLUMN_LABEL = Object.fromEntries(EXPORT_COLUMNS);
+    const EXPORT_STORAGE_KEY = 'mixxtune.reportExportLayout';
 
-    const loadExportColumns = () => {
+    const canonicalOrder = () => [...EXPORT_COLUMN_KEYS];
+
+    const loadExportLayout = () => {
         try {
             const raw = window.localStorage.getItem(EXPORT_STORAGE_KEY);
             if (raw) {
                 const saved = JSON.parse(raw);
-                if (Array.isArray(saved)) {
-                    const keep = EXPORT_COLUMN_KEYS.filter((k) =>
-                        saved.includes(k)
-                    );
-                    if (keep.length) {
-                        return keep;
-                    }
-                }
+
+                /* order must be an arrangement of exactly the known keys */
+                const order =
+                    Array.isArray(saved?.order) &&
+                    saved.order.length === EXPORT_COLUMN_KEYS.length &&
+                    EXPORT_COLUMN_KEYS.every((k) => saved.order.includes(k))
+                        ? saved.order
+                        : canonicalOrder();
+
+                const selected = Array.isArray(saved?.selected)
+                    ? EXPORT_COLUMN_KEYS.filter((k) => saved.selected.includes(k))
+                    : [...EXPORT_COLUMN_KEYS];
+
+                return { order, selected };
             }
         } catch (e) {
-            /* storage unavailable / corrupt - fall back to all columns */
+            /* storage unavailable / corrupt - fall back to defaults */
         }
-        return [...EXPORT_COLUMN_KEYS];
+
+        return { order: canonicalOrder(), selected: [...EXPORT_COLUMN_KEYS] };
     };
 
-    const [exportCols, setExportCols] = useState(loadExportColumns);
+    const initialExportLayout = loadExportLayout();
+    const [exportOrder, setExportOrder] = useState(initialExportLayout.order);
+    const [exportSelected, setExportSelected] = useState(
+        initialExportLayout.selected
+    );
     const [showColumnPicker, setShowColumnPicker] = useState(false);
 
     useEffect(() => {
         try {
             window.localStorage.setItem(
                 EXPORT_STORAGE_KEY,
-                JSON.stringify(exportCols)
+                JSON.stringify({ order: exportOrder, selected: exportSelected })
             );
         } catch (e) {
             /* ignore storage failures */
         }
-    }, [exportCols]);
+    }, [exportOrder, exportSelected]);
+
+    /* the columns that will actually be exported, in the chosen order */
+    const orderedSelected = exportOrder.filter((k) =>
+        exportSelected.includes(k)
+    );
 
     const toggleExportCol = (key) =>
-        setExportCols((current) =>
-            EXPORT_COLUMN_KEYS.filter((k) =>
-                k === key ? !current.includes(key) : current.includes(k)
-            )
+        setExportSelected((current) =>
+            current.includes(key)
+                ? current.filter((k) => k !== key)
+                : [...current, key]
         );
 
     const setAllExportCols = (on) =>
-        setExportCols(on ? [...EXPORT_COLUMN_KEYS] : []);
+        setExportSelected(on ? [...EXPORT_COLUMN_KEYS] : []);
+
+    const moveExportCol = (key, dir) =>
+        setExportOrder((current) => {
+            const i = current.indexOf(key);
+            const j = i + dir;
+
+            if (i < 0 || j < 0 || j >= current.length) {
+                return current;
+            }
+
+            const next = [...current];
+            [next[i], next[j]] = [next[j], next[i]];
+
+            return next;
+        });
 
     const [publishAt, setPublishAt] = useState(
         financialReview.publish_at
@@ -279,17 +314,10 @@ export default function ImportShow({
             }
         });
 
-        /* W146: only send the column list when it is a real subset; sending
-           all (or none) just lets the server fall back to every column. */
-        const selectedCols = EXPORT_COLUMN_KEYS.filter((k) =>
-            exportCols.includes(k)
-        );
-
-        if (
-            selectedCols.length > 0 &&
-            selectedCols.length < EXPORT_COLUMN_KEYS.length
-        ) {
-            query.columns = selectedCols.join(',');
+        /* W147: send the chosen columns in the chosen order; the server honours
+           the order exactly. (Empty selection -> server falls back to all.) */
+        if (orderedSelected.length > 0) {
+            query.columns = orderedSelected.join(',');
         }
 
         const qs = new URLSearchParams(query).toString();
@@ -300,9 +328,7 @@ export default function ImportShow({
         );
     };
 
-    const exportColCount = EXPORT_COLUMN_KEYS.filter((k) =>
-        exportCols.includes(k)
-    ).length;
+    const exportColCount = orderedSelected.length;
 
     const activeFilterCount = Object.keys(
         (() => {
@@ -1073,7 +1099,7 @@ export default function ImportShow({
                         <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                                 <div className="text-xs font-semibold text-slate-600">
-                                    Columns in the download
+                                    Columns &amp; order in the download
                                 </div>
                                 <div className="flex gap-3 text-xs font-semibold">
                                     <button
@@ -1093,26 +1119,74 @@ export default function ImportShow({
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-4">
-                                {EXPORT_COLUMNS.map(([key, label]) => (
-                                    <label
-                                        key={key}
-                                        className="flex items-center gap-2 text-sm text-slate-700"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={exportCols.includes(key)}
-                                            onChange={() => toggleExportCol(key)}
-                                            className="h-4 w-4 rounded border-slate-300 text-violet-600"
-                                        />
-                                        {label}
-                                    </label>
-                                ))}
-                            </div>
+                            <ol className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                                {exportOrder.map((key, index) => {
+                                    const included =
+                                        exportSelected.includes(key);
+
+                                    return (
+                                        <li
+                                            key={key}
+                                            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5"
+                                        >
+                                            <span className="w-5 text-right text-xs tabular-nums text-slate-400">
+                                                {index + 1}
+                                            </span>
+
+                                            <input
+                                                type="checkbox"
+                                                checked={included}
+                                                onChange={() =>
+                                                    toggleExportCol(key)
+                                                }
+                                                className="h-4 w-4 rounded border-slate-300 text-violet-600"
+                                            />
+
+                                            <span
+                                                className={`flex-1 truncate text-sm ${
+                                                    included
+                                                        ? 'text-slate-700'
+                                                        : 'text-slate-400'
+                                                }`}
+                                            >
+                                                {EXPORT_COLUMN_LABEL[key]}
+                                            </span>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    moveExportCol(key, -1)
+                                                }
+                                                disabled={index === 0}
+                                                className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                                                title="Move up"
+                                            >
+                                                ▲
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    moveExportCol(key, 1)
+                                                }
+                                                disabled={
+                                                    index ===
+                                                    exportOrder.length - 1
+                                                }
+                                                className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                                                title="Move down"
+                                            >
+                                                ▼
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ol>
 
                             <div className="mt-2 text-xs text-slate-500">
-                                Your selection is remembered on this device and
-                                used as the default next time.
+                                Tick the columns to include and use ▲▼ to arrange
+                                their order. Your layout is remembered on this
+                                device and used as the default next time.
                             </div>
                         </div>
                     )}

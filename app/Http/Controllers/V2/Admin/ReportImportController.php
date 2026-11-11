@@ -848,10 +848,11 @@ class ReportImportController extends Controller
         $filters = $this->rowFilters($request);
 
         /*
-         * W146: the admin can pick which columns land in the CSV
-         * (?columns=track_title,isrc,...). Unknown keys are ignored and the
-         * canonical order below is always kept. With nothing valid selected we
-         * fall back to every column, so an empty/!broken request never yields
+         * W146/W147: the admin can pick which columns land in the CSV and in
+         * which order (?columns=track_title,label_name,isrc,...). Unknown keys
+         * are ignored, duplicates are collapsed, and the admin's order is kept
+         * exactly as given. With nothing valid selected we fall back to every
+         * column in the canonical order, so a broken/empty request never yields
          * an empty file.
          */
         $allColumns = [
@@ -886,10 +887,16 @@ class ReportImportController extends Controller
 
         $requested = is_array($requested) ? $requested : [];
 
-        $columns = array_values(array_filter(
-            array_keys($allColumns),
-            fn ($key) => in_array($key, $requested, true)
-        ));
+        /* Keep the admin's order; drop unknown keys and duplicates. */
+        $columns = [];
+
+        foreach ($requested as $key) {
+            $key = is_string($key) ? trim($key) : '';
+
+            if (isset($allColumns[$key]) && ! in_array($key, $columns, true)) {
+                $columns[] = $key;
+            }
+        }
 
         if (empty($columns)) {
             $columns = array_keys($allColumns);
