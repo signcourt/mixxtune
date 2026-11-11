@@ -105,4 +105,60 @@ class ReportImportExportColumnsTest extends TestCase
         $this->assertStringContainsString('Platform', $csv);
         $this->assertStringContainsString('Earnings', $csv);
     }
+
+    public function test_layout_applies_custom_headers_and_order(): void
+    {
+        [$super, $importId] = $this->seedImport();
+
+        $layout = json_encode([
+            ['f' => 'label_name', 'h' => 'Company'],
+            ['f' => 'isrc', 'h' => 'Code'],
+        ]);
+
+        $csv = $this->actingAs($super)
+            ->get('/admin/reports/imports/'.$importId.'/rows/export?layout='.urlencode($layout))
+            ->assertOk()
+            ->streamedContent();
+
+        $header = strtok($csv, "\n");
+
+        // custom header names, in the given order
+        $this->assertStringContainsString('Company', $header);
+        $this->assertStringContainsString('Code', $header);
+        $this->assertLessThan(strpos($header, 'Code'), strpos($header, 'Company'));
+
+        // default headers / other columns are gone
+        $this->assertStringNotContainsString('Label', $header);
+        $this->assertStringNotContainsString('Track', $header);
+        $this->assertStringNotContainsString('Collected Revenue', $header);
+
+        // the data still lands under the renamed columns
+        $this->assertStringContainsString('AlphaLabel', $csv);
+        $this->assertStringContainsString('INMXT2600001', $csv);
+    }
+
+    public function test_layout_drops_unknown_fields_and_bad_json_falls_back(): void
+    {
+        [$super, $importId] = $this->seedImport();
+
+        // only the valid slot survives
+        $layout = json_encode([
+            ['f' => 'made_up', 'h' => 'Nope'],
+            ['f' => 'isrc', 'h' => 'Code'],
+        ]);
+        $header = strtok($this->actingAs($super)
+            ->get('/admin/reports/imports/'.$importId.'/rows/export?layout='.urlencode($layout))
+            ->assertOk()
+            ->streamedContent(), "\n");
+        $this->assertStringContainsString('Code', $header);
+        $this->assertStringNotContainsString('Nope', $header);
+
+        // broken JSON falls back to all columns with default headers
+        $csv = $this->actingAs($super)
+            ->get('/admin/reports/imports/'.$importId.'/rows/export?layout=not-json')
+            ->assertOk()
+            ->streamedContent();
+        $this->assertStringContainsString('Collected Revenue', $csv);
+        $this->assertStringContainsString('Platform', $csv);
+    }
 }

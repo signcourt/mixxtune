@@ -136,84 +136,100 @@ export default function ImportShow({
     ];
     const EXPORT_COLUMN_KEYS = EXPORT_COLUMNS.map(([key]) => key);
     const EXPORT_COLUMN_LABEL = Object.fromEntries(EXPORT_COLUMNS);
-    const EXPORT_STORAGE_KEY = 'mixxtune.reportExportLayout';
+    const EXPORT_STORAGE_KEY = 'mixxtune.reportExportTemplate';
 
-    const canonicalOrder = () => [...EXPORT_COLUMN_KEYS];
+    /* W148: the download is built slot by slot. A slot = { f: field key, h:
+       header text }. f === '' is an empty slot (skipped). The template (which
+       field in each slot + its header) is remembered per browser. */
+    const defaultSlots = () =>
+        EXPORT_COLUMNS.map(([key, label]) => ({ f: key, h: label }));
 
-    const loadExportLayout = () => {
+    const loadExportSlots = () => {
         try {
             const raw = window.localStorage.getItem(EXPORT_STORAGE_KEY);
             if (raw) {
                 const saved = JSON.parse(raw);
-
-                /* order must be an arrangement of exactly the known keys */
-                const order =
-                    Array.isArray(saved?.order) &&
-                    saved.order.length === EXPORT_COLUMN_KEYS.length &&
-                    EXPORT_COLUMN_KEYS.every((k) => saved.order.includes(k))
-                        ? saved.order
-                        : canonicalOrder();
-
-                const selected = Array.isArray(saved?.selected)
-                    ? EXPORT_COLUMN_KEYS.filter((k) => saved.selected.includes(k))
-                    : [...EXPORT_COLUMN_KEYS];
-
-                return { order, selected };
+                if (Array.isArray(saved) && saved.length) {
+                    return saved.map((s) => ({
+                        f:
+                            typeof s?.f === 'string' &&
+                            EXPORT_COLUMN_KEYS.includes(s.f)
+                                ? s.f
+                                : '',
+                        h:
+                            typeof s?.h === 'string'
+                                ? s.h.slice(0, 100)
+                                : '',
+                    }));
+                }
             }
         } catch (e) {
             /* storage unavailable / corrupt - fall back to defaults */
         }
 
-        return { order: canonicalOrder(), selected: [...EXPORT_COLUMN_KEYS] };
+        return defaultSlots();
     };
 
-    const initialExportLayout = loadExportLayout();
-    const [exportOrder, setExportOrder] = useState(initialExportLayout.order);
-    const [exportSelected, setExportSelected] = useState(
-        initialExportLayout.selected
-    );
+    const [exportSlots, setExportSlots] = useState(loadExportSlots);
     const [showColumnPicker, setShowColumnPicker] = useState(false);
 
     useEffect(() => {
         try {
             window.localStorage.setItem(
                 EXPORT_STORAGE_KEY,
-                JSON.stringify({ order: exportOrder, selected: exportSelected })
+                JSON.stringify(exportSlots)
             );
         } catch (e) {
             /* ignore storage failures */
         }
-    }, [exportOrder, exportSelected]);
+    }, [exportSlots]);
 
-    /* the columns that will actually be exported, in the chosen order */
-    const orderedSelected = exportOrder.filter((k) =>
-        exportSelected.includes(k)
-    );
+    /* slots that actually produce a CSV column (a field is chosen) */
+    const activeSlots = exportSlots.filter((s) => s.f !== '');
+    const exportColCount = activeSlots.length;
 
-    const toggleExportCol = (key) =>
-        setExportSelected((current) =>
-            current.includes(key)
-                ? current.filter((k) => k !== key)
-                : [...current, key]
+    const slotLabel = (index) =>
+        index < 26 ? String.fromCharCode(65 + index) : String(index + 1);
+
+    const setSlotField = (index, field) =>
+        setExportSlots((cur) =>
+            cur.map((s, i) => {
+                if (i !== index) {
+                    return s;
+                }
+
+                /* auto-fill the header with the field's label while the admin
+                   has not typed a custom one */
+                const prevDefault = s.f ? EXPORT_COLUMN_LABEL[s.f] : '';
+                const keepHeader = s.h !== '' && s.h !== prevDefault;
+
+                return {
+                    f: field,
+                    h: keepHeader
+                        ? s.h
+                        : field
+                          ? EXPORT_COLUMN_LABEL[field]
+                          : '',
+                };
+            })
         );
 
-    const setAllExportCols = (on) =>
-        setExportSelected(on ? [...EXPORT_COLUMN_KEYS] : []);
+    const setSlotHeader = (index, header) =>
+        setExportSlots((cur) =>
+            cur.map((s, i) =>
+                i === index ? { ...s, h: header.slice(0, 100) } : s
+            )
+        );
 
-    const moveExportCol = (key, dir) =>
-        setExportOrder((current) => {
-            const i = current.indexOf(key);
-            const j = i + dir;
+    const removeSlot = (index) =>
+        setExportSlots((cur) =>
+            cur.length > 1 ? cur.filter((_, i) => i !== index) : cur
+        );
 
-            if (i < 0 || j < 0 || j >= current.length) {
-                return current;
-            }
+    const addSlot = () =>
+        setExportSlots((cur) => [...cur, { f: '', h: '' }]);
 
-            const next = [...current];
-            [next[i], next[j]] = [next[j], next[i]];
-
-            return next;
-        });
+    const resetSlots = () => setExportSlots(defaultSlots());
 
     const [publishAt, setPublishAt] = useState(
         financialReview.publish_at
@@ -314,10 +330,16 @@ export default function ImportShow({
             }
         });
 
-        /* W147: send the chosen columns in the chosen order; the server honours
-           the order exactly. (Empty selection -> server falls back to all.) */
-        if (orderedSelected.length > 0) {
-            query.columns = orderedSelected.join(',');
+        /* W148: send the full slot template (field + custom header, in order).
+           The server writes the CSV exactly like this. Empty -> server falls
+           back to all columns with default headers. */
+        if (activeSlots.length > 0) {
+            query.layout = JSON.stringify(
+                activeSlots.map((s) => ({
+                    f: s.f,
+                    h: (s.h || EXPORT_COLUMN_LABEL[s.f] || '').slice(0, 100),
+                }))
+            );
         }
 
         const qs = new URLSearchParams(query).toString();
@@ -328,7 +350,6 @@ export default function ImportShow({
         );
     };
 
-    const exportColCount = orderedSelected.length;
 
     const activeFilterCount = Object.keys(
         (() => {
@@ -1068,7 +1089,7 @@ export default function ImportShow({
                                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                                 title="Choose which columns are included in the CSV"
                             >
-                                Columns ({exportColCount}/{EXPORT_COLUMN_KEYS.length})
+                                Columns ({exportColCount})
                                 <span className="text-xs text-slate-400">
                                     {showColumnPicker ? '▲' : '▼'}
                                 </span>
@@ -1099,94 +1120,95 @@ export default function ImportShow({
                         <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                                 <div className="text-xs font-semibold text-slate-600">
-                                    Columns &amp; order in the download
+                                    Download layout — slot by slot
                                 </div>
                                 <div className="flex gap-3 text-xs font-semibold">
                                     <button
                                         type="button"
-                                        onClick={() => setAllExportCols(true)}
+                                        onClick={addSlot}
                                         className="text-violet-600 hover:underline"
                                     >
-                                        Select all
+                                        + Add column
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setAllExportCols(false)}
+                                        onClick={resetSlots}
                                         className="text-slate-500 hover:underline"
                                     >
-                                        Clear all
+                                        Reset
                                     </button>
                                 </div>
                             </div>
 
-                            <ol className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
-                                {exportOrder.map((key, index) => {
-                                    const included =
-                                        exportSelected.includes(key);
+                            <div className="space-y-1.5">
+                                {exportSlots.map((slot, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5"
+                                    >
+                                        <span className="w-6 text-center text-xs font-semibold tabular-nums text-slate-400">
+                                            {slotLabel(index)}
+                                        </span>
 
-                                    return (
-                                        <li
-                                            key={key}
-                                            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5"
+                                        <select
+                                            value={slot.f}
+                                            onChange={(event) =>
+                                                setSlotField(
+                                                    index,
+                                                    event.target.value
+                                                )
+                                            }
+                                            className="h-9 min-w-[150px] flex-1 rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                                            title="Which report field goes in this slot"
                                         >
-                                            <span className="w-5 text-right text-xs tabular-nums text-slate-400">
-                                                {index + 1}
-                                            </span>
+                                            <option value="">— empty —</option>
+                                            {EXPORT_COLUMNS.map(
+                                                ([key, label]) => (
+                                                    <option
+                                                        key={key}
+                                                        value={key}
+                                                    >
+                                                        {label}
+                                                    </option>
+                                                )
+                                            )}
+                                        </select>
 
-                                            <input
-                                                type="checkbox"
-                                                checked={included}
-                                                onChange={() =>
-                                                    toggleExportCol(key)
-                                                }
-                                                className="h-4 w-4 rounded border-slate-300 text-violet-600"
-                                            />
+                                        <input
+                                            type="text"
+                                            value={slot.h}
+                                            onChange={(event) =>
+                                                setSlotHeader(
+                                                    index,
+                                                    event.target.value
+                                                )
+                                            }
+                                            disabled={slot.f === ''}
+                                            placeholder="Header name in the file"
+                                            className="h-9 min-w-[150px] flex-1 rounded-lg border border-slate-300 px-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
+                                            title="The column heading written into the CSV"
+                                        />
 
-                                            <span
-                                                className={`flex-1 truncate text-sm ${
-                                                    included
-                                                        ? 'text-slate-700'
-                                                        : 'text-slate-400'
-                                                }`}
-                                            >
-                                                {EXPORT_COLUMN_LABEL[key]}
-                                            </span>
-
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    moveExportCol(key, -1)
-                                                }
-                                                disabled={index === 0}
-                                                className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 disabled:opacity-30"
-                                                title="Move up"
-                                            >
-                                                ▲
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    moveExportCol(key, 1)
-                                                }
-                                                disabled={
-                                                    index ===
-                                                    exportOrder.length - 1
-                                                }
-                                                className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 disabled:opacity-30"
-                                                title="Move down"
-                                            >
-                                                ▼
-                                            </button>
-                                        </li>
-                                    );
-                                })}
-                            </ol>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeSlot(index)}
+                                            disabled={exportSlots.length <= 1}
+                                            className="rounded px-2 py-1 text-sm font-semibold text-slate-400 hover:bg-slate-100 hover:text-red-600 disabled:opacity-30"
+                                            title="Remove this slot"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
 
                             <div className="mt-2 text-xs text-slate-500">
-                                Tick the columns to include and use ▲▼ to arrange
-                                their order. Your layout is remembered on this
-                                device and used as the default next time.
+                                For each slot (A, B, C …) pick which report field
+                                goes there and type the header name you want in
+                                the file. Set a slot to “— empty —” to skip it,
+                                or “+ Add column” for an extra one. This layout is
+                                remembered on this device and used as the default
+                                next time.
                             </div>
                         </div>
                     )}

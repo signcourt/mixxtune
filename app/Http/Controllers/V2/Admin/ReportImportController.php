@@ -887,24 +887,72 @@ class ReportImportController extends Controller
 
         $requested = is_array($requested) ? $requested : [];
 
-        /* Keep the admin's order; drop unknown keys and duplicates. */
-        $columns = [];
+        /*
+         * W148: an optional "layout" (JSON array of {f: field, h: header})
+         * carries both the column order and a custom header per column, so the
+         * admin builds the file slot by slot. When it is absent we fall back to
+         * the W146/W147 "columns" list (ordered field keys, default headers),
+         * and finally to every column.
+         */
+        $slots = [];
 
-        foreach ($requested as $key) {
-            $key = is_string($key) ? trim($key) : '';
+        $layoutRaw = $request->query('layout');
 
-            if (isset($allColumns[$key]) && ! in_array($key, $columns, true)) {
-                $columns[] = $key;
+        if (is_string($layoutRaw) && $layoutRaw !== '') {
+            $decoded = json_decode($layoutRaw, true);
+
+            if (is_array($decoded)) {
+                foreach ($decoded as $item) {
+                    $field = is_array($item) ? ($item['f'] ?? null) : null;
+
+                    if (is_string($field) && isset($allColumns[$field])) {
+                        $header = is_array($item) && isset($item['h'])
+                            ? trim((string) $item['h'])
+                            : '';
+
+                        if ($header === '') {
+                            $header = $allColumns[$field];
+                        }
+
+                        $slots[] = [
+                            'f' => $field,
+                            'h' => mb_substr($header, 0, 100),
+                        ];
+                    }
+                }
             }
         }
 
-        if (empty($columns)) {
-            $columns = array_keys($allColumns);
+        if (empty($slots)) {
+            /* Keep the admin's order; drop unknown keys and duplicates. */
+            $columns = [];
+
+            foreach ($requested as $key) {
+                $key = is_string($key) ? trim($key) : '';
+
+                if (isset($allColumns[$key]) && ! in_array($key, $columns, true)) {
+                    $columns[] = $key;
+                }
+            }
+
+            if (empty($columns)) {
+                $columns = array_keys($allColumns);
+            }
+
+            foreach ($columns as $key) {
+                $slots[] = ['f' => $key, 'h' => $allColumns[$key]];
+            }
         }
 
-        $headers = array_map(fn ($key) => $allColumns[$key], $columns);
+        /* distinct underlying fields to select; headers + slots drive the CSV */
+        $fields = array_values(array_unique(array_map(
+            fn ($slot) => $slot['f'],
+            $slots
+        )));
 
-        $query = $reportImport->rows()->select(array_merge(['id'], $columns));
+        $headers = array_map(fn ($slot) => $slot['h'], $slots);
+
+        $query = $reportImport->rows()->select(array_merge(['id'], $fields));
         $this->applyRowFilters($query, $filters);
         $query->orderBy('id');
 
@@ -913,16 +961,16 @@ class ReportImportController extends Controller
             .'-'.now()->format('Ymd-His').'.csv';
 
         return response()->streamDownload(
-            function () use ($query, $columns, $headers): void {
+            function () use ($query, $slots, $headers): void {
                 $out = fopen('php://output', 'w');
                 fputcsv($out, $headers);
 
-                $query->chunk(1000, function ($rows) use ($out, $columns): void {
+                $query->chunk(1000, function ($rows) use ($out, $slots): void {
                     foreach ($rows as $row) {
                         $line = [];
 
-                        foreach ($columns as $column) {
-                            $line[] = $row->{$column};
+                        foreach ($slots as $slot) {
+                            $line[] = $row->{$slot['f']};
                         }
 
                         fputcsv($out, $line);
