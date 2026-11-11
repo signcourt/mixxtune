@@ -1925,6 +1925,28 @@ Route::middleware([
     });
 
 
+/* IPRS Publishing Royalty - Phase 1: upload + parse IPRS statement files. */
+Route::middleware(['auth', 'verified'])
+    ->prefix('admin/iprs')
+    ->name('v2.admin.iprs.')
+    ->group(function () {
+        Route::get(
+            '/',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'index']
+        )->name('index');
+
+        Route::post(
+            '/uploads',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'store']
+        )->name('store');
+
+        Route::delete(
+            '/uploads/{iprsUpload:public_id}',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'destroy']
+        )->name('destroy');
+    });
+
+
 
 
 Route::middleware(['auth', 'verified'])

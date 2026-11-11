@@ -471,6 +471,13 @@ const adminNavigation = (
                               href: routes.royalties,
                               permission: 'royalties.view',
                           },
+                          /* IPRS Publishing Royalty - upload & parse IPRS statements (super admin) */
+                          {
+                              id: 'financial-iprs',
+                              label: 'IPRS Royalty',
+                              href: '/admin/iprs',
+                              permission: 'royalties.view',
+                          },
                       ]
                     : []),
                 {
