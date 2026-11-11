@@ -158,6 +158,11 @@ html.mt-night .mt-main .divide-slate-200 > :not([hidden]) ~ :not([hidden]){borde
 html.mt-night .mt-main .divide-gray-100 > :not([hidden]) ~ :not([hidden]){border-color:#253246 !important}
 html.mt-night .mt-main .ring-slate-200, html.mt-night .mt-main .ring-slate-300, html.mt-night .mt-main .ring-white{--tw-ring-color:#334155 !important}
 html.mt-night .mt-main input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), html.mt-night .mt-main select, html.mt-night .mt-main textarea{background-color:#0f172a !important;color:#e2e8f0 !important;border-color:#334155 !important;color-scheme:dark}
+/* W153: file inputs (e.g. the report upload "Choose File" box) kept their light
+   look in night mode because [type=file] is excluded above. Darken the box and
+   its native file-selector button so they match the rest of the night surface. */
+html.mt-night .mt-main input[type=file]{background-color:#0f172a !important;color:#e2e8f0 !important;border-color:#334155 !important;color-scheme:dark}
+html.mt-night .mt-main input[type=file]::file-selector-button{background-color:#1e293b !important;color:#e2e8f0 !important;border-color:#334155 !important}
 html.mt-night .mt-main input::placeholder, html.mt-night .mt-main textarea::placeholder{color:#64748b !important}
 html.mt-night .mt-main option{background:#0f172a;color:#e2e8f0}
 html.mt-night .mt-main table thead, html.mt-night .mt-main thead tr{background-color:#0f172a}
