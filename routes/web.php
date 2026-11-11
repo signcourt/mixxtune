@@ -1793,6 +1793,14 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.admin.reports.imports.download');
 
+/* W145: download the currently-filtered report rows as CSV (store/track/label/ISRC/... wise) */
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/admin/reports/imports/{reportImport}/rows/export',
+        [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'exportRows']
+    )
+    ->name('v2.admin.reports.imports.rows.export');
+
 Route::middleware(['auth', 'verified'])
     ->post(
         '/admin/reports/imports/{reportImport}/re-detect-unmapped',

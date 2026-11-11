@@ -75,13 +75,38 @@ export default function ImportShow({
     financialReview = {},
     missingRateLabels = [],
     filters = {},
+    facets = {},
 }) {
-    const [search, setSearch] = useState(
-        filters.search || ''
-    );
+    /* W145: per-column filters for the Report Rows table + filtered CSV download. */
+    const FILTER_KEYS = [
+        'search',
+        'track_title',
+        'track_artist',
+        'album_title',
+        'album_artist',
+        'label_name',
+        'isrc',
+        'upc',
+        'platform',
+        'country_code',
+        'currency',
+        'sale_month',
+        'mapping_status',
+    ];
 
-    const [mappingStatus, setMappingStatus] =
-        useState(filters.mapping_status || '');
+    const emptyFilters = () =>
+        FILTER_KEYS.reduce((acc, key) => ({ ...acc, [key]: '' }), {});
+
+    const filtersFromProps = () =>
+        FILTER_KEYS.reduce(
+            (acc, key) => ({ ...acc, [key]: filters[key] || '' }),
+            {}
+        );
+
+    const [filterForm, setFilterForm] = useState(filtersFromProps);
+
+    const setFilterField = (key, value) =>
+        setFilterForm((current) => ({ ...current, [key]: value }));
 
     const [publishAt, setPublishAt] = useState(
         financialReview.publish_at
@@ -121,26 +146,32 @@ export default function ImportShow({
         useState('');
 
     useEffect(() => {
-        setSearch(filters.search || '');
-        setMappingStatus(
-            filters.mapping_status || ''
-        );
-    }, [
-        filters.search,
-        filters.mapping_status,
-    ]);
+        setFilterForm(filtersFromProps());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filters]);
+
+    const queryFromForm = () => {
+        const query = {};
+
+        FILTER_KEYS.forEach((key) => {
+            const value = String(filterForm[key] || '').trim();
+
+            if (value !== '') {
+                query[key] = value;
+            }
+        });
+
+        return query;
+    };
 
     const applyFilters = (event) => {
-        event.preventDefault();
+        if (event) {
+            event.preventDefault();
+        }
 
         router.get(
             `/admin/reports/imports/${reportImport.id}/view`,
-            {
-                search:
-                    search.trim() || undefined,
-                mapping_status:
-                    mappingStatus || undefined,
-            },
+            queryFromForm(),
             {
                 preserveState: true,
                 preserveScroll: true,
@@ -150,8 +181,7 @@ export default function ImportShow({
     };
 
     const clearFilters = () => {
-        setSearch('');
-        setMappingStatus('');
+        setFilterForm(emptyFilters());
 
         router.get(
             `/admin/reports/imports/${reportImport.id}/view`,
@@ -163,6 +193,39 @@ export default function ImportShow({
             }
         );
     };
+
+    /* Download matches the table that is actually on screen (the applied
+       filters from props), not unsaved edits in the inputs. */
+    const exportHref = () => {
+        const query = {};
+
+        FILTER_KEYS.forEach((key) => {
+            const value = String(filters[key] || '').trim();
+
+            if (value !== '') {
+                query[key] = value;
+            }
+        });
+
+        const qs = new URLSearchParams(query).toString();
+
+        return (
+            `/admin/reports/imports/${reportImport.id}/rows/export` +
+            (qs ? `?${qs}` : '')
+        );
+    };
+
+    const activeFilterCount = Object.keys(
+        (() => {
+            const query = {};
+            FILTER_KEYS.forEach((key) => {
+                if (String(filters[key] || '').trim() !== '') {
+                    query[key] = true;
+                }
+            });
+            return query;
+        })()
+    ).length;
 
     const financialStatus = String(
         financialReview.financial_status ||
@@ -871,67 +934,134 @@ export default function ImportShow({
                     onSubmit={applyFilters}
                     className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                 >
-                    <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_auto]">
-                        <div className="relative">
-                            <Search
-                                size={17}
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                            />
-
-                            <input
-                                type="search"
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(
-                                        event.target.value
-                                    )
-                                }
-                                placeholder="Search track, artist, label, ISRC, UPC, platform..."
-                                className="w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-3 text-sm"
-                            />
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm font-semibold text-slate-900">
+                            Filter rows
+                            {activeFilterCount > 0 && (
+                                <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">
+                                    {activeFilterCount} active
+                                </span>
+                            )}
                         </div>
 
-                        <select
-                            value={mappingStatus}
-                            onChange={(event) =>
-                                setMappingStatus(
-                                    event.target.value
-                                )
-                            }
-                            className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm"
+                        <a
+                            href={exportHref()}
+                            className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                            title="Download exactly the rows shown below (all applied filters) as a CSV"
                         >
-                            <option value="">
-                                All Mapping Status
-                            </option>
+                            <Download size={16} />
+                            Download filtered rows (CSV)
+                        </a>
+                    </div>
 
-                            {mappingOptions.map(
-                                (status) => (
-                                    <option
-                                        key={status}
-                                        value={status}
-                                    >
+                    <div className="relative">
+                        <Search
+                            size={17}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+
+                        <input
+                            type="search"
+                            value={filterForm.search}
+                            onChange={(event) =>
+                                setFilterField('search', event.target.value)
+                            }
+                            placeholder="Search across track, artist, label, ISRC, UPC, platform, country..."
+                            className="w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-3 text-sm"
+                        />
+                    </div>
+
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {[
+                            ['track_title', 'Track'],
+                            ['track_artist', 'Artist'],
+                            ['album_title', 'Album'],
+                            ['album_artist', 'Album artist'],
+                            ['label_name', 'Label'],
+                            ['isrc', 'ISRC'],
+                            ['upc', 'UPC'],
+                        ].map(([key, label]) => (
+                            <label key={key} className="block">
+                                <span className="mb-1 block text-xs font-semibold text-slate-600">
+                                    {label}
+                                </span>
+                                <input
+                                    type="text"
+                                    value={filterForm[key]}
+                                    onChange={(event) =>
+                                        setFilterField(key, event.target.value)
+                                    }
+                                    placeholder={`Any ${label.toLowerCase()}`}
+                                    className={`h-10 w-full rounded-lg border border-slate-300 px-3 text-sm ${
+                                        key === 'isrc' || key === 'upc' ? 'font-mono' : ''
+                                    }`}
+                                />
+                            </label>
+                        ))}
+
+                        {[
+                            ['platform', 'Platform', facets.platform],
+                            ['country_code', 'Country', facets.country_code],
+                            ['currency', 'Currency', facets.currency],
+                            ['sale_month', 'Sales month', facets.sale_month],
+                        ].map(([key, label, options]) => (
+                            <label key={key} className="block">
+                                <span className="mb-1 block text-xs font-semibold text-slate-600">
+                                    {label}
+                                </span>
+                                <select
+                                    value={filterForm[key]}
+                                    onChange={(event) =>
+                                        setFilterField(key, event.target.value)
+                                    }
+                                    className="h-10 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                                >
+                                    <option value="">All</option>
+                                    {(options || []).map((opt) => (
+                                        <option key={opt} value={opt}>
+                                            {opt}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        ))}
+
+                        <label className="block">
+                            <span className="mb-1 block text-xs font-semibold text-slate-600">
+                                Mapping
+                            </span>
+                            <select
+                                value={filterForm.mapping_status}
+                                onChange={(event) =>
+                                    setFilterField('mapping_status', event.target.value)
+                                }
+                                className="h-10 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                            >
+                                <option value="">All mapping status</option>
+                                {mappingOptions.map((status) => (
+                                    <option key={status} value={status}>
                                         {status}
                                     </option>
-                                )
-                            )}
-                        </select>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
 
-                        <div className="flex gap-2">
-                            <button
-                                type="submit"
-                                className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white"
-                            >
-                                Apply
-                            </button>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                            type="submit"
+                            className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+                        >
+                            Apply filters
+                        </button>
 
-                            <button
-                                type="button"
-                                onClick={clearFilters}
-                                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
-                            >
-                                Clear
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={clearFilters}
+                            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                            Clear
+                        </button>
                     </div>
                 </form>
 

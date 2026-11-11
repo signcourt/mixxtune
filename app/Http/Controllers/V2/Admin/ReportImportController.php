@@ -285,29 +285,8 @@ class ReportImportController extends Controller
             'Admin access required.'
         );
 
-        $validated = validator(
-            $request->query(),
-            [
-                'search' => [
-                    'nullable',
-                    'string',
-                    'max:191',
-                ],
-                'mapping_status' => [
-                    'nullable',
-                    'string',
-                    'max:50',
-                ],
-            ]
-        )->validate();
-
-        $search = trim(
-            (string) ($validated['search'] ?? '')
-        );
-
-        $mappingStatus = trim(
-            (string) ($validated['mapping_status'] ?? '')
-        );
+        /* W145: per-column filters (shared with the CSV export below). */
+        $filters = $this->rowFilters($request);
 
         $rowsQuery = $reportImport
             ->rows()
@@ -340,31 +319,7 @@ class ReportImportController extends Controller
                 'mapped_at',
             ]);
 
-        if ($search !== '') {
-            $rowsQuery->where(
-                function ($query) use ($search): void {
-                    $like = '%'.$search.'%';
-
-                    $query
-                        ->where('track_title', 'like', $like)
-                        ->orWhere('track_artist', 'like', $like)
-                        ->orWhere('album_title', 'like', $like)
-                        ->orWhere('album_artist', 'like', $like)
-                        ->orWhere('label_name', 'like', $like)
-                        ->orWhere('isrc', 'like', $like)
-                        ->orWhere('upc', 'like', $like)
-                        ->orWhere('platform', 'like', $like)
-                        ->orWhere('country_code', 'like', $like);
-                }
-            );
-        }
-
-        if ($mappingStatus !== '') {
-            $rowsQuery->where(
-                'mapping_status',
-                $mappingStatus
-            );
-        }
+        $this->applyRowFilters($rowsQuery, $filters);
 
         $rows = $rowsQuery
             ->orderBy('id')
@@ -657,6 +612,30 @@ class ReportImportController extends Controller
             )
             ->values();
 
+        /*
+         * W145: small distinct value lists for the dropdown filters
+         * (platform / country / currency / sales month). Free-text columns
+         * (track, artist, label, ISRC, UPC) stay as "contains" text inputs
+         * because their distinct counts are unbounded.
+         */
+        $facetColumn = function (string $column) use ($reportImport) {
+            return DB::table('report_rows')
+                ->where('report_import_id', $reportImport->id)
+                ->whereNotNull($column)
+                ->where($column, '!=', '')
+                ->distinct()
+                ->orderBy($column)
+                ->pluck($column)
+                ->values();
+        };
+
+        $facets = [
+            'platform' => $facetColumn('platform'),
+            'country_code' => $facetColumn('country_code'),
+            'currency' => $facetColumn('currency'),
+            'sale_month' => $facetColumn('sale_month'),
+        ];
+
         return Inertia::render(
             'V2/Admin/Reports/ImportShow',
             [
@@ -756,10 +735,162 @@ class ReportImportController extends Controller
                         $reviewReady,
                 ],
 
-                'filters' => [
-                    'search' => $search,
-                    'mapping_status' => $mappingStatus,
-                ],
+                'filters' => (object) $filters,
+
+                'facets' => $facets,
+            ]
+        );
+    }
+
+    /*
+     * W145: read + validate the Report-Rows filters from the query string.
+     * Shared by show() (the paginated table) and exportRows() (the CSV), so
+     * the download always matches exactly what the admin is looking at.
+     */
+    private function rowFilters(Request $request): array
+    {
+        $validated = validator(
+            $request->query(),
+            [
+                'search' => ['nullable', 'string', 'max:191'],
+                'track_title' => ['nullable', 'string', 'max:191'],
+                'track_artist' => ['nullable', 'string', 'max:191'],
+                'album_title' => ['nullable', 'string', 'max:191'],
+                'album_artist' => ['nullable', 'string', 'max:191'],
+                'label_name' => ['nullable', 'string', 'max:191'],
+                'isrc' => ['nullable', 'string', 'max:191'],
+                'upc' => ['nullable', 'string', 'max:191'],
+                'platform' => ['nullable', 'string', 'max:191'],
+                'country_code' => ['nullable', 'string', 'max:191'],
+                'currency' => ['nullable', 'string', 'max:191'],
+                'sale_month' => ['nullable', 'string', 'max:191'],
+                'mapping_status' => ['nullable', 'string', 'max:50'],
+            ]
+        )->validate();
+
+        $out = [];
+
+        foreach ($validated as $key => $value) {
+            $value = trim((string) ($value ?? ''));
+
+            if ($value !== '') {
+                $out[$key] = $value;
+            }
+        }
+
+        return $out;
+    }
+
+    /*
+     * W145: apply the Report-Rows filters to a report_rows query.
+     * - "search" is a cross-column contains match (unchanged behaviour).
+     * - track / artist / album / label / ISRC / UPC are per-column contains.
+     * - platform / country / currency / sales month / mapping status are
+     *   exact matches (they come from dropdowns of real values).
+     */
+    private function applyRowFilters($query, array $filters): void
+    {
+        if (isset($filters['search'])) {
+            $like = '%'.$filters['search'].'%';
+
+            $query->where(function ($inner) use ($like): void {
+                $inner
+                    ->where('track_title', 'like', $like)
+                    ->orWhere('track_artist', 'like', $like)
+                    ->orWhere('album_title', 'like', $like)
+                    ->orWhere('album_artist', 'like', $like)
+                    ->orWhere('label_name', 'like', $like)
+                    ->orWhere('isrc', 'like', $like)
+                    ->orWhere('upc', 'like', $like)
+                    ->orWhere('platform', 'like', $like)
+                    ->orWhere('country_code', 'like', $like);
+            });
+        }
+
+        foreach (
+            ['track_title', 'track_artist', 'album_title', 'album_artist', 'label_name', 'isrc', 'upc']
+            as $column
+        ) {
+            if (isset($filters[$column])) {
+                $query->where($column, 'like', '%'.$filters[$column].'%');
+            }
+        }
+
+        foreach (
+            ['platform', 'country_code', 'currency', 'sale_month', 'mapping_status']
+            as $column
+        ) {
+            if (isset($filters[$column])) {
+                $query->where($column, $filters[$column]);
+            }
+        }
+    }
+
+    /*
+     * W145: stream the currently-filtered report rows as a CSV so an admin
+     * can re-check a slice (e.g. one label) outside the panel. Uses the same
+     * filters as the table and chunks the query, so it stays memory-safe even
+     * for a very large import.
+     */
+    public function exportRows(
+        Request $request,
+        ReportImport $reportImport,
+        PermissionService $permissions
+    ) {
+        $role = $permissions->role($request->user());
+
+        abort_unless(
+            in_array($role, ['admin', 'super_admin'], true),
+            403,
+            'Admin access required.'
+        );
+
+        $filters = $this->rowFilters($request);
+
+        $columns = [
+            'reporting_month', 'track_title', 'track_artist', 'album_title', 'album_artist',
+            'label_name', 'isrc', 'upc', 'platform', 'country_code', 'currency', 'cms',
+            'sale_type', 'sale_date', 'sale_month', 'streams', 'sale_units', 'label_rate',
+            'collected_revenue', 'earnings', 'mapping_status',
+        ];
+
+        $headers = [
+            'Reporting Month', 'Track', 'Artist', 'Album', 'Album Artist', 'Label', 'ISRC', 'UPC',
+            'Platform', 'Country', 'Currency', 'CMS', 'Sale Type', 'Sale Date', 'Sales Month',
+            'Streams', 'Units', 'Applied Rate', 'Collected Revenue', 'Earnings', 'Mapping',
+        ];
+
+        $query = $reportImport->rows()->select(array_merge(['id'], $columns));
+        $this->applyRowFilters($query, $filters);
+        $query->orderBy('id');
+
+        $filename = 'report-'.$reportImport->id.'-rows'
+            .(isset($filters['label_name']) ? '-'.\Illuminate\Support\Str::slug($filters['label_name']) : '')
+            .'-'.now()->format('Ymd-His').'.csv';
+
+        return response()->streamDownload(
+            function () use ($query, $columns, $headers): void {
+                $out = fopen('php://output', 'w');
+                fputcsv($out, $headers);
+
+                $query->chunk(1000, function ($rows) use ($out, $columns): void {
+                    foreach ($rows as $row) {
+                        $line = [];
+
+                        foreach ($columns as $column) {
+                            $line[] = $row->{$column};
+                        }
+
+                        fputcsv($out, $line);
+                    }
+                });
+
+                fclose($out);
+            },
+            $filename,
+            [
+                'Content-Type' => 'text/csv',
+                'Cache-Control' => 'no-store, no-cache, must-revalidate',
             ]
         );
     }
