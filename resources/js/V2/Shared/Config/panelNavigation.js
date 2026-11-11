@@ -215,6 +215,12 @@ const ownerNavigation = (
                     permission: 'royalties.view',
                 },
                 {
+                    id: 'financial-publishing',
+                    label: 'Publishing',
+                    href: routes.publishing,
+                    permission: 'royalties.view',
+                },
+                {
                     id: 'financial-reports',
                     label: 'Reports',
                     href: routes.reports,

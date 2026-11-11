@@ -1863,6 +1863,14 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.royalties.index');
 
+/* W150: owner Publishing dashboard (rights/performing royalties matched by ISRC) */
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/publishing',
+        [\App\Http\Controllers\V2\RoyaltyController::class, 'publishing']
+    )
+    ->name('v2.publishing.index');
+
 Route::middleware(['auth','verified'])
     ->get(
         '/admin/royalties',

@@ -240,6 +240,125 @@ class RoyaltyController extends Controller
         );
     }
 
+    /*
+     * W150: owner-facing Publishing dashboard.
+     *
+     * Shows the published rights/performing royalties (IPRS / PRS / TPL) that
+     * were matched to THIS owner's catalogue by ISRC. Read-only - money still
+     * reaches the wallet through the separate admin "credit wallet" step.
+     * Rights ledger lines are the ones with source_type = rights_royalty_allocation.
+     */
+    public function publishing(
+        Request $request,
+        PermissionService $permissions
+    ): Response {
+        $permissions->authorize(
+            $request->user(),
+            'royalties.view'
+        );
+
+        $role = $permissions->role($request->user());
+
+        $base = DB::table('royalty_ledgers as rl')
+            ->where('rl.source_type', 'rights_royalty_allocation');
+
+        if ($role === 'artist') {
+            $artistId = DB::table('artists')
+                ->where('user_id', $request->user()->id)
+                ->value('id');
+
+            $base->where('rl.artist_id', $artistId ?: 0);
+        } elseif ($role === 'label') {
+            $teamAccess = app(LabelTeamAccessService::class);
+
+            $labelIds = $teamAccess->accessibleLabelIds($request->user());
+            $artistIds = $teamAccess->accessibleArtistIds($request->user());
+
+            if ($labelIds->isEmpty() && $artistIds->isEmpty()) {
+                $base->whereRaw('1 = 0');
+            } else {
+                $base->where(function ($builder) use ($labelIds, $artistIds) {
+                    if ($labelIds->isNotEmpty()) {
+                        $builder->whereIn('rl.label_id', $labelIds);
+                    }
+
+                    if ($artistIds->isNotEmpty()) {
+                        if ($labelIds->isNotEmpty()) {
+                            $builder->orWhereIn('rl.artist_id', $artistIds);
+                        } else {
+                            $builder->whereIn('rl.artist_id', $artistIds);
+                        }
+                    }
+                });
+            }
+        } else {
+            /* Admin / super admin review publishing under Rights Royalties. */
+            return Inertia::render('V2/Royalties/Publishing', [
+                'role' => $role,
+                'isOwner' => false,
+                'summary' => ['total_gross' => 0, 'total_payable' => 0, 'lines' => 0, 'currency' => 'INR'],
+                'monthly' => [],
+                'rows' => ['data' => []],
+                'filters' => ['month' => ''],
+            ]);
+        }
+
+        $summary = [
+            'total_gross' => round((float) (clone $base)->sum('rl.gross_amount'), 2),
+            'total_payable' => round((float) (clone $base)->sum('rl.payable_amount'), 2),
+            'lines' => (clone $base)->count(),
+            'currency' => (string) ((clone $base)->value('rl.currency') ?: 'INR'),
+        ];
+
+        $monthly = (clone $base)
+            ->whereNotNull('rl.statement_month')
+            ->where('rl.statement_month', '!=', '')
+            ->selectRaw('SUBSTR(rl.statement_month, 1, 7) as ym')
+            ->selectRaw('COALESCE(SUM(rl.payable_amount), 0) as payable')
+            ->groupByRaw('SUBSTR(rl.statement_month, 1, 7)')
+            ->orderByDesc('ym')
+            ->limit(12)
+            ->get()
+            ->reverse()
+            ->values()
+            ->map(fn ($r) => ['month' => (string) $r->ym, 'payable' => round((float) $r->payable, 2)])
+            ->all();
+
+        $month = trim((string) $request->query('month', ''));
+
+        $list = clone $base;
+        if ($month !== '') {
+            $list->where('rl.statement_month', 'like', $month.'%');
+        }
+
+        $rows = $list
+            ->leftJoin('tracks as t', 't.id', '=', 'rl.track_id')
+            ->orderByDesc('rl.statement_month')
+            ->orderByDesc('rl.id')
+            ->select([
+                'rl.public_id',
+                'rl.statement_month',
+                'rl.territory',
+                'rl.currency',
+                'rl.gross_amount',
+                'rl.payable_amount',
+                'rl.status',
+                't.title as track_title',
+                't.isrc as track_isrc',
+            ])
+            ->paginate(50)
+            ->withQueryString();
+
+        return Inertia::render('V2/Royalties/Publishing', [
+            'role' => $role,
+            'isOwner' => true,
+            'summary' => $summary,
+            'monthly' => $monthly,
+            'rows' => $rows,
+            'filters' => ['month' => $month],
+        ]);
+    }
+
     /* W54: list of uploaded rights royalty reports (newest first) */
     private function rightsImports(): array
     {

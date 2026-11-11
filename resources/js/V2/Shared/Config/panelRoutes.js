@@ -20,6 +20,8 @@ export const PANEL_ROUTES = {
 
         royalties: "/artist/royalties",
 
+        publishing: "/publishing",
+
         wallet: "/artist/wallet",
 
         withdrawals: "/artist/withdrawals",
@@ -62,6 +64,8 @@ export const PANEL_ROUTES = {
         catalogue: "/catalogue",
 
         royalties: "/royalties",
+
+        publishing: "/publishing",
 
         wallet: "/wallet",
 
