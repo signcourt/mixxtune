@@ -256,6 +256,28 @@ class RecoupmentReviewTest extends TestCase
             ->where('advances.0.recovery', 10));
     }
 
+    public function test_plan_base_rate_is_resolved_from_the_owner_label_rate(): void
+    {
+        // Owner's label is at 80%. An advance with a 10% charge must store base 80
+        // (so the effective rate while repaying is 70%, not 90%).
+        $super = $this->user('super_admin');
+        $owner = $this->user('label');
+        $label = Label::factory()->create(['user_id' => $owner->id, 'revenue_share_percentage' => 80]);
+
+        $this->viaActionOtp($super, fn () => $this->actingAs($super)->post($this->url, [
+            'user_id' => $owner->id,
+            'label_id' => $label->id,
+            'title' => 'Advance',
+            'recovery_uplift_percentage' => 100,
+            'advance_charge_percentage' => 10,
+            'initial_amount' => 5000,
+        ]))->assertSessionHasNoErrors();
+
+        $plan = RecoupmentPlan::query()->firstOrFail();
+        $this->assertEqualsWithDelta(80.0, (float) $plan->base_percentage, 0.001);
+        $this->assertEqualsWithDelta(10.0, (float) $plan->advance_charge_percentage, 0.001);
+    }
+
     public function test_delete_removes_a_plan_with_no_recovery_after_otp(): void
     {
         $super = $this->user('super_admin');

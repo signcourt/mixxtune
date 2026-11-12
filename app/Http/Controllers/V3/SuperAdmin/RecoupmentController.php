@@ -114,6 +114,39 @@ class RecoupmentController extends Controller
         ]);
     }
 
+    /*
+     * W170-fix: the owner's applicable (label/artist) revenue share, used as the
+     * plan's base rate. For a whole-account plan with several labels, the common
+     * rate is used when they agree, otherwise the max (most generous) is taken.
+     * Falls back to 100 only when no rate is set anywhere.
+     */
+    private function resolveApplicableRate(User $user, $labelId, $artistId): float
+    {
+        $clamp = fn ($v) => max(0.0, min(100.0, round((float) $v, 4)));
+
+        if ($labelId) {
+            $r = DB::table('labels')->where('id', $labelId)->value('revenue_share_percentage');
+
+            return $r === null ? 100.0 : $clamp($r);
+        }
+        if ($artistId) {
+            $r = DB::table('artists')->where('id', $artistId)->value('revenue_share_percentage');
+
+            return $r === null ? 100.0 : $clamp($r);
+        }
+
+        // Whole account: look at the owner's labels and artists.
+        $rates = DB::table('labels')->where('user_id', $user->id)->whereNotNull('revenue_share_percentage')->pluck('revenue_share_percentage')
+            ->merge(DB::table('artists')->where('user_id', $user->id)->whereNotNull('revenue_share_percentage')->pluck('revenue_share_percentage'))
+            ->map(fn ($v) => $clamp($v))->filter(fn ($v) => $v > 0)->values();
+
+        if ($rates->isEmpty()) {
+            return 100.0;
+        }
+
+        return $rates->unique()->count() === 1 ? (float) $rates->first() : (float) $rates->max();
+    }
+
     /** Recovery % actually used (same rules as RecoupmentCalculationService). */
     private function rates(RecoupmentPlan $plan): array
     {
@@ -200,6 +233,14 @@ class RecoupmentController extends Controller
                 'user_id' => 'This owner already has an active plan. Add the new amount to that plan with "Add cost" instead.',
             ]);
         }
+
+        /*
+         * W170-fix: the plan's base_percentage must be the owner's REAL
+         * applicable (label/artist) rate so the advance charge reduces the right
+         * number (e.g. 80% - 10 = 70%, not 100 - 10). The form no longer asks for
+         * it, so resolve it from the owner here.
+         */
+        $data['base_percentage'] = $this->resolveApplicableRate($user, $data['label_id'] ?? null, $data['artist_id'] ?? null);
 
         $amount = round((float) ($data['initial_amount'] ?? 0), 2);
         $amountText = number_format($amount, 2, '.', '');
@@ -379,11 +420,11 @@ class RecoupmentController extends Controller
     /** Change title / notes / rates of a plan that is not cancelled. */
     public function update(Request $request, RecoupmentPlan $plan)
     {
-        // MIXXTUNE_RECOVERY_NET_BASIS_V1: only "Recovery % of earning" matters;
-        // base is display-only (default 100) and the "<= base" caps are gone.
-        if ($request->input('base_percentage', '') === '' || $request->input('base_percentage') === null) {
-            $request->merge(['base_percentage' => 100]);
-        }
+        // W170-fix: base is the owner's real applicable rate, resolved from the
+        // owner (not a 100 default), so the advance charge reduces the right rate.
+        $request->merge([
+            'base_percentage' => $this->resolveApplicableRate($plan->user, $plan->label_id, $plan->artist_id),
+        ]);
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:5000'],
