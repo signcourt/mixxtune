@@ -1960,6 +1960,11 @@ Route::middleware(['auth', 'verified'])
             [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'unmapWork']
         )->name('unmap');
 
+        Route::post(
+            '/uploads/{iprsUpload:public_id}/publish',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'publish']
+        )->name('publish');
+
         Route::delete(
             '/uploads/{iprsUpload:public_id}',
             [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'destroy']

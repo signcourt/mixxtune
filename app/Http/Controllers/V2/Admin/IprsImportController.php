@@ -9,6 +9,7 @@ use App\Models\Iprs\IprsWork;
 use App\Models\User;
 use App\Services\Iprs\IprsImportService;
 use App\Services\Iprs\IprsMappingService;
+use App\Services\Iprs\IprsPublishService;
 use App\Services\V2\ActionOtpGuard;
 use App\Services\V2\PermissionService;
 use Illuminate\Http\RedirectResponse;
@@ -132,6 +133,29 @@ class IprsImportController extends Controller
         return back()->with('flash', ['success' => 'Mapping removed.']);
     }
 
+    /** Publish mapped royalty to owners' wallets (OTP-gated, like report approval). */
+    public function publish(Request $request, PermissionService $permissions, IprsPublishService $publish, IprsUpload $iprsUpload): RedirectResponse
+    {
+        $this->gate($request, $permissions);
+
+        app(ActionOtpGuard::class)->require($request->user(), 'iprs.publish', 'publish IPRS royalty to owners');
+
+        $r = $publish->publish($iprsUpload, $request->user()->id);
+
+        $parts = [$r['published'].' line(s) credited ₹'.number_format($r['credited'], 2)];
+        if ($r['already']) {
+            $parts[] = $r['already'].' already published';
+        }
+        if ($r['skipped_unmatched']) {
+            $parts[] = $r['skipped_unmatched'].' unmatched skipped';
+        }
+        if ($r['skipped_no_owner']) {
+            $parts[] = $r['skipped_no_owner'].' without owner skipped';
+        }
+
+        return back()->with('flash', ['success' => 'Published to owners: '.implode(', ', $parts).'.']);
+    }
+
     public function store(Request $request, PermissionService $permissions, IprsImportService $service): RedirectResponse
     {
         $this->gate($request, $permissions);
@@ -235,6 +259,7 @@ class IprsImportController extends Controller
             'total_works' => (int) $u->total_works,
             'status' => $u->status,
             'period_label' => $u->period_label,
+            'published' => $u->metadata['published'] ?? null,
             'created_at' => optional($u->created_at)->toIso8601String(),
         ];
     }

@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Link2, Loader2, Music2, Search, Unlink, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Link2, Loader2, Music2, Search, Send, Unlink, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
@@ -164,6 +164,18 @@ export default function Show({ role = "admin", upload = {}, works = [] }) {
     const flash = page.props?.flash ?? {};
     const ok = upload.within_tolerance;
     const matchedCount = works.filter((w) => w.mapping_status === "matched").length;
+    const published = upload.status === "distributed" && upload.published;
+    const [publishing, setPublishing] = useState(false);
+
+    const doPublish = () => {
+        if (!window.confirm("Publish mapped royalty to the owners' wallets? Each owner is credited at their royalty rate.")) return;
+        setPublishing(true);
+        router.post(`/admin/iprs/uploads/${upload.public_id}/publish`, {}, {
+            preserveScroll: true,
+            onError: (e) => { if (e?.action_otp) return; },
+            onFinish: () => setPublishing(false),
+        });
+    };
 
     return (
         <PanelLayout role={role} title="IPRS statement" subtitle={upload.file_name}>
@@ -208,6 +220,29 @@ export default function Show({ role = "admin", upload = {}, works = [] }) {
                         </div>
                     </div>
                 </div>
+
+                {/* publish */}
+                {published ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" /> Published to owners</div>
+                        <div className="mt-0.5 text-xs text-emerald-700">
+                            {upload.published.lines} line(s) credited {money(upload.published.credited)} to owners’ wallets. You can map and publish more works; already-published lines are never credited twice.
+                        </div>
+                    </div>
+                ) : matchedCount > 0 ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3">
+                        <div className="text-sm text-violet-900">
+                            <span className="font-semibold">Ready to publish.</span> {matchedCount} mapped work(s) will be credited to each owner’s wallet at their own royalty rate (same % as their digital deal). A one-time code is e-mailed to confirm.
+                        </div>
+                        <button type="button" onClick={doPublish} disabled={publishing} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+                            {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Publish to owners
+                        </button>
+                    </div>
+                ) : (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                        Map at least one work to a song to publish its royalty to the owner.
+                    </div>
+                )}
 
                 {/* works */}
                 {works.map((w) => {
