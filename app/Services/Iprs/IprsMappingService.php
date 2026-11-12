@@ -58,6 +58,14 @@ class IprsMappingService
                 'owner_name' => $label->name ?? $artist->stage_name ?? $t->primary_artist_name ?? '—',
                 'owner_type' => $label ? 'label' : ($artist ? 'artist' : null),
                 'current_work_no' => $t->iprs_work_no,
+                // Singer + writers, so an admin can tell same-titled songs apart
+                // by matching against the IPRS work's credits.
+                'primary_artist' => $t->primary_artist_name,
+                'featuring_artist' => $t->featuring_artist_name,
+                'composer' => $t->composer_name,
+                'author' => $t->author_name,
+                'music_director' => $t->music_director_name,
+                'publisher' => $t->publisher_name,
             ];
         })->all();
     }

@@ -131,7 +131,8 @@ class IprsMappingTest extends TestCase
         $this->actingAs($super)->getJson('/admin/iprs/tracks/search?q=DHARA')
             ->assertOk()
             ->assertJsonPath('tracks.0.title', 'DHARA 302')
-            ->assertJsonPath('tracks.0.isrc', 'INMXT2600001');
+            ->assertJsonPath('tracks.0.isrc', 'INMXT2600001')
+            ->assertJsonStructure(['tracks' => [['primary_artist', 'composer', 'author', 'music_director']]]);
 
         $this->actingAs($super)->getJson('/admin/iprs/tracks/search?q=INMXT2600001')
             ->assertOk()

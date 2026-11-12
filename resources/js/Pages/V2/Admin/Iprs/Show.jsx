@@ -108,6 +108,13 @@ function MapPanel({ upload, work }) {
                         </button>
                     </div>
 
+                    {work.credits?.length > 0 && (
+                        <div className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-600">
+                            <span className="font-semibold text-slate-500">This work’s writers:</span>{" "}
+                            {work.credits.map((c) => `${c.name} (${ROLES[c.role] || c.role || "—"})`).join(" · ")}
+                        </div>
+                    )}
+
                     {searching && <p className="flex items-center gap-1.5 text-xs text-slate-400"><Loader2 className="h-3.5 w-3.5 animate-spin" /> searching…</p>}
                     {!searching && q.trim().length >= 2 && results.length === 0 && <p className="text-xs text-slate-400">No matching song found.</p>}
 
@@ -120,6 +127,21 @@ function MapPanel({ upload, work }) {
                                         <div className="text-xs text-slate-500">
                                             {t.isrc || "no ISRC"}{t.upc ? ` · UPC ${t.upc}` : ""}{t.owner_name ? ` · ${t.owner_name}` : ""}
                                         </div>
+                                        {[
+                                            t.primary_artist && `Singer: ${t.primary_artist}`,
+                                            t.composer && `Composer: ${t.composer}`,
+                                            t.author && `Author: ${t.author}`,
+                                            t.music_director && `Music Dir: ${t.music_director}`,
+                                        ].filter(Boolean).length > 0 && (
+                                            <div className="text-[11px] text-slate-500">
+                                                {[
+                                                    t.primary_artist && `Singer: ${t.primary_artist}`,
+                                                    t.composer && `Composer: ${t.composer}`,
+                                                    t.author && `Author: ${t.author}`,
+                                                    t.music_director && `Music Dir: ${t.music_director}`,
+                                                ].filter(Boolean).join(" · ")}
+                                            </div>
+                                        )}
                                         {t.current_work_no && t.current_work_no !== work.work_int_no && (
                                             <div className="text-[11px] text-amber-600">already holds work {t.current_work_no} — mapping will move it here</div>
                                         )}
