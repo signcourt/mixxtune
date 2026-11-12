@@ -120,8 +120,9 @@ class RecoupmentController extends Controller
      * rate is used when they agree, otherwise the max (most generous) is taken.
      * Falls back to 100 only when no rate is set anywhere.
      */
-    private function resolveApplicableRate(User $user, $labelId, $artistId): float
+    private function resolveApplicableRate($user, $labelId, $artistId): float
     {
+        $userId = is_object($user) ? (int) $user->id : (int) $user;
         $clamp = fn ($v) => max(0.0, min(100.0, round((float) $v, 4)));
 
         if ($labelId) {
@@ -136,8 +137,8 @@ class RecoupmentController extends Controller
         }
 
         // Whole account: look at the owner's labels and artists.
-        $rates = DB::table('labels')->where('user_id', $user->id)->whereNotNull('revenue_share_percentage')->pluck('revenue_share_percentage')
-            ->merge(DB::table('artists')->where('user_id', $user->id)->whereNotNull('revenue_share_percentage')->pluck('revenue_share_percentage'))
+        $rates = DB::table('labels')->where('user_id', $userId)->whereNotNull('revenue_share_percentage')->pluck('revenue_share_percentage')
+            ->merge(DB::table('artists')->where('user_id', $userId)->whereNotNull('revenue_share_percentage')->pluck('revenue_share_percentage'))
             ->map(fn ($v) => $clamp($v))->filter(fn ($v) => $v > 0)->values();
 
         if ($rates->isEmpty()) {
@@ -196,8 +197,8 @@ class RecoupmentController extends Controller
 
         $ids = $owners->pluck('id');
 
-        $labels = DB::table('labels')->whereIn('user_id', $ids)->orderBy('name')->get(['id', 'name', 'user_id'])->groupBy('user_id');
-        $artists = DB::table('artists')->whereIn('user_id', $ids)->orderBy('stage_name')->get(['id', 'stage_name', 'legal_name', 'user_id'])->groupBy('user_id');
+        $labels = DB::table('labels')->whereIn('user_id', $ids)->orderBy('name')->get(['id', 'name', 'user_id', 'revenue_share_percentage'])->groupBy('user_id');
+        $artists = DB::table('artists')->whereIn('user_id', $ids)->orderBy('stage_name')->get(['id', 'stage_name', 'legal_name', 'user_id', 'revenue_share_percentage'])->groupBy('user_id');
         $open = RecoupmentPlan::query()->whereIn('user_id', $ids)->where('status', 'active')->get(['id', 'user_id', 'plan_number', 'outstanding_amount'])->keyBy('user_id');
         $wallets = DB::table('wallets')->whereIn('user_id', $ids)->groupBy('user_id')
             ->select('user_id', DB::raw('SUM(available_balance) as available'))->get()->keyBy('user_id');
@@ -210,8 +211,11 @@ class RecoupmentController extends Controller
                 'role' => $o->role,
                 'client_id' => $o->client_id,
                 'wallet' => round((float) ($wallets[$o->id]->available ?? 0), 2),
-                'labels' => ($labels[$o->id] ?? collect())->map(fn ($l) => ['id' => $l->id, 'name' => $l->name])->values(),
-                'artists' => ($artists[$o->id] ?? collect())->map(fn ($a) => ['id' => $a->id, 'name' => $a->stage_name ?: $a->legal_name])->values(),
+                // W172: the owner's applicable rate (whole account) + per label/artist,
+                // so the plan form can preview "80% -> 70%" correctly.
+                'applicable_rate' => $this->resolveApplicableRate((int) $o->id, null, null),
+                'labels' => ($labels[$o->id] ?? collect())->map(fn ($l) => ['id' => $l->id, 'name' => $l->name, 'rate' => $l->revenue_share_percentage === null ? null : round((float) $l->revenue_share_percentage, 2)])->values(),
+                'artists' => ($artists[$o->id] ?? collect())->map(fn ($a) => ['id' => $a->id, 'name' => $a->stage_name ?: $a->legal_name, 'rate' => $a->revenue_share_percentage === null ? null : round((float) $a->revenue_share_percentage, 2)])->values(),
                 'open_plan' => isset($open[$o->id]) ? [
                     'id' => $open[$o->id]->id,
                     'plan_number' => $open[$o->id]->plan_number,

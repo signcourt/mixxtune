@@ -364,13 +364,27 @@ function NewPlanModal({ onClose }) {
         return () => clearTimeout(t);
     }, [q]);
 
+    // W172: the owner's applicable rate for the chosen scope, so the preview
+    // shows the real "80% -> 70%". Whole account uses the account rate; a single
+    // label/artist uses its own rate.
+    const rateFor = (o, labelId, artistId) => {
+        if (!o) return 100;
+        if (labelId) { const l = (o.labels || []).find((x) => String(x.id) === String(labelId)); return l && l.rate != null ? Number(l.rate) : (o.applicable_rate ?? 100); }
+        if (artistId) { const a = (o.artists || []).find((x) => String(x.id) === String(artistId)); return a && a.rate != null ? Number(a.rate) : (o.applicable_rate ?? 100); }
+        return o.applicable_rate ?? 100;
+    };
+
     const pick = (o) => {
         setPicked(o);
-        setData((d) => ({ ...d, user_id: o.id, label_id: "", artist_id: "", title: d.title || `Advance - ${o.name}` }));
+        setData((d) => ({ ...d, user_id: o.id, label_id: "", artist_id: "", base_percentage: rateFor(o, "", ""), title: d.title || `Advance - ${o.name}` }));
     };
 
     const scope = data.label_id ? `l:${data.label_id}` : data.artist_id ? `a:${data.artist_id}` : "";
-    const setScope = (v) => setData((d) => ({ ...d, label_id: v.startsWith("l:") ? v.slice(2) : "", artist_id: v.startsWith("a:") ? v.slice(2) : "" }));
+    const setScope = (v) => {
+        const labelId = v.startsWith("l:") ? v.slice(2) : "";
+        const artistId = v.startsWith("a:") ? v.slice(2) : "";
+        setData((d) => ({ ...d, label_id: labelId, artist_id: artistId, base_percentage: rateFor(picked, labelId, artistId) }));
+    };
     const amount = Number(data.initial_amount || 0);
     const blocked = !!picked?.open_plan;
 
