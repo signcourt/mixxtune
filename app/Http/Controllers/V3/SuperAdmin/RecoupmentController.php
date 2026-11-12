@@ -129,9 +129,15 @@ class RecoupmentController extends Controller
         $uplift = min(100, $uplift);
         $running = $plan->status === 'active' && (float) $plan->outstanding_amount > 0;
 
+        // W170: advance charge reduces the owner's applicable rate while running.
+        $charge = max(0, min(100, (float) ($plan->advance_charge_percentage ?? 0)));
+        $applicable = $running ? max(0, $base - $charge) : $base;
+
         return [
             'base' => round($base, 2),
             'recovery' => round($uplift, 2),
+            'advance_charge' => round($charge, 2),
+            'applicable_now' => round($applicable, 2),
             'owner_now' => round($running ? $base - $uplift : $base, 2),
             'running' => $running,
         ];
@@ -384,10 +390,12 @@ class RecoupmentController extends Controller
             'base_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'recovery_uplift_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
             'maximum_recovery_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'advance_charge_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ], [], [
             'base_percentage' => 'owner share',
             'recovery_uplift_percentage' => 'recovery % of earning',
             'maximum_recovery_percentage' => 'maximum recovery %',
+            'advance_charge_percentage' => 'advance charge %',
         ]);
 
         if ($plan->status === 'cancelled') {
@@ -415,6 +423,7 @@ class RecoupmentController extends Controller
             'base_percentage' => round((float) $data['base_percentage'], 4),
             'recovery_uplift_percentage' => round((float) $data['recovery_uplift_percentage'], 4),
             'maximum_recovery_percentage' => isset($data['maximum_recovery_percentage']) ? round((float) $data['maximum_recovery_percentage'], 4) : null,
+            'advance_charge_percentage' => max(0, min(100, round((float) ($data['advance_charge_percentage'] ?? 0), 4))),
         ]);
 
         FinanceAudit::log(

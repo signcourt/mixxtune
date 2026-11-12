@@ -98,6 +98,9 @@ class RecoupmentManagementService
                             4
                         )
                         : null,
+                // W170: extra points taken off the applicable rate while the
+                // advance is outstanding (0-100).
+                'advance_charge_percentage' => max(0, min(100, round((float) ($data['advance_charge_percentage'] ?? 0), 4))),
                 'total_recoverable_amount' => 0,
                 'total_recovered_amount' => 0,
                 'outstanding_amount' => 0,

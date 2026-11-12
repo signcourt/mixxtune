@@ -97,6 +97,15 @@ class StoreRecoupmentPlanRequest extends FormRequest
                 'max:100',
             ],
 
+            // W170: extra points off the owner's applicable rate while the
+            // advance is outstanding.
+            'advance_charge_percentage' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:100',
+            ],
+
             'recovery_method' => [
                 'nullable',
                 'in:percentage',

@@ -674,6 +674,7 @@ class ReportImportScheduledPublisher
          */
         $recovery = null;
         $recoveryAmount = 0.0;
+        $advanceChargeAmount = 0.0;
 
         if ($deltaNet > 0) {
             $planQuery = RecoupmentPlan::query()
@@ -712,8 +713,24 @@ class ReportImportScheduledPublisher
             }
 
             if (isset($plan) && $plan) {
-                $recovery =
-                    $this->recoupment
+                /*
+                 * MIXXTUNE_ADVANCE_CHARGE_V1
+                 *
+                 * While an advance is outstanding, the owner's applicable rate is
+                 * reduced by advance_charge_percentage points. That reduction is a
+                 * share of the COLLECTED (gross) revenue — e.g. 80% - 10 = 70%,
+                 * so 10% of gross moves from the owner's net to the publisher's
+                 * profit. Recovery then runs on the already-reduced net. When the
+                 * advance clears, the charge no longer applies (no active plan).
+                 */
+                $charge = round((float) $plan->advance_charge_percentage, 8);
+                if ($charge > 0 && $deltaGross > 0) {
+                    $advanceChargeAmount = round(min($deltaGross * ($charge / 100), $deltaNet), 8);
+                    $deltaNet = round($deltaNet - $advanceChargeAmount, 8);
+                }
+
+                $recovery = $deltaNet > 0
+                    ? $this->recoupment
                         ->applyStatementRecovery(
                             $plan,
                             $deltaGross,
@@ -738,7 +755,8 @@ class ReportImportScheduledPublisher
                                     'report_import_posting:'
                                     .$postingId,
                             ]
-                        );
+                        )
+                    : null;
 
                 if ($recovery) {
                     $recoveryAmount = round(
@@ -955,6 +973,26 @@ class ReportImportScheduledPublisher
          * Its totals cover all allocations, while deductions
          * accumulate import-by-import.
          */
+        /*
+         * MIXXTUNE_ADVANCE_CHARGE_V1: the advance charge is extra publisher
+         * commission while the advance is outstanding. It raises commission and
+         * lowers the owner's net_payable on the statement; it is not a recovery
+         * (it does not reduce the advance).
+         */
+        if ($advanceChargeAmount > 0) {
+            DB::table('royalty_statements')
+                ->where('id', $posting->royalty_statement_id)
+                ->update([
+                    'commission_amount' => DB::raw('commission_amount + '.$advanceChargeAmount),
+                    'net_payable' => DB::raw(
+                        'CASE WHEN net_payable - '.$advanceChargeAmount
+                        .' > 0 THEN net_payable - '.$advanceChargeAmount
+                        .' ELSE 0 END'
+                    ),
+                    'updated_at' => now(),
+                ]);
+        }
+
         if ($recoveryAmount > 0) {
             DB::table('royalty_statements')
                 ->where(

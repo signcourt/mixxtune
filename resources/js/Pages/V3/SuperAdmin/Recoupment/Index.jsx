@@ -213,7 +213,7 @@ function Row({ p, busy, onOpen, onDelete }) {
                 </div>
                 <div className="mt-0.5 truncate text-sm text-slate-600">{p.title}</div>
                 <div className="mt-0.5 text-xs text-slate-500">
-                    Recovery <b className="text-amber-700">{pct(r.recovery)}</b> of earning{r.running ? <> → owner gets <b className="text-violet-700">{pct(100 - r.recovery)}</b> while repaying</> : null} · since {day(p.starts_on)}
+                    Recovery <b className="text-amber-700">{pct(r.recovery)}</b> of earning{r.advance_charge > 0 ? <> · advance charge <b className="text-amber-700">+{pct(r.advance_charge)}</b>{r.running ? <> (rate <b className="text-violet-700">{pct(r.base)}→{pct(r.applicable_now)}</b>)</> : null}</> : null} · since {day(p.starts_on)}
                 </div>
             </div>
             <div className="w-full shrink-0 lg:w-64">
@@ -278,16 +278,32 @@ function Field({ label, hint, children }) {
     );
 }
 
-/* Shows what the rates mean on ₹1,000 of store revenue. */
-function RateExample({ recovery }) {
+/* Shows what the rates mean on ₹1,000 of collected store revenue. */
+function RateExample({ recovery, base, charge }) {
     const r = Number(recovery);
+    const applicable = Number(base);
+    const chg = Number(charge) || 0;
     if (!(r >= 0) || Number.isNaN(r)) return null;
-    // Example on an earning of ₹1,000 (what is left after the label rate).
-    const toAdvance = (r / 100) * 1000;
-    const toWallet = 1000 - toAdvance;
+
+    const collected = 1000;
+    const hasRate = applicable > 0 && applicable <= 100;
+    // Owner's effective rate while the advance runs = applicable - charge.
+    const effective = hasRate ? Math.max(0, applicable - chg) : null;
+    // Net earning on ₹1,000 collected at the effective rate.
+    const net = hasRate ? collected * (effective / 100) : 1000;
+    const toAdvance = (r / 100) * net;
+    const toWallet = net - toAdvance;
+    const yourProfit = hasRate ? collected - net : null;
+
     return (
-        <div className="rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-900">
-            On an earning of <b>₹1,000</b> (after the label rate): <b>{money(toAdvance)}</b> goes to the advance and <b>{money(toWallet)}</b> to the owner's wallet — until the advance is cleared.
+        <div className="rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-900 space-y-0.5">
+            {hasRate && chg > 0 && (
+                <div>While the advance runs: owner rate <b>{applicable}%</b> → <b>{effective}%</b>, your profit <b>{100 - applicable}%</b> → <b>{100 - effective}%</b>.</div>
+            )}
+            <div>
+                On <b>₹1,000</b> collected{hasRate ? <> → owner earning <b>{money(net)}</b>{chg > 0 ? <> (your extra profit {money(yourProfit)})</> : null}</> : <> (owner earning)</>}: <b>{money(toAdvance)}</b> repays the advance, <b>{money(toWallet)}</b> to the wallet.
+            </div>
+            <div className="text-violet-700">When the advance clears, the rate returns to normal.</div>
         </div>
     );
 }
@@ -295,13 +311,19 @@ function RateExample({ recovery }) {
 function RateFields({ data, setData }) {
     return (
         <>
-            <Field label="Recovery % of earning">
-                <input required type="number" min="0" max="100" step="0.01" value={data.recovery_uplift_percentage} onChange={(e) => setData("recovery_uplift_percentage", e.target.value)} className={input} placeholder="e.g. 100" />
-            </Field>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Recovery % of earning">
+                    <input required type="number" min="0" max="100" step="0.01" value={data.recovery_uplift_percentage} onChange={(e) => setData("recovery_uplift_percentage", e.target.value)} className={input} placeholder="e.g. 100" />
+                </Field>
+                <Field label="Advance charge % (extra, optional)">
+                    <input type="number" min="0" max="100" step="0.01" value={data.advance_charge_percentage ?? ""} onChange={(e) => setData("advance_charge_percentage", e.target.value)} className={input} placeholder="e.g. 10" />
+                </Field>
+            </div>
             <p className="-mt-2 text-xs text-slate-500">
-                How much of the owner's <b>earning</b> (what is left after the label rate) goes to repay the advance, on each statement. <b>100</b> = the whole earning goes to the advance until it is cleared, then they get paid normally.
+                <b>Recovery %</b>: how much of the owner's earning repays the advance each statement (100 = the whole earning until cleared).<br />
+                <b>Advance charge %</b>: extra points taken off the owner's label rate <b>while the advance runs</b> — e.g. an 80% owner with a 10% charge is paid at 70%, and the extra 10% is your profit. 0 = no change. It stops automatically when the advance is cleared.
             </p>
-            <RateExample recovery={data.recovery_uplift_percentage} />
+            <RateExample recovery={data.recovery_uplift_percentage} base={data.base_percentage} charge={data.advance_charge_percentage} />
         </>
     );
 }
@@ -319,6 +341,7 @@ function NewPlanModal({ onClose }) {
         expense_date: today(),
         base_percentage: 100,
         recovery_uplift_percentage: "100",
+        advance_charge_percentage: "",
         maximum_recovery_percentage: "",
         starts_on: today(),
         notes: "",
@@ -746,6 +769,7 @@ function Settings({ plan, onChanged }) {
         notes: plan.notes ?? "",
         base_percentage: Number(plan.base_percentage ?? 0),
         recovery_uplift_percentage: Number(plan.recovery_uplift_percentage ?? 0),
+        advance_charge_percentage: plan.advance_charge_percentage === null || plan.advance_charge_percentage === undefined ? "" : Number(plan.advance_charge_percentage),
         maximum_recovery_percentage: plan.maximum_recovery_percentage === null ? "" : Number(plan.maximum_recovery_percentage),
         notify_owner: true,
     });
