@@ -1840,6 +1840,14 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.admin.reports.imports.update');
 
+/* W162: change a report's reporting month everywhere (published too), OTP-gated */
+Route::middleware(['auth', 'verified'])
+    ->patch(
+        '/admin/reports/imports/{reportImport}/change-month',
+        [\App\Http\Controllers\V2\Admin\ReportImportController::class, 'changeMonth']
+    )
+    ->name('v2.admin.reports.imports.change-month');
+
 /* W142 (Wave B): edit one report row (ISRC / names) then re-map + recalc */
 Route::middleware(['auth', 'verified'])
     ->patch(

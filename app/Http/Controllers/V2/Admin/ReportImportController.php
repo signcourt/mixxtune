@@ -1953,6 +1953,60 @@ class ReportImportController extends Controller
         );
     }
 
+    /**
+     * W162: change a report's reporting month EVERYWHERE it shows (card,
+     * statements, wallets, analytics) without changing any amount. Works for a
+     * published report too (re-points its allocations/postings to the new-month
+     * statement and recomputes both). Major operation -> e-mail OTP first.
+     */
+    public function changeMonth(
+        Request $request,
+        ReportImport $reportImport,
+        PermissionService $permissions,
+        \App\Services\V2\ReportMonthChangeService $mover
+    ): RedirectResponse {
+        $role = $permissions->role($request->user());
+
+        abort_unless(
+            in_array($role, ['admin', 'super_admin'], true),
+            403,
+            'Admin access required.'
+        );
+
+        $validated = validator(
+            $request->all(),
+            [
+                'reporting_month' => ['required', 'date_format:Y-m'],
+            ]
+        )->validate();
+
+        $newMonth = $validated['reporting_month'];
+        $oldMonth = (string) $reportImport->reporting_month;
+
+        if ($newMonth === $oldMonth) {
+            return back()->with('success', 'Reporting month is already '.$newMonth.'.');
+        }
+
+        // Major operation: confirm with an e-mailed code before anything is saved.
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            $request->user(),
+            'report.change_month:'.$reportImport->id,
+            'change report month from '.$oldMonth.' to '.$newMonth
+        );
+
+        try {
+            $result = $mover->move($reportImport, $newMonth, (int) optional($request->user())->id);
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['reporting_month' => $e->getMessage()]);
+        }
+
+        return back()->with(
+            'success',
+            'Reporting month changed from '.$oldMonth.' to '.$newMonth
+                .($result['published'] ? ' (published report moved; wallet balances unchanged).' : '.')
+        );
+    }
+
     public function destroy(
         Request $request,
         ReportImport $reportImport,

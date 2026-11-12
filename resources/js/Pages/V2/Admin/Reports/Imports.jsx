@@ -89,8 +89,10 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
         e.preventDefault();
         if (!editing || !editMonth || busy) return;
         setBusy(true);
-        router.patch(`/admin/reports/imports/${editing.id}`, { reporting_month: editMonth }, {
+        router.patch(`/admin/reports/imports/${editing.id}/change-month`, { reporting_month: editMonth }, {
             preserveScroll: true,
+            // Keep the modal open when an OTP is required (the global OTP prompt
+            // opens on errors.action_otp; pressing Save again confirms the move).
             onSuccess: () => { setEditing(null); setEditMonth(""); },
             onFinish: () => setBusy(false),
         });
@@ -235,15 +237,15 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
                                             <a href={`/admin/reports/imports/${i.id}/download`} title="Download the original file" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600">
                                                 <Download className="h-4 w-4" />
                                             </a>
+                                            {!running && (
+                                                <button type="button" title="Change reporting month" onClick={() => { setEditing(i); setEditMonth(String(i.reporting_month || "").slice(0, 7)); }} disabled={busy} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 disabled:opacity-50">
+                                                    <Pencil className="h-4 w-4" />
+                                                </button>
+                                            )}
                                             {!locked && !running && (
-                                                <>
-                                                    <button type="button" title="Change reporting month" onClick={() => { setEditing(i); setEditMonth(String(i.reporting_month || "").slice(0, 7)); }} disabled={busy} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 disabled:opacity-50">
-                                                        <Pencil className="h-4 w-4" />
-                                                    </button>
-                                                    <button type="button" title="Delete report" onClick={() => remove(i)} disabled={busy} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 disabled:opacity-50">
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                </>
+                                                <button type="button" title="Delete report" onClick={() => remove(i)} disabled={busy} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 disabled:opacity-50">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
                                             )}
                                         </div>
                                     </li>
@@ -273,7 +275,7 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
                             <button type="button" onClick={() => setEditing(null)} disabled={busy} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" aria-label="Close"><X className="h-4 w-4" /></button>
                         </div>
                         <input type="month" required value={editMonth} onChange={(e) => setEditMonth(e.target.value)} className="mt-4 h-11 w-full rounded-xl border border-slate-300 px-3 text-sm" />
-                        <p className="mt-2 text-xs text-slate-500">Moves this report and all its rows to the new month. Only possible before approval.</p>
+                        <p className="mt-2 text-xs text-slate-500">Moves this report and everything it shows — card, statements, wallets and analytics — to the new month. Amounts and wallet balances do not change. A confirmation code is e-mailed before it is saved.</p>
                         <div className="mt-5 flex justify-end gap-2">
                             <button type="button" onClick={() => setEditing(null)} disabled={busy} className="h-10 rounded-xl border border-slate-300 px-4 text-sm font-semibold">Cancel</button>
                             <button type="submit" disabled={busy || !editMonth} className="h-10 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white disabled:opacity-40">{busy ? "Saving…" : "Save"}</button>
