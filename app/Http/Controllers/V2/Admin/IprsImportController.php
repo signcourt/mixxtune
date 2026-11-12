@@ -4,9 +4,11 @@ namespace App\Http\Controllers\V2\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Distribution\Track;
+use App\Models\Iprs\IprsHeldRevenue;
 use App\Models\Iprs\IprsUpload;
 use App\Models\Iprs\IprsWork;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use App\Services\Iprs\IprsImportService;
 use App\Services\Iprs\IprsMappingService;
 use App\Services\Iprs\IprsPublishService;
@@ -144,6 +146,9 @@ class IprsImportController extends Controller
         $r = $publish->publish($iprsUpload, $request->user()->id);
 
         $parts = [$r['published'].' line(s) credited ₹'.number_format($r['credited'], 2)];
+        if ($r['held']) {
+            $parts[] = $r['held'].' held ₹'.number_format($r['held_amount'], 2).' (owner has no active user)';
+        }
         if ($r['already']) {
             $parts[] = $r['already'].' already published';
         }
@@ -263,6 +268,67 @@ class IprsImportController extends Controller
         $rates->setRate($data['owner_type'], (int) $data['owner_id'], $data['royalty_type'], (float) $data['owner_share_percentage'], $request->user()->id);
 
         return back()->with('flash', ['success' => 'Rate saved: owner keeps '.$data['owner_share_percentage'].'%.']);
+    }
+
+    /** Payments held because the owner has no active user, grouped by owner. */
+    public function held(Request $request, PermissionService $permissions): Response
+    {
+        $role = $this->gate($request, $permissions);
+
+        $holds = IprsHeldRevenue::where('status', 'held')->get();
+
+        $labelIds = $holds->where('owner_type', 'label')->pluck('owner_id')->unique()->all();
+        $artistIds = $holds->where('owner_type', 'artist')->pluck('owner_id')->unique()->all();
+        $labels = DB::table('labels')->whereIn('id', $labelIds)->get(['id', 'name', 'user_id'])->keyBy('id');
+        $artists = DB::table('artists')->whereIn('id', $artistIds)->get(['id', 'stage_name', 'user_id'])->keyBy('id');
+        $activeUserIds = User::where('account_status', 'active')
+            ->whereIn('id', $holds->pluck('user_id')->filter()->unique()->all() ?: [0])
+            ->pluck('id')->flip();
+
+        $owners = $holds->groupBy(fn ($h) => $h->owner_type.':'.$h->owner_id)->map(function ($group) use ($labels, $artists) {
+            $first = $group->first();
+            $ownerRow = $first->owner_type === 'label' ? $labels->get($first->owner_id) : $artists->get($first->owner_id);
+            $userId = $ownerRow->user_id ?? null; // current user on the owner (may differ from when held)
+
+            return [
+                'owner_type' => $first->owner_type,
+                'owner_id' => (int) $first->owner_id,
+                'name' => $ownerRow->name ?? $ownerRow->stage_name ?? '—',
+                'count' => $group->count(),
+                'total_held' => round((float) $group->sum('net_amount'), 2),
+                'reasons' => $group->pluck('reason')->unique()->values()->all(),
+                'has_user' => (bool) $userId,
+                'user_active' => $userId ? User::where('id', $userId)->where('account_status', 'active')->exists() : false,
+            ];
+        })->values();
+
+        return Inertia::render('V2/Admin/Iprs/Held', [
+            'role' => $role,
+            'owners' => $owners,
+            'total_held' => round((float) $holds->sum('net_amount'), 2),
+        ]);
+    }
+
+    /** Release held payments (OTP-gated) once the owner has an active user. */
+    public function releaseHeld(Request $request, PermissionService $permissions, IprsPublishService $publish): RedirectResponse
+    {
+        $this->gate($request, $permissions);
+
+        $data = $request->validate([
+            'owner_type' => ['nullable', 'in:label,artist'],
+            'owner_id' => ['nullable', 'integer'],
+        ]);
+
+        app(ActionOtpGuard::class)->require($request->user(), 'iprs.release', 'release held IPRS payments to owners');
+
+        $r = $publish->release($request->user()->id, $data['owner_type'] ?? null, isset($data['owner_id']) ? (int) $data['owner_id'] : null);
+
+        $msg = $r['released'].' payment(s) released (₹'.number_format($r['credited'], 2).').';
+        if ($r['still_held']) {
+            $msg .= ' '.$r['still_held'].' still held (owner has no active user yet).';
+        }
+
+        return back()->with('flash', ['success' => $msg]);
     }
 
     private function gate(Request $request, PermissionService $permissions): string

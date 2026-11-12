@@ -1945,6 +1945,16 @@ Route::middleware(['auth', 'verified'])
             [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'saveRate']
         )->name('rates.save');
 
+        Route::get(
+            '/held',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'held']
+        )->name('held');
+
+        Route::post(
+            '/held/release',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'releaseHeld']
+        )->name('held.release');
+
         Route::post(
             '/uploads',
             [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'store']
