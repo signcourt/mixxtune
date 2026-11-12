@@ -1940,6 +1940,11 @@ Route::middleware(['auth', 'verified'])
             [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'store']
         )->name('store');
 
+        Route::get(
+            '/uploads/{iprsUpload:public_id}',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'show']
+        )->name('show');
+
         Route::delete(
             '/uploads/{iprsUpload:public_id}',
             [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'destroy']

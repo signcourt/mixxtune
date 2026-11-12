@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V2\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Iprs\IprsUpload;
+use App\Models\Iprs\IprsWork;
 use App\Services\Iprs\IprsImportService;
 use App\Services\V2\ActionOtpGuard;
 use App\Services\V2\PermissionService;
@@ -33,6 +34,45 @@ class IprsImportController extends Controller
         return Inertia::render('V2/Admin/Iprs/Uploads', [
             'role' => $role,
             'uploads' => $uploads,
+        ]);
+    }
+
+    public function show(Request $request, PermissionService $permissions, IprsUpload $iprsUpload): Response
+    {
+        $role = $this->gate($request, $permissions);
+
+        $lines = $iprsUpload->lines()->orderBy('work_int_no')->orderBy('source_month')->get();
+
+        $workMeta = IprsWork::whereIn('work_int_no', $lines->pluck('work_int_no')->unique()->all())
+            ->get()
+            ->keyBy('work_int_no');
+
+        $works = $lines->groupBy('work_int_no')->map(function ($group, $workNo) use ($workMeta) {
+            $meta = $workMeta->get($workNo);
+
+            return [
+                'work_int_no' => (string) $workNo,
+                'title' => $meta->title ?? $group->first()->title,
+                'language' => $meta->language ?? null,
+                'credits' => $meta->credits ?? [],
+                'total_amount' => round((float) $group->sum('amount'), 4),
+                'mapping_status' => $group->first()->mapping_status,
+                'lines' => $group->map(fn ($l) => [
+                    'id' => $l->id,
+                    'source' => $l->source,
+                    'source_month' => $l->source_month,
+                    'pool' => $l->pool,
+                    'own_pct' => $l->own_pct !== null ? (float) $l->own_pct : null,
+                    'coll_pct' => $l->coll_pct !== null ? (float) $l->coll_pct : null,
+                    'amount' => (float) $l->amount,
+                ])->values(),
+            ];
+        })->values();
+
+        return Inertia::render('V2/Admin/Iprs/Show', [
+            'role' => $role,
+            'upload' => $this->serialize($iprsUpload),
+            'works' => $works,
         ]);
     }
 

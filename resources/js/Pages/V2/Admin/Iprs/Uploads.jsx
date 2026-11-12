@@ -181,17 +181,17 @@ export default function Uploads({ role = "admin", uploads = {} }) {
                                 const ok = u.within_tolerance;
                                 return (
                                     <div key={u.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-5">
-                                        <div className="min-w-0 flex-1">
+                                        <Link href={`/admin/iprs/uploads/${u.public_id}`} className="min-w-0 flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="truncate text-sm font-bold text-slate-900">{u.file_name}</span>
+                                                <span className="truncate text-sm font-bold text-slate-900 hover:text-violet-700 hover:underline">{u.file_name}</span>
                                                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{label}</span>
                                                 {u.period_label && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{u.period_label}</span>}
                                             </div>
                                             <div className="mt-0.5 text-xs text-slate-500">
                                                 {u.member_name || "—"}{u.member_internal_no ? ` · Internal ${u.member_internal_no}` : ""}{u.ipi_name_no ? ` · IPI ${u.ipi_name_no}` : ""}
                                             </div>
-                                            <div className="text-[11px] text-slate-400">uploaded {when(u.created_at)}</div>
-                                        </div>
+                                            <div className="text-[11px] text-slate-400">uploaded {when(u.created_at)} · click to view</div>
+                                        </Link>
 
                                         <div className="text-right text-xs">
                                             <div className={`font-semibold ${ok ? "text-emerald-700" : "text-red-600"}`}>
