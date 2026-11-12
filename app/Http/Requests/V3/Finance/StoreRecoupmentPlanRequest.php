@@ -24,6 +24,12 @@ class StoreRecoupmentPlanRequest extends FormRequest
                 $this->merge([$key => null]);
             }
         }
+
+        // base_percentage is display-only now; default it to 100 so the owner's
+        // effective share reads sensibly when the form doesn't send it.
+        if (! $this->filled('base_percentage')) {
+            $this->merge(['base_percentage' => 100]);
+        }
     }
 
     public function attributes(): array
@@ -63,8 +69,15 @@ class StoreRecoupmentPlanRequest extends FormRequest
                 'max:255',
             ],
 
+            /*
+             * MIXXTUNE_RECOVERY_NET_BASIS_V1: the only recovery lever is
+             * "Recovery % of earning" (recovery_uplift_percentage), 0-100, where
+             * 100 = the whole net earning goes to the advance. base_percentage is
+             * kept for display only and defaults to 100; the old "<= base" caps
+             * are gone.
+             */
             'base_percentage' => [
-                'required',
+                'nullable',
                 'numeric',
                 'min:0',
                 'max:100',
@@ -75,7 +88,6 @@ class StoreRecoupmentPlanRequest extends FormRequest
                 'numeric',
                 'min:0',
                 'max:100',
-                'lte:base_percentage',
             ],
 
             'maximum_recovery_percentage' => [
@@ -83,7 +95,6 @@ class StoreRecoupmentPlanRequest extends FormRequest
                 'numeric',
                 'min:0',
                 'max:100',
-                'lte:base_percentage',
             ],
 
             'recovery_method' => [

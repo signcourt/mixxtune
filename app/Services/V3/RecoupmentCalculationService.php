@@ -49,6 +49,15 @@ class RecoupmentCalculationService
             return 0.0;
         }
 
+        /*
+         * MIXXTUNE_RECOVERY_NET_BASIS_V1
+         *
+         * Recovery is a percentage of the owner's NET earning (what is left
+         * after the label rate), not of the reconstructed source revenue. The
+         * old "<= base share" cap is gone, so 100% is allowed and means the whole
+         * earning goes to the advance until it is cleared. An optional maximum
+         * still caps it when set.
+         */
         $uplift = max(
             0,
             (float) $plan->recovery_uplift_percentage
@@ -62,16 +71,6 @@ class RecoupmentCalculationService
                 max(0, (float) $maximum)
             );
         }
-
-        /*
-         * Recovery cannot exceed the beneficiary's contractual
-         * base share, otherwise beneficiary payable becomes
-         * negative.
-         */
-        $uplift = min(
-            $uplift,
-            max(0, (float) $plan->base_percentage)
-        );
 
         return $this->clampPercentage($uplift);
     }
@@ -401,10 +400,10 @@ class RecoupmentCalculationService
             8
         );
 
+        // Net-basis recovery needs only the net earning, a recovery %, and an
+        // outstanding balance; the owner's base share no longer gates it.
         if (
-            $allocatedGross <= 0
-            || $currentPayable <= 0
-            || $basePercentage <= 0
+            $currentPayable <= 0
             || $recoveryPercentage <= 0
         ) {
             return [
@@ -443,14 +442,17 @@ class RecoupmentCalculationService
             ];
         }
 
-        $sourceAmount = round(
-            $allocatedGross
-            / ($basePercentage / 100),
-            8
-        );
+        /*
+         * MIXXTUNE_RECOVERY_NET_BASIS_V1: recovery is a percentage of the
+         * owner's net earning (currentPayable), not of the reconstructed source.
+         * reconstructed_source_amount is still reported for the audit trail.
+         */
+        $sourceAmount = $basePercentage > 0
+            ? round($allocatedGross / ($basePercentage / 100), 8)
+            : round($allocatedGross, 8);
 
         $calculatedRecovery = round(
-            $sourceAmount
+            $currentPayable
             * ($recoveryPercentage / 100),
             8
         );

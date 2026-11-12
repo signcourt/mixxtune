@@ -124,7 +124,9 @@ class RecoupmentController extends Controller
             $uplift = min($uplift, max(0, (float) $plan->maximum_recovery_percentage));
         }
 
-        $uplift = min($uplift, $base);
+        // MIXXTUNE_RECOVERY_NET_BASIS_V1: recovery is % of earning, not capped by
+        // the owner's base share anymore (so 100% shows as 100%).
+        $uplift = min(100, $uplift);
         $running = $plan->status === 'active' && (float) $plan->outstanding_amount > 0;
 
         return [
@@ -351,15 +353,20 @@ class RecoupmentController extends Controller
     /** Change title / notes / rates of a plan that is not cancelled. */
     public function update(Request $request, RecoupmentPlan $plan)
     {
+        // MIXXTUNE_RECOVERY_NET_BASIS_V1: only "Recovery % of earning" matters;
+        // base is display-only (default 100) and the "<= base" caps are gone.
+        if ($request->input('base_percentage', '') === '' || $request->input('base_percentage') === null) {
+            $request->merge(['base_percentage' => 100]);
+        }
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:5000'],
-            'base_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
-            'recovery_uplift_percentage' => ['required', 'numeric', 'min:0', 'max:100', 'lte:base_percentage'],
-            'maximum_recovery_percentage' => ['nullable', 'numeric', 'min:0', 'max:100', 'lte:base_percentage'],
+            'base_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'recovery_uplift_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
+            'maximum_recovery_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ], [], [
             'base_percentage' => 'owner share',
-            'recovery_uplift_percentage' => 'recovery %',
+            'recovery_uplift_percentage' => 'recovery % of earning',
             'maximum_recovery_percentage' => 'maximum recovery %',
         ]);
 

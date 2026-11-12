@@ -502,7 +502,7 @@ class RecoupmentManagementServiceTest extends TestCase
                 'title' => 'Statement Recovery Test',
                 'base_percentage' => 70,
                 'recovery_uplift_percentage' => 10,
-                'maximum_recovery_percentage' => 10,
+                'maximum_recovery_percentage' => null,
                 'initial_amount' => 1000,
             ]
         );
@@ -529,7 +529,7 @@ class RecoupmentManagementServiceTest extends TestCase
         );
 
         $this->assertEquals(
-            250,
+            157.5,
             (float)
             $recovery->applied_recovery_amount
         );
@@ -537,13 +537,13 @@ class RecoupmentManagementServiceTest extends TestCase
         $plan->refresh();
 
         $this->assertEquals(
-            250,
+            157.5,
             (float)
             $plan->total_recovered_amount
         );
 
         $this->assertEquals(
-            750,
+            842.5,
             (float)
             $plan->outstanding_amount
         );
@@ -560,8 +560,8 @@ class RecoupmentManagementServiceTest extends TestCase
             [
                 'title' => 'Completed Retry Test',
                 'base_percentage' => 20,
-                'recovery_uplift_percentage' => 10,
-                'maximum_recovery_percentage' => 10,
+                'recovery_uplift_percentage' => 100,
+                'maximum_recovery_percentage' => null,
                 'initial_amount' => 5000,
             ]
         );
@@ -652,8 +652,8 @@ class RecoupmentManagementServiceTest extends TestCase
             [
                 'title' => 'Payable Cap Test',
                 'base_percentage' => 20,
-                'recovery_uplift_percentage' => 20,
-                'maximum_recovery_percentage' => 20,
+                'recovery_uplift_percentage' => 100,
+                'maximum_recovery_percentage' => null,
                 'initial_amount' => 100000,
             ]
         );

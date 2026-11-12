@@ -213,7 +213,9 @@ class RecoupmentReviewTest extends TestCase
             ->assertSessionHasNoErrors();
         $this->assertEquals(20, (float) $plan->fresh()->recovery_uplift_percentage);
 
-        $this->actingAs($super)->post($this->url.'/'.$plan->id.'/update', array_merge($base, ['recovery_uplift_percentage' => 90]))
+        // Recovery % is no longer capped by base (90 is now valid); only an
+        // out-of-range value (>100) is rejected.
+        $this->actingAs($super)->post($this->url.'/'.$plan->id.'/update', array_merge($base, ['recovery_uplift_percentage' => 150]))
             ->assertSessionHasErrors('recovery_uplift_percentage');
     }
 

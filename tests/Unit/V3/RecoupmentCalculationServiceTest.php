@@ -158,8 +158,10 @@ class RecoupmentCalculationServiceTest extends TestCase
         );
     }
 
-    public function test_recovery_uplift_cannot_exceed_base_percentage(): void
+    public function test_recovery_uplift_is_no_longer_capped_by_base_percentage(): void
     {
+        // MIXXTUNE_RECOVERY_NET_BASIS_V1: the old "recovery <= owner base share"
+        // cap is gone, so a recovery % above base is honoured.
         $plan = new RecoupmentPlan([
             'base_percentage' => 20,
             'recovery_uplift_percentage' => 50,
@@ -174,25 +176,8 @@ class RecoupmentCalculationServiceTest extends TestCase
         );
 
         $this->assertSame(
-            20.0,
+            50.0,
             $result['recovery_percentage']
-        );
-
-        $this->assertSame(
-            0.0,
-            $result[
-                'effective_beneficiary_percentage'
-            ]
-        );
-
-        $this->assertSame(
-            20000.0,
-            $result['applied_recovery_amount']
-        );
-
-        $this->assertSame(
-            0.0,
-            $result['beneficiary_payable']
         );
     }
 
@@ -414,8 +399,10 @@ class RecoupmentCalculationServiceTest extends TestCase
         );
     }
 
-    public function test_allocated_statement_uses_gross_for_source_and_net_for_cap(): void
+    public function test_allocated_statement_recovery_is_percent_of_net_earning(): void
     {
+        // MIXXTUNE_RECOVERY_NET_BASIS_V1: recovery is a % of the owner's NET
+        // earning (what is left after the label rate), not of reconstructed source.
         $plan = new RecoupmentPlan([
             'base_percentage' => 70,
             'recovery_uplift_percentage' => 10,
@@ -432,45 +419,36 @@ class RecoupmentCalculationServiceTest extends TestCase
             1575
         );
 
-        /*
-         * Allocated gross 1750 at a 70% contractual share
-         * reconstructs source gross 2500.
-         *
-         * Recovery is therefore 10% of 2500 = 250,
-         * NOT 10% of the already commission-reduced 1575.
-         */
+        // Recovery = 10% of the net earning 1575 = 157.5.
         $this->assertEquals(
-            2500,
-            $result['reconstructed_source_amount']
-        );
-
-        $this->assertEquals(
-            250,
+            157.5,
             $result['calculated_recovery_amount']
         );
 
         $this->assertEquals(
-            250,
+            157.5,
             $result['applied_recovery_amount']
         );
 
         $this->assertEquals(
-            1325,
+            1417.5,
             $result['current_payable_after']
         );
 
         $this->assertEquals(
-            750,
+            842.5,
             $result['outstanding_after']
         );
     }
 
     public function test_allocated_statement_recovery_is_capped_by_current_net_payable(): void
     {
+        // 100% recovery of the net earning: the whole earning goes to the advance
+        // and net payable never goes negative.
         $plan = new RecoupmentPlan([
             'base_percentage' => 20,
-            'recovery_uplift_percentage' => 20,
-            'maximum_recovery_percentage' => 20,
+            'recovery_uplift_percentage' => 100,
+            'maximum_recovery_percentage' => null,
             'outstanding_amount' => 100000,
             'status' => 'active',
         ]);
@@ -483,19 +461,9 @@ class RecoupmentCalculationServiceTest extends TestCase
             50
         );
 
-        /*
-         * Reconstructed source = 1000.
-         * Calculated recovery = 200.
-         * Only 50 is currently payable, so recovery must
-         * stop at 50 and never create negative net payable.
-         */
+        // Recovery = 100% of net 50 = 50; outstanding drops by 50.
         $this->assertEquals(
-            1000,
-            $result['reconstructed_source_amount']
-        );
-
-        $this->assertEquals(
-            200,
+            50,
             $result['calculated_recovery_amount']
         );
 

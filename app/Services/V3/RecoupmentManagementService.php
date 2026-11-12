@@ -21,8 +21,13 @@ class RecoupmentManagementService
         array $data,
         ?User $createdBy = null
     ): RecoupmentPlan {
+        /*
+         * MIXXTUNE_RECOVERY_NET_BASIS_V1: base_percentage is display-only and
+         * defaults to 100; recovery_uplift_percentage is "Recovery % of earning"
+         * (0-100) and is NO LONGER capped by the base share.
+         */
         $basePercentage = round(
-            (float) ($data['base_percentage'] ?? 0),
+            (float) ($data['base_percentage'] ?? 100),
             4
         );
 
@@ -40,10 +45,10 @@ class RecoupmentManagementService
             ]);
         }
 
-        if ($uplift < 0 || $uplift > $basePercentage) {
+        if ($uplift < 0 || $uplift > 100) {
             throw ValidationException::withMessages([
                 'recovery_uplift_percentage' =>
-                    'Recovery uplift cannot exceed the base percentage.',
+                    'Recovery % must be between 0 and 100.',
             ]);
         }
 

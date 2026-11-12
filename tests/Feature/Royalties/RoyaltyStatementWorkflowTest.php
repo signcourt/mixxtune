@@ -1618,18 +1618,12 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         /*
-         * Deterministic integration fixture:
+         * MIXXTUNE_RECOVERY_NET_BASIS_V1 integration fixture:
          *
-         * Beneficiary contractual share = 70%.
-         * Allocated gross              = 1750.
-         * Reconstructed source gross   = 2500.
-         *
-         * Existing statement commission leaves
-         * current payable at 1575.
-         *
-         * Recovery uplift = 10 percentage points.
-         * Recovery        = 2500 x 10% = 250.
-         * Final payable   = 1575 - 250 = 1325.
+         * Net earning (payable after the label rate) = 1575.
+         * Recovery % of earning = 10%.
+         * Recovery      = 1575 x 10% = 157.5.
+         * Final payable = 1575 - 157.5 = 1417.5.
          */
         $statement->update([
             'gross_earnings' => 1750,
@@ -1647,7 +1641,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
                 'artist_id' => $artist->id,
                 'base_percentage' => 70,
                 'recovery_uplift_percentage' => 10,
-                'maximum_recovery_percentage' => 10,
+                'maximum_recovery_percentage' => null,
                 'initial_amount' => 1000,
                 'initial_category' => 'advance',
                 'initial_title' => 'Artist Advance',
@@ -1666,24 +1660,24 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            250,
+            157.5,
             (float) $approved->other_deductions
         );
 
         $this->assertEquals(
-            1325,
+            1417.5,
             (float) $approved->net_payable
         );
 
         $plan->refresh();
 
         $this->assertEquals(
-            250,
+            157.5,
             (float) $plan->total_recovered_amount
         );
 
         $this->assertEquals(
-            750,
+            842.5,
             (float) $plan->outstanding_amount
         );
 
@@ -1705,7 +1699,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
         );
 
         $this->assertEquals(
-            250,
+            157.5,
             (float)
             $recovery->applied_recovery_amount
         );
@@ -1725,12 +1719,12 @@ class RoyaltyStatementWorkflowTest extends TestCase
             ->firstOrFail();
 
         $this->assertEquals(
-            1325,
+            1417.5,
             (float) $wallet->pending_balance
         );
 
         $this->assertEquals(
-            1325,
+            1417.5,
             (float) $wallet->lifetime_earnings
         );
 
@@ -1751,7 +1745,7 @@ class RoyaltyStatementWorkflowTest extends TestCase
                 ->firstOrFail();
 
         $this->assertEquals(
-            1325,
+            1417.5,
             (float) $walletTransaction->amount
         );
 

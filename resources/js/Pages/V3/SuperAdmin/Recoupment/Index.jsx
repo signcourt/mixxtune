@@ -199,7 +199,7 @@ function Row({ p, busy, onOpen }) {
                 </div>
                 <div className="mt-0.5 truncate text-sm text-slate-600">{p.title}</div>
                 <div className="mt-0.5 text-xs text-slate-500">
-                    Recovery <b className="text-amber-700">{pct(r.recovery)}</b> of revenue · owner share {pct(r.base)}{r.running ? <> → <b className="text-violet-700">{pct(r.owner_now)}</b> while repaying</> : null} · since {day(p.starts_on)}
+                    Recovery <b className="text-amber-700">{pct(r.recovery)}</b> of earning{r.running ? <> → owner gets <b className="text-violet-700">{pct(100 - r.recovery)}</b> while repaying</> : null} · since {day(p.starts_on)}
                 </div>
             </div>
             <div className="w-full shrink-0 lg:w-64">
@@ -260,15 +260,15 @@ function Field({ label, hint, children }) {
 }
 
 /* Shows what the rates mean on ₹1,000 of store revenue. */
-function RateExample({ base, recovery, max }) {
-    const b = Number(base);
-    let r = Number(recovery);
-    if (max !== "" && max !== null && max !== undefined) r = Math.min(r, Number(max));
-    r = Math.min(r, b);
-    if (!(b > 0) || !(r >= 0) || Number.isNaN(r)) return null;
+function RateExample({ recovery }) {
+    const r = Number(recovery);
+    if (!(r >= 0) || Number.isNaN(r)) return null;
+    // Example on an earning of ₹1,000 (what is left after the label rate).
+    const toAdvance = (r / 100) * 1000;
+    const toWallet = 1000 - toAdvance;
     return (
         <div className="rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-900">
-            On <b>₹1,000</b> store revenue: owner normally gets <b>{money(b * 10)}</b>. While repaying, <b>{money(r * 10)}</b> goes to the advance and <b>{money((b - r) * 10)}</b> to the owner's wallet.
+            On an earning of <b>₹1,000</b> (after the label rate): <b>{money(toAdvance)}</b> goes to the advance and <b>{money(toWallet)}</b> to the owner's wallet — until the advance is cleared.
         </div>
     );
 }
@@ -276,19 +276,13 @@ function RateExample({ base, recovery, max }) {
 function RateFields({ data, setData }) {
     return (
         <>
-            <div className="grid grid-cols-3 gap-2">
-                <Field label="Owner share %">
-                    <input required type="number" min="0" max="100" step="0.01" value={data.base_percentage} onChange={(e) => setData("base_percentage", e.target.value)} className={input} placeholder="e.g. 80" />
-                </Field>
-                <Field label="Recovery %">
-                    <input required type="number" min="0" max="100" step="0.01" value={data.recovery_uplift_percentage} onChange={(e) => setData("recovery_uplift_percentage", e.target.value)} className={input} placeholder="e.g. 10" />
-                </Field>
-                <Field label="Max %">
-                    <input type="number" min="0" max="100" step="0.01" value={data.maximum_recovery_percentage} onChange={(e) => setData("maximum_recovery_percentage", e.target.value)} className={input} placeholder="optional" />
-                </Field>
-            </div>
-            <p className="-mt-2 text-xs text-slate-500">Owner share = the owner's % of store revenue in their agreement. Recovery = how many of those % points go to repay the advance.</p>
-            <RateExample base={data.base_percentage} recovery={data.recovery_uplift_percentage} max={data.maximum_recovery_percentage} />
+            <Field label="Recovery % of earning">
+                <input required type="number" min="0" max="100" step="0.01" value={data.recovery_uplift_percentage} onChange={(e) => setData("recovery_uplift_percentage", e.target.value)} className={input} placeholder="e.g. 100" />
+            </Field>
+            <p className="-mt-2 text-xs text-slate-500">
+                How much of the owner's <b>earning</b> (what is left after the label rate) goes to repay the advance, on each statement. <b>100</b> = the whole earning goes to the advance until it is cleared, then they get paid normally.
+            </p>
+            <RateExample recovery={data.recovery_uplift_percentage} />
         </>
     );
 }
@@ -304,8 +298,8 @@ function NewPlanModal({ onClose }) {
         initial_title: "",
         reference_number: "",
         expense_date: today(),
-        base_percentage: "",
-        recovery_uplift_percentage: "",
+        base_percentage: 100,
+        recovery_uplift_percentage: "100",
         maximum_recovery_percentage: "",
         starts_on: today(),
         notes: "",
@@ -442,7 +436,7 @@ function NewPlanModal({ onClose }) {
 
                 <div className="flex justify-end gap-2">
                     <button type="button" onClick={onClose} className="h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold">Cancel</button>
-                    <button type="submit" disabled={processing || !data.user_id || blocked || data.base_percentage === "" || data.recovery_uplift_percentage === ""} className="h-11 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white disabled:opacity-40">
+                    <button type="submit" disabled={processing || !data.user_id || blocked || data.recovery_uplift_percentage === ""} className="h-11 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white disabled:opacity-40">
                         {processing ? "Saving…" : amount > 0 ? `Create · recover ${money(amount)}` : "Create plan"}
                     </button>
                 </div>
@@ -474,7 +468,7 @@ function DetailModal({ plan, tab, setTab, onClose, onChanged }) {
             </div>
             <div className="mt-2"><Bar total={Number(plan.total_recoverable_amount || 0)} done={Number(plan.total_recovered_amount || 0)} /></div>
             <p className="mt-2 text-xs text-slate-500">
-                Recovery {pct(r.recovery)} of revenue · owner share {pct(r.base)}{r.running ? ` → ${pct(r.owner_now)} while repaying` : ""}. Recovery happens automatically when royalty statements / report imports are posted.
+                Recovery {pct(r.recovery)} of earning{r.running ? ` → owner gets ${pct(100 - r.recovery)} while repaying` : ""}. Recovery happens automatically when royalty statements / report imports are posted.
             </p>
 
             <div className="mt-4 flex gap-1 overflow-x-auto border-b border-slate-200">
