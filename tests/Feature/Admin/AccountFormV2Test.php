@@ -147,6 +147,38 @@ class AccountFormV2Test extends TestCase
         $this->assertSame(80.0, (float) $base->fresh()->revenue_share_percentage);
     }
 
+    /**
+     * MIXXTUNE_EDIT_EXISTING_LABEL_RATE_V1: editing an owner from the user form
+     * must be able to CHANGE a label's existing % (previously the edit path
+     * ignored label_revenue_rates, so an 80% label stayed 80% forever).
+     */
+    public function test_edit_updates_an_existing_label_rate(): void
+    {
+        $super = $this->super();
+        $this->actingAs($super)->post('/admin/users', $this->payload(['new_labels' => ['Rate Change Label'], 'new_label_rates' => [80]]))->assertSessionHasNoErrors();
+        $user = User::query()->where('name', 'Sanatan Records')->firstOrFail();
+        $label = Label::query()->where('user_id', $user->id)->firstOrFail();
+        $this->assertSame(80.0, (float) $label->fresh()->revenue_share_percentage);
+
+        // changing an existing % needs the e-mailed confirmation code (same guard
+        // as the Labels-page rate change); wrap the request in viaActionOtp.
+        $resp = $this->viaActionOtp($super, fn () => $this->actingAs($super)->patch('/admin/users/'.$user->id, [
+            'name' => 'Sanatan Records',
+            'full_name' => 'Ramesh K. Sharma',
+            'email' => $user->email,
+            'role' => 'label',
+            'account_status' => $user->account_status,
+            'kyc_status' => 'pending',
+            'label_ids' => [$label->id],
+            'label_revenue_rates' => [(string) $label->id => 70],
+            'permissions' => [],
+        ]));
+        $resp->assertSessionHasNoErrors()->assertSessionHas('success');
+
+        // the existing rate is now changed to 70, not stuck at 80
+        $this->assertSame(70.0, (float) $label->fresh()->revenue_share_percentage);
+    }
+
     public function test_create_page_marks_owned_labels(): void
     {
         $super = $this->super();

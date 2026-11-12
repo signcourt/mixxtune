@@ -3634,7 +3634,10 @@ $oldValues = [
                     ->all(),
         ];
 
-        $ratesBefore = $validated['role'] === 'label' ? $this->labelRatesBefore(['new_labels' => $validated['new_labels'] ?? []]) : [];
+        $ratesBefore = $validated['role'] === 'label' ? $this->labelRatesBefore([
+            'new_labels' => $validated['new_labels'] ?? [],
+            'label_rates' => $validated['label_revenue_rates'] ?? [],
+        ]) : [];
 
         DB::transaction(
             function () use (
@@ -4512,9 +4515,15 @@ $oldValues = [
             }
         );
 
-        /* W79: a new label added on the edit form gets its own % */
+        /* W79: a new label added on the edit form gets its own %
+         * MIXXTUNE_EDIT_EXISTING_LABEL_RATE_V1: and an existing label's % posted
+         * as label_revenue_rates is applied too (previously it was ignored). */
         if ($validated['role'] === 'label') {
-            $this->applyLabelRates($user, ['new_labels' => $validated['new_labels'] ?? [], 'new_label_rates' => $validated['new_label_rates'] ?? []], $request, $ratesBefore);
+            $this->applyLabelRates($user, [
+                'new_labels' => $validated['new_labels'] ?? [],
+                'new_label_rates' => $validated['new_label_rates'] ?? [],
+                'label_revenue_rates' => $validated['label_revenue_rates'] ?? [],
+            ], $request, $ratesBefore);
         }
 
         $user->refresh();
@@ -4759,6 +4768,17 @@ $oldValues = [
         foreach (($validated['label_rates'] ?? []) as $labelId => $rate) {
             $hadRate = array_key_exists((int) $labelId, $before) && $before[(int) $labelId] !== null && $before[(int) $labelId] !== '';
             if ($rate !== null && $rate !== '' && ! $hadRate) {
+                $targets[] = [Label::query()->whereKey((int) $labelId)->where('user_id', $user->id)->first(), (float) $rate];
+            }
+        }
+
+        // MIXXTUNE_EDIT_EXISTING_LABEL_RATE_V1: the edit form posts existing
+        // labels' rates as label_revenue_rates[label_id]. Unlike assignment-time
+        // (label_rates, where an already-priced label keeps its %), an owner
+        // editing their own label here means to CHANGE its %, so apply it even
+        // when a prior % exists. Same-name siblings are kept in step below.
+        foreach (($validated['label_revenue_rates'] ?? []) as $labelId => $rate) {
+            if ($rate !== null && $rate !== '') {
                 $targets[] = [Label::query()->whereKey((int) $labelId)->where('user_id', $user->id)->first(), (float) $rate];
             }
         }
