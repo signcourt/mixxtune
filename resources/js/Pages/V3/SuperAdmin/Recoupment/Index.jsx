@@ -1,6 +1,6 @@
 import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import axios from "axios";
-import { BadgeIndianRupee, Ban, CheckCircle2, Download, FileText, History, Loader2, Pencil, Plus, ReceiptIndianRupee, Search, TrendingDown, Upload, WalletCards, X } from "lucide-react";
+import { BadgeIndianRupee, Ban, CheckCircle2, Download, FileText, History, Loader2, Pencil, Plus, ReceiptIndianRupee, Search, Trash2, TrendingDown, Upload, WalletCards, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
@@ -81,6 +81,18 @@ export default function Index({ plans = {}, summary = {}, filters = {} }) {
         }
     };
 
+    // Delete a plan that never recovered anything (OTP-gated server-side).
+    const del = (p) => {
+        if (!window.confirm(`Delete plan ${p.plan_number} for ${p.user?.email || "this owner"}?\n\nThis permanently removes the plan and its costs. Only possible because nothing was recovered yet.`)) return;
+        setLoadingId(p.id);
+        router.post(`/super-admin/finance/recoupment/${p.id}/delete`, {}, {
+            preserveScroll: true,
+            // The global OTP prompt opens on errors.action_otp; pressing Delete
+            // again after entering the code completes it.
+            onFinish: () => setLoadingId(null),
+        });
+    };
+
     const refresh = () => {
         if (!detail) return;
         axios.get(`/super-admin/finance/recoupment/${detail.plan.id}`).then(({ data }) => setDetail((d) => d && { ...d, plan: data.data }));
@@ -143,7 +155,7 @@ export default function Index({ plans = {}, summary = {}, filters = {} }) {
                     </div>
                 ) : (
                     <ul className="divide-y divide-slate-100">
-                        {rows.map((p) => <Row key={p.id} p={p} busy={loadingId === p.id} onOpen={(tab) => openDetail(p.id, tab)} />)}
+                        {rows.map((p) => <Row key={p.id} p={p} busy={loadingId === p.id} onOpen={(tab) => openDetail(p.id, tab)} onDelete={() => del(p)} />)}
                     </ul>
                 )}
 
@@ -181,10 +193,12 @@ function Bar({ total, done }) {
     );
 }
 
-function Row({ p, busy, onOpen }) {
+function Row({ p, busy, onOpen, onDelete }) {
     const [label, cls] = STATUS[p.status] ?? STATUS.cancelled;
     const r = p.rates ?? {};
     const total = Number(p.total_recoverable_amount || 0);
+    // Deletable only when nothing was ever recovered (keeps real money's audit trail).
+    const canDelete = Number(p.total_recovered_amount || 0) <= 0 && Number(p.recoveries_count || 0) === 0;
 
     return (
         <li className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center">
@@ -220,6 +234,11 @@ function Row({ p, busy, onOpen }) {
                 <button type="button" disabled={busy} onClick={() => onOpen("recoveries")} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600" title="Recoveries">
                     <History className="h-3.5 w-3.5" /> {p.recoveries_count ?? 0}
                 </button>
+                {canDelete && (
+                    <button type="button" disabled={busy} onClick={onDelete} title="Delete this plan" className="inline-flex h-9 items-center gap-1 rounded-lg border border-red-200 px-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                )}
             </div>
         </li>
     );

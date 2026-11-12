@@ -255,4 +255,38 @@ class RecoupmentReviewTest extends TestCase
             ->where('advances.0.outstanding', 1500)
             ->where('advances.0.recovery', 10));
     }
+
+    public function test_delete_removes_a_plan_with_no_recovery_after_otp(): void
+    {
+        $super = $this->user('super_admin');
+        $owner = $this->user('label');
+        $this->plan($super, $owner, 1000);
+        $plan = RecoupmentPlan::query()->firstOrFail();
+
+        $this->viaActionOtp($super, fn () => $this->actingAs($super)->post($this->url.'/'.$plan->id.'/delete'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('recoupment_plans', ['id' => $plan->id]);
+    }
+
+    public function test_delete_is_blocked_when_the_plan_already_recovered(): void
+    {
+        $super = $this->user('super_admin');
+        $owner = $this->user('label');
+        $this->plan($super, $owner, 1000);
+        $plan = RecoupmentPlan::query()->firstOrFail();
+
+        // Give it a recovery so its audit trail must be kept.
+        app(RecoupmentManagementService::class)->applyStatementRecovery(
+            $plan,
+            500,
+            500,
+            ['idempotency_key' => 'test-del-block:1']
+        );
+
+        $this->actingAs($super)->post($this->url.'/'.$plan->id.'/delete')
+            ->assertSessionHasErrors('plan');
+
+        $this->assertDatabaseHas('recoupment_plans', ['id' => $plan->id]);
+    }
 }

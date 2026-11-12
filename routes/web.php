@@ -3145,6 +3145,7 @@ Route::middleware([
         Route::get('/owners', [\App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class, 'owners'])->name('owners');
         Route::get('/export', [\App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class, 'export'])->name('export');
         Route::post('/{plan}/update', [\App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class, 'update'])->name('update');
+        Route::post('/{plan}/delete', [\App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class, 'destroy'])->name('delete');
         Route::post('/{plan}/expenses/{expense}/remove', [\App\Http\Controllers\V3\SuperAdmin\RecoupmentController::class, 'removeExpense'])->name('expenses.remove');
 
         Route::post(

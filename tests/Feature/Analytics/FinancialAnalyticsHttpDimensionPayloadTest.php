@@ -384,22 +384,15 @@ class FinancialAnalyticsHttpDimensionPayloadTest extends TestCase
 
             );
 
-        $content =
-            $response->getContent();
+        // Check the analytics payload specifically for foreign leakage, rather
+        // than scanning the whole HTML (where an unrelated "9000" elsewhere on
+        // the page — a wallet figure, a notification — could cause a false fail).
+        $analytics = $response->viewData('page')['props']['financialAnalytics'] ?? [];
+        $analyticsJson = json_encode($analytics);
 
-        $this->assertStringNotContainsString(
-            'Foreign Type',
-            $content
-        );
-
-        $this->assertStringNotContainsString(
-            'FOREIGN-CMS',
-            $content
-        );
-
-        $this->assertStringNotContainsString(
-            '9000',
-            $content
-        );
+        $this->assertStringNotContainsString('Foreign Type', $analyticsJson);
+        $this->assertStringNotContainsString('FOREIGN-CMS', $analyticsJson);
+        $this->assertStringNotContainsString('9000', $analyticsJson);
+        $this->assertStringNotContainsString('8000', $analyticsJson);
     }
 }

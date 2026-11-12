@@ -455,6 +455,42 @@ class RecoupmentController extends Controller
         return back()->with('success', 'Recoupment plan cancelled. Nothing more will be recovered from this owner.');
     }
 
+    /**
+     * Permanently delete a recoupment plan (and its costs/documents). Allowed
+     * only when nothing was ever recovered from it, so a plan that moved real
+     * money keeps its audit trail. OTP-gated.
+     */
+    public function destroy(Request $request, RecoupmentPlan $plan)
+    {
+        $recovered = round((float) $plan->total_recovered_amount, 8);
+        $hasRecoveries = $plan->recoveries()->exists();
+
+        if ($recovered > 0 || $hasRecoveries) {
+            throw ValidationException::withMessages([
+                'plan' => 'This plan has already recovered money, so it cannot be deleted (its record is kept for audit). You can cancel it instead.',
+            ]);
+        }
+
+        app(ActionOtpGuard::class)->require(
+            Auth::user(),
+            'recoupment.delete:'.$plan->id,
+            'delete recoupment plan '.($plan->plan_number ?: '#'.$plan->id)
+        );
+
+        $snapshot = FinanceAudit::pick($plan, ['id', 'plan_number', 'user_id', 'label_id', 'artist_id', 'status', 'total_recoverable_amount', 'total_recovered_amount', 'outstanding_amount']);
+
+        $planNumber = $plan->plan_number ?: '#'.$plan->id;
+        $plan->delete(); // expenses, documents and recoveries cascade
+
+        FinanceAudit::log(
+            'finance.recoupment_plan_deleted',
+            'Recoupment plan '.$planNumber.' permanently deleted (no recovery had happened).',
+            $snapshot,
+        );
+
+        return back()->with('success', 'Recoupment plan '.$planNumber.' deleted.');
+    }
+
     public function details(RecoupmentPlan $plan): JsonResponse
     {
         $plan->load([
