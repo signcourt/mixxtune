@@ -166,6 +166,12 @@ export default function Show({ role = "admin", upload = {}, works = [] }) {
     const matchedCount = works.filter((w) => w.mapping_status === "matched").length;
     const published = upload.status === "distributed" && upload.published;
     const [publishing, setPublishing] = useState(false);
+    const [filter, setFilter] = useState("all");
+
+    const unmatchedCount = works.filter((w) => w.mapping_status === "unmatched").length;
+    const filtered = works.filter((w) =>
+        filter === "all" ? true : filter === "matched" ? w.mapping_status === "matched" : w.mapping_status !== "matched"
+    );
 
     const doPublish = () => {
         if (!window.confirm("Publish mapped royalty to the owners' wallets? Each owner is credited at their royalty rate.")) return;
@@ -244,8 +250,32 @@ export default function Show({ role = "admin", upload = {}, works = [] }) {
                     </div>
                 )}
 
+                {/* filter */}
+                <div className="flex flex-wrap items-center gap-2">
+                    {[
+                        ["all", `All (${works.length})`],
+                        ["matched", `Mapped (${matchedCount})`],
+                        ["unmatched", `Unmatched (${unmatchedCount})`],
+                    ].map(([key, label]) => (
+                        <button
+                            key={key}
+                            type="button"
+                            onClick={() => setFilter(key)}
+                            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${filter === key ? "bg-violet-600 text-white" : "border border-slate-300 text-slate-600"}`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+
+                {filtered.length === 0 && (
+                    <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                        No works in this filter.
+                    </p>
+                )}
+
                 {/* works */}
-                {works.map((w) => {
+                {filtered.map((w) => {
                     const [label, tone] = MAP_BADGE[w.mapping_status] || [w.mapping_status, "bg-slate-100 text-slate-500"];
                     return (
                         <section key={w.work_int_no} className="rounded-2xl border border-slate-200 bg-white shadow-sm">
