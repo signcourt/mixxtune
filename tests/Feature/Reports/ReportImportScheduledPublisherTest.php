@@ -285,6 +285,44 @@ class ReportImportScheduledPublisherTest extends TestCase
         $this->assertSame(0, DB::table('wallet_transactions')->count());
     }
 
+    // Recoupment end-to-end: an active advance is recovered from this import's
+    // earning, and only the remainder credits the wallet.
+    public function test_report_publish_recovers_an_active_advance_from_earning(): void
+    {
+        // Active-user label with 1000 net earning on this import.
+        $s = $this->scenario([['user' => 'active', 'allocs' => [['1250.00000000', '1000.00000000']]]]);
+
+        // Advance: 400 outstanding, recover 100% of earning.
+        $planId = $this->ins('recoupment_plans', [
+            'user_id' => $s['users'][0],
+            'label_id' => $s['labels'][0],
+            'artist_id' => null,
+            'plan_number' => 'RP-E2E-1',
+            'title' => 'Advance',
+            'base_percentage' => 100,
+            'recovery_uplift_percentage' => 100,
+            'maximum_recovery_percentage' => null,
+            'total_recoverable_amount' => 400,
+            'total_recovered_amount' => 0,
+            'outstanding_amount' => 400,
+            'status' => 'active',
+        ]);
+
+        $this->publisher()->publish($s['import']);
+
+        // A recovery of 400 was recorded against the advance.
+        $recovery = DB::table('recoupment_recoveries')->where('recoupment_plan_id', $planId)->first();
+        $this->assertNotNull($recovery, 'no recovery was created on publish');
+        $this->assertEqualsWithDelta(400.0, (float) $recovery->applied_recovery_amount, 0.00001);
+
+        // Advance outstanding fell to 0.
+        $this->assertEqualsWithDelta(0.0, (float) DB::table('recoupment_plans')->where('id', $planId)->value('outstanding_amount'), 0.00001);
+
+        // Wallet was credited the remainder only: 1000 - 400 = 600.
+        $credit = DB::table('wallet_transactions')->where('direction', 'credit')->sum('amount');
+        $this->assertEqualsWithDelta(600.0, (float) $credit, 0.00001);
+    }
+
     // Test E1
     public function test_e1_existing_hold_with_tampered_amount_fails_safely(): void
     {

@@ -967,11 +967,16 @@ class ReportImportScheduledPublisher
                             'other_deductions + '
                             .$recoveryAmount
                         ),
+                    /*
+                     * MIXXTUNE_PORTABLE_NET_PAYABLE_V1: clamp at zero with a
+                     * CASE expression instead of GREATEST() so the update runs
+                     * on every DB engine (MariaDB in prod, SQLite in tests).
+                     */
                     'net_payable' =>
                         DB::raw(
-                            'GREATEST(0, net_payable - '
-                            .$recoveryAmount
-                            .')'
+                            'CASE WHEN net_payable - '.$recoveryAmount
+                            .' > 0 THEN net_payable - '.$recoveryAmount
+                            .' ELSE 0 END'
                         ),
                     'updated_at' =>
                         now(),
