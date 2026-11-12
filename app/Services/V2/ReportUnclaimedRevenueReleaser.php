@@ -106,16 +106,47 @@ class ReportUnclaimedRevenueReleaser
                 throw new RuntimeException('Owner user is not active.');
             }
 
-            if (
-                Schema::hasTable('recoupment_plans')
-                && DB::table('recoupment_plans')
-                    ->where('user_id', $userId)
-                    ->where('status', 'active')
-                    ->where('outstanding_amount', '>', 0)
-                    ->exists()
-            ) {
-                throw new RuntimeException('Owner has an active recoupment plan; release needs recoupment handling.');
+            /*
+             * MIXXTUNE_HOLD_RELEASE_RECOUPMENT_V1
+             *
+             * If the owner has an active advance (recoupment plan with an
+             * outstanding balance), recover from THIS release first - exactly
+             * the way the publisher recovers at publish time - then credit only
+             * what is left to the wallet. Idempotency is keyed to the hold, so a
+             * retry never double-recovers. The advance's outstanding falls by the
+             * recovered amount.
+             */
+            $grossForRecovery = (float) $hold->gross_amount;
+            $netForRecovery = (float) $amount;
+            $recoveredAmount = 0.0;
+            $recoveryId = null;
+
+            if (Schema::hasTable('recoupment_plans')) {
+                $plan = $this->findActivePlan((string) $hold->owner_type, (int) $hold->owner_id, $userId);
+
+                if ($plan) {
+                    $recovery = app(\App\Services\V3\RecoupmentManagementService::class)
+                        ->applyStatementRecovery(
+                            $plan,
+                            $grossForRecovery,
+                            $netForRecovery,
+                            [
+                                'royalty_statement_id' => (int) $posting->royalty_statement_id,
+                                'reporting_month' => (string) (DB::table('report_imports')->where('id', $posting->report_import_id)->value('reporting_month') ?? ''),
+                                'reference' => 'Hold release #'.$hold->id.' (import posting '.$posting->id.')',
+                                'idempotency_key' => 'report_hold_release:'.$hold->id,
+                            ]
+                        );
+
+                    if ($recovery) {
+                        $recoveredAmount = round((float) $recovery->applied_recovery_amount, 8);
+                        $recoveryId = (int) $recovery->id;
+                    }
+                }
             }
+
+            // What actually reaches the wallet = net minus advance recovery.
+            $creditAmount = $fmt(max(0.0, round((float) $amount - $recoveredAmount, 8)));
 
             $currency = (string) $hold->currency;
 
@@ -150,11 +181,13 @@ class ReportUnclaimedRevenueReleaser
             /* MIXXTUNE_WALLET_DECIMAL_SAFE_V1: add in SQL, read back */
             $before = (string) $wallet->available_balance;
 
-            DB::table('wallets')->where('id', $wallet->id)->update([
-                'available_balance' => DB::raw('available_balance + ('.$amount.')'),
-                'lifetime_credits' => DB::raw('lifetime_credits + '.$amount),
-                'updated_at' => now(),
-            ]);
+            if ((float) $creditAmount > 0) {
+                DB::table('wallets')->where('id', $wallet->id)->update([
+                    'available_balance' => DB::raw('available_balance + ('.$creditAmount.')'),
+                    'lifetime_credits' => DB::raw('lifetime_credits + '.$creditAmount),
+                    'updated_at' => now(),
+                ]);
+            }
 
             $after = (string) DB::table('wallets')->where('id', $wallet->id)->value('available_balance');
 
@@ -170,31 +203,44 @@ class ReportUnclaimedRevenueReleaser
                 'released_by_user_id' => $actorUserId,
                 'released_at' => $releasedAt->toDateTimeString(),
                 'note' => $note,
+                'gross_amount' => $fmt($hold->net_amount),
+                'advance_recovered' => $fmt($recoveredAmount),
+                'credited_to_wallet' => $creditAmount,
+                'recoupment_recovery_id' => $recoveryId,
             ];
 
-            $txId = DB::table('wallet_transactions')->insertGetId([
-                'public_id' => (string) Str::ulid(),
-                'wallet_id' => $wallet->id,
-                'user_id' => $userId,
-                'artist_id' => $hold->owner_type === 'artist' ? (int) $hold->owner_id : null,
-                'label_id' => $hold->owner_type === 'label' ? (int) $hold->owner_id : null,
-                'transaction_type' => 'royalty_import',
-                'direction' => 'credit',
-                'amount' => $amount,
-                'currency' => $currency,
-                'balance_before' => $before,
-                'balance_after' => $after,
-                'reference_type' => 'report_import_posting',
-                'reference_id' => (int) $posting->id,
-                'description' => trim('Royalty import '.$month).' (released hold)',
-                'status' => 'posted',
-                'effective_at' => $releasedAt,
-                'posted_at' => $releasedAt,
-                'metadata' => json_encode($releaseMeta),
-                'created_by' => $actorUserId,
-                'created_at' => $releasedAt,
-                'updated_at' => $releasedAt,
-            ]);
+            // Only record a wallet credit when something actually reaches the wallet
+            // (a fully-recovered release puts everything against the advance).
+            $txId = null;
+            if ((float) $creditAmount > 0) {
+                $desc = trim('Royalty import '.$month).' (released hold)';
+                if ($recoveredAmount > 0) {
+                    $desc .= ' — advance recovered '.$fmt($recoveredAmount);
+                }
+                $txId = DB::table('wallet_transactions')->insertGetId([
+                    'public_id' => (string) Str::ulid(),
+                    'wallet_id' => $wallet->id,
+                    'user_id' => $userId,
+                    'artist_id' => $hold->owner_type === 'artist' ? (int) $hold->owner_id : null,
+                    'label_id' => $hold->owner_type === 'label' ? (int) $hold->owner_id : null,
+                    'transaction_type' => 'royalty_import',
+                    'direction' => 'credit',
+                    'amount' => $creditAmount,
+                    'currency' => $currency,
+                    'balance_before' => $before,
+                    'balance_after' => $after,
+                    'reference_type' => 'report_import_posting',
+                    'reference_id' => (int) $posting->id,
+                    'description' => $desc,
+                    'status' => 'posted',
+                    'effective_at' => $releasedAt,
+                    'posted_at' => $releasedAt,
+                    'metadata' => json_encode($releaseMeta),
+                    'created_by' => $actorUserId,
+                    'created_at' => $releasedAt,
+                    'updated_at' => $releasedAt,
+                ]);
+            }
 
             $postingMeta = json_decode((string) ($posting->metadata ?? ''), true);
             $postingMeta = is_array($postingMeta) ? $postingMeta : [];
@@ -228,11 +274,37 @@ class ReportUnclaimedRevenueReleaser
                 'hold_id' => (int) $hold->id,
                 'user_id' => $userId,
                 'wallet_id' => (int) $wallet->id,
-                'wallet_transaction_id' => (int) $txId,
-                'amount' => $amount,
+                'wallet_transaction_id' => $txId !== null ? (int) $txId : null,
+                'amount' => $amount,                 // full held net (gross of advance)
+                'advance_recovered' => $fmt($recoveredAmount),
+                'credited' => $creditAmount,         // what reached the wallet
                 'balance_before' => $before,
                 'balance_after' => $after,
             ];
         });
+    }
+
+    /**
+     * Find the owner's active advance plan the same way the publisher does:
+     * prefer an owner-specific plan, then fall back to a user-level plan.
+     */
+    private function findActivePlan(string $ownerType, int $ownerId, int $userId): ?\App\Models\Finance\RecoupmentPlan
+    {
+        $base = \App\Models\Finance\RecoupmentPlan::query()
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->where('outstanding_amount', '>', 0);
+
+        if ($ownerType === 'label') {
+            $plan = (clone $base)->where('label_id', $ownerId)->whereNull('artist_id')->first();
+        } else {
+            $plan = (clone $base)->where('artist_id', $ownerId)->whereNull('label_id')->first();
+        }
+
+        if (! $plan) {
+            $plan = (clone $base)->whereNull('label_id')->whereNull('artist_id')->first();
+        }
+
+        return $plan;
     }
 }

@@ -461,6 +461,12 @@ const adminNavigation = (
                     label: 'Finance & Royalties',
                     href: '/admin/finance',
                 },
+                /* W163: all held revenue (digital import + IPRS) in one place */
+                {
+                    id: 'financial-held-revenue',
+                    label: 'Held revenue',
+                    href: '/admin/finance/held',
+                },
                 /* MIXXTUNE_FINANCE_CLEANUP_V1: statement lists are in Finance & Royalties / Statements;
                    this page is only the IPRS / PRS rights royalty upload (super admin) */
                 ...(role === 'super_admin'

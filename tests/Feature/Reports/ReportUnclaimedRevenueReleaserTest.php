@@ -256,15 +256,27 @@ class ReportUnclaimedRevenueReleaserTest extends TestCase
         $this->assertNoMoneyMoved();
     }
 
-    public function test_r6_active_recoupment_plan_blocks_release(): void
+    public function test_r6_active_recoupment_plan_is_recovered_then_remainder_credits(): void
     {
-        $s = $this->heldScenario();
+        // New behaviour (W164): an active advance is recovered from the release
+        // first, and only the remainder credits the wallet.
+        $s = $this->heldScenario();              // net 17.10344035
         $uid = $this->linkOwner($s['label']);
-        $this->ins('recoupment_plans', ['user_id' => $uid, 'status' => 'active', 'outstanding_amount' => 10]);
+        $this->ins('recoupment_plans', [
+            'user_id' => $uid, 'label_id' => $s['label'], 'status' => 'active',
+            'base_percentage' => 100, 'recovery_uplift_percentage' => 100, 'maximum_recovery_percentage' => 100,
+            'total_recoverable_amount' => 10, 'total_recovered_amount' => 0, 'outstanding_amount' => 10,
+        ]);
 
-        $this->expectFailure(fn () => $this->releaser()->release($s['hold'], $this->actor()), 'recoupment');
+        $result = $this->releaser()->release($s['hold'], $this->actor());
 
-        $this->assertNoMoneyMoved();
+        $this->assertEqualsWithDelta(10.0, (float) $result['advance_recovered'], 0.00001);
+        $this->assertEqualsWithDelta(7.10344035, (float) $result['credited'], 0.00001);
+
+        // Advance cleared; wallet got the remainder.
+        $this->assertEqualsWithDelta(0.0, (float) DB::table('recoupment_plans')->where('user_id', $uid)->value('outstanding_amount'), 0.00001);
+        $this->assertEqualsWithDelta(7.10344035, (float) DB::table('wallets')->where('user_id', $uid)->whereNull('label_id')->whereNull('artist_id')->value('available_balance'), 0.00001);
+        $this->assertSame('released', DB::table('report_unclaimed_revenues')->where('id', $s['hold'])->value('status'));
     }
 
     public function test_r7_existing_wallet_balance_is_added_exactly(): void

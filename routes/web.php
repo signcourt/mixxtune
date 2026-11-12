@@ -2093,6 +2093,22 @@ Route::middleware(['auth', 'verified'])
     ->whereNumber('hold')
     ->name('v2.admin.finance.hold.release');
 
+/* W163: unified Held revenue screen (digital import holds + IPRS held) */
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/admin/finance/held',
+        [\App\Http\Controllers\V2\Admin\FinanceController::class, 'heldRevenue']
+    )
+    ->name('v2.admin.finance.held');
+
+/* W163: release ALL of one owner's digital import holds under one OTP */
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/admin/finance/held/release-owner',
+        [\App\Http\Controllers\V2\Admin\FinanceController::class, 'releaseDigitalOwner']
+    )
+    ->name('v2.admin.finance.held.release-owner');
+
 
 Route::middleware(['auth', 'verified'])
     ->get(

@@ -445,6 +445,120 @@ class FinanceController extends Controller
     }
 
     /*
+     * W163: one "Held revenue" screen for BOTH hold sources.
+     *
+     * Digital report imports park owner money in report_unclaimed_revenues
+     * when the owner has no active user; IPRS publishing parks it in
+     * iprs_held_revenues for the same reason. This page lists them together,
+     * per owner, with the source tagged, and routes each Release button to the
+     * existing (OTP-gated) release endpoints - it adds no new money path.
+     */
+    public function heldRevenue(
+        Request $request,
+        PermissionService $permissions
+    ): Response {
+        $role = $permissions->role($request->user());
+        abort_unless(in_array($role, ['admin', 'super_admin'], true), 403, 'Admin access required.');
+
+        $ownerName = function (string $type, array $ids): \Illuminate\Support\Collection {
+            if ($ids === []) {
+                return collect();
+            }
+            if ($type === 'label') {
+                return DB::table('labels')->whereIn('id', $ids)->get(['id', 'name', 'user_id'])->keyBy('id');
+            }
+
+            return DB::table('artists')->whereIn('id', $ids)->get(['id', 'stage_name as name', 'user_id'])->keyBy('id');
+        };
+
+        // --- Source A: digital import holds (report_unclaimed_revenues, status 'held') ---
+        $digital = DB::table('report_unclaimed_revenues')->where('status', 'held')
+            ->get(['id', 'owner_type', 'owner_id', 'currency', 'net_amount']);
+
+        // --- Source B: IPRS publishing holds (iprs_held_revenues, status 'held') ---
+        $iprs = DB::table('iprs_held_revenues')->where('status', 'held')
+            ->get(['id', 'owner_type', 'owner_id', 'net_amount', 'user_id']);
+
+        $labelIds = $digital->where('owner_type', 'label')->pluck('owner_id')
+            ->merge($iprs->where('owner_type', 'label')->pluck('owner_id'))->filter()->unique()->values()->all();
+        $artistIds = $digital->where('owner_type', 'artist')->pluck('owner_id')
+            ->merge($iprs->where('owner_type', 'artist')->pluck('owner_id'))->filter()->unique()->values()->all();
+        $labels = $ownerName('label', $labelIds);
+        $artists = $ownerName('artist', $artistIds);
+
+        $activeUserIds = \App\Models\User::where('account_status', 'active')
+            ->whereIn('id', $labels->pluck('user_id')->merge($artists->pluck('user_id'))->filter()->unique()->all() ?: [0])
+            ->pluck('id')->flip();
+
+        $ownerMeta = function (string $type, int $id) use ($labels, $artists, $activeUserIds): array {
+            $row = $type === 'label' ? $labels->get($id) : $artists->get($id);
+            $userId = $row->user_id ?? null;
+
+            return [
+                'name' => $row->name ?? '—',
+                'has_user' => (bool) $userId,
+                'user_active' => $userId ? $activeUserIds->has($userId) : false,
+            ];
+        };
+
+        $owners = [];
+        $key = fn ($t, $i) => $t.':'.$i;
+
+        foreach ($digital->groupBy(fn ($h) => $key($h->owner_type, $h->owner_id)) as $k => $group) {
+            $first = $group->first();
+            $m = $ownerMeta($first->owner_type, (int) $first->owner_id);
+            $owners[$k] = [
+                'owner_type' => $first->owner_type,
+                'owner_id' => (int) $first->owner_id,
+                'name' => $m['name'],
+                'has_user' => $m['has_user'],
+                'user_active' => $m['user_active'],
+                'digital_total' => round((float) $group->sum('net_amount'), 2),
+                'digital_hold_ids' => $group->pluck('id')->map(fn ($x) => (int) $x)->values()->all(),
+                'iprs_total' => 0.0,
+                'iprs_count' => 0,
+            ];
+        }
+
+        foreach ($iprs->groupBy(fn ($h) => $key($h->owner_type, $h->owner_id)) as $k => $group) {
+            $first = $group->first();
+            if (! isset($owners[$k])) {
+                $m = $ownerMeta($first->owner_type, (int) $first->owner_id);
+                $owners[$k] = [
+                    'owner_type' => $first->owner_type,
+                    'owner_id' => (int) $first->owner_id,
+                    'name' => $m['name'],
+                    'has_user' => $m['has_user'],
+                    'user_active' => $m['user_active'],
+                    'digital_total' => 0.0,
+                    'digital_hold_ids' => [],
+                    'iprs_total' => 0.0,
+                    'iprs_count' => 0,
+                ];
+            }
+            $owners[$k]['iprs_total'] = round((float) $group->sum('net_amount'), 2);
+            $owners[$k]['iprs_count'] = $group->count();
+        }
+
+        $list = collect($owners)->map(function ($o) {
+            $o['total_held'] = round($o['digital_total'] + $o['iprs_total'], 2);
+
+            return $o;
+        })->sortByDesc('total_held')->values();
+
+        return Inertia::render('V2/Admin/Finance/Held', [
+            'role' => $role,
+            'owners' => $list,
+            'summary' => [
+                'digital_total' => round((float) $digital->sum('net_amount'), 2),
+                'iprs_total' => round((float) $iprs->sum('net_amount'), 2),
+                'total' => round((float) $digital->sum('net_amount') + (float) $iprs->sum('net_amount'), 2),
+                'owner_count' => $list->count(),
+            ],
+        ]);
+    }
+
+    /*
      * MIXXTUNE_FINANCE_HOLD_RELEASE_V1
      *
      * Super-admin releases an unclaimed import hold to the owner's
@@ -485,14 +599,81 @@ class FinanceController extends Controller
 
         \App\Services\V2\FinanceAudit::log(
             'finance.hold_released',
-            'Held revenue #'.$hold.' of '.number_format((float) ($result['amount'] ?? 0), 2).' released to the owner wallet.',
+            'Held revenue #'.$hold.' of '.number_format((float) ($result['amount'] ?? 0), 2).' released'
+                .((float) ($result['advance_recovered'] ?? 0) > 0 ? ' (advance recovered '.number_format((float) $result['advance_recovered'], 2).', credited '.number_format((float) $result['credited'], 2).')' : ' to the owner wallet').'.',
             is_array($result) ? array_filter($result, fn ($v) => is_scalar($v) || $v === null) : [],
         );
 
-        return back()->with(
-            'success',
-            'Held revenue of '.number_format((float) $result['amount'], 2).' released to the owner wallet.'
+        $recovered = (float) ($result['advance_recovered'] ?? 0);
+        $msg = $recovered > 0
+            ? 'Held revenue of '.number_format((float) $result['amount'], 2).' released: advance recovered '.number_format($recovered, 2).', '.number_format((float) $result['credited'], 2).' credited to the wallet.'
+            : 'Held revenue of '.number_format((float) $result['credited'], 2).' released to the owner wallet.';
+
+        return back()->with('success', $msg);
+    }
+
+    /*
+     * W163: release ALL of one owner's digital import holds under a single OTP
+     * (from the unified Held revenue screen). Reuses the same per-hold releaser,
+     * so no new money path. Idempotent: holds already released are skipped.
+     */
+    public function releaseDigitalOwner(
+        Request $request,
+        PermissionService $permissions,
+        \App\Services\V2\ReportUnclaimedRevenueReleaser $releaser
+    ): RedirectResponse {
+        abort_unless($permissions->role($request->user()) === 'super_admin', 403);
+
+        $data = $request->validate([
+            'owner_type' => ['required', 'in:label,artist'],
+            'owner_id' => ['required', 'integer'],
+        ]);
+
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            $request->user(),
+            'hold.release_owner:'.$data['owner_type'].':'.$data['owner_id'],
+            'release all held import revenue for this owner to their wallet'
         );
+
+        $ids = DB::table('report_unclaimed_revenues')
+            ->where('status', 'held')
+            ->where('owner_type', $data['owner_type'])
+            ->where('owner_id', (int) $data['owner_id'])
+            ->pluck('id');
+
+        $released = 0;
+        $credited = 0.0;
+        $recovered = 0.0;
+        $errors = [];
+        foreach ($ids as $id) {
+            try {
+                $r = $releaser->release((int) $id, (int) $request->user()->id, 'Released from Held revenue screen (per owner)');
+                $released++;
+                $credited += (float) ($r['credited'] ?? 0);
+                $recovered += (float) ($r['advance_recovered'] ?? 0);
+            } catch (\RuntimeException $e) {
+                $errors[] = $e->getMessage();
+            }
+        }
+
+        if ($released > 0) {
+            \App\Services\V2\FinanceAudit::log(
+                'finance.hold_released_owner',
+                $released.' held import payment(s) released; '.number_format($credited, 2).' to wallet'
+                    .($recovered > 0 ? ', '.number_format($recovered, 2).' recovered against advance' : '').'.',
+                ['owner_type' => $data['owner_type'], 'owner_id' => (int) $data['owner_id'], 'released' => $released, 'credited' => $credited, 'advance_recovered' => $recovered],
+            );
+        }
+
+        if ($released === 0 && $errors !== []) {
+            return back()->withErrors(['release' => $errors[0]]);
+        }
+
+        $msg = $released.' held payment(s) released — '.number_format($credited, 2).' credited to the wallet'
+            .($recovered > 0 ? ', '.number_format($recovered, 2).' recovered against the advance' : '').'.'
+            .($errors !== [] ? ' '.count($errors).' still held.' : '');
+
+        return back()->with('success', $msg);
     }
 
     public function makeAvailable(
