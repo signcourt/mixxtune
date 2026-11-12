@@ -1,6 +1,6 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Wallet } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Search, Wallet, X } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 
@@ -18,6 +18,24 @@ export default function Held({ role = "admin", owners = [], summary = {} }) {
     const flash = page.props?.flash ?? {};
     const errors = page.props?.errors ?? {};
     const [busy, setBusy] = useState(null);
+    const [q, setQ] = useState("");
+
+    // Live filter: as the admin types, matching owners stay; no Enter needed.
+    // Best matches (name starts with the query) float to the top.
+    const shown = useMemo(() => {
+        const needle = q.trim().toLowerCase();
+        if (!needle) return owners;
+        const scored = [];
+        for (const o of owners) {
+            const name = String(o.name || "").toLowerCase();
+            const idx = name.indexOf(needle);
+            if (idx === -1) continue;
+            // rank: starts-with (0) beats contains (1); then by position, then amount.
+            scored.push({ o, rank: idx === 0 ? 0 : 1, idx });
+        }
+        scored.sort((a, b) => a.rank - b.rank || a.idx - b.idx || (b.o.total_held || 0) - (a.o.total_held || 0));
+        return scored.map((s) => s.o);
+    }, [owners, q]);
 
     const releaseDigital = (o) => {
         if (!window.confirm(`Release ${money(o.digital_total)} of import-held revenue to ${o.name}'s wallet?`)) return;
@@ -69,12 +87,32 @@ export default function Held({ role = "admin", owners = [], summary = {} }) {
                     Money is held when its owner has <span className="font-semibold">no active user account</span> yet. Link the label/artist to an active user, then release — the amount goes to that owner's wallet. A confirmation code is e-mailed first. Only super-admins can release.
                 </div>
 
+                {owners.length > 0 && (
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="text"
+                            value={q}
+                            onChange={(e) => setQ(e.target.value)}
+                            placeholder="Search owner by name…"
+                            className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-10 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                        />
+                        {q && (
+                            <button type="button" onClick={() => setQ("")} title="Clear" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+                                <X className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
                     {owners.length === 0 ? (
                         <p className="px-5 py-12 text-center text-sm text-slate-500">Nothing held — every published payment reached an active owner.</p>
+                    ) : shown.length === 0 ? (
+                        <p className="px-5 py-12 text-center text-sm text-slate-500">No owner matches “{q}”.</p>
                     ) : (
                         <div className="divide-y divide-slate-100">
-                            {owners.map((o) => {
+                            {shown.map((o) => {
                                 const dKey = `d:${o.owner_type}:${o.owner_id}`;
                                 const iKey = `i:${o.owner_type}:${o.owner_id}`;
                                 return (
