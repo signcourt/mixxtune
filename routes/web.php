@@ -1945,6 +1945,21 @@ Route::middleware(['auth', 'verified'])
             [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'show']
         )->name('show');
 
+        Route::get(
+            '/tracks/search',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'searchTracks']
+        )->name('tracks.search');
+
+        Route::post(
+            '/uploads/{iprsUpload:public_id}/map',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'mapWork']
+        )->name('map');
+
+        Route::post(
+            '/uploads/{iprsUpload:public_id}/unmap',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'unmapWork']
+        )->name('unmap');
+
         Route::delete(
             '/uploads/{iprsUpload:public_id}',
             [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'destroy']

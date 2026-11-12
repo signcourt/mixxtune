@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\V2\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Distribution\Track;
 use App\Models\Iprs\IprsUpload;
 use App\Models\Iprs\IprsWork;
+use App\Models\User;
 use App\Services\Iprs\IprsImportService;
+use App\Services\Iprs\IprsMappingService;
 use App\Services\V2\ActionOtpGuard;
 use App\Services\V2\PermissionService;
 use Illuminate\Http\RedirectResponse;
@@ -47,16 +50,28 @@ class IprsImportController extends Controller
             ->get()
             ->keyBy('work_int_no');
 
-        $works = $lines->groupBy('work_int_no')->map(function ($group, $workNo) use ($workMeta) {
+        $trackMeta = Track::whereIn('id', $lines->pluck('track_id')->filter()->unique()->all())
+            ->get(['id', 'title', 'isrc'])
+            ->keyBy('id');
+        $clients = User::whereIn('id', $lines->pluck('client_id')->filter()->unique()->all())
+            ->get(['id', 'name'])
+            ->keyBy('id');
+
+        $works = $lines->groupBy('work_int_no')->map(function ($group, $workNo) use ($workMeta, $trackMeta, $clients) {
             $meta = $workMeta->get($workNo);
+            $first = $group->first();
+            $track = $first->track_id ? $trackMeta->get($first->track_id) : null;
+            $client = $first->client_id ? $clients->get($first->client_id) : null;
 
             return [
                 'work_int_no' => (string) $workNo,
-                'title' => $meta->title ?? $group->first()->title,
+                'title' => $meta->title ?? $first->title,
                 'language' => $meta->language ?? null,
                 'credits' => $meta->credits ?? [],
                 'total_amount' => round((float) $group->sum('amount'), 4),
-                'mapping_status' => $group->first()->mapping_status,
+                'mapping_status' => $first->mapping_status,
+                'mapped_track' => $track ? ['title' => $track->title, 'isrc' => $track->isrc] : null,
+                'owner_name' => $client->name ?? null,
                 'lines' => $group->map(fn ($l) => [
                     'id' => $l->id,
                     'source' => $l->source,
@@ -74,6 +89,47 @@ class IprsImportController extends Controller
             'upload' => $this->serialize($iprsUpload),
             'works' => $works,
         ]);
+    }
+
+    /** Search the catalogue by song title or ISRC for the mapping picker. */
+    public function searchTracks(Request $request, PermissionService $permissions, IprsMappingService $mapping): \Illuminate\Http\JsonResponse
+    {
+        $this->gate($request, $permissions);
+
+        $q = (string) $request->query('q', '');
+
+        return response()->json([
+            'tracks' => mb_strlen(trim($q)) >= 2 ? $mapping->searchTracks($q) : [],
+        ]);
+    }
+
+    /** Map a work to a track: stores the work number on the track and matches its lines. */
+    public function mapWork(Request $request, PermissionService $permissions, IprsMappingService $mapping, IprsUpload $iprsUpload): RedirectResponse
+    {
+        $this->gate($request, $permissions);
+
+        $data = $request->validate([
+            'work_int_no' => ['required', 'string', 'max:40'],
+            'track_id' => ['required', 'integer'],
+        ]);
+
+        $result = $mapping->mapWork($data['work_int_no'], (int) $data['track_id'], $request->user()->id);
+
+        return back()->with('flash', [
+            'success' => 'Mapped to "'.$result['track_title'].'"'.($result['isrc'] ? ' ('.$result['isrc'].')' : '').' — '.$result['matched_lines'].' line(s) matched.',
+        ]);
+    }
+
+    /** Remove a work's mapping. */
+    public function unmapWork(Request $request, PermissionService $permissions, IprsMappingService $mapping, IprsUpload $iprsUpload): RedirectResponse
+    {
+        $this->gate($request, $permissions);
+
+        $data = $request->validate(['work_int_no' => ['required', 'string', 'max:40']]);
+
+        $mapping->unmapWork($data['work_int_no']);
+
+        return back()->with('flash', ['success' => 'Mapping removed.']);
     }
 
     public function store(Request $request, PermissionService $permissions, IprsImportService $service): RedirectResponse

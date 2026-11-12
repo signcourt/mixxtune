@@ -134,6 +134,9 @@ class IprsImportService
             return $upload;
         });
 
+        // Auto-map lines whose work number already sits on a track from an earlier mapping.
+        app(IprsMappingService::class)->autoMapUpload($upload);
+
         $message = $status === 'imported'
             ? '"'.$fileName.'" imported - '.$upload->total_lines.' line(s), '.$upload->total_works.' work(s).'
             : '"'.$fileName.'" imported but needs review - parsed total '.$parsedTotal.' vs file total '.($fileTotal ?? 'n/a').'.';

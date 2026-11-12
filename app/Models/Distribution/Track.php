@@ -38,6 +38,7 @@ class Track extends Model
         'isrc_is_auto_generated',
         'isrc_assigned_at',
         'isrc_assigned_by',
+        'iprs_work_no',
         'language',
         'title_language',
         'lyrics_language',

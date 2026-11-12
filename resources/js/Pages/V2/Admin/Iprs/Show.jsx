@@ -1,10 +1,11 @@
-import { Head, Link } from "@inertiajs/react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Music2 } from "lucide-react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Link2, Loader2, Music2, Search, Unlink, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 
-/* IPRS Phase 2 (view): read-only detail of one imported statement - its works,
-   writers and royalty lines. Mapping to the catalogue is added on top of this. */
+/* IPRS Phase 2: statement detail + map each work to a catalogue track.
+   Mapping stores the work number on the track, so future statements auto-map. */
 
 const MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const ROLES = { C: "Composer", A: "Author / Lyricist", CA: "Composer + Author", E: "Publisher", SE: "Sub-publisher", AR: "Arranger" };
@@ -19,8 +20,128 @@ const MAP_BADGE = {
     ignored: ["Ignored", "bg-slate-100 text-slate-500"],
 };
 
+function MapPanel({ upload, work }) {
+    const [open, setOpen] = useState(false);
+    const [q, setQ] = useState("");
+    const [results, setResults] = useState([]);
+    const [searching, setSearching] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const timer = useRef(null);
+
+    useEffect(() => {
+        if (!open) return;
+        if (timer.current) clearTimeout(timer.current);
+        if (q.trim().length < 2) {
+            setResults([]);
+            return;
+        }
+        timer.current = setTimeout(async () => {
+            setSearching(true);
+            try {
+                const res = await fetch(`/admin/iprs/tracks/search?q=${encodeURIComponent(q.trim())}`, {
+                    headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+                });
+                const data = await res.json();
+                setResults(data.tracks || []);
+            } catch {
+                setResults([]);
+            } finally {
+                setSearching(false);
+            }
+        }, 300);
+        return () => timer.current && clearTimeout(timer.current);
+    }, [q, open]);
+
+    const doMap = (trackId) => {
+        setBusy(true);
+        router.post(`/admin/iprs/uploads/${upload.public_id}/map`, { work_int_no: work.work_int_no, track_id: trackId }, {
+            preserveScroll: true,
+            onFinish: () => { setBusy(false); setOpen(false); setQ(""); setResults([]); },
+        });
+    };
+
+    const unmap = () => {
+        if (!window.confirm("Remove this mapping? The work will become unmatched again.")) return;
+        setBusy(true);
+        router.post(`/admin/iprs/uploads/${upload.public_id}/unmap`, { work_int_no: work.work_int_no }, {
+            preserveScroll: true,
+            onFinish: () => setBusy(false),
+        });
+    };
+
+    if (work.mapping_status === "matched" && work.mapped_track) {
+        return (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-emerald-50/50 px-4 py-2.5 sm:px-5">
+                <div className="text-sm text-emerald-800">
+                    <span className="font-semibold">Mapped →</span> {work.mapped_track.title}
+                    {work.mapped_track.isrc ? <span className="text-emerald-600"> · {work.mapped_track.isrc}</span> : null}
+                    {work.owner_name ? <span className="text-slate-500"> · owner {work.owner_name}</span> : null}
+                </div>
+                <button type="button" onClick={unmap} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 disabled:opacity-50">
+                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlink className="h-3.5 w-3.5" />} Unmap
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="border-t border-slate-100 px-4 py-2.5 sm:px-5">
+            {!open ? (
+                <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white">
+                    <Link2 className="h-3.5 w-3.5" /> Map to a song
+                </button>
+            ) : (
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                                autoFocus
+                                value={q}
+                                onChange={(e) => setQ(e.target.value)}
+                                placeholder="Search your catalogue by song name or ISRC…"
+                                className="h-10 w-full rounded-xl border border-slate-300 pl-9 pr-3 text-sm"
+                            />
+                        </div>
+                        <button type="button" onClick={() => { setOpen(false); setQ(""); setResults([]); }} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500">
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    {searching && <p className="flex items-center gap-1.5 text-xs text-slate-400"><Loader2 className="h-3.5 w-3.5 animate-spin" /> searching…</p>}
+                    {!searching && q.trim().length >= 2 && results.length === 0 && <p className="text-xs text-slate-400">No matching song found.</p>}
+
+                    {results.length > 0 && (
+                        <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+                            {results.map((t) => (
+                                <div key={t.track_id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                    <div className="min-w-0">
+                                        <div className="truncate text-sm font-semibold text-slate-800">{t.title}</div>
+                                        <div className="text-xs text-slate-500">
+                                            {t.isrc || "no ISRC"}{t.upc ? ` · UPC ${t.upc}` : ""}{t.owner_name ? ` · ${t.owner_name}` : ""}
+                                        </div>
+                                        {t.current_work_no && t.current_work_no !== work.work_int_no && (
+                                            <div className="text-[11px] text-amber-600">already holds work {t.current_work_no} — mapping will move it here</div>
+                                        )}
+                                    </div>
+                                    <button type="button" onClick={() => doMap(t.track_id)} disabled={busy} className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">
+                                        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />} Map
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function Show({ role = "admin", upload = {}, works = [] }) {
+    const page = usePage();
+    const flash = page.props?.flash ?? {};
     const ok = upload.within_tolerance;
+    const matchedCount = works.filter((w) => w.mapping_status === "matched").length;
 
     return (
         <PanelLayout role={role} title="IPRS statement" subtitle={upload.file_name}>
@@ -30,6 +151,12 @@ export default function Show({ role = "admin", upload = {}, works = [] }) {
                 <Link href="/admin/iprs" className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-700">
                     <ArrowLeft className="h-4 w-4" /> Back to IPRS statements
                 </Link>
+
+                {flash.success && (
+                    <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                        <CheckCircle2 className="h-4 w-4" /> {flash.success}
+                    </div>
+                )}
 
                 {/* summary */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -42,7 +169,10 @@ export default function Show({ role = "admin", upload = {}, works = [] }) {
                                 {upload.ipi_name_no ? ` · IPI Name ${upload.ipi_name_no}` : ""}
                                 {upload.ipi_base_no ? ` · IPI Base ${upload.ipi_base_no}` : ""}
                             </div>
-                            {upload.period_label && <div className="mt-1 text-xs text-slate-500">Period: {upload.period_label}</div>}
+                            <div className="mt-1 text-xs text-slate-500">
+                                {matchedCount} of {works.length} works mapped
+                                {upload.period_label ? ` · Period: ${upload.period_label}` : ""}
+                            </div>
                         </div>
                         <div className="text-right">
                             <div className={`text-xl font-bold ${ok ? "text-emerald-700" : "text-red-600"}`}>
@@ -74,9 +204,12 @@ export default function Show({ role = "admin", upload = {}, works = [] }) {
                                 <div className="text-right text-sm font-bold text-slate-900">{money(w.total_amount)}</div>
                             </div>
 
+                            {/* mapping control */}
+                            <MapPanel upload={upload} work={w} />
+
                             {/* writers */}
                             {w.credits?.length > 0 && (
-                                <div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
+                                <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3 sm:px-5">
                                     {w.credits.map((c, i) => (
                                         <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1 text-xs text-slate-700">
                                             <span className="font-semibold">{c.name}</span>
@@ -116,7 +249,7 @@ export default function Show({ role = "admin", upload = {}, works = [] }) {
                 })}
 
                 <p className="px-1 text-xs text-slate-400">
-                    IPRS files carry no ISRC — only the Work No and title. Mapping each work to a track (ISRC) and its owner is the next step; once mapped, the royalty can be split and shown to the right client.
+                    Mapping a work stores its work number on the chosen song, so the next IPRS statement with the same work number maps to that song automatically. Mapped royalty can then be split and shown to the owner.
                 </p>
             </div>
         </PanelLayout>
