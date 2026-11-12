@@ -7,6 +7,7 @@ use App\Models\Finance\RecoupmentPlan;
 use App\Models\Finance\RecoupmentRecovery;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class RecoupmentManagementService
@@ -144,6 +145,105 @@ class RecoupmentManagementService
             }
 
             return $plan->fresh();
+        });
+    }
+
+    /*
+     * MIXXTUNE_INSTANT_WALLET_SWEEP_V1
+     *
+     * Right after an advance is created, recover from the owner's EXISTING
+     * wallet balance immediately (not just from future report earnings). Takes
+     * recovery% of the current available balance, capped by the outstanding,
+     * writes a recovery row and a wallet debit, and lowers the wallet. Runs in
+     * its own transaction, is idempotent per plan+balance snapshot, and never
+     * drives a wallet below zero.
+     */
+    public function sweepWalletBalance(RecoupmentPlan $plan, ?int $actorId = null): ?RecoupmentRecovery
+    {
+        return DB::transaction(function () use ($plan, $actorId) {
+            $lockedPlan = RecoupmentPlan::query()->whereKey($plan->id)->lockForUpdate()->firstOrFail();
+
+            if (! $lockedPlan->isActive()) {
+                return null;
+            }
+
+            $outstanding = round((float) $lockedPlan->outstanding_amount, 8);
+            if ($outstanding <= 0) {
+                return null;
+            }
+
+            // The owner's own wallet (user-level; not a per-label/artist sub-wallet).
+            $wallet = DB::table('wallets')
+                ->where('user_id', $lockedPlan->user_id)
+                ->whereNull('label_id')
+                ->whereNull('artist_id')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $wallet || (float) $wallet->available_balance <= 0) {
+                return null;
+            }
+
+            $recoveryPct = $this->calculator->recoveryPercentage($lockedPlan);
+            $available = round((float) $wallet->available_balance, 8);
+
+            // Recover recovery% of the available balance, capped by outstanding and balance.
+            $take = round(min($available * ($recoveryPct / 100), $outstanding, $available), 8);
+            if ($take <= 0) {
+                return null;
+            }
+
+            $before = (string) $wallet->available_balance;
+            DB::table('wallets')->where('id', $wallet->id)->update([
+                'available_balance' => DB::raw('available_balance - ('.$take.')'),
+                'lifetime_debits' => DB::raw('lifetime_debits + '.$take),
+                'updated_at' => now(),
+            ]);
+            $after = (string) DB::table('wallets')->where('id', $wallet->id)->value('available_balance');
+
+            $txId = DB::table('wallet_transactions')->insertGetId([
+                'public_id' => (string) Str::ulid(),
+                'wallet_id' => $wallet->id,
+                'user_id' => $lockedPlan->user_id,
+                'artist_id' => $lockedPlan->artist_id,
+                'label_id' => $lockedPlan->label_id,
+                'transaction_type' => 'recoupment_recovery',
+                'direction' => 'debit',
+                'amount' => $take,
+                'currency' => (string) $wallet->currency,
+                'balance_before' => $before,
+                'balance_after' => $after,
+                'reference_type' => 'recoupment_plan',
+                'reference_id' => $lockedPlan->id,
+                'description' => 'Advance recovered from wallet balance ('.($lockedPlan->plan_number ?: '#'.$lockedPlan->id).')',
+                'status' => 'posted',
+                'effective_at' => now(),
+                'posted_at' => now(),
+                'metadata' => json_encode(['recoupment_plan_id' => $lockedPlan->id, 'source' => 'instant_wallet_sweep']),
+                'created_by' => $actorId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $recovery = RecoupmentRecovery::create([
+                'recoupment_plan_id' => $lockedPlan->id,
+                'royalty_statement_id' => null,
+                'wallet_transaction_id' => $txId,
+                'source_amount' => $available,
+                'base_percentage' => round((float) $lockedPlan->base_percentage, 8),
+                'recovery_percentage' => $recoveryPct,
+                'calculated_recovery_amount' => round($available * ($recoveryPct / 100), 8),
+                'applied_recovery_amount' => $take,
+                'outstanding_before' => $outstanding,
+                'outstanding_after' => round($outstanding - $take, 8),
+                'reporting_month' => now()->format('Y-m'),
+                'reference' => 'Instant wallet sweep on advance creation',
+                'idempotency_key' => 'wallet_sweep:'.$lockedPlan->id.':'.$txId,
+            ]);
+
+            $this->recalculatePlanTotals($lockedPlan);
+
+            return $recovery;
         });
     }
 

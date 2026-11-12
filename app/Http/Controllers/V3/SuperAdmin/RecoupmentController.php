@@ -215,6 +215,21 @@ class RecoupmentController extends Controller
             $plan
         );
 
+        // MIXXTUNE_INSTANT_WALLET_SWEEP_V1: recover immediately from the owner's
+        // existing wallet balance, not just future earnings.
+        $sweptAmount = 0.0;
+        if ($amount > 0) {
+            $sweep = $this->management->sweepWalletBalance($plan->fresh(), optional(Auth::user())->id);
+            if ($sweep) {
+                $sweptAmount = round((float) $sweep->applied_recovery_amount, 2);
+                FinanceAudit::log(
+                    'finance.recoupment_wallet_swept',
+                    '₹'.number_format($sweptAmount, 2).' recovered instantly from the wallet balance of '.($user->name ?: $user->email).' for '.$plan->plan_number.'.',
+                    ['plan_id' => $plan->id, 'amount' => $sweptAmount],
+                );
+            }
+        }
+
         if ($request->boolean('notify_owner', true) && $amount > 0) {
             $this->tellOwner(
                 $user,
@@ -224,7 +239,12 @@ class RecoupmentController extends Controller
             );
         }
 
-        return back()->with('success', 'Plan '.$plan->plan_number.' created'.($amount > 0 ? ' with ₹'.number_format($amount, 2).' to recover.' : '. Add the advance with "Add cost".'));
+        $msg = 'Plan '.$plan->plan_number.' created'.($amount > 0 ? ' with ₹'.number_format($amount, 2).' to recover.' : '. Add the advance with "Add cost".');
+        if ($sweptAmount > 0) {
+            $msg .= ' ₹'.number_format($sweptAmount, 2).' was recovered instantly from the wallet.';
+        }
+
+        return back()->with('success', $msg);
     }
 
     private function checkScope(User $user, $labelId, $artistId): void

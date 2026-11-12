@@ -687,4 +687,46 @@ class RecoupmentManagementServiceTest extends TestCase
         );
     }
 
+    public function test_wallet_sweep_recovers_existing_balance_instantly_on_create(): void
+    {
+        $user = \App\Models\User::factory()->create();
+
+        // Owner already has 506.41 sitting in the wallet.
+        \Illuminate\Support\Facades\DB::table('wallets')->insert([
+            'public_id' => (string) \Illuminate\Support\Str::ulid(),
+            'user_id' => $user->id,
+            'artist_id' => null,
+            'label_id' => null,
+            'currency' => 'INR',
+            'available_balance' => 506.41,
+            'pending_balance' => 0,
+            'lifetime_credits' => 506.41,
+            'lifetime_debits' => 0,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Advance of 500 @ 100% recovery.
+        $plan = $this->service->createPlan($user, [
+            'base_percentage' => 100,
+            'recovery_uplift_percentage' => 100,
+            'maximum_recovery_percentage' => null,
+            'initial_amount' => 500,
+            'initial_category' => 'advance',
+            'initial_title' => 'Advance',
+        ], $user);
+
+        $sweep = $this->service->sweepWalletBalance($plan->fresh(), $user->id);
+
+        // 500 taken from the wallet (capped by outstanding), balance left 6.41.
+        $this->assertNotNull($sweep);
+        $this->assertEqualsWithDelta(500.0, (float) $sweep->applied_recovery_amount, 0.001);
+        $this->assertEqualsWithDelta(6.41, (float) \Illuminate\Support\Facades\DB::table('wallets')->where('user_id', $user->id)->value('available_balance'), 0.001);
+
+        // Advance cleared; a debit transaction exists.
+        $this->assertEqualsWithDelta(0.0, (float) $plan->fresh()->outstanding_amount, 0.001);
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('wallet_transactions')->where('direction', 'debit')->where('transaction_type', 'recoupment_recovery')->count());
+    }
+
 }
