@@ -323,13 +323,15 @@ class ReportImportScheduledPublisherTest extends TestCase
         $this->assertEqualsWithDelta(600.0, (float) $credit, 0.00001);
     }
 
-    // W170: advance charge reduces the owner's net (extra profit) before recovery.
-    public function test_advance_charge_reduces_net_then_recovery_runs_on_the_reduced_net(): void
+    // MIXXTUNE_ADVANCE_CHARGE_ON_WALLET_V1: the charge is a flat % of the NET
+    // amount landing in the wallet (not a label-rate reduction); recovery runs on
+    // the remaining net.
+    public function test_advance_charge_is_percent_of_net_then_recovery_runs_on_the_rest(): void
     {
         // Active-user label: collected 1000, net 800 (applicable rate 80%).
         $s = $this->scenario([['user' => 'active', 'allocs' => [['1000.00000000', '800.00000000']]]]);
 
-        // Advance 10000, advance charge 10% (80 -> 70), recovery 100% of earning.
+        // Advance 10000, advance charge 10% of net, recovery 100% of earning.
         $planId = $this->ins('recoupment_plans', [
             'user_id' => $s['users'][0],
             'label_id' => $s['labels'][0],
@@ -348,22 +350,22 @@ class ReportImportScheduledPublisherTest extends TestCase
 
         $this->publisher()->publish($s['import']);
 
-        // Advance charge = 10% of collected 1000 = 100 -> reduced net 700.
-        // Recovery 100% of 700 = 700 to the advance; wallet gets 0.
+        // Advance charge = 10% of net 800 = 80 -> reduced net 720.
+        // Recovery 100% of 720 = 720 to the advance; wallet gets 0.
         $recovery = DB::table('recoupment_recoveries')->where('recoupment_plan_id', $planId)->first();
         $this->assertNotNull($recovery);
-        $this->assertEqualsWithDelta(700.0, (float) $recovery->applied_recovery_amount, 0.001);
+        $this->assertEqualsWithDelta(720.0, (float) $recovery->applied_recovery_amount, 0.001);
 
-        // Outstanding fell by 700 (10000 -> 9300).
-        $this->assertEqualsWithDelta(9300.0, (float) DB::table('recoupment_plans')->where('id', $planId)->value('outstanding_amount'), 0.001);
+        // Outstanding fell by 720 (10000 -> 9280).
+        $this->assertEqualsWithDelta(9280.0, (float) DB::table('recoupment_plans')->where('id', $planId)->value('outstanding_amount'), 0.001);
 
         // Wallet credited 0 (whole reduced net went to the advance).
         $credit = (float) DB::table('wallet_transactions')->where('direction', 'credit')->sum('amount');
         $this->assertEqualsWithDelta(0.0, $credit, 0.001);
 
-        // Statement: the 100 advance charge is recorded as commission (your profit).
+        // Statement: the 80 advance charge is recorded as commission (your profit).
         $stmt = DB::table('royalty_statements')->where('id', $s['stmt'][0])->first();
-        $this->assertEqualsWithDelta(100.0, (float) $stmt->commission_amount, 0.001);
+        $this->assertEqualsWithDelta(80.0, (float) $stmt->commission_amount, 0.001);
     }
 
     // Test E1

@@ -190,43 +190,99 @@ class RecoupmentManagementService
             $recoveryPct = $this->calculator->recoveryPercentage($lockedPlan);
             $available = round((float) $wallet->available_balance, 8);
 
-            // Recover recovery% of the available balance, capped by outstanding and balance.
-            $take = round(min($available * ($recoveryPct / 100), $outstanding, $available), 8);
-            if ($take <= 0) {
+            /*
+             * MIXXTUNE_ADVANCE_CHARGE_ON_WALLET_V1
+             *
+             * The advance charge is a flat % of the net amount that lands in the
+             * wallet (whatever the source - digital/YouTube publisher, IPRS, ...),
+             * NOT a reduction of the label rate. Of the base we sweep:
+             *   commission = base * charge%   -> publisher/company profit
+             *   recoup     = base - commission -> reduces the advance
+             * recoup is still capped by the outstanding advance.
+             */
+            $charge = round((float) $lockedPlan->advance_charge_percentage, 8);
+            // base = recovery% of the available balance, capped by balance
+            $base = round(min($available * ($recoveryPct / 100), $available), 8);
+            $commission = $charge > 0 ? round($base * ($charge / 100), 8) : 0.0;
+            $recoupBase = round($base - $commission, 8);
+            // the advance only takes what it still owes
+            $take = round(min($recoupBase, $outstanding), 8);
+            if ($take <= 0 && $commission <= 0) {
                 return null;
             }
+            // total pulled from the wallet = advance repayment + commission
+            $sweep = round($take + $commission, 8);
 
-            $before = (string) $wallet->available_balance;
+            $balanceBefore = round((float) $wallet->available_balance, 8);
             DB::table('wallets')->where('id', $wallet->id)->update([
-                'available_balance' => DB::raw('available_balance - ('.$take.')'),
-                'lifetime_debits' => DB::raw('lifetime_debits + '.$take),
+                'available_balance' => DB::raw('available_balance - ('.$sweep.')'),
+                'lifetime_debits' => DB::raw('lifetime_debits + '.$sweep),
                 'updated_at' => now(),
             ]);
-            $after = (string) DB::table('wallets')->where('id', $wallet->id)->value('available_balance');
 
-            $txId = DB::table('wallet_transactions')->insertGetId([
-                'public_id' => (string) Str::ulid(),
-                'wallet_id' => $wallet->id,
-                'user_id' => $lockedPlan->user_id,
-                'artist_id' => $lockedPlan->artist_id,
-                'label_id' => $lockedPlan->label_id,
-                'transaction_type' => 'recoupment_recovery',
-                'direction' => 'debit',
-                'amount' => $take,
-                'currency' => (string) $wallet->currency,
-                'balance_before' => $before,
-                'balance_after' => $after,
-                'reference_type' => 'recoupment_plan',
-                'reference_id' => $lockedPlan->id,
-                'description' => 'Advance recovered from wallet balance ('.($lockedPlan->plan_number ?: '#'.$lockedPlan->id).')',
-                'status' => 'posted',
-                'effective_at' => now(),
-                'posted_at' => now(),
-                'metadata' => json_encode(['recoupment_plan_id' => $lockedPlan->id, 'source' => 'instant_wallet_sweep']),
-                'created_by' => $actorId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // Post the advance-repayment debit first, then the commission debit.
+            $runningBefore = $balanceBefore;
+            $txId = null;
+            if ($take > 0) {
+                $runningAfter = round($runningBefore - $take, 8);
+                $txId = DB::table('wallet_transactions')->insertGetId([
+                    'public_id' => (string) Str::ulid(),
+                    'wallet_id' => $wallet->id,
+                    'user_id' => $lockedPlan->user_id,
+                    'artist_id' => $lockedPlan->artist_id,
+                    'label_id' => $lockedPlan->label_id,
+                    'transaction_type' => 'recoupment_recovery',
+                    'direction' => 'debit',
+                    'amount' => $take,
+                    'currency' => (string) $wallet->currency,
+                    'balance_before' => (string) $runningBefore,
+                    'balance_after' => (string) $runningAfter,
+                    'reference_type' => 'recoupment_plan',
+                    'reference_id' => $lockedPlan->id,
+                    'description' => 'Advance recovered from wallet balance ('.($lockedPlan->plan_number ?: '#'.$lockedPlan->id).')',
+                    'status' => 'posted',
+                    'effective_at' => now(),
+                    'posted_at' => now(),
+                    'metadata' => json_encode(['recoupment_plan_id' => $lockedPlan->id, 'source' => 'instant_wallet_sweep']),
+                    'created_by' => $actorId,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $runningBefore = $runningAfter;
+            }
+            if ($commission > 0) {
+                $runningAfter = round($runningBefore - $commission, 8);
+                DB::table('wallet_transactions')->insert([
+                    'public_id' => (string) Str::ulid(),
+                    'wallet_id' => $wallet->id,
+                    'user_id' => $lockedPlan->user_id,
+                    'artist_id' => $lockedPlan->artist_id,
+                    'label_id' => $lockedPlan->label_id,
+                    'transaction_type' => 'advance_charge_commission',
+                    'direction' => 'debit',
+                    'amount' => $commission,
+                    'currency' => (string) $wallet->currency,
+                    'balance_before' => (string) $runningBefore,
+                    'balance_after' => (string) $runningAfter,
+                    'reference_type' => 'recoupment_plan',
+                    'reference_id' => $lockedPlan->id,
+                    'description' => 'Advance charge ('.rtrim(rtrim(number_format($charge, 4), '0'), '.').'%) on wallet balance ('.($lockedPlan->plan_number ?: '#'.$lockedPlan->id).')',
+                    'status' => 'posted',
+                    'effective_at' => now(),
+                    'posted_at' => now(),
+                    'metadata' => json_encode(['recoupment_plan_id' => $lockedPlan->id, 'source' => 'instant_wallet_sweep', 'advance_charge_percentage' => $charge]),
+                    'created_by' => $actorId,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            if ($take <= 0) {
+                // only commission was taken; no recovery row to create
+                $this->recalculatePlanTotals($lockedPlan);
+
+                return null;
+            }
 
             $recovery = RecoupmentRecovery::create([
                 'recoupment_plan_id' => $lockedPlan->id,

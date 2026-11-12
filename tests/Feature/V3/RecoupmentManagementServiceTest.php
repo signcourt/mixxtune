@@ -729,4 +729,59 @@ class RecoupmentManagementServiceTest extends TestCase
         $this->assertSame(1, \Illuminate\Support\Facades\DB::table('wallet_transactions')->where('direction', 'debit')->where('transaction_type', 'recoupment_recovery')->count());
     }
 
+    /**
+     * MIXXTUNE_ADVANCE_CHARGE_ON_WALLET_V1: with an advance charge, the sweep
+     * takes charge% of the wallet amount as commission and only the rest repays
+     * the advance. ₹506, 10% charge, 100% recovery:
+     *   commission = 50.60 (publisher profit), recoup = 455.40, wallet -> 0.
+     */
+    public function test_wallet_sweep_applies_advance_charge_before_recovery(): void
+    {
+        $user = \App\Models\User::factory()->create();
+
+        \Illuminate\Support\Facades\DB::table('wallets')->insert([
+            'public_id' => (string) \Illuminate\Support\Str::ulid(),
+            'user_id' => $user->id,
+            'artist_id' => null,
+            'label_id' => null,
+            'currency' => 'INR',
+            'available_balance' => 506.00,
+            'pending_balance' => 0,
+            'lifetime_credits' => 506.00,
+            'lifetime_debits' => 0,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Advance 1000 @ 100% recovery, 10% advance charge.
+        $plan = $this->service->createPlan($user, [
+            'base_percentage' => 100,
+            'recovery_uplift_percentage' => 100,
+            'maximum_recovery_percentage' => null,
+            'advance_charge_percentage' => 10,
+            'initial_amount' => 1000,
+            'initial_category' => 'advance',
+            'initial_title' => 'Advance',
+        ], $user);
+
+        $sweep = $this->service->sweepWalletBalance($plan->fresh(), $user->id);
+
+        // commission = 506 * 10% = 50.60 ; recoup = 455.40.
+        $this->assertNotNull($sweep);
+        $this->assertEqualsWithDelta(455.40, (float) $sweep->applied_recovery_amount, 0.001);
+
+        // Wallet emptied: 455.40 to advance + 50.60 commission = 506.
+        $this->assertEqualsWithDelta(0.0, (float) \Illuminate\Support\Facades\DB::table('wallets')->where('user_id', $user->id)->value('available_balance'), 0.001);
+
+        // Outstanding fell by 455.40 only (1000 -> 544.60).
+        $this->assertEqualsWithDelta(544.60, (float) $plan->fresh()->outstanding_amount, 0.001);
+
+        // The 50.60 is booked as a separate commission debit, not a recovery.
+        $this->assertEqualsWithDelta(50.60, (float) \Illuminate\Support\Facades\DB::table('wallet_transactions')
+            ->where('transaction_type', 'advance_charge_commission')->sum('amount'), 0.001);
+        $this->assertEqualsWithDelta(455.40, (float) \Illuminate\Support\Facades\DB::table('wallet_transactions')
+            ->where('transaction_type', 'recoupment_recovery')->sum('amount'), 0.001);
+    }
+
 }

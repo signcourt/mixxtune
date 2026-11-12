@@ -714,18 +714,19 @@ class ReportImportScheduledPublisher
 
             if (isset($plan) && $plan) {
                 /*
-                 * MIXXTUNE_ADVANCE_CHARGE_V1
+                 * MIXXTUNE_ADVANCE_CHARGE_ON_WALLET_V1
                  *
-                 * While an advance is outstanding, the owner's applicable rate is
-                 * reduced by advance_charge_percentage points. That reduction is a
-                 * share of the COLLECTED (gross) revenue — e.g. 80% - 10 = 70%,
-                 * so 10% of gross moves from the owner's net to the publisher's
-                 * profit. Recovery then runs on the already-reduced net. When the
-                 * advance clears, the charge no longer applies (no active plan).
+                 * The advance charge is a flat % of the NET amount that lands in
+                 * the owner's wallet (whatever the source — digital/YouTube
+                 * publisher, IPRS, …), not a reduction of the label rate. So the
+                 * charge is advance_charge_percentage of deltaNet: that slice
+                 * becomes the publisher/company commission, and recovery then
+                 * runs on the remaining net. When the advance clears, no active
+                 * plan is found and the charge no longer applies.
                  */
                 $charge = round((float) $plan->advance_charge_percentage, 8);
-                if ($charge > 0 && $deltaGross > 0) {
-                    $advanceChargeAmount = round(min($deltaGross * ($charge / 100), $deltaNet), 8);
+                if ($charge > 0 && $deltaNet > 0) {
+                    $advanceChargeAmount = round($deltaNet * ($charge / 100), 8);
                     $deltaNet = round($deltaNet - $advanceChargeAmount, 8);
                 }
 
@@ -974,10 +975,10 @@ class ReportImportScheduledPublisher
          * accumulate import-by-import.
          */
         /*
-         * MIXXTUNE_ADVANCE_CHARGE_V1: the advance charge is extra publisher
-         * commission while the advance is outstanding. It raises commission and
-         * lowers the owner's net_payable on the statement; it is not a recovery
-         * (it does not reduce the advance).
+         * MIXXTUNE_ADVANCE_CHARGE_ON_WALLET_V1: the advance charge is extra
+         * publisher commission while the advance is outstanding — a flat % of the
+         * owner's net. It raises commission and lowers the owner's net_payable on
+         * the statement; it is not a recovery (it does not reduce the advance).
          */
         if ($advanceChargeAmount > 0) {
             DB::table('royalty_statements')
