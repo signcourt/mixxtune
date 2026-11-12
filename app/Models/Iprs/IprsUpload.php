@@ -22,6 +22,7 @@ class IprsUpload extends Model
         'total_lines',
         'total_works',
         'status',
+        'royalty_type',
         'period_label',
         'metadata',
     ];

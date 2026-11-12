@@ -1935,6 +1935,16 @@ Route::middleware(['auth', 'verified'])
             [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'index']
         )->name('index');
 
+        Route::get(
+            '/rates',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'rates']
+        )->name('rates');
+
+        Route::post(
+            '/rates',
+            [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'saveRate']
+        )->name('rates.save');
+
         Route::post(
             '/uploads',
             [\App\Http\Controllers\V2\Admin\IprsImportController::class, 'store']

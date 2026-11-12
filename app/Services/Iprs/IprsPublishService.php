@@ -26,6 +26,7 @@ class IprsPublishService
     public function __construct(
         private CatalogueOwnershipService $ownership,
         private WalletPostingService $wallet,
+        private IprsRateService $rates,
     ) {
     }
 
@@ -69,7 +70,13 @@ class IprsPublishService
             }
 
             $gross = round((float) $line->amount, 8);
-            $share = (float) $owner['share'];
+            // Owner-share rate for this owner and the statement's royalty type
+            // (per-owner rate -> global default -> digital share -> 100).
+            $share = $this->rates->ownerShare(
+                $owner['beneficiary_type'],
+                (int) $owner['beneficiary_id'],
+                $upload->royalty_type ?: 'publishing'
+            );
             $net = round($gross * $share / 100, 8);
 
             $ledgerId = DB::transaction(function () use ($line, $track, $owner, $gross, $net, $share, $month, $actorId) {

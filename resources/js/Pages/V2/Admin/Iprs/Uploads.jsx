@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from "@inertiajs/react";
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, Trash2, Upload, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, Percent, Trash2, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
@@ -92,6 +92,12 @@ export default function Uploads({ role = "admin", uploads = {} }) {
             <Head title="IPRS Publishing Royalty" />
 
             <div className="space-y-5">
+                <div className="flex justify-end">
+                    <Link href="/admin/iprs/rates" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700">
+                        <Percent className="h-4 w-4" /> Royalty rates
+                    </Link>
+                </div>
+
                 {flash.success && (
                     <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
                         <CheckCircle2 className="h-4 w-4" /> {flash.success}

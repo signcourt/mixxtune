@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Iprs\IprsImportService;
 use App\Services\Iprs\IprsMappingService;
 use App\Services\Iprs\IprsPublishService;
+use App\Services\Iprs\IprsRateService;
 use App\Services\V2\ActionOtpGuard;
 use App\Services\V2\PermissionService;
 use Illuminate\Http\RedirectResponse;
@@ -224,6 +225,44 @@ class IprsImportController extends Controller
         $iprsUpload->delete(); // cascades to lines
 
         return back()->with('flash', ['success' => 'IPRS statement deleted.']);
+    }
+
+    /** Per-owner, per-type IPRS royalty rate settings. */
+    public function rates(Request $request, PermissionService $permissions, IprsRateService $rates): Response
+    {
+        $role = $this->gate($request, $permissions);
+
+        $q = (string) $request->query('q', '');
+
+        return Inertia::render('V2/Admin/Iprs/Rates', [
+            'role' => $role,
+            'types' => IprsRateService::TYPES,
+            'defaults' => $rates->defaults(),
+            'owners' => $rates->listOwners($q),
+            'q' => $q,
+        ]);
+    }
+
+    public function saveRate(Request $request, PermissionService $permissions, IprsRateService $rates): RedirectResponse
+    {
+        $this->gate($request, $permissions);
+
+        $data = $request->validate([
+            'owner_type' => ['required', 'in:label,artist,default'],
+            'owner_id' => ['required', 'integer', 'min:0'],
+            'royalty_type' => ['required', 'in:'.implode(',', IprsRateService::TYPES)],
+            'owner_share_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+        ]);
+
+        if ($data['owner_share_percentage'] === null || $data['owner_share_percentage'] === '') {
+            $rates->clearRate($data['owner_type'], (int) $data['owner_id'], $data['royalty_type']);
+
+            return back()->with('flash', ['success' => 'Rate cleared (will use the next fallback).']);
+        }
+
+        $rates->setRate($data['owner_type'], (int) $data['owner_id'], $data['royalty_type'], (float) $data['owner_share_percentage'], $request->user()->id);
+
+        return back()->with('flash', ['success' => 'Rate saved: owner keeps '.$data['owner_share_percentage'].'%.']);
     }
 
     private function gate(Request $request, PermissionService $permissions): string
