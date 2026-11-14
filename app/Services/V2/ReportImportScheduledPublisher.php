@@ -714,19 +714,25 @@ class ReportImportScheduledPublisher
 
             if (isset($plan) && $plan) {
                 /*
-                 * MIXXTUNE_ADVANCE_CHARGE_ON_WALLET_V1
+                 * MIXXTUNE_ADVANCE_CHARGE_RATE_V2 (W181)
                  *
-                 * The advance charge is a flat % of the NET amount that lands in
-                 * the owner's wallet (whatever the source — digital/YouTube
-                 * publisher, IPRS, …), not a reduction of the label rate. So the
-                 * charge is advance_charge_percentage of deltaNet: that slice
-                 * becomes the publisher/company commission, and recovery then
-                 * runs on the remaining net. When the advance clears, no active
-                 * plan is found and the charge no longer applies.
+                 * The advance charge REDUCES THE LABEL RATE by C percentage
+                 * points while the advance is outstanding, so it is C% of the
+                 * GROSS (source) revenue, not of the net. Example: label 80%,
+                 * charge 1% -> label effective 79%:
+                 *   gross 100 -> net 80 (label 80%) -> charge = 1% of 100 = 1
+                 *   -> owner net = 79 (79%); the 1 is company profit.
+                 * (V1 took C% of the net, 80 x 1% = 0.80 -> 79.2%, a fraction of
+                 * a point rather than a full point.) The charge amount and the %
+                 * in force are recorded on the recovery row, so an editable
+                 * charge % keeps correct history. When the advance clears, no
+                 * active plan is found and the full label rate returns.
                  */
                 $charge = round((float) $plan->advance_charge_percentage, 8);
-                if ($charge > 0 && $deltaNet > 0) {
-                    $advanceChargeAmount = round($deltaNet * ($charge / 100), 8);
+                if ($charge > 0 && $deltaGross > 0 && $deltaNet > 0) {
+                    $advanceChargeAmount = round($deltaGross * ($charge / 100), 8);
+                    // never let the charge push the owner's net below zero
+                    $advanceChargeAmount = round(min($advanceChargeAmount, $deltaNet), 8);
                     $deltaNet = round($deltaNet - $advanceChargeAmount, 8);
                 }
 
@@ -760,6 +766,12 @@ class ReportImportScheduledPublisher
                                 // into the owner-facing recovery invoice total.
                                 'advance_charge_amount' =>
                                     $advanceChargeAmount,
+
+                                // MIXXTUNE_ADVANCE_CHARGE_RATE_V2 (W181): record
+                                // the % in force so profit history survives an
+                                // editable charge %.
+                                'advance_charge_percentage' =>
+                                    $charge,
                             ]
                         )
                     : null;

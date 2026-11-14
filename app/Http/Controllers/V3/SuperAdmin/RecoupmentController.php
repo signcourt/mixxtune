@@ -88,6 +88,12 @@ class RecoupmentController extends Controller
 
         $plans->getCollection()->transform(function (RecoupmentPlan $plan) {
             $plan->setAttribute('rates', $this->rates($plan));
+            // MIXXTUNE_ADVANCE_CHARGE_RATE_V2 (W181): cumulative company profit
+            // from the advance charge for this plan, read from the per-recovery
+            // recorded amounts (correct even after the charge % is edited).
+            $plan->setAttribute('charge_profit', round((float) DB::table('recoupment_recoveries')
+                ->where('recoupment_plan_id', $plan->id)
+                ->sum('advance_charge_amount'), 2));
 
             return $plan;
         });
@@ -102,6 +108,8 @@ class RecoupmentController extends Controller
             'completed_plans' => RecoupmentPlan::query()->where('status', 'completed')->count(),
             'written_off' => round((float) RecoupmentPlan::query()->where('status', 'cancelled')->sum('outstanding_amount'), 2),
             'empty_plans' => RecoupmentPlan::query()->where('status', 'active')->where('total_recoverable_amount', '<=', 0)->count(),
+            // W181: total company profit from advance charges, all plans.
+            'charge_profit' => round((float) DB::table('recoupment_recoveries')->sum('advance_charge_amount'), 2),
         ];
 
         return Inertia::render('V3/SuperAdmin/Recoupment/Index', [

@@ -730,12 +730,13 @@ class RecoupmentManagementServiceTest extends TestCase
     }
 
     /**
-     * MIXXTUNE_ADVANCE_CHARGE_ON_WALLET_V1: with an advance charge, the sweep
-     * takes charge% of the wallet amount as commission and only the rest repays
-     * the advance. ₹506, 10% charge, 100% recovery:
-     *   commission = 50.60 (publisher profit), recoup = 455.40, wallet -> 0.
+     * MIXXTUNE_ADVANCE_CHARGE_RATE_V2 (W181): the instant sweep on advance
+     * creation takes a clean 100% of the money ALREADY in the wallet into the
+     * advance — NO advance charge (that balance was credited earlier at the full
+     * label rate; the charge only reduces the label rate on new earnings). ₹506,
+     * 100% recovery: recoup = 506, wallet -> 0, no commission.
      */
-    public function test_wallet_sweep_applies_advance_charge_before_recovery(): void
+    public function test_wallet_sweep_takes_a_clean_full_balance_with_no_charge(): void
     {
         $user = \App\Models\User::factory()->create();
 
@@ -754,7 +755,8 @@ class RecoupmentManagementServiceTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        // Advance 1000 @ 100% recovery, 10% advance charge.
+        // Advance 1000 @ 100% recovery, 10% advance charge set on the plan
+        // (which must NOT apply to the instant sweep of pre-existing balance).
         $plan = $this->service->createPlan($user, [
             'base_percentage' => 100,
             'recovery_uplift_percentage' => 100,
@@ -767,25 +769,23 @@ class RecoupmentManagementServiceTest extends TestCase
 
         $sweep = $this->service->sweepWalletBalance($plan->fresh(), $user->id);
 
-        // commission = 506 * 10% = 50.60 ; recoup = 455.40.
+        // The whole ₹506 repays the advance — no charge carved out.
         $this->assertNotNull($sweep);
-        $this->assertEqualsWithDelta(455.40, (float) $sweep->applied_recovery_amount, 0.001);
+        $this->assertEqualsWithDelta(506.00, (float) $sweep->applied_recovery_amount, 0.001);
 
-        // Wallet emptied: 455.40 to advance + 50.60 commission = 506.
+        // Wallet emptied: 506 to advance, nothing else.
         $this->assertEqualsWithDelta(0.0, (float) \Illuminate\Support\Facades\DB::table('wallets')->where('user_id', $user->id)->value('available_balance'), 0.001);
 
-        // Outstanding fell by 455.40 only (1000 -> 544.60).
-        $this->assertEqualsWithDelta(544.60, (float) $plan->fresh()->outstanding_amount, 0.001);
+        // Outstanding fell by the full 506 (1000 -> 494).
+        $this->assertEqualsWithDelta(494.00, (float) $plan->fresh()->outstanding_amount, 0.001);
 
-        // The 50.60 is booked as a separate commission debit, not a recovery.
-        $this->assertEqualsWithDelta(50.60, (float) \Illuminate\Support\Facades\DB::table('wallet_transactions')
+        // No commission debit at all; the recovery debit is the full 506.
+        $this->assertEqualsWithDelta(0.0, (float) \Illuminate\Support\Facades\DB::table('wallet_transactions')
             ->where('transaction_type', 'advance_charge_commission')->sum('amount'), 0.001);
-        $this->assertEqualsWithDelta(455.40, (float) \Illuminate\Support\Facades\DB::table('wallet_transactions')
+        $this->assertEqualsWithDelta(506.00, (float) \Illuminate\Support\Facades\DB::table('wallet_transactions')
             ->where('transaction_type', 'recoupment_recovery')->sum('amount'), 0.001);
 
-        // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1 + HIDE_ADVANCE_CHARGE_V1:
-        // the owner-facing invoice total folds the charge into the recovery,
-        // so it is the WHOLE amount taken: -(455.40 + 50.60) = -506.00.
+        // The owner-facing advance-recovery invoice total is the whole -506.00.
         $inv = \Illuminate\Support\Facades\DB::table('invoices')
             ->where('user_id', $user->id)->where('invoice_type', 'advance_recovery')->first();
         $this->assertNotNull($inv, 'advance_recovery invoice should be created on sweep');

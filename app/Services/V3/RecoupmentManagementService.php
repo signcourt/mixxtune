@@ -191,27 +191,26 @@ class RecoupmentManagementService
             $available = round((float) $wallet->available_balance, 8);
 
             /*
-             * MIXXTUNE_ADVANCE_CHARGE_ON_WALLET_V1
+             * MIXXTUNE_ADVANCE_CHARGE_RATE_V2 (W181)
              *
-             * The advance charge is a flat % of the net amount that lands in the
-             * wallet (whatever the source - digital/YouTube publisher, IPRS, ...),
-             * NOT a reduction of the label rate. Of the base we sweep:
-             *   commission = base * charge%   -> publisher/company profit
-             *   recoup     = base - commission -> reduces the advance
-             * recoup is still capped by the outstanding advance.
+             * The instant sweep on advance creation pulls money that is ALREADY
+             * in the wallet — it was credited earlier at the full label rate, so
+             * NO advance charge applies to it (the charge only reduces the label
+             * rate on NEW earnings, handled at report-publish time). The sweep is
+             * therefore a clean 100% (recovery%) of the available balance into the
+             * advance, capped by the outstanding. (V1 carved a commission out of
+             * this sweep — removed.)
              */
-            $charge = round((float) $lockedPlan->advance_charge_percentage, 8);
             // base = recovery% of the available balance, capped by balance
             $base = round(min($available * ($recoveryPct / 100), $available), 8);
-            $commission = $charge > 0 ? round($base * ($charge / 100), 8) : 0.0;
-            $recoupBase = round($base - $commission, 8);
+            $commission = 0.0;
             // the advance only takes what it still owes
-            $take = round(min($recoupBase, $outstanding), 8);
-            if ($take <= 0 && $commission <= 0) {
+            $take = round(min($base, $outstanding), 8);
+            if ($take <= 0) {
                 return null;
             }
-            // total pulled from the wallet = advance repayment + commission
-            $sweep = round($take + $commission, 8);
+            // total pulled from the wallet = advance repayment (no charge here)
+            $sweep = $take;
 
             $balanceBefore = round((float) $wallet->available_balance, 8);
             DB::table('wallets')->where('id', $wallet->id)->update([
@@ -719,6 +718,18 @@ class RecoupmentManagementService
                     $preview[
                         'recovery_percentage'
                     ],
+
+                /*
+                 * MIXXTUNE_ADVANCE_CHARGE_RATE_V2 (W181): record the advance
+                 * charge % in force and the ₹ taken as company profit for this
+                 * recovery event, so the super-admin profit view is accurate even
+                 * after the charge % is edited.
+                 */
+                'advance_charge_percentage' =>
+                    round((float) ($context['advance_charge_percentage'] ?? 0), 8),
+
+                'advance_charge_amount' =>
+                    round((float) ($context['advance_charge_amount'] ?? 0), 8),
 
                 'calculated_recovery_amount' =>
                     $preview[

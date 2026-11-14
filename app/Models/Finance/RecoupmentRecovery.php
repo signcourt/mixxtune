@@ -14,6 +14,9 @@ class RecoupmentRecovery extends Model
         'source_amount',
         'base_percentage',
         'recovery_percentage',
+        // W181: advance charge recorded per recovery event (editable-% history)
+        'advance_charge_percentage',
+        'advance_charge_amount',
         'calculated_recovery_amount',
         'applied_recovery_amount',
         'outstanding_before',
@@ -27,6 +30,8 @@ class RecoupmentRecovery extends Model
         'source_amount' => 'decimal:8',
         'base_percentage' => 'decimal:4',
         'recovery_percentage' => 'decimal:4',
+        'advance_charge_percentage' => 'decimal:4',
+        'advance_charge_amount' => 'decimal:8',
         'calculated_recovery_amount' => 'decimal:8',
         'applied_recovery_amount' => 'decimal:8',
         'outstanding_before' => 'decimal:8',

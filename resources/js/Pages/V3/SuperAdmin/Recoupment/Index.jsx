@@ -110,11 +110,13 @@ export default function Index({ plans = {}, summary = {}, filters = {} }) {
                 </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
                 <Stat icon={ReceiptIndianRupee} label="Given / to recover" value={money(summary.total_recoverable)} hint="active + fully recovered plans" />
                 <Stat icon={BadgeIndianRupee} label="Recovered" value={money(summary.total_recovered)} tone="text-emerald-700" />
                 <Stat icon={TrendingDown} label="Still outstanding" value={money(summary.outstanding)} tone="text-amber-700" hint={summary.written_off > 0 ? `${money(summary.written_off)} written off (cancelled)` : null} />
                 <Stat icon={WalletCards} label="Plans recovering" value={`${summary.active_plans ?? 0}`} hint={`${summary.completed_plans ?? 0} fully recovered`} />
+                {/* W181: company profit from advance charges */}
+                <Stat icon={BadgeIndianRupee} label="Charge profit" value={money(summary.charge_profit ?? 0)} tone="text-violet-700" hint="company earnings from advance charges" />
             </div>
 
             {summary.empty_plans > 0 && (
@@ -217,6 +219,12 @@ function Row({ p, busy, onOpen, onDelete }) {
                     {r.advance_charge > 0 && (
                         <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">
                             charge +{pct(r.advance_charge)}{r.running ? <> · {pct(r.base)}→{pct(r.applicable_now)}</> : null}
+                        </span>
+                    )}
+                    {/* W181: cumulative company profit from the charge on this plan */}
+                    {Number(p.charge_profit || 0) > 0 && (
+                        <span className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-700">
+                            profit {money(p.charge_profit)}
                         </span>
                     )}
                     <span className="text-slate-400">since {day(p.starts_on)}</span>
