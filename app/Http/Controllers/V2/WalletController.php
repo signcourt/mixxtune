@@ -175,7 +175,8 @@ class WalletController extends Controller
             $transactions = $this->history(
                 \App\Models\Finance\WalletTransaction::query()
                     ->whereIn('wallet_id', $onlyWallet ? [$onlyWallet] : $walletIds),
-                true
+                true,
+                $role
             );
 
             /*
@@ -318,7 +319,7 @@ class WalletController extends Controller
                     $wallet,
 
                 'transactions' =>
-                    $this->history($wallet->transactions()->getQuery(), false),
+                    $this->history($wallet->transactions()->getQuery(), false, $role),
 
                 /* MIXXTUNE_WALLET_V2: money in withdrawal requests (was "on hold" 0) */
                 'inWithdrawal' => round((float) \Illuminate\Support\Facades\DB::table('withdrawals')
@@ -359,7 +360,7 @@ class WalletController extends Controller
      * name, owner (staff view), paging ("tx_page"). Before: raw ISO dates,
      * raw type codes, no paging links, no owner on the staff page.
      */
-    private function history($query, bool $staff)
+    private function history($query, bool $staff, ?string $role = null)
     {
         $labels = [
             'royalty_credit' => 'Royalty (pending)',
@@ -377,6 +378,31 @@ class WalletController extends Controller
             'advance_charge_commission' => 'Advance charge',
         ];
 
+        /*
+         * MIXXTUNE_HIDE_ADVANCE_CHARGE_V1
+         *
+         * Only a super admin sees the advance charge broken out (that is the
+         * publisher's profit). For an owner and a manager/admin the charge is
+         * folded INTO the advance-recovery line so they see one "Advance
+         * recovery" of the full amount, never a separate "10% charge" that would
+         * look like an extra deduction. This is display-only: the underlying
+         * wallet_transactions and balances are never changed.
+         */
+        $hideCharge = $role !== 'super_admin';
+        $chargeByPlan = collect();
+        if ($hideCharge) {
+            // Map each recovery's plan to the charge that rode with it, so we can
+            // add that amount onto the recovery row we DO show. Keyed by
+            // reference_id (the plan) — the sweep writes both in one go.
+            $chargeByPlan = (clone $query)->getQuery()
+                ->where('transaction_type', 'advance_charge_commission')
+                ->get(['reference_id', 'amount'])
+                ->groupBy('reference_id')
+                ->map(fn ($g) => (float) $g->sum('amount'));
+            // Drop the standalone charge rows from what we page through.
+            $query = $query->where('transaction_type', '!=', 'advance_charge_commission');
+        }
+
         $page = $query
             ->orderByDesc('id')
             ->paginate(30, ['*'], 'tx_page')
@@ -386,16 +412,25 @@ class WalletController extends Controller
             ? \Illuminate\Support\Facades\DB::table('users')->whereIn('id', $page->getCollection()->pluck('user_id')->filter())->pluck('name', 'id')
             : collect();
 
-        return $page->through(function ($t) use ($labels, $names, $staff) {
+        return $page->through(function ($t) use ($labels, $names, $staff, $hideCharge, $chargeByPlan) {
             $type = (string) ($t->transaction_type ?? '');
             $when = $t->posted_at ?? $t->created_at;
+            $amount = round((float) $t->amount, 2);
+
+            // Fold the matching advance charge into this recovery row (display only).
+            if ($hideCharge && in_array($type, ['recoupment_recovery', 'recoupment'], true)) {
+                $extra = (float) ($chargeByPlan[$t->reference_id] ?? 0);
+                if ($extra > 0) {
+                    $amount = round($amount + $extra, 2);
+                }
+            }
 
             return [
                 'id' => $t->id,
                 'date' => $when ? \Illuminate\Support\Carbon::parse($when)->timezone('Asia/Kolkata')->format('d M Y, h:i A') : '—',
                 'type' => $labels[$type] ?? ucfirst(str_replace('_', ' ', $type ?: 'entry')),
                 'direction' => $t->direction,
-                'amount' => round((float) $t->amount, 2),
+                'amount' => $amount,
                 'balance_after' => $t->balance_after !== null ? round((float) $t->balance_after, 2) : null,
                 'description' => $t->description,
                 'month' => $t->financial_month ? \Illuminate\Support\Carbon::parse($t->financial_month)->format('M Y') : null,

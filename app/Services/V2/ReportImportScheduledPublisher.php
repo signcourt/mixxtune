@@ -755,6 +755,11 @@ class ReportImportScheduledPublisher
                                 'idempotency_key' =>
                                     'report_import_posting:'
                                     .$postingId,
+
+                                // MIXXTUNE_HIDE_ADVANCE_CHARGE_V1: charge folds
+                                // into the owner-facing recovery invoice total.
+                                'advance_charge_amount' =>
+                                    $advanceChargeAmount,
                             ]
                         )
                     : null;

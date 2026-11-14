@@ -128,9 +128,16 @@ class InvoiceService
      */
     public function generateFromRecovery(
         \App\Models\Finance\RecoupmentRecovery $recovery,
-        ?int $actorId = null
+        ?int $actorId = null,
+        float $chargeAmount = 0.0
     ): ?Invoice {
-        $amount = round((float) $recovery->applied_recovery_amount, 2);
+        $recovered = round((float) $recovery->applied_recovery_amount, 2);
+        $charge = round(max(0, $chargeAmount), 2);
+        // MIXXTUNE_HIDE_ADVANCE_CHARGE_V1: the owner-facing amount folds the
+        // advance charge INTO the recovery, so the invoice total is the whole
+        // amount taken (recovery + charge). The split is kept in item meta for
+        // the super admin's breakdown. Underlying money is unchanged.
+        $amount = round($recovered + $charge, 2);
         if ($amount <= 0) {
             return null; // nothing recovered -> no invoice
         }
@@ -144,7 +151,7 @@ class InvoiceService
             return null;
         }
 
-        return DB::transaction(function () use ($recovery, $plan, $owner, $amount, $actorId) {
+        return DB::transaction(function () use ($recovery, $plan, $owner, $amount, $recovered, $charge, $actorId) {
             // Idempotent: one invoice per recovery row (keyed in notes).
             $key = 'recovery:'.$recovery->id;
             $existing = Invoice::query()
@@ -199,7 +206,9 @@ class InvoiceService
                 'meta' => [
                     'recoupment_plan_id' => $plan->id,
                     'recoupment_recovery_id' => $recovery->id,
-                    'recovered_amount' => $amount,
+                    'total_taken' => $amount,            // owner-facing (recovery + charge)
+                    'recovered_amount' => $recovered,    // super-admin breakdown
+                    'advance_charge' => $charge,         // super-admin breakdown (profit)
                     'outstanding_after' => round((float) $recovery->outstanding_after, 2),
                 ],
             ]);

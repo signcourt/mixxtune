@@ -303,8 +303,9 @@ class RecoupmentManagementService
             $this->recalculatePlanTotals($lockedPlan);
 
             // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1: one invoice per recovery.
+            // Fold the advance charge into the owner-facing invoice total.
             try {
-                app(\App\Services\V2\InvoiceService::class)->generateFromRecovery($recovery, $actorId);
+                app(\App\Services\V2\InvoiceService::class)->generateFromRecovery($recovery, $actorId, $commission);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('advance-recovery invoice (sweep) failed: '.$e->getMessage(), ['recovery_id' => $recovery->id]);
             }
@@ -788,8 +789,13 @@ class RecoupmentManagementService
             }
 
             // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1: one invoice per recovery.
+            // Fold the advance charge into the owner-facing invoice total.
             try {
-                app(\App\Services\V2\InvoiceService::class)->generateFromRecovery($recovery, $context['actor_id'] ?? null);
+                app(\App\Services\V2\InvoiceService::class)->generateFromRecovery(
+                    $recovery,
+                    $context['actor_id'] ?? null,
+                    (float) ($context['advance_charge_amount'] ?? 0)
+                );
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('advance-recovery invoice (statement) failed: '.$e->getMessage(), ['recovery_id' => $recovery->id]);
             }

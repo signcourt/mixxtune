@@ -140,6 +140,56 @@ class WalletReviewTest extends TestCase
             ->where('transactions.data.0.type', 'Manual adjustment'));
     }
 
+    /**
+     * MIXXTUNE_HIDE_ADVANCE_CHARGE_V1: an owner (and a manager/admin) sees the
+     * advance charge folded into one "Advance recovery" row; only a super admin
+     * sees the charge broken out.
+     */
+    private function recoveryPair(WalletAccount $w, int $planId, float $recovery, float $charge): void
+    {
+        DB::table('wallet_transactions')->insert([
+            'public_id' => (string) Str::ulid(), 'wallet_id' => $w->id, 'user_id' => $w->user_id,
+            'transaction_type' => 'recoupment_recovery', 'direction' => 'debit', 'amount' => $recovery, 'currency' => 'INR',
+            'balance_before' => 0, 'balance_after' => 0, 'reference_type' => 'recoupment_plan', 'reference_id' => $planId,
+            'description' => 'rec', 'status' => 'posted', 'created_at' => '2026-10-21 07:00:00', 'updated_at' => now(),
+        ]);
+        DB::table('wallet_transactions')->insert([
+            'public_id' => (string) Str::ulid(), 'wallet_id' => $w->id, 'user_id' => $w->user_id,
+            'transaction_type' => 'advance_charge_commission', 'direction' => 'debit', 'amount' => $charge, 'currency' => 'INR',
+            'balance_before' => 0, 'balance_after' => 0, 'reference_type' => 'recoupment_plan', 'reference_id' => $planId,
+            'description' => 'chg', 'status' => 'posted', 'created_at' => '2026-10-21 07:00:01', 'updated_at' => now(),
+        ]);
+    }
+
+    public function test_owner_sees_advance_charge_folded_into_recovery(): void
+    {
+        $owner = $this->user('label');
+        $w = $this->wallet($owner, 0, 0);
+        $this->recoveryPair($w, 4242, 455.77, 50.64);
+
+        // Owner: one row only, "Advance recovery", amount = 455.77 + 50.64 = 506.41.
+        $this->actingAs($owner)->get('/wallet')->assertOk()->assertInertia(fn (Assert $p) => $p
+            ->where('transactions.data', fn ($rows) => collect($rows)->count() === 1
+                && collect($rows)->first()['type'] === 'Advance recovery'
+                && abs((float) collect($rows)->first()['amount'] - 506.41) < 0.001)
+            ->etc());
+    }
+
+    public function test_super_admin_sees_advance_charge_broken_out(): void
+    {
+        $super = $this->user('super_admin');
+        $owner = $this->user('label');
+        $w = $this->wallet($owner, 0, 0);
+        $this->recoveryPair($w, 4343, 455.77, 50.64);
+
+        // Super admin: both rows present, charge shown separately.
+        $this->actingAs($super)->get('/admin/wallet?wallet='.$w->id)->assertOk()->assertInertia(fn (Assert $p) => $p
+            ->where('transactions.data', fn ($rows) => collect($rows)->count() === 2
+                && collect($rows)->contains(fn ($r) => $r['type'] === 'Advance charge' && abs((float) $r['amount'] - 50.64) < 0.001)
+                && collect($rows)->contains(fn ($r) => $r['type'] === 'Advance recovery' && abs((float) $r['amount'] - 455.77) < 0.001))
+            ->etc());
+    }
+
     public function test_owner_balances_csv_is_staff_only_and_audited(): void
     {
         $super = $this->user('super_admin');

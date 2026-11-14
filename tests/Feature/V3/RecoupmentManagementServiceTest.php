@@ -783,12 +783,13 @@ class RecoupmentManagementServiceTest extends TestCase
         $this->assertEqualsWithDelta(455.40, (float) \Illuminate\Support\Facades\DB::table('wallet_transactions')
             ->where('transaction_type', 'recoupment_recovery')->sum('amount'), 0.001);
 
-        // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1: an advance_recovery invoice is
-        // auto-created for the recovery, with a MINUS total.
+        // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1 + HIDE_ADVANCE_CHARGE_V1:
+        // the owner-facing invoice total folds the charge into the recovery,
+        // so it is the WHOLE amount taken: -(455.40 + 50.60) = -506.00.
         $inv = \Illuminate\Support\Facades\DB::table('invoices')
             ->where('user_id', $user->id)->where('invoice_type', 'advance_recovery')->first();
         $this->assertNotNull($inv, 'advance_recovery invoice should be created on sweep');
-        $this->assertEqualsWithDelta(-455.40, (float) $inv->total_amount, 0.001);
+        $this->assertEqualsWithDelta(-506.00, (float) $inv->total_amount, 0.001);
     }
 
     /**
