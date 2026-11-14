@@ -391,6 +391,23 @@ class WithdrawalService
                         now(),
                 ]);
 
+            /*
+             * MIXXTUNE_WITHDRAWAL_INVOICE_ON_REQUEST_V1: raise the owner's
+             * invoice as soon as the withdrawal is requested, so the owner (and
+             * the super admin) has the document with the payee bank details from
+             * the start. It is made final when the payout is paid. A failure here
+             * must not fail the withdrawal, so it is logged and swallowed.
+             */
+            try {
+                app(\App\Services\Invoices\InvoiceGenerationService::class)
+                    ->generateFromWithdrawal((int) $withdrawal->id, $actor->id);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning(
+                    'withdrawal-request invoice failed: '.$e->getMessage(),
+                    ['withdrawal_id' => $withdrawal->id]
+                );
+            }
+
             return $withdrawal->fresh();
         });
     }

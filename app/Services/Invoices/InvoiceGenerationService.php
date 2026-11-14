@@ -50,11 +50,18 @@ class InvoiceGenerationService
                 );
             }
 
-            if ($withdrawal->status !== 'paid') {
+            /*
+             * MIXXTUNE_WITHDRAWAL_INVOICE_ON_REQUEST_V1: the invoice is raised as
+             * soon as the owner requests a withdrawal (status 'issued'), and the
+             * SAME invoice becomes final ('paid') when the payout is made. Only
+             * a cancelled/rejected withdrawal gets no document.
+             */
+            if (! in_array($withdrawal->status, ['pending', 'approved', 'processing', 'paid'], true)) {
                 throw new RuntimeException(
-                    'Financial document can only be generated for a paid withdrawal.'
+                    'A financial document is not generated for a '.$withdrawal->status.' withdrawal.'
                 );
             }
+            $isPaid = $withdrawal->status === 'paid';
 
             $existing = DB::table('invoices')
                 ->where(
@@ -64,6 +71,33 @@ class InvoiceGenerationService
                 ->first();
 
             if ($existing) {
+                // If the payout is now genuinely paid (and the payee is still
+                // payout-ready — same KYC/company gate as a fresh document), mark
+                // the already-raised invoice final. If the payee is no longer
+                // ready (e.g. KYC re-opened), leave it 'issued' and let the
+                // existing "paid but not booked" safeguards stand.
+                if ($isPaid && $existing->status !== 'paid') {
+                    // Booking a paid withdrawal still requires the payee to be
+                    // payout-ready (KYC + company). If they are not (e.g. KYC was
+                    // re-opened), we must NOT silently book it paid — throw so the
+                    // caller keeps the "paid but not booked" safeguard, exactly as
+                    // before request-time invoices existed.
+                    $payeeNow = User::query()->find($withdrawal->user_id);
+                    $profileNow = $payeeNow ? PayoutProfile::query()->where('user_id', $payeeNow->id)->first() : null;
+                    $policyNow = $payeeNow ? $this->taxPolicy->policyFor($payeeNow, $profileNow) : null;
+                    if (! $policyNow || ! ($policyNow['kyc_ready'] ?? false)) {
+                        throw new RuntimeException('Payee KYC must be verified before booking the payout document.');
+                    }
+                    if (! ($policyNow['company_ready'] ?? false)) {
+                        throw new RuntimeException('Company billing configuration is incomplete.');
+                    }
+                    DB::table('invoices')->where('id', $existing->id)->update([
+                        'status' => 'paid',
+                        'paid_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
                 return [
                     'created' => false,
                     'invoice_id' =>
@@ -265,7 +299,7 @@ class InvoiceGenerationService
                         $netPayable,
 
                     'status' =>
-                        'issued',
+                        $isPaid ? 'paid' : 'issued',
 
                     'billing_name' =>
                         $billingName,
@@ -285,9 +319,29 @@ class InvoiceGenerationService
                     'pan' =>
                         $deduction['pan'],
 
+                    /*
+                     * MIXXTUNE_WITHDRAWAL_INVOICE_BANK_V1: the payee's own bank
+                     * details go onto the withdrawal invoice (full account
+                     * number, IFSC, bank, UPI, holder, address) so the document
+                     * reads like the bill the owner raises on us. The company's
+                     * own bank account is never put here.
+                     */
                     'billing_details' =>
                         json_encode(
-                            $policy['payee']
+                            array_merge(
+                                (array) $policy['payee'],
+                                $profile ? array_filter([
+                                    'account_holder_name' => $profile->account_holder_name,
+                                    'bank_account_number' => $profile->bank_account_number,
+                                    'ifsc_code' => $profile->ifsc_code,
+                                    'bank_name' => $profile->bank_name,
+                                    'branch_name' => $profile->branch_name ?? null,
+                                    'upi_id' => $profile->upi_id,
+                                    'pan_number' => $profile->pan_number,
+                                    'gst_number' => $profile->gst_number ?? null,
+                                    'address' => $billingAddress,
+                                ], fn ($v) => $v !== null && $v !== '') : []
+                            )
                         ),
 
                     'company_details' =>

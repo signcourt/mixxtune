@@ -257,9 +257,34 @@
             @if(!empty($invoice->pan))
                 PAN:
                 {{ $invoice->pan }}
+            @elseif(!empty($billing['pan_number']))
+                PAN:
+                {{ $billing['pan_number'] }}
             @elseif(!empty($billing['masked_pan']))
                 PAN:
                 {{ $billing['masked_pan'] }}
+            @endif
+
+            {{-- MIXXTUNE_WITHDRAWAL_INVOICE_BANK_V1: payee's own bank details --}}
+            @if(($invoice->invoice_type ?? '') !== 'advance_recovery' &&
+                (!empty($billing['bank_account_number']) || !empty($billing['upi_id'])))
+                <br>
+                <div class="label" style="margin-top:6px">Payee Bank Details</div>
+                @if(!empty($billing['account_holder_name']))
+                    {{ $billing['account_holder_name'] }}<br>
+                @endif
+                @if(!empty($billing['bank_account_number']))
+                    A/C: {{ $billing['bank_account_number'] }}<br>
+                @endif
+                @if(!empty($billing['ifsc_code']))
+                    IFSC: {{ $billing['ifsc_code'] }}<br>
+                @endif
+                @if(!empty($billing['bank_name']))
+                    {{ $billing['bank_name'] }}{{ !empty($billing['branch_name']) ? ' - '.$billing['branch_name'] : '' }}<br>
+                @endif
+                @if(!empty($billing['upi_id']))
+                    UPI: {{ $billing['upi_id'] }}
+                @endif
             @endif
         </td>
     </tr>

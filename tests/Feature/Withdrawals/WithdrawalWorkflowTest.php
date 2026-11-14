@@ -1105,4 +1105,33 @@ class WithdrawalWorkflowTest extends TestCase
             $wallet->getTable()
         );
     }
+
+    /**
+     * MIXXTUNE_WITHDRAWAL_INVOICE_ON_REQUEST_V1 + BANK_V1: requesting a
+     * withdrawal raises the owner's invoice straight away (status 'issued')
+     * carrying the payee bank details; paying it makes the same invoice 'paid'.
+     */
+    public function test_withdrawal_request_raises_an_invoice_with_bank_details(): void
+    {
+        [$user, $wallet, $profile, $withdrawal] = $this->createWithdrawal(1500);
+
+        // Invoice exists already at request time, before any payout.
+        $inv = \Illuminate\Support\Facades\DB::table('invoices')->where('withdrawal_id', $withdrawal->id)->first();
+        $this->assertNotNull($inv, 'an invoice should be raised when the withdrawal is requested');
+        $this->assertSame('issued', $inv->status);
+
+        // Payee bank details are on the invoice billing_details.
+        $billing = json_decode((string) $inv->billing_details, true) ?: [];
+        $this->assertNotEmpty($billing['bank_account_number'] ?? null, 'owner bank account number should be on the invoice');
+        $this->assertNotEmpty($billing['ifsc_code'] ?? null);
+
+        // Paying it makes the SAME invoice final.
+        $admin = $this->createUser('super_admin');
+        $withdrawal = $this->service()->approve($withdrawal, $admin);
+        $withdrawal = $this->service()->markPaid($withdrawal, $admin, 'UTR-INV-1', 'done');
+
+        $after = \Illuminate\Support\Facades\DB::table('invoices')->where('withdrawal_id', $withdrawal->id)->get();
+        $this->assertCount(1, $after, 'still one invoice (not a duplicate) after payout');
+        $this->assertSame('paid', $after->first()->status);
+    }
 }
