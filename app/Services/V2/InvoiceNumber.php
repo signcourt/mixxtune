@@ -15,6 +15,42 @@ use Illuminate\Support\Facades\DB;
  */
 class InvoiceNumber
 {
+    /*
+     * MIXXTUNE_LABEL_INVOICE_PREFIX_V1 (W180)
+     * Each label raises its own invoice series, so the number carries a prefix
+     * made from the label's name: "Sanatan Records" -> "SR", "Zee Music" ->
+     * "ZM". Single-word names take their first two letters ("Believe" -> "BE").
+     * Anything non-alphanumeric is dropped; the result is 2-12 upper-case
+     * letters/digits, falling back to the global prefix when a name gives
+     * nothing usable. The running serial is still per-prefix (see next()), so
+     * every label gets its own independent sequence.
+     */
+    public static function labelPrefix(?string $labelName, ?string $fallback = null): string
+    {
+        $words = preg_split('/\s+/', trim((string) $labelName)) ?: [];
+        $initials = '';
+        foreach ($words as $w) {
+            $w = preg_replace('/[^A-Za-z0-9]/', '', $w);
+            if ($w !== '') {
+                $initials .= strtoupper($w[0]);
+            }
+        }
+
+        if (strlen($initials) < 2) {
+            // single usable word (or none): take its first two letters
+            $flat = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $labelName));
+            $initials = substr($flat, 0, 2);
+        }
+
+        $initials = substr($initials, 0, 12);
+
+        if (strlen($initials) < 2) {
+            return $fallback ?: PlatformRules::invoicePrefix();
+        }
+
+        return $initials;
+    }
+
     public static function next(string $period, ?string $prefix = null): string
     {
         $prefix = $prefix ?: PlatformRules::invoicePrefix();

@@ -186,9 +186,20 @@ class InvoiceGenerationService
             $totalAmount = $deduction['total'];
             $netPayable = $deduction['net'];
 
-            /* MIXXTUNE_INVOICES_V2: next free number (was count + 1, could repeat) */
+            /*
+             * MIXXTUNE_INVOICES_V2: next free number (was count + 1, could repeat).
+             * MIXXTUNE_LABEL_INVOICE_PREFIX_V1 (W180): each label raises its own
+             * series, so the number is prefixed from the label's name
+             * (e.g. "Sanatan Records" -> SR-202611-000001). Falls back to the
+             * global prefix when the withdrawal has no label name.
+             */
+            $invoicePrefix = \App\Services\V2\InvoiceNumber::labelPrefix(
+                $withdrawal->label_name
+                    ?? ($policy['payee']['account_holder_name'] ?? null)
+            );
             $invoiceNumber = \App\Services\V2\InvoiceNumber::next(
-                now()->format('Ym')
+                now()->format('Ym'),
+                $invoicePrefix
             );
 
             $billingName =
@@ -381,6 +392,24 @@ class InvoiceGenerationService
 
                             'generated_by_policy' =>
                                 true,
+
+                            /*
+                             * MIXXTUNE_WITHDRAWAL_INVOICE_PERIOD_V1 (W180): the
+                             * payout period shown on the invoice. A withdrawal
+                             * is not tied to one statement month, so we label it
+                             * by the month the request was made.
+                             */
+                            'payout_period' =>
+                                ($withdrawal->created_at
+                                    ? \Illuminate\Support\Carbon::parse($withdrawal->created_at)
+                                    : now())->format('F Y'),
+
+                            /*
+                             * MIXXTUNE_LABEL_INVOICE_PREFIX_V1 (W180): remember
+                             * the label name used for this invoice's series.
+                             */
+                            'label_name' =>
+                                $withdrawal->label_name,
                         ]),
 
                     'document_generated_at' =>

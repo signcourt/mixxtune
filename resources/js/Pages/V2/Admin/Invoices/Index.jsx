@@ -18,6 +18,45 @@ export default function Index({ role = "admin", tab = "ready", counts = {}, stat
     const [notify, setNotify] = useState(true);
     const first = useRef(true);
 
+    // W180: tick-select for bulk download / release on the "All invoices" tab.
+    const [picked, setPicked] = useState({});
+    const pickedIds = Object.keys(picked).filter((k) => picked[k]).map(Number);
+    const toggle = (id) => setPicked((p) => ({ ...p, [id]: !p[id] }));
+    const invRows = (invoices?.data ?? []);
+    const allOnPage = invRows.length > 0 && invRows.every((v) => picked[v.id]);
+    const toggleAll = () => {
+        const next = { ...picked };
+        const target = !allOnPage;
+        invRows.forEach((v) => { next[v.id] = target; });
+        setPicked(next);
+    };
+
+    const bulkDownload = () => {
+        if (pickedIds.length === 0 && !filters.month) {
+            window.alert("Tick at least one invoice, or choose a month, to download.");
+            return;
+        }
+        // GET download: a plain query-string URL, so the browser saves the ZIP
+        // (no CSRF needed for GET). Ticked ids win; otherwise the chosen month.
+        const params = new URLSearchParams();
+        if (pickedIds.length > 0) {
+            pickedIds.forEach((id) => params.append("invoice_ids[]", id));
+        } else if (filters.month) {
+            params.set("month", filters.month);
+        }
+        window.location = `/admin/invoices/bulk-download?${params.toString()}`;
+    };
+
+    const bulkRelease = () => {
+        if (pickedIds.length === 0) { window.alert("Tick at least one payout invoice to release."); return; }
+        if (!window.confirm(`Release payment for ${pickedIds.length} selected payout invoice(s)? This sends the money via the payout gateway.`)) return;
+        setBusy("release");
+        router.post("/admin/invoices/bulk-release", { invoice_ids: pickedIds }, {
+            preserveScroll: true,
+            onFinish: () => { setBusy(null); setPicked({}); },
+        });
+    };
+
     const go = (patch) => router.get(URL, { ...filters, ...patch, page: undefined }, { preserveState: true, preserveScroll: true, replace: true });
 
     useEffect(() => {
@@ -130,30 +169,52 @@ export default function Index({ role = "admin", tab = "ready", counts = {}, stat
                         ))}
                     </ul>
                 ) : (
-                    <ul className="divide-y divide-slate-100">
-                        {rows.map((v) => (
-                            <li key={v.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-sm font-bold text-slate-900">{v.number}</span>
-                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{v.kind}</span>
-                                        <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold capitalize text-violet-700">{v.status}</span>
+                    <>
+                        {/* W180: bulk toolbar — tick-select, ZIP download, super-admin release */}
+                        <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
+                            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                <input type="checkbox" checked={allOnPage} onChange={toggleAll} />
+                                {pickedIds.length > 0 ? `${pickedIds.length} selected` : "Select all on this page"}
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={bulkDownload} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700">
+                                    <Download className="h-3.5 w-3.5" /> Download selected (ZIP){filters.month && pickedIds.length === 0 ? " — whole month" : ""}
+                                </button>
+                                {role === "super_admin" && (
+                                    <button type="button" disabled={busy === "release" || pickedIds.length === 0} onClick={bulkRelease} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-40">
+                                        {busy === "release" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Release selected payments
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <ul className="divide-y divide-slate-100">
+                            {rows.map((v) => (
+                                <li key={v.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
+                                    <label className="flex items-center pr-1">
+                                        <input type="checkbox" checked={!!picked[v.id]} onChange={() => toggle(v.id)} />
+                                    </label>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-sm font-bold text-slate-900">{v.number}</span>
+                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{v.kind}</span>
+                                            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold capitalize text-violet-700">{v.status}</span>
+                                        </div>
+                                        <div className="mt-0.5 truncate text-sm text-slate-700">{v.owner} <span className="text-xs text-slate-500">· {v.owner_email}</span></div>
+                                        <div className="text-xs text-slate-500">{v.date}{v.month_label ? ` · for ${v.month_label}` : ""}</div>
                                     </div>
-                                    <div className="mt-0.5 truncate text-sm text-slate-700">{v.owner} <span className="text-xs text-slate-500">· {v.owner_email}</span></div>
-                                    <div className="text-xs text-slate-500">{v.date}{v.month_label ? ` · for ${v.month_label}` : ""}</div>
-                                </div>
-                                <div className="flex items-center justify-between gap-4 sm:justify-end">
-                                    <div className="text-right">
-                                        <div className="text-base font-black text-slate-900">{money(v.net, v.currency)}</div>
-                                        {v.tds > 0 && <div className="text-xs text-slate-500">after TDS {money(v.tds, v.currency)}</div>}
+                                    <div className="flex items-center justify-between gap-4 sm:justify-end">
+                                        <div className="text-right">
+                                            <div className="text-base font-black text-slate-900">{money(v.net, v.currency)}</div>
+                                            {v.tds > 0 && <div className="text-xs text-slate-500">after TDS {money(v.tds, v.currency)}</div>}
+                                        </div>
+                                        <a href={`/invoices/${v.id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700">
+                                            <Download className="h-3.5 w-3.5" /> PDF
+                                        </a>
                                     </div>
-                                    <a href={`/invoices/${v.id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700">
-                                        <Download className="h-3.5 w-3.5" /> PDF
-                                    </a>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
+                                </li>
+                            ))}
+                        </ul>
+                    </>
                 )}
 
                 {list.last_page > 1 && (

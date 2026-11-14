@@ -2337,6 +2337,22 @@ Route::middleware(['auth', 'verified'])
     )
     ->name('v2.admin.invoices.generate-missing');
 
+/* MIXXTUNE_INVOICE_BULK_DOWNLOAD_V1 (W180): ZIP of ticked / month invoices (GET so a plain link downloads it) */
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/admin/invoices/bulk-download',
+        [\App\Http\Controllers\V2\Admin\InvoiceManagementController::class, 'bulkDownload']
+    )
+    ->name('v2.admin.invoices.bulk-download');
+
+/* MIXXTUNE_INVOICE_BULK_RELEASE_V1 (W180): release ticked payouts (super admin only, enforced in controller) */
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/admin/invoices/bulk-release',
+        [\App\Http\Controllers\V2\Admin\InvoiceManagementController::class, 'bulkRelease']
+    )
+    ->name('v2.admin.invoices.bulk-release');
+
 
 Route::middleware(['auth', 'verified'])
     ->get(

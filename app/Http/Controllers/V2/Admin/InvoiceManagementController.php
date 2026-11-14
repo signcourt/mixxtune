@@ -160,6 +160,9 @@ class InvoiceManagementController extends Controller
                     'tds' => round((float) $v->tds_amount, 2),
                     'net' => round((float) ($hasNet && $v->net_payable !== null && (float) $v->net_payable > 0 ? $v->net_payable : (float) $v->total_amount - (float) $v->tds_amount), 2),
                     'status' => $v->status,
+                    // W180: expose the linked withdrawal so the super admin can
+                    // tick payout invoices and release them in bulk.
+                    'withdrawal_id' => ($hasWd && $v->withdrawal_id) ? (int) $v->withdrawal_id : null,
                 ]);
         }
 
@@ -288,5 +291,153 @@ class InvoiceManagementController extends Controller
         } catch (\Throwable $e) {
             report($e);
         }
+    }
+
+    /*
+     * MIXXTUNE_INVOICE_BULK_DOWNLOAD_V1 (W180)
+     * Download the selected invoices (ticked in the list, or every invoice of a
+     * chosen month) as one ZIP of PDFs. Admins are scoped to the owners they
+     * can access; a super admin can take any. Each PDF is the super-admin copy
+     * (TDS breakdown + net released).
+     */
+    public function bulkDownload(
+        Request $request,
+        PermissionService $permissions,
+        AdminFinancialAccessService $access
+    ) {
+        $this->guard($request, $permissions);
+
+        $ids = collect((array) $request->input('invoice_ids', []))
+            ->map(fn ($v) => (int) $v)->filter()->unique()->values();
+
+        $month = (string) $request->input('month', '');
+
+        $q = Invoice::query();
+        if ($request->user()->role !== 'super_admin') {
+            $q->whereIn('user_id', $access->accessibleUserIds($request->user()));
+        }
+        if ($ids->isNotEmpty()) {
+            $q->whereIn('id', $ids);
+        } elseif (preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $q->whereBetween('invoice_date', [$month.'-01', date('Y-m-t', strtotime($month.'-01'))]);
+        } else {
+            return back()->withErrors(['invoice' => 'Pick at least one invoice, or choose a month, to download.']);
+        }
+
+        $invoices = $q->orderBy('id')->limit(500)->get();
+        if ($invoices->isEmpty()) {
+            return back()->withErrors(['invoice' => 'No invoices match the selection.']);
+        }
+
+        $zipName = 'invoices-'.($month ?: 'selected').'-'.date('Ymd_His').'.zip';
+        $zipPath = tempnam(sys_get_temp_dir(), 'inv').'.zip';
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            return back()->withErrors(['invoice' => 'Could not prepare the ZIP file.']);
+        }
+
+        $seen = [];
+        foreach ($invoices as $invoice) {
+            $invoice->load(['items', 'user', 'statement']);
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice', [
+                'invoice' => $invoice,
+                'forSuperAdmin' => true,
+            ])->output();
+
+            $name = preg_replace('/[^A-Za-z0-9._-]/', '_', (string) $invoice->invoice_number).'.pdf';
+            if (isset($seen[$name])) {
+                $name = ($seen[$name]++).'-'.$name;
+            } else {
+                $seen[$name] = 1;
+            }
+            $zip->addFromString($name, $pdf);
+        }
+        $zip->close();
+
+        \App\Services\V2\FinanceAudit::log(
+            'finance.invoices_bulk_downloaded',
+            $invoices->count().' invoice PDF(s) downloaded as a ZIP.',
+            ['count' => $invoices->count(), 'month' => $month ?: null]
+        );
+
+        return response()->download($zipPath, $zipName)->deleteFileAfterSend(true);
+    }
+
+    /*
+     * MIXXTUNE_INVOICE_BULK_RELEASE_V1 (W180)
+     * Release payment for the ticked payout invoices in one go. SUPER ADMIN
+     * ONLY. Each ticked invoice must be a payout invoice (linked to a
+     * withdrawal); we release only the ones whose withdrawal is still
+     * approved/pending, reusing the single, audited, idempotent
+     * BankPayoutService::payWithdrawal path. Failures are collected per item
+     * (not all-or-nothing) and reported back; nothing here changes the money
+     * math, which lives in PayoutDeductionService + BankPayoutService.
+     */
+    public function bulkRelease(
+        Request $request,
+        PermissionService $permissions
+    ): RedirectResponse {
+        $role = $this->guard($request, $permissions);
+        abort_unless($role === 'super_admin', 403, 'Only a super admin can release payments.');
+
+        $ids = collect((array) $request->input('invoice_ids', []))
+            ->map(fn ($v) => (int) $v)->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return back()->withErrors(['invoice' => 'Tick at least one payout invoice to release.']);
+        }
+
+        $invoices = Invoice::query()->whereIn('id', $ids)->get();
+
+        $released = 0;
+        $skipped = [];
+        $failed = [];
+
+        $bank = app(\App\Services\V2\Payouts\BankPayoutService::class);
+
+        foreach ($invoices as $invoice) {
+            $wid = (int) ($invoice->withdrawal_id ?? 0);
+            if ($wid <= 0) {
+                $skipped[] = $invoice->invoice_number.' (not a payout invoice)';
+                continue;
+            }
+
+            $w = \App\Models\Finance\WithdrawalRequest::query()->find($wid);
+            if (! $w) {
+                $skipped[] = $invoice->invoice_number.' (withdrawal not found)';
+                continue;
+            }
+            if (! in_array($w->status, ['approved', 'pending'], true)) {
+                $skipped[] = $invoice->invoice_number.' (withdrawal is '.$w->status.')';
+                continue;
+            }
+
+            try {
+                $bank->payWithdrawal($w, $request->user(), 'Bulk release from Invoices');
+                $released++;
+            } catch (\Throwable $e) {
+                $failed[] = $invoice->invoice_number.' ('.$e->getMessage().')';
+            }
+        }
+
+        \App\Services\V2\FinanceAudit::log(
+            'finance.payouts_bulk_released',
+            "Bulk release: {$released} sent, ".count($skipped).' skipped, '.count($failed).' failed.',
+            ['released' => $released, 'skipped' => $skipped, 'failed' => $failed]
+        );
+
+        $msg = $released > 0 ? "{$released} payment(s) sent for release." : 'No payments were released.';
+        $notes = [];
+        if ($skipped) {
+            $notes[] = count($skipped).' skipped: '.implode('; ', array_slice($skipped, 0, 5));
+        }
+        if ($failed) {
+            $notes[] = count($failed).' failed: '.implode('; ', array_slice($failed, 0, 5));
+        }
+
+        return $notes
+            ? back()->with('success', $msg)->withErrors(['invoice' => implode(' | ', $notes)])
+            : back()->with('success', $msg);
     }
 }

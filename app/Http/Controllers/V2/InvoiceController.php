@@ -115,10 +115,15 @@ class InvoiceController extends Controller
             'statement',
         ]);
 
+        // W180: the super-admin / admin copy shows the TDS breakdown + net
+        // released; the owner copy shows the gross (+GST) with no TDS line.
+        $forSuperAdmin = in_array($role, ['admin', 'super_admin'], true);
+
         return Pdf::loadView(
             'pdf.invoice',
             [
                 'invoice' => $invoice,
+                'forSuperAdmin' => $forSuperAdmin,
             ]
         )->download(
             $invoice->invoice_number . '.pdf'
