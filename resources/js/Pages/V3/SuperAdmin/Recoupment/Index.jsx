@@ -216,9 +216,10 @@ function Row({ p, busy, onOpen, onDelete }) {
                 <div className="mt-0.5 truncate text-sm text-slate-600">{p.title}</div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                     <span>Recovery <b className="text-amber-700">{pct(r.recovery)}</b></span>
-                    {r.advance_charge > 0 && (
+                    {/* W182: charge only applies while the advance is still running; once cleared the rate is back to L% so hide the badge entirely */}
+                    {r.advance_charge > 0 && r.running && (
                         <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">
-                            charge +{pct(r.advance_charge)}{r.running ? <> · {pct(r.base)}→{pct(r.applicable_now)}</> : null}
+                            charge +{pct(r.advance_charge)} · {pct(r.base)}→{pct(r.applicable_now)}
                         </span>
                     )}
                     {/* W181: cumulative company profit from the charge on this plan */}
@@ -545,7 +546,7 @@ function DetailModal({ plan, tab, setTab, onClose, onChanged }) {
             </div>
             <div className="mt-2"><Bar total={Number(plan.total_recoverable_amount || 0)} done={Number(plan.total_recovered_amount || 0)} /></div>
             <p className="mt-2 text-xs text-slate-500">
-                Recovery {pct(r.recovery)} of earning{r.advance_charge > 0 ? <> · advance charge +{pct(r.advance_charge)}</> : null}. Applied automatically when statements or reports are posted.
+                Recovery {pct(r.recovery)} of earning{r.advance_charge > 0 && r.running ? <> · advance charge +{pct(r.advance_charge)}</> : null}. Applied automatically when statements or reports are posted.
             </p>
 
             <div className="mt-4 flex gap-1 overflow-x-auto border-b border-slate-200">
