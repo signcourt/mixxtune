@@ -51,7 +51,22 @@ class WithdrawalService
             ->where('can_withdraw', false)
             ->exists();
 
-        return ! $hasSuspendedArtist;
+        if ($hasSuspendedArtist) {
+            return false;
+        }
+
+        /*
+         * MIXXTUNE_WALLET_ADVANCE_MINUS_V1: an owner with an advance still being
+         * repaid cannot withdraw until it clears. The wallet balance is shown as
+         * a minus of the outstanding advance, and payouts stay off until zero.
+         */
+        $hasOutstandingAdvance = \App\Models\Finance\RecoupmentPlan::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('outstanding_amount', '>', 0)
+            ->exists();
+
+        return ! $hasOutstandingAdvance;
     }
 
     public function create(

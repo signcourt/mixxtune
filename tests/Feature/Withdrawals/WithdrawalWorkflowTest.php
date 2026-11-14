@@ -367,6 +367,47 @@ class WithdrawalWorkflowTest extends TestCase
         );
     }
 
+    /**
+     * MIXXTUNE_WALLET_ADVANCE_MINUS_V1: an owner with an advance still being
+     * repaid cannot withdraw; once the advance clears, withdrawals reopen.
+     */
+    public function test_withdrawal_is_blocked_while_an_advance_is_outstanding(): void
+    {
+        $user = $this->createUser();
+        $this->createWallet($user, 5000);
+        $this->createVerifiedProfile($user);
+
+        $plan = \App\Models\Finance\RecoupmentPlan::query()->create([
+            'public_id' => (string) \Illuminate\Support\Str::ulid(),
+            'plan_number' => 'RCP-TEST-ADVBLOCK',
+            'user_id' => $user->id,
+            'label_id' => null,
+            'artist_id' => null,
+            'title' => 'Advance',
+            'base_percentage' => 100,
+            'recovery_uplift_percentage' => 100,
+            'total_recoverable_amount' => 1000,
+            'total_recovered_amount' => 0,
+            'outstanding_amount' => 1000,
+            'status' => 'active',
+        ]);
+
+        $this->assertFalse($this->service()->withdrawalEnabledFor($user));
+        try {
+            $this->service()->create($user, 1500, 'bank');
+            $this->fail('Withdrawal should be blocked while an advance is outstanding.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('withdrawal', $exception->errors());
+        }
+        $this->assertDatabaseCount('withdrawals', 0);
+
+        // Advance cleared -> withdrawals reopen.
+        $plan->update(['outstanding_amount' => 0, 'total_recovered_amount' => 1000, 'status' => 'completed']);
+        $this->assertTrue($this->service()->withdrawalEnabledFor($user));
+        $w = $this->service()->create($user, 1500, 'bank');
+        $this->assertNotNull($w);
+    }
+
     public function test_payout_profile_is_required(): void
     {
         $user = $this->createUser();

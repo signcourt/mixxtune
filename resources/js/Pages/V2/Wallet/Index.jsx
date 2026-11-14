@@ -31,7 +31,14 @@ export default function Index({
 
     const available = Number(wallet.available_balance ?? 0);
     const minimum = Number(minimumWithdrawal ?? 0);
-    const canRequest = withdrawalEnabled && minimum > 0 && available >= minimum;
+    // MIXXTUNE_WALLET_ADVANCE_MINUS_V1: the owner's real balance net of any
+    // advance still being repaid. While an advance is outstanding this is
+    // negative and the payout button stays off.
+    const outstanding = (advances ?? []).reduce((s, a) => s + Number(a.outstanding ?? 0), 0);
+    const netBalance = available - outstanding;      // the big headline number (can be negative)
+    const hasAdvance = outstanding > 0;
+    // Payout needs: no advance left AND at least the minimum withdraw-able.
+    const canRequest = !staff && withdrawalEnabled && !hasAdvance && minimum > 0 && available >= minimum;
     const today = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "long", year: "numeric" }).format(new Date());
 
     return (
@@ -44,12 +51,18 @@ export default function Index({
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                             <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                                <WalletCards className="h-4 w-4" /> {staff ? "All owner wallets · available now" : `Available balance on ${today}`}
+                                <WalletCards className="h-4 w-4" /> {staff ? "All owner wallets · available now" : hasAdvance ? `Balance on ${today}` : `Available balance on ${today}`}
                             </div>
-                            <div className="mt-1 text-[34px] font-black tracking-tight text-slate-950 sm:text-[40px]">{money(available)}</div>
+                            <div className={`mt-1 text-[34px] font-black tracking-tight sm:text-[40px] ${!staff && netBalance < 0 ? "text-rose-600" : "text-slate-950"}`}>
+                                {!staff && netBalance < 0 ? `-${money(Math.abs(netBalance))}` : money(staff ? available : netBalance)}
+                            </div>
                             {staff ? (
                                 <p className="text-sm text-slate-500">
                                     {wallet.owners_with_money ?? 0} of {wallet.wallet_count ?? 0} owners have money to withdraw. This page only shows balances — nothing here moves money.
+                                </p>
+                            ) : hasAdvance ? (
+                                <p className="text-sm text-slate-500">
+                                    This is your balance after the advance still being recovered. Withdrawable now: <span className="font-semibold text-slate-700">{money(0)}</span>.
                                 </p>
                             ) : (
                                 <p className="text-sm text-slate-500">Money you can ask to be paid to your bank now.</p>
@@ -67,16 +80,21 @@ export default function Index({
                                         <button type="button" disabled className="inline-flex h-12 cursor-not-allowed items-center justify-center rounded-xl bg-slate-200 px-6 text-[15px] font-semibold text-slate-500">
                                             Request my payment
                                         </button>
+                                        {/* MIXXTUNE_WALLET_ADVANCE_MINUS_V1: one clear line — advance first, then the threshold. */}
                                         {!withdrawalEnabled ? (
-                                            <p className="max-w-xs rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 lg:ml-auto">
-                                                Withdrawals are switched off for this account. Please contact support.
+                                            <p className="max-w-xs text-xs text-slate-500 lg:ml-auto">
+                                                Withdrawals are currently unavailable for this account. Please contact support.
+                                            </p>
+                                        ) : hasAdvance ? (
+                                            <p className="max-w-xs text-xs text-slate-500 lg:ml-auto">
+                                                Payments unlock once the outstanding advance of {money(outstanding)} is fully recovered.
                                             </p>
                                         ) : minimum > 0 ? (
-                                            <p className="text-xs text-slate-500">
-                                                Minimum {money(minimum)} · you need {money(Math.max(minimum - available, 0))} more.
+                                            <p className="max-w-xs text-xs text-slate-500 lg:ml-auto">
+                                                Payments can be requested once your balance reaches {money(minimum)}.
                                             </p>
                                         ) : (
-                                            <p className="text-xs text-slate-500">Payments are not open yet.</p>
+                                            <p className="max-w-xs text-xs text-slate-500 lg:ml-auto">Payments are not open yet.</p>
                                         )}
                                     </div>
                                 )}

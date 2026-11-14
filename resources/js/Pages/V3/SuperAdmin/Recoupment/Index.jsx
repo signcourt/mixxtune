@@ -212,8 +212,14 @@ function Row({ p, busy, onOpen, onDelete }) {
                     {owner(p)} <span className="font-normal text-slate-500">· {p.user?.email} · {scopeText(p)}</span>
                 </div>
                 <div className="mt-0.5 truncate text-sm text-slate-600">{p.title}</div>
-                <div className="mt-0.5 text-xs text-slate-500">
-                    Recovery <b className="text-amber-700">{pct(r.recovery)}</b> of earning{r.advance_charge > 0 ? <> · advance charge <b className="text-amber-700">+{pct(r.advance_charge)}</b>{r.running ? <> (rate <b className="text-violet-700">{pct(r.base)}→{pct(r.applicable_now)}</b>)</> : null}</> : null} · since {day(p.starts_on)}
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                    <span>Recovery <b className="text-amber-700">{pct(r.recovery)}</b></span>
+                    {r.advance_charge > 0 && (
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">
+                            charge +{pct(r.advance_charge)}{r.running ? <> · {pct(r.base)}→{pct(r.applicable_now)}</> : null}
+                        </span>
+                    )}
+                    <span className="text-slate-400">since {day(p.starts_on)}</span>
                 </div>
             </div>
             <div className="w-full shrink-0 lg:w-64">
@@ -293,17 +299,26 @@ function RateExample({ recovery, base, charge }) {
     const net = hasRate ? collected * (effective / 100) : 1000;
     const toAdvance = (r / 100) * net;
     const toWallet = net - toAdvance;
-    const yourProfit = hasRate ? collected - net : null;
+
+    // One compact "on ₹1,000" example, shown as aligned rows instead of a paragraph.
+    const rows = [
+        hasRate && ["Owner earns (net)", money(net), chg > 0 ? `rate ${applicable}% → ${effective}%` : `rate ${applicable}%`],
+        [`Repays the advance (${pct(r)})`, money(toAdvance), null],
+        ["Goes to the wallet", money(toWallet), null],
+    ].filter(Boolean);
 
     return (
-        <div className="rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-900 space-y-0.5">
-            {hasRate && chg > 0 && (
-                <div>While the advance runs: owner rate <b>{applicable}%</b> → <b>{effective}%</b>, your profit <b>{100 - applicable}%</b> → <b>{100 - effective}%</b>.</div>
-            )}
-            <div>
-                On <b>₹1,000</b> collected{hasRate ? <> → owner earning <b>{money(net)}</b>{chg > 0 ? <> (your extra profit {money(yourProfit)})</> : null}</> : <> (owner earning)</>}: <b>{money(toAdvance)}</b> repays the advance, <b>{money(toWallet)}</b> to the wallet.
+        <div className="rounded-xl bg-violet-50 px-3 py-2.5 text-xs text-violet-900">
+            <div className="mb-1.5 font-semibold text-violet-700">Example — on ₹1,000 collected</div>
+            <div className="space-y-1">
+                {rows.map(([k, v, note], i) => (
+                    <div key={i} className="flex items-baseline justify-between gap-2">
+                        <span>{k}{note ? <span className="text-violet-500"> · {note}</span> : null}</span>
+                        <b className="shrink-0 tabular-nums">{v}</b>
+                    </div>
+                ))}
             </div>
-            <div className="text-violet-700">When the advance clears, the rate returns to normal.</div>
+            <div className="mt-1.5 text-violet-500">When the advance clears, the rate returns to normal.</div>
         </div>
     );
 }
@@ -314,15 +329,13 @@ function RateFields({ data, setData }) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Recovery % of earning">
                     <input required type="number" min="0" max="100" step="0.01" value={data.recovery_uplift_percentage} onChange={(e) => setData("recovery_uplift_percentage", e.target.value)} className={input} placeholder="e.g. 100" />
+                    <p className="mt-1 text-[11px] text-slate-400">How much of each statement repays the advance. 100 = the whole earning.</p>
                 </Field>
-                <Field label="Advance charge % (extra, optional)">
+                <Field label="Advance charge % (optional)">
                     <input type="number" min="0" max="100" step="0.01" value={data.advance_charge_percentage ?? ""} onChange={(e) => setData("advance_charge_percentage", e.target.value)} className={input} placeholder="e.g. 10" />
+                    <p className="mt-1 text-[11px] text-slate-400">Extra % off the owner's rate while repaying — your profit. 0 = none.</p>
                 </Field>
             </div>
-            <p className="-mt-2 text-xs text-slate-500">
-                <b>Recovery %</b>: how much of the owner's earning repays the advance each statement (100 = the whole earning until cleared).<br />
-                <b>Advance charge %</b>: extra points taken off the owner's label rate <b>while the advance runs</b> — e.g. an 80% owner with a 10% charge is paid at 70%, and the extra 10% is your profit. 0 = no change. It stops automatically when the advance is cleared.
-            </p>
             <RateExample recovery={data.recovery_uplift_percentage} base={data.base_percentage} charge={data.advance_charge_percentage} />
         </>
     );
@@ -524,7 +537,7 @@ function DetailModal({ plan, tab, setTab, onClose, onChanged }) {
             </div>
             <div className="mt-2"><Bar total={Number(plan.total_recoverable_amount || 0)} done={Number(plan.total_recovered_amount || 0)} /></div>
             <p className="mt-2 text-xs text-slate-500">
-                Recovery {pct(r.recovery)} of earning{r.running ? ` → owner gets ${pct(100 - r.recovery)} while repaying` : ""}. Recovery happens automatically when royalty statements / report imports are posted.
+                Recovery {pct(r.recovery)} of earning{r.advance_charge > 0 ? <> · advance charge +{pct(r.advance_charge)}</> : null}. Applied automatically when statements or reports are posted.
             </p>
 
             <div className="mt-4 flex gap-1 overflow-x-auto border-b border-slate-200">
@@ -545,9 +558,9 @@ function DetailModal({ plan, tab, setTab, onClose, onChanged }) {
 
 function Mini({ label, value, tone = "text-slate-900" }) {
     return (
-        <div className="rounded-xl bg-slate-50 px-3 py-2">
-            <div className="text-[11px] font-semibold text-slate-500">{label}</div>
-            <div className={`text-sm font-black sm:text-base ${tone}`}>{value}</div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+            <div className={`mt-0.5 text-base font-black tabular-nums sm:text-lg ${tone}`}>{value}</div>
         </div>
     );
 }
