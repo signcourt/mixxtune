@@ -287,7 +287,7 @@
 </table>
 
 <div class="section-title">
-    Royalty Payout Details
+    {{ ($invoice->invoice_type ?? '') === 'advance_recovery' ? 'Advance Recovery Details' : 'Royalty Payout Details' }}
 </div>
 
 <table class="items">
@@ -403,7 +403,7 @@
 
     <tr class="net-row">
         <td>
-            Net Payable
+            {{ ($invoice->invoice_type ?? '') === 'advance_recovery' ? 'Amount Recovered' : 'Net Payable' }}
         </td>
 
         <td class="right">

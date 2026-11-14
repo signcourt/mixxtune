@@ -37,7 +37,7 @@ export default function Index({ role = "artist", invoices = {} }) {
                                 <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="text-sm font-bold text-slate-900">{v.number}</span>
-                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{v.kind}</span>
+                                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${v.is_recovery ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-600"}`}>{v.kind}</span>
                                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${STATUS[v.status] ?? "bg-slate-100 text-slate-600"}`}>{v.status}</span>
                                     </div>
                                     <div className="mt-0.5 text-xs text-slate-500">
@@ -46,7 +46,7 @@ export default function Index({ role = "artist", invoices = {} }) {
                                 </div>
                                 <div className="flex items-center justify-between gap-4 sm:justify-end">
                                     <div className="text-right">
-                                        <div className="text-base font-black text-slate-900">{money(v.net, v.currency)}</div>
+                                        <div className={`text-base font-black ${v.is_recovery || v.net < 0 ? "text-rose-600" : "text-slate-900"}`}>{money(v.net, v.currency)}</div>
                                         {v.tds > 0 && <div className="text-xs text-slate-500">after TDS {money(v.tds, v.currency)}</div>}
                                     </div>
                                     <a href={`/invoices/${v.id}/download`} className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">

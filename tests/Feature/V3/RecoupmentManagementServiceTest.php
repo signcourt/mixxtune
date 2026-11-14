@@ -782,6 +782,41 @@ class RecoupmentManagementServiceTest extends TestCase
             ->where('transaction_type', 'advance_charge_commission')->sum('amount'), 0.001);
         $this->assertEqualsWithDelta(455.40, (float) \Illuminate\Support\Facades\DB::table('wallet_transactions')
             ->where('transaction_type', 'recoupment_recovery')->sum('amount'), 0.001);
+
+        // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1: an advance_recovery invoice is
+        // auto-created for the recovery, with a MINUS total.
+        $inv = \Illuminate\Support\Facades\DB::table('invoices')
+            ->where('user_id', $user->id)->where('invoice_type', 'advance_recovery')->first();
+        $this->assertNotNull($inv, 'advance_recovery invoice should be created on sweep');
+        $this->assertEqualsWithDelta(-455.40, (float) $inv->total_amount, 0.001);
+    }
+
+    /**
+     * MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1: generating twice for the same
+     * recovery does not double-bill (idempotent by recovery id).
+     */
+    public function test_advance_recovery_invoice_is_idempotent(): void
+    {
+        $user = \App\Models\User::factory()->create();
+        \Illuminate\Support\Facades\DB::table('wallets')->insert([
+            'public_id' => (string) \Illuminate\Support\Str::ulid(),
+            'user_id' => $user->id, 'artist_id' => null, 'label_id' => null, 'currency' => 'INR',
+            'available_balance' => 200.00, 'pending_balance' => 0, 'lifetime_credits' => 200.00,
+            'lifetime_debits' => 0, 'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $plan = $this->service->createPlan($user, [
+            'base_percentage' => 100, 'recovery_uplift_percentage' => 100, 'maximum_recovery_percentage' => null,
+            'initial_amount' => 1000, 'initial_category' => 'advance', 'initial_title' => 'Advance',
+        ], $user);
+        $sweep = $this->service->sweepWalletBalance($plan->fresh(), $user->id);
+        $this->assertNotNull($sweep);
+
+        $svc = app(\App\Services\V2\InvoiceService::class);
+        $svc->generateFromRecovery($sweep);
+        $svc->generateFromRecovery($sweep);
+
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('invoices')
+            ->where('user_id', $user->id)->where('invoice_type', 'advance_recovery')->count());
     }
 
 }

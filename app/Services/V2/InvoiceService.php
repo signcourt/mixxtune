@@ -118,6 +118,96 @@ class InvoiceService
         });
     }
 
+    /*
+     * MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1
+     *
+     * Every advance recovery (instant wallet sweep or report-publish) gets its
+     * own invoice of type 'advance_recovery', total shown as a MINUS of the
+     * amount recovered from the owner. Idempotent per recovery row, so a retry
+     * never double-bills. The owner sees it on /invoices and can download the PDF.
+     */
+    public function generateFromRecovery(
+        \App\Models\Finance\RecoupmentRecovery $recovery,
+        ?int $actorId = null
+    ): ?Invoice {
+        $amount = round((float) $recovery->applied_recovery_amount, 2);
+        if ($amount <= 0) {
+            return null; // nothing recovered -> no invoice
+        }
+
+        $plan = \App\Models\Finance\RecoupmentPlan::query()->find($recovery->recoupment_plan_id);
+        if (! $plan) {
+            return null;
+        }
+        $owner = User::query()->find($plan->user_id);
+        if (! $owner) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($recovery, $plan, $owner, $amount, $actorId) {
+            // Idempotent: one invoice per recovery row (keyed in notes).
+            $key = 'recovery:'.$recovery->id;
+            $existing = Invoice::query()
+                ->where('invoice_type', 'advance_recovery')
+                ->where('notes', 'like', '%['.$key.']%')
+                ->first();
+            if ($existing) {
+                return $existing;
+            }
+
+            $month = $this->monthLabel($recovery->reporting_month);
+            $company = $this->company();
+            // Negative total: this is money recovered FROM the owner, not paid to them.
+            $signed = -1 * $amount;
+
+            $invoice = new Invoice();
+            $invoice->forceFill(array_filter([
+                'public_id' => (string) Str::ulid(),
+                'invoice_number' => InvoiceNumber::next(now()->format('Y')),
+                'user_id' => $owner->id,
+                'label_id' => $this->has('label_id') ? ($plan->label_id ?: null) : null,
+                'invoice_type' => 'advance_recovery',
+                'invoice_date' => now()->toDateString(),
+                'currency' => 'INR',
+                'subtotal' => $signed,
+                'tax_amount' => 0,
+                'tds_amount' => 0,
+                'total_amount' => $signed,
+                'net_payable' => $this->has('net_payable') ? $signed : null,
+                'status' => 'generated',
+                'billing_name' => $this->has('billing_name') ? ($owner->name ?: $owner->email) : null,
+                'billing_email' => $this->has('billing_email') ? $owner->email : null,
+                'billing_details' => ['name' => $owner->name, 'email' => $owner->email],
+                'company_details' => $company,
+                'notes' => "Advance recovery for {$plan->plan_number}"
+                    .($recovery->reporting_month ? " ({$month})" : '')
+                    ." [{$key}]",
+                'created_by' => $actorId,
+            ], fn ($v) => $v !== null));
+            $invoice->save();
+
+            $invoice->items()->create([
+                'description' => mb_substr(
+                    "Advance recovered against {$plan->plan_number}"
+                        .($recovery->reporting_month ? " for {$recovery->reporting_month} ({$month})" : ''),
+                    0,
+                    255
+                ),
+                'quantity' => 1,
+                'rate' => $signed,
+                'amount' => $signed,
+                'meta' => [
+                    'recoupment_plan_id' => $plan->id,
+                    'recoupment_recovery_id' => $recovery->id,
+                    'recovered_amount' => $amount,
+                    'outstanding_after' => round((float) $recovery->outstanding_after, 2),
+                ],
+            ]);
+
+            return $invoice->fresh(['items', 'user']);
+        });
+    }
+
     private function has(string $column): bool
     {
         static $cols = null;

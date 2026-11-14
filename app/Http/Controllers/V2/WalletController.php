@@ -371,6 +371,10 @@ class WalletController extends Controller
             'manual_adjustment' => 'Manual adjustment',
             'adjustment_reversal' => 'Adjustment reversed',
             'recoupment' => 'Advance recovery',
+            // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1: the real types written by the
+            // recovery engine (were falling through to a raw-cased default).
+            'recoupment_recovery' => 'Advance recovery',
+            'advance_charge_commission' => 'Advance charge',
         ];
 
         $page = $query

@@ -197,7 +197,7 @@ function HistorySection({ transactions, money, staff, historyWallet, historyOwne
                                     <div className="text-[11px] text-slate-400">{t.date}</div>
                                 </div>
                                 <div className="shrink-0 text-right">
-                                    <div className={`whitespace-nowrap text-sm font-bold ${credit ? "text-emerald-700" : "text-slate-800"}`}>{credit ? "+" : "−"}{money(t.amount)}</div>
+                                    <div className={`whitespace-nowrap text-sm font-bold ${credit ? "text-emerald-700" : "text-rose-600"}`}>{credit ? "+" : "−"}{money(t.amount)}</div>
                                     {t.balance_after !== null && <div className="whitespace-nowrap text-[11px] text-slate-500">balance {money(t.balance_after)}</div>}
                                 </div>
                             </li>

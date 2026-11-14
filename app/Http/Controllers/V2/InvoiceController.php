@@ -53,18 +53,29 @@ class InvoiceController extends Controller
                     ->paginate(25)
                     ->through(function (Invoice $v) {
                         $net = (float) ($v->getAttribute('net_payable') ?? 0);
+                        // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1: recovery invoices
+                        // are a minus (money recovered from the owner); keep the
+                        // sign and label them clearly.
+                        $isRecovery = $v->invoice_type === 'advance_recovery';
+                        $kind = $isRecovery
+                            ? 'Advance recovery'
+                            : ($v->getAttribute('withdrawal_id') ? 'Payout' : 'Monthly royalty');
+                        $net = $isRecovery
+                            ? round((float) $v->total_amount, 2)
+                            : round($net > 0 ? $net : (float) $v->total_amount - (float) $v->tds_amount, 2);
 
                         return [
                             'id' => $v->id,
                             'number' => $v->invoice_number,
                             'date' => $v->invoice_date?->format('d M Y'),
-                            'kind' => $v->getAttribute('withdrawal_id') ? 'Payout' : 'Monthly royalty',
+                            'kind' => $kind,
+                            'is_recovery' => $isRecovery,
                             'month_label' => $v->statement ? app(\App\Services\V2\InvoiceService::class)->monthLabel($v->statement->statement_month) : null,
                             'owner' => $v->user?->name,
                             'currency' => $v->currency ?: 'INR',
                             'total' => round((float) $v->total_amount, 2),
                             'tds' => round((float) $v->tds_amount, 2),
-                            'net' => round($net > 0 ? $net : (float) $v->total_amount - (float) $v->tds_amount, 2),
+                            'net' => $net,
                             'status' => $v->status,
                         ];
                     }),

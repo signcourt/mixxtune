@@ -321,6 +321,12 @@ class ReportImportScheduledPublisherTest extends TestCase
         // Wallet was credited the remainder only: 1000 - 400 = 600.
         $credit = DB::table('wallet_transactions')->where('direction', 'credit')->sum('amount');
         $this->assertEqualsWithDelta(600.0, (float) $credit, 0.00001);
+
+        // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1: the recovery got its own
+        // advance_recovery invoice, total minus 400.
+        $inv = DB::table('invoices')->where('invoice_type', 'advance_recovery')->first();
+        $this->assertNotNull($inv, 'advance_recovery invoice should be created on report publish');
+        $this->assertEqualsWithDelta(-400.0, (float) $inv->total_amount, 0.001);
     }
 
     // MIXXTUNE_ADVANCE_CHARGE_ON_WALLET_V1: the charge is a flat % of the NET

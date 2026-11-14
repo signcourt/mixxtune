@@ -302,6 +302,13 @@ class RecoupmentManagementService
 
             $this->recalculatePlanTotals($lockedPlan);
 
+            // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1: one invoice per recovery.
+            try {
+                app(\App\Services\V2\InvoiceService::class)->generateFromRecovery($recovery, $actorId);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('advance-recovery invoice (sweep) failed: '.$e->getMessage(), ['recovery_id' => $recovery->id]);
+            }
+
             return $recovery;
         });
     }
@@ -778,6 +785,13 @@ class RecoupmentManagementService
                     'completed_on' =>
                         now()->toDateString(),
                 ]);
+            }
+
+            // MIXXTUNE_ADVANCE_RECOVERY_INVOICE_V1: one invoice per recovery.
+            try {
+                app(\App\Services\V2\InvoiceService::class)->generateFromRecovery($recovery, $context['actor_id'] ?? null);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('advance-recovery invoice (statement) failed: '.$e->getMessage(), ['recovery_id' => $recovery->id]);
             }
 
             return $recovery;
