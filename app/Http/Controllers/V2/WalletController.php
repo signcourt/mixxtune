@@ -307,6 +307,15 @@ class WalletController extends Controller
                 'role' =>
                     $role,
 
+                /* MIXXTUNE_KYC_BEFORE_WITHDRAWAL_V1: the wallet "Request my payment"
+                 * button uses this to send unverified owners to their KYC page
+                 * instead of the withdrawal form. The server still gates the form
+                 * and the request itself; this is only for a clean button. */
+                'kycVerified' =>
+                    \App\Models\Finance\PayoutProfile::query()
+                        ->where('user_id', $financialOwner->id)
+                        ->value('kyc_status') === 'verified',
+
                 'minimumWithdrawal' =>
                     $minimumWithdrawal,
 

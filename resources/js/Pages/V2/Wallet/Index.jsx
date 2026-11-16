@@ -12,6 +12,7 @@ export default function Index({
     transactions = {},
     minimumWithdrawal = 0,
     withdrawalEnabled = true,
+    kycVerified = true,
     owners = null,
     ownerSearch = "",
     advances = [],
@@ -39,6 +40,8 @@ export default function Index({
     const hasAdvance = outstanding > 0;
     // Payout needs: no advance left AND at least the minimum withdraw-able.
     const canRequest = !staff && withdrawalEnabled && !hasAdvance && minimum > 0 && available >= minimum;
+    // MIXXTUNE_KYC_BEFORE_WITHDRAWAL_V1: KYC page differs for artist vs label/owner.
+    const kycUrl = role === "artist" ? "/artist/kyc" : "/kyc-profile";
     const today = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "long", year: "numeric" }).format(new Date());
 
     return (
@@ -72,9 +75,20 @@ export default function Index({
                         {!staff && (
                             <div className="lg:text-right">
                                 {canRequest ? (
-                                    <Link href="/withdrawals" className="inline-flex h-12 items-center justify-center rounded-xl bg-violet-600 px-6 text-[15px] font-semibold text-white shadow-sm hover:bg-violet-700">
-                                        Request my payment
-                                    </Link>
+                                    kycVerified ? (
+                                        <Link href="/withdrawals" className="inline-flex h-12 items-center justify-center rounded-xl bg-violet-600 px-6 text-[15px] font-semibold text-white shadow-sm hover:bg-violet-700">
+                                            Request my payment
+                                        </Link>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <Link href={kycUrl} className="inline-flex h-12 items-center justify-center rounded-xl bg-violet-600 px-6 text-[15px] font-semibold text-white shadow-sm hover:bg-violet-700">
+                                                Complete KYC to withdraw
+                                            </Link>
+                                            <p className="max-w-xs text-xs text-slate-500 lg:ml-auto">
+                                                Finish your KYC verification first — then you can request a payment.
+                                            </p>
+                                        </div>
+                                    )
                                 ) : (
                                     <div className="space-y-2">
                                         <button type="button" disabled className="inline-flex h-12 cursor-not-allowed items-center justify-center rounded-xl bg-slate-200 px-6 text-[15px] font-semibold text-slate-500">

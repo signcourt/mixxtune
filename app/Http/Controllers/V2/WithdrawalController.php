@@ -22,7 +22,7 @@ class WithdrawalController extends Controller
         WalletService $walletService,
         LabelFinancialContextService $financialContext,
         WithdrawalService $withdrawalService
-    ): Response {
+    ): Response|RedirectResponse {
         $actor = $request->user();
 
         $financialOwner =
@@ -40,6 +40,24 @@ class WithdrawalController extends Controller
                 $financialOwner->id
             )
             ->first();
+
+        /*
+         * MIXXTUNE_KYC_BEFORE_WITHDRAWAL_V1: no one reaches the withdrawal form
+         * until their KYC is verified. This is the server-side gate that catches
+         * the Wallet button, the Artist wallet button and a typed /withdrawals
+         * URL alike. The actual request creation in WithdrawalService::create()
+         * already blocks unverified KYC too, so money can never move; this just
+         * sends the owner straight to their KYC page instead of a dead form.
+         */
+        if (! $profile || $profile->kyc_status !== 'verified') {
+            $role = $permissions->role($financialOwner);
+            $kycUrl = $role === 'artist' ? '/artist/kyc' : '/kyc-profile';
+
+            return redirect($kycUrl)->with(
+                'info',
+                'Please complete your KYC verification before requesting a withdrawal.'
+            );
+        }
 
         return Inertia::render(
             'V2/Withdrawals/Index',
