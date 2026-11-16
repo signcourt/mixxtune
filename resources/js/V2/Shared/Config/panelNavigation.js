@@ -208,11 +208,13 @@ const ownerNavigation = (
                     href: routes.wallet,
                     permission: 'wallet.view',
                 },
+                /* W186: Royalties removed (unused); order is now
+                   Wallet -> Analytics -> Publishing -> Reports. */
                 {
-                    id: 'financial-royalties',
-                    label: 'Royalties',
-                    href: routes.royalties,
-                    permission: 'royalties.view',
+                    id: 'financial-analytics',
+                    label: 'Analytics',
+                    href: routes.analytics,
+                    permission: 'reports.view',
                 },
                 {
                     id: 'financial-publishing',
@@ -224,12 +226,6 @@ const ownerNavigation = (
                     id: 'financial-reports',
                     label: 'Reports',
                     href: routes.reports,
-                    permission: 'reports.view',
-                },
-                {
-                    id: 'financial-analytics',
-                    label: 'Analytics',
-                    href: routes.analytics,
                     permission: 'reports.view',
                 },
             ],
