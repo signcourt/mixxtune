@@ -141,6 +141,50 @@ function Pager({ page, name }) {
 
 function HistorySection({ transactions, money, staff, historyWallet, historyOwner, role }) {
     const rows = transactions.data ?? [];
+
+    /* W190: fold same-reference advance-recovery legs into ONE displayed row.
+       Backend keeps every leg as its own record; this only groups them for display
+       so a single recoupment run reads as one "Advance recovery", not two. */
+    const foldedRows = (() => {
+        const refOf = (t) => {
+            const m = String(t?.description ?? "").match(/\bRCP-[A-Za-z0-9-]+/);
+            return m ? m[0] : null;
+        };
+        const isRecovery = (t) =>
+            String(t?.type ?? "") === "Advance recovery" &&
+            (t?.direction ?? "debit") !== "credit";
+        const out = [];
+        const groupIndex = {};
+        for (const t of rows) {
+            const ref = refOf(t);
+            if (ref && isRecovery(t)) {
+                const key = "rec:" + ref;
+                if (key in groupIndex) {
+                    const g = out[groupIndex[key]];
+                    g._amount += Number(t.amount ?? 0);
+                    const b = t.balance_after;
+                    if (b !== null && b !== undefined) {
+                        const nb = Number(b);
+                        if (g._balance === null || g._balance === undefined || nb < g._balance) g._balance = nb;
+                    }
+                    g._count += 1;
+                    g.description = "Advance recovered (" + ref + ")";
+                    continue;
+                }
+                groupIndex[key] = out.length;
+                out.push({
+                    ...t,
+                    _amount: Number(t.amount ?? 0),
+                    _balance: (t.balance_after === null || t.balance_after === undefined) ? null : Number(t.balance_after),
+                    _count: 1,
+                });
+                continue;
+            }
+            out.push({ ...t, _amount: Number(t.amount ?? 0), _balance: t.balance_after, _count: 1 });
+        }
+        return out;
+    })();
+    const foldedCollapsed = rows.length - foldedRows.length;
     const clear = () => router.get(window.location.pathname, { wallet: undefined, owner_search: new URLSearchParams(window.location.search).get("owner_search") || undefined }, { preserveScroll: true, preserveState: true });
 
     /* W71: one clickable title "Transaction history & Invoices"; it opens the list below and scrolls to it */
@@ -163,7 +207,10 @@ function HistorySection({ transactions, money, staff, historyWallet, historyOwne
             return !was;
         });
     };
-    const total = transactions.total ?? rows.length;
+    const rawTotal = transactions.total ?? rows.length;
+    const total = (foldedCollapsed > 0 && rawTotal === rows.length)
+        ? foldedRows.length
+        : rawTotal;
     const title = staff ? (historyWallet ? `History · ${historyOwner ?? "owner"}` : "Wallet history & Invoices") : "Transaction history & Invoices";
 
     return (
@@ -197,7 +244,7 @@ function HistorySection({ transactions, money, staff, historyWallet, historyOwne
                 </div>
             ) : (
                 <ul className="divide-y divide-slate-100">
-                    {rows.map((t) => {
+                    {foldedRows.map((t) => {
                         const credit = t.direction === "credit";
                         return (
                             <li key={t.id} className="flex items-start justify-between gap-3 px-4 py-3 sm:px-5">
@@ -211,8 +258,8 @@ function HistorySection({ transactions, money, staff, historyWallet, historyOwne
                                     <div className="text-[11px] text-slate-400">{t.date}</div>
                                 </div>
                                 <div className="shrink-0 text-right">
-                                    <div className={`whitespace-nowrap text-sm font-bold ${credit ? "text-emerald-700" : "text-rose-600"}`}>{credit ? "+" : "−"}{money(t.amount)}</div>
-                                    {t.balance_after !== null && <div className="whitespace-nowrap text-[11px] text-slate-500">balance {money(t.balance_after)}</div>}
+                                    <div className={`whitespace-nowrap text-sm font-bold ${credit ? "text-emerald-700" : "text-rose-600"}`}>{credit ? "+" : "−"}{money(t._amount ?? t.amount)}</div>
+                                    {(t._balance ?? t.balance_after) !== null && (t._balance ?? t.balance_after) !== undefined && <div className="whitespace-nowrap text-[11px] text-slate-500">balance {money(t._balance ?? t.balance_after)}</div>}
                                 </div>
                             </li>
                         );
