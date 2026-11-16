@@ -154,6 +154,22 @@ class WithdrawalService
             ]);
         }
 
+        /*
+         * MIXXTUNE_PAYOUT_CYCLE_V1 (W185b-2): quarterly owners can only request in a
+         * quarter-end month (Mar/Jun/Sep/Dec). The money keeps accruing in the wallet
+         * the other months. This is the hard server-side gate; the frontend also
+         * disables the button, but a request must never slip through here.
+         */
+        $cycleEligibility = $this->cycleEligibilityFor($user);
+
+        if (! $cycleEligibility['allowed']) {
+            throw ValidationException::withMessages([
+                'withdrawal' =>
+                    $cycleEligibility['message']
+                    ?? 'Quarterly payouts open only at the end of each quarter.',
+            ]);
+        }
+
         $wallet = $this->walletService
             ->account($user);
 
@@ -1223,6 +1239,81 @@ class WithdrawalService
             'payable_after' => null,
             'message' =>
                 'Your payment request is in and is being processed.',
+        ];
+    }
+
+    /*
+     * MIXXTUNE_PAYOUT_CYCLE_V1 (W185b-2)
+     *
+     * Resolve the effective payout cycle for a financial owner. An owner can hold
+     * several Labels and/or Artists; if ANY of them is quarterly we treat the owner
+     * as quarterly (the more restrictive choice, as decided). Same user_id +
+     * not-deleted scoping as withdrawalEnabledFor(). Returns 'monthly' | 'quarterly'.
+     */
+    public function payoutCycleFor(User $user): string
+    {
+        $hasQuarterlyLabel = Label::query()
+            ->where('user_id', $user->id)
+            ->whereNull('deleted_at')
+            ->where('payout_cycle', 'quarterly')
+            ->exists();
+
+        if ($hasQuarterlyLabel) {
+            return 'quarterly';
+        }
+
+        $hasQuarterlyArtist = Artist::query()
+            ->where('user_id', $user->id)
+            ->whereNull('deleted_at')
+            ->where('payout_cycle', 'quarterly')
+            ->exists();
+
+        return $hasQuarterlyArtist ? 'quarterly' : 'monthly';
+    }
+
+    /*
+     * MIXXTUNE_PAYOUT_CYCLE_V1 (W185b-2)
+     *
+     * Can this owner place a withdrawal request in the current month?
+     *   - monthly   -> always (other eligibility checks still apply elsewhere)
+     *   - quarterly -> only in a quarter-end month (Mar/Jun/Sep/Dec)
+     * Pure w.r.t. the clock ($now injectable for tests). Takes the already-resolved
+     * cycle string so callers can avoid a second DB hit.
+     */
+    public function cycleAllowsRequestNow(
+        string $cycle,
+        ?\DateTimeInterface $now = null
+    ): bool {
+        if ($cycle !== 'quarterly') {
+            return true;
+        }
+
+        $month = (int) ($now
+            ? \Carbon\Carbon::parse($now)->month
+            : \Carbon\Carbon::now()->month);
+
+        return in_array($month, [3, 6, 9, 12], true);
+    }
+
+    /*
+     * MIXXTUNE_PAYOUT_CYCLE_V1 (W185b-2)
+     *
+     * Owner-facing eligibility for the current month, for the Wallet/Withdrawals
+     * button. Returns [ 'cycle' => ..., 'allowed' => bool, 'message' => ?string ].
+     */
+    public function cycleEligibilityFor(
+        User $user,
+        ?\DateTimeInterface $now = null
+    ): array {
+        $cycle = $this->payoutCycleFor($user);
+        $allowed = $this->cycleAllowsRequestNow($cycle, $now);
+
+        return [
+            'cycle' => $cycle,
+            'allowed' => $allowed,
+            'message' => $allowed
+                ? null
+                : 'Quarterly payouts open only at the end of each quarter (March, June, September, December). Your balance keeps growing until then.',
         ];
     }
 

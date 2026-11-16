@@ -43,6 +43,9 @@ export default function Index({
     withdrawals = {},
     minimumAmount = 0,
     withdrawalEnabled = true,
+    /* MIXXTUNE_PAYOUT_CYCLE_V1 (W185b-2): quarterly owners can only request in
+       Mar/Jun/Sep/Dec. Defaults keep monthly owners unaffected. */
+    cycleEligibility = { cycle: 'monthly', allowed: true, message: null },
 }) {
     const { flash = {} } = usePage().props;
 
@@ -90,8 +93,12 @@ export default function Index({
         amountValue >= minimum &&
         amountValue <= availableBalance;
 
+    /* MIXXTUNE_PAYOUT_CYCLE_V1 (W185b-2): quarterly gate. */
+    const cycleAllowed = cycleEligibility?.allowed !== false;
+
     const canWithdraw =
         withdrawalEnabled &&
+        cycleAllowed &&
         profileExists &&
         isVerified &&
         selectedMethodReady &&
@@ -118,6 +125,17 @@ export default function Index({
             title: 'Withdrawals suspended',
             detail:
                 'New withdrawal requests are currently disabled for this account.',
+            action: null,
+        });
+    }
+
+    /* MIXXTUNE_PAYOUT_CYCLE_V1 (W185b-2): quarterly owners outside Mar/Jun/Sep/Dec. */
+    if (withdrawalEnabled && !cycleAllowed) {
+        blockers.push({
+            title: 'Quarterly payout — opens at quarter end',
+            detail:
+                cycleEligibility?.message ??
+                'Quarterly payouts open only in March, June, September and December. Your balance keeps growing until then.',
             action: null,
         });
     }

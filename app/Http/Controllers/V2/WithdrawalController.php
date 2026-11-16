@@ -83,6 +83,16 @@ class WithdrawalController extends Controller
                         $financialOwner
                     ),
 
+                /*
+                 * MIXXTUNE_PAYOUT_CYCLE_V1 (W185b-2): quarterly owners can only
+                 * request in Mar/Jun/Sep/Dec. The page uses this to disable the
+                 * button and show an "opens at quarter end" note the other months.
+                 */
+                'cycleEligibility' =>
+                    $withdrawalService->cycleEligibilityFor(
+                        $financialOwner
+                    ),
+
                 'withdrawals' =>
                     WithdrawalRequest::query()
                         ->with([
