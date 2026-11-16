@@ -1176,4 +1176,54 @@ class WithdrawalService
         );
     }
 
+    /*
+     * MIXXTUNE_PAYOUT_TIMING_V1 (W185a)
+     *
+     * Owner-facing payout timing for a placed request, built on the "20th" rule:
+     *   - request on or before the 20th  -> paid after THIS month's 20th
+     *   - request after the 20th         -> no promised date; just "processing"
+     *
+     * Pure function (no DB, no side effects) so it is easy to test and safe to call
+     * from the controller flash. Returns a small array the frontend can render:
+     *   [
+     *     'payable_after' => 'Y-m-d' | null,   // the 20th it will be paid after, or null
+     *     'message'       => string,           // ready-to-show owner message
+     *   ]
+     * $now is injectable for tests; defaults to the real clock.
+     */
+    public function payoutTimingMessage(
+        ?\DateTimeInterface $requestedAt = null,
+        ?\DateTimeInterface $now = null
+    ): array {
+        $ref = $requestedAt
+            ? \Carbon\Carbon::instance(
+                \Carbon\Carbon::parse($requestedAt)
+            )
+            : ($now
+                ? \Carbon\Carbon::parse($now)
+                : \Carbon\Carbon::now());
+
+        $dayOfMonth = (int) $ref->day;
+
+        if ($dayOfMonth <= 20) {
+            $payable = $ref->copy()->day(20)->startOfDay();
+
+            return [
+                'payable_after' =>
+                    $payable->format('Y-m-d'),
+                'message' =>
+                    'Your payment request is in — it will be processed after '
+                    . $payable->format('jS M Y')
+                    . '.',
+            ];
+        }
+
+        /* After the 20th: deliberately no promised date — just "processing". */
+        return [
+            'payable_after' => null,
+            'message' =>
+                'Your payment request is in and is being processed.',
+        ];
+    }
+
 }

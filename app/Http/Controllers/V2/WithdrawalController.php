@@ -144,11 +144,34 @@ class WithdrawalController extends Controller
             $actor
         );
 
-        return back()->with(
-            'success',
-            'Withdrawal request '
-            . $withdrawal->withdrawal_number
-            . ' submitted.'
+        /*
+         * MIXXTUNE_PAYOUT_TIMING_V1 (W185a): give the owner a clear confirmation —
+         * the reference number plus a processing/timing message built on the 20th
+         * rule. The status itself is unchanged ('pending'); this is only the
+         * owner-facing message. 'payout' is structured so the page can render it
+         * nicely; 'success' stays as a plain string for older views.
+         */
+        $timing = $withdrawals->payoutTimingMessage(
+            $withdrawal->requested_at
         );
+
+        return back()
+            ->with(
+                'success',
+                'Payment request '
+                . $withdrawal->withdrawal_number
+                . ' placed. '
+                . $timing['message']
+            )
+            ->with('payout', [
+                'reference' =>
+                    $withdrawal->withdrawal_number,
+                'status' =>
+                    $withdrawal->status,
+                'payable_after' =>
+                    $timing['payable_after'],
+                'message' =>
+                    $timing['message'],
+            ]);
     }
 }

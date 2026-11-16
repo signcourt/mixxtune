@@ -27,6 +27,15 @@ const statusStyles = {
         'bg-rose-50 text-rose-700 ring-rose-600/20',
 };
 
+/* MIXXTUNE_PAYOUT_TIMING_V1 (W185a): owner-friendly words for each status. */
+const statusLabels = {
+    pending: 'Requested',
+    approved: 'Approved',
+    processing: 'Processing',
+    paid: 'Completed — paid',
+    rejected: 'Rejected',
+};
+
 export default function Index({
     role = 'artist',
     wallet = {},
@@ -149,10 +158,44 @@ export default function Index({
             <Head title="Withdrawals" />
 
             <div className="space-y-6">
-                {flash.success && (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800">
-                        {flash.success}
+                {/* MIXXTUNE_PAYOUT_TIMING_V1 (W185a): rich confirmation after a request. */}
+                {flash.payout ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-800">
+                        <p className="text-sm font-semibold">
+                            Your payment request is in — it&apos;s being processed.
+                        </p>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+                            <span>
+                                Reference:{' '}
+                                <span className="font-semibold">
+                                    {flash.payout.reference}
+                                </span>
+                            </span>
+
+                            {flash.payout.payable_after && (
+                                <span>
+                                    Payment after:{' '}
+                                    <span className="font-semibold">
+                                        {formatDate(
+                                            flash.payout
+                                                .payable_after
+                                        )}
+                                    </span>
+                                </span>
+                            )}
+                        </div>
+
+                        <p className="mt-2 text-xs text-emerald-700">
+                            {flash.payout.message}
+                        </p>
                     </div>
+                ) : (
+                    flash.success && (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800">
+                            {flash.success}
+                        </div>
+                    )
                 )}
 
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -422,6 +465,11 @@ function StatusBadge({ status }) {
     const normalized =
         status ?? 'pending';
 
+    /* MIXXTUNE_PAYOUT_TIMING_V1 (W185a): show friendly words, fall back to the raw status. */
+    const label =
+        statusLabels[normalized] ??
+        normalized.replaceAll('_', ' ');
+
     return (
         <span
             className={[
@@ -430,7 +478,7 @@ function StatusBadge({ status }) {
                     statusStyles.pending,
             ].join(' ')}
         >
-            {normalized.replaceAll('_', ' ')}
+            {label}
         </span>
     );
 }
