@@ -15,7 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
 class OfficeStaffOnly
 {
     /* paths an office staff member is allowed to open (prefix match, no leading slash) */
-    private const ALLOW = ['office', 'notifications', 'logout', 'profile', 'email/verify', 'email/verification-notification'];
+    /* W192: 'impersonation' lets a staff user POST /impersonation/stop to return to Super Admin. */
+    private const ALLOW = ['office', 'notifications', 'logout', 'profile', 'email/verify', 'email/verification-notification', 'impersonation'];
 
     public function handle(Request $request, Closure $next): Response
     {
