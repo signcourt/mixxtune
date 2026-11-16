@@ -218,7 +218,7 @@ class ReportController extends Controller
                                 \Carbon\Carbon::createFromFormat(
                                     'Y-m',
                                     $month
-                                )->format('F Y');
+                                )->format(/* W188 */ 'M-y');
                         } catch (\Throwable $e) {
                             $period = $month;
                         }

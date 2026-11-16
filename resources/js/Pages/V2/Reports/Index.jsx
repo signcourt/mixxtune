@@ -464,22 +464,14 @@ export default function ReportsIndex({
                     .split('-')
                     .map(Number);
 
-                const label = new Intl.DateTimeFormat(
+                /* W188: short "Sep-26" period label everywhere on Reports. */
+                const mon = new Intl.DateTimeFormat(
                     'en-US',
-                    {
-                        month: 'long',
-                        year: 'numeric',
-                        timeZone: 'UTC',
-                    }
+                    { month: 'short', timeZone: 'UTC' }
                 ).format(
-                    new Date(
-                        Date.UTC(
-                            year,
-                            month - 1,
-                            1
-                        )
-                    )
+                    new Date(Date.UTC(year, month - 1, 1))
                 );
+                const label = `${mon}-${String(year).slice(-2)}`;
 
                 return {
                     value: String(value),
