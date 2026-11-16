@@ -38,6 +38,8 @@ class Artist extends Model
         'can_receive_splits',
         'can_create_releases',
         'can_withdraw',
+        /* MIXXTUNE_PAYOUT_CYCLE_V1 (W185b): monthly | quarterly, default monthly */
+        'payout_cycle',
         'created_by',
         'updated_by',
     ];
@@ -56,6 +58,17 @@ class Artist extends Model
     public function label(): BelongsTo
     {
         return $this->belongsTo(Label::class);
+    }
+
+    /* MIXXTUNE_PAYOUT_CYCLE_V1 (W185b): mirror Label's cycle helpers. */
+    public function isMonthlyPayout(): bool
+    {
+        return $this->payout_cycle === 'monthly';
+    }
+
+    public function isQuarterlyPayout(): bool
+    {
+        return $this->payout_cycle === 'quarterly';
     }
 
     public function user(): BelongsTo
