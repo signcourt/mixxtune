@@ -134,6 +134,8 @@ export default function Create({
         state_code: "",
         role: initialRole,
         revenue_share_percentage: "",
+        /* MIXXTUNE_PAYOUT_CYCLE_V1 (W185c): monthly | quarterly, default monthly */
+        payout_cycle: "monthly",
         send_invitation: true,
         /* W80: the owner fills KYC & bank himself after login, we verify */
         kyc_by_owner: false,
@@ -320,6 +322,24 @@ export default function Create({
                                 <option value="IN">India</option>
                             </select>
                         </label>
+                        {/* MIXXTUNE_PAYOUT_CYCLE_V1 (W185c): payout cycle for this payee account. */}
+                        {isPayee && (
+                            <label>
+                                <FieldLabel label="Payout cycle" required />
+                                <select
+                                    value={data.payout_cycle}
+                                    onChange={(event) => setData("payout_cycle", event.target.value)}
+                                    className={inputClass(errors.payout_cycle)}
+                                >
+                                    <option value="monthly">Monthly — can request every month</option>
+                                    <option value="quarterly">Quarterly — only Mar/Jun/Sep/Dec</option>
+                                </select>
+                                {errors.payout_cycle && <div className="mt-1 text-xs text-red-600">{errors.payout_cycle}</div>}
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Quarterly owners’ balance keeps growing monthly; they can request a payout only at quarter end.
+                                </p>
+                            </label>
+                        )}
                         <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
                             <div><b className="text-slate-700">Username</b> and <b className="text-slate-700">Client ID</b> are created automatically when you save.</div>
                         </div>

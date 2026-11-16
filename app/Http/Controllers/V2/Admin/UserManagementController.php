@@ -623,6 +623,14 @@ class UserManagementController extends Controller
                 'in:admin,label,artist',
             ],
 
+            /* MIXXTUNE_PAYOUT_CYCLE_V1 (W185c): super-admin picks the payout cycle
+               for a new payee account. Only monthly/quarterly; defaults to monthly. */
+            'payout_cycle' => [
+                'nullable',
+                'string',
+                'in:monthly,quarterly',
+            ],
+
             'revenue_share_percentage' => [
                 'nullable',
                 'required_if:role,label,artist',
@@ -1606,6 +1614,30 @@ class UserManagementController extends Controller
         /* W79: each label row on the form has its own revenue % (a label that already has a % keeps it) */
         if ($validated['role'] === 'label') {
             $this->applyLabelRates($user, $validated, $request, $ratesBefore);
+        }
+
+        /*
+         * MIXXTUNE_PAYOUT_CYCLE_V1 (W185c): stamp the chosen payout cycle on every
+         * label and artist this payee owns, now that all of them exist and are linked
+         * (created, adopted, or synced). Done once here, outside the entity-creation
+         * branches, so it is independent of which path made each entity. Only for
+         * payee accounts; defaults to monthly. This is exactly what payoutCycleFor()
+         * reads, so the quarterly gate (W185b-2) picks it up immediately.
+         */
+        if (in_array($validated['role'], ['label', 'artist'], true)) {
+            $cycle = ($validated['payout_cycle'] ?? 'monthly') === 'quarterly'
+                ? 'quarterly'
+                : 'monthly';
+
+            Label::query()
+                ->where('user_id', $user->id)
+                ->whereNull('deleted_at')
+                ->update(['payout_cycle' => $cycle]);
+
+            Artist::query()
+                ->where('user_id', $user->id)
+                ->whereNull('deleted_at')
+                ->update(['payout_cycle' => $cycle]);
         }
 
         if (
