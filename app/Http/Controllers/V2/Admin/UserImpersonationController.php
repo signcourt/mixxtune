@@ -9,6 +9,8 @@ use App\Services\V2\PermissionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
 
 class UserImpersonationController extends Controller
 {
@@ -17,7 +19,7 @@ class UserImpersonationController extends Controller
         User $user,
         PermissionService $permissions,
         AuditLogService $audit
-    ): RedirectResponse {
+    ): Response {
         abort_unless(
             $permissions->role(
                 $request->user()
@@ -98,20 +100,18 @@ class UserImpersonationController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect(
+        // W191: full page reload so the browser picks up the regenerated CSRF token.
+        return Inertia::location(
             $this->dashboardFor(
                 $user
             )
-        )->with(
-            'success',
-            "You are now viewing the panel as {$user->name}."
         );
     }
 
     public function stop(
         Request $request,
         AuditLogService $audit
-    ): RedirectResponse {
+    ): Response {
         $originalUserId =
             $request->session()->get(
                 'impersonator_user_id'
@@ -169,11 +169,9 @@ class UserImpersonationController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect(
+        // W191: full page reload so the browser picks up the regenerated CSRF token.
+        return Inertia::location(
             '/admin/users'
-        )->with(
-            'success',
-            'Returned to Super Admin account.'
         );
     }
 
