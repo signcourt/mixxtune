@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import PageMessages from '@/V2/Shared/Components/PageMessages';
+import BankChangeOtpPrompt from '@/V2/Shared/Components/BankChangeOtpPrompt'; // W196
 
 /*
  * W60 MIXXTUNE_MANAGERS_V2: search, status filter, last login, clear
@@ -38,6 +39,8 @@ export default function Index({ role = 'super_admin', admins = {}, filters = {},
     return (
         <PanelLayout role={role} title="Managers" subtitle="People who work on the labels and artists assigned to them">
             <Head title="Managers" />
+            {/* W196: e-mail OTP box for suspend / activate */}
+            <BankChangeOtpPrompt />
             <PageMessages />
 
             <div className="space-y-5">

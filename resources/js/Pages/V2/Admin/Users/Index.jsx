@@ -11,6 +11,7 @@ import {
 } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import BankChangeOtpPrompt from '@/V2/Shared/Components/BankChangeOtpPrompt'; // W196
 
 // MIXXTUNE_QUICK_EDIT_PERMISSION_OPTIONS_V1
 const quickEditPermissionOptions = [
@@ -529,6 +530,8 @@ export default function Index({
             subtitle="Manage managers, labels, artists and team accounts"
         >
             <Head title="User Management" />
+            {/* W196: e-mail OTP box for suspend / activate */}
+            <BankChangeOtpPrompt />
 
             {quickEditUser &&
                 quickEditForm && (

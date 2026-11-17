@@ -1720,6 +1720,13 @@ class UserManagementController extends Controller
                 ? 'suspended'
                 : 'active';
 
+        /* W196: suspend / activate needs an e-mailed OTP (same guard as other sensitive actions). */
+        app(\App\Services\V2\ActionOtpGuard::class)->require(
+            $request->user(),
+            'user.status:' . $user->id . ':' . $newStatus,
+            ($newStatus === 'suspended' ? 'suspend' : 'activate') . ' the account of ' . $user->email
+        );
+
         $user->update([
             'account_status' =>
                 $newStatus,
