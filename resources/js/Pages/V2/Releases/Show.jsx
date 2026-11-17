@@ -596,7 +596,12 @@ function OwnerPoster({ release, role }) {
     const [busy, setBusy] = useState(false);
     const canRequest = role !== 'super_admin' && role !== 'admin';
     const pending = Boolean(release.poster_change_pending);
-    const url = artworkUrl(release.artwork_path);
+    /* W195c: while pending, show the proposed (latest) poster, not the old one. */
+    const url = artworkUrl(
+        pending && release.poster_pending_path
+            ? release.poster_pending_path
+            : release.artwork_path
+    );
 
     const pick = () => fileRef.current && fileRef.current.click();
 

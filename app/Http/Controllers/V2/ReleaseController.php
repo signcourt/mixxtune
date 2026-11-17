@@ -1128,12 +1128,22 @@ class ReleaseController extends Controller
                     'artwork_path' =>
                         $release->artwork_path,
 
-                    /* W195: true when a poster change is waiting for approval. */
+                    /* W195c: the latest pending poster change (so the owner sees the NEW poster
+                       smoky while it waits, not the old one). null when nothing is pending. */
                     'poster_change_pending' =>
                         \App\Models\Distribution\PosterChangeRequest::query()
                             ->where('release_id', $release->id)
                             ->where('status', 'pending')
                             ->exists(),
+
+                    'poster_pending_path' =>
+                        optional(
+                            \App\Models\Distribution\PosterChangeRequest::query()
+                                ->where('release_id', $release->id)
+                                ->where('status', 'pending')
+                                ->orderByDesc('id')
+                                ->first()
+                        )->proposed_path,
                     'worldwide' =>
                         (bool) $release->worldwide,
                     'stores' =>
