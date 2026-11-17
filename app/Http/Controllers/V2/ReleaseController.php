@@ -1127,6 +1127,13 @@ class ReleaseController extends Controller
                         $release->phonographic_year,
                     'artwork_path' =>
                         $release->artwork_path,
+
+                    /* W195: true when a poster change is waiting for approval. */
+                    'poster_change_pending' =>
+                        \App\Models\Distribution\PosterChangeRequest::query()
+                            ->where('release_id', $release->id)
+                            ->where('status', 'pending')
+                            ->exists(),
                     'worldwide' =>
                         (bool) $release->worldwide,
                     'stores' =>

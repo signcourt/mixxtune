@@ -138,6 +138,7 @@ export default function Show({
     nextInQueue = null,
     deliveryUrl = null,
     canEditMetadata = true,
+    posterRequest = null,
 }) {
     const [notes, setNotes] = useState('');
     const [processing, setProcessing] = useState(false);
@@ -318,6 +319,8 @@ export default function Show({
                         <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
                             {/* W194: poster with hover icons - pencil (edit) + download */}
                             <PosterBox release={release} canChange={canEditMetadata} />
+                            {/* W195b: pending poster change request (label/artist) */}
+                            <PosterRequestReview posterRequest={posterRequest} />
 
                             <div className="min-w-0 flex-1">
                                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
@@ -695,6 +698,61 @@ function PosterBox({ release, canChange }) {
                 className="hidden"
                 onChange={onFile}
             />
+        </div>
+    );
+}
+
+function PosterRequestReview({ posterRequest }) {
+    /* W195b: a label/artist asked to change this release's poster - approve or reject. */
+    const [busy, setBusy] = useState(false);
+    if (!posterRequest) return null;
+
+    const act = (kind) => {
+        if (busy) return;
+        setBusy(true);
+        router.post(
+            `/admin/poster-requests/${posterRequest.id}/${kind}`,
+            {},
+            { preserveScroll: true, onFinish: () => setBusy(false) }
+        );
+    };
+
+    return (
+        <div className="w-full rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-700">
+                Poster change requested
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <img
+                    src={`/storage/${posterRequest.proposed_path}`}
+                    alt="Proposed poster"
+                    className="h-24 w-24 rounded-xl border-2 border-amber-300 object-cover"
+                />
+                <div className="min-w-0 flex-1 text-sm text-slate-700">
+                    <div>Requested by <b>{posterRequest.requested_by || 'a user'}</b></div>
+                    {posterRequest.created_at && (
+                        <div className="text-xs text-slate-400">{posterRequest.created_at}</div>
+                    )}
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => act('approve')}
+                        disabled={busy}
+                        className="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                        {busy ? '...' : 'Approve'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => act('reject')}
+                        disabled={busy}
+                        className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                        Reject
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }

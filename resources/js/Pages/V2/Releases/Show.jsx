@@ -8,6 +8,7 @@ import {
 import {
     Head,
     Link,
+    router,
     usePage,
 } from '@inertiajs/react';
 
@@ -344,23 +345,8 @@ export default function Show({
 
                 <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="grid gap-7 lg:grid-cols-[240px_1fr]">
-                        <div className="aspect-square overflow-hidden rounded-2xl bg-slate-100">
-                            {artworkUrl(
-                                release.artwork_path
-                            ) ? (
-                                <img
-                                    src={artworkUrl(
-                                        release.artwork_path
-                                    )}
-                                    alt={release.title}
-                                    className="h-full w-full object-cover"
-                                />
-                            ) : (
-                                <div className="flex h-full items-center justify-center text-7xl text-slate-300">
-                                    ♪
-                                </div>
-                            )}
-                        </div>
+                        {/* W195: owner poster with request-change pencil */}
+                        <OwnerPoster release={release} role={role} />
 
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -597,6 +583,135 @@ export default function Show({
                 )}
             </div>
         </PanelLayout>
+    );
+}
+
+function OwnerPoster({ release, role }) {
+    /* W195b: label/artist REQUEST a poster change with a confirm step.
+       pick -> local preview + uploading INSIDE the box -> Change request / Cancel.
+       On submit the poster shows smoky (pending) and is locked until approved. */
+    const fileRef = useRef(null);
+    const [file, setFile] = useState(null);
+    const [preview, setPreview] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const canRequest = role !== 'super_admin' && role !== 'admin';
+    const pending = Boolean(release.poster_change_pending);
+    const url = artworkUrl(release.artwork_path);
+
+    const pick = () => fileRef.current && fileRef.current.click();
+
+    const onFile = (e) => {
+        const f = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!f) return;
+        setFile(f);
+        setPreview(URL.createObjectURL(f));
+    };
+
+    const cancel = () => {
+        if (preview) URL.revokeObjectURL(preview);
+        setFile(null);
+        setPreview(null);
+    };
+
+    const submit = () => {
+        if (!file || busy) return;
+        setBusy(true);
+        router.post(
+            `/releases/${release.id}/artwork-request`,
+            { artwork: file },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onFinish: () => {
+                    setBusy(false);
+                    cancel();
+                },
+            }
+        );
+    };
+
+    const Pencil = (
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg>
+    );
+
+    return (
+        <div>
+            <div className="group relative aspect-square overflow-hidden rounded-2xl bg-slate-100">
+                {/* base image: current poster, or the just-picked preview */}
+                {preview ? (
+                    <img src={preview} alt="New poster" className="h-full w-full object-cover" />
+                ) : url ? (
+                    <img src={url} alt={release.title} className={`h-full w-full object-cover ${pending ? 'opacity-40 blur-[1px]' : ''}`} />
+                ) : (
+                    <div className="flex h-full items-center justify-center text-7xl text-slate-300">♪</div>
+                )}
+
+                {/* pencil: only when nothing is picked and nothing pending */}
+                {canRequest && !preview && !pending && (
+                    <button
+                        type="button"
+                        onClick={pick}
+                        title="Request a poster change"
+                        aria-label="Request a poster change"
+                        className="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow opacity-0 transition hover:bg-white group-hover:opacity-100"
+                    >
+                        {Pencil}
+                    </button>
+                )}
+
+                {/* uploading overlay INSIDE the box */}
+                {busy && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-sm font-semibold text-white">
+                        Uploading...
+                    </div>
+                )}
+
+                {/* pending (smoky) badge */}
+                {canRequest && pending && !preview && (
+                    <div className="absolute inset-x-0 bottom-0 bg-black/55 px-2 py-1 text-center text-[11px] font-semibold text-white">
+                        Waiting for approval
+                    </div>
+                )}
+            </div>
+
+            {/* confirm step: Change request (proceed) + Cancel */}
+            {canRequest && preview && !busy && (
+                <div className="mt-2 flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={submit}
+                        className="inline-flex items-center rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700"
+                    >
+                        Change request
+                    </button>
+                    <button
+                        type="button"
+                        onClick={cancel}
+                        className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
+
+            {canRequest && pending && !preview && (
+                <p className="mt-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+                    Poster change requested - waiting for approval.
+                </p>
+            )}
+
+            <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png"
+                className="hidden"
+                onChange={onFile}
+            />
+        </div>
     );
 }
 

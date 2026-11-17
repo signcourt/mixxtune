@@ -1313,6 +1313,39 @@ Route::middleware(['auth', 'verified'])
     ->name('v2.releases.artwork-update');
 
 
+/* W195 MIXXTUNE_POSTER_CHANGE_REQUEST: owner requests a poster change; super-admin/admin review. */
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/releases/{release}/artwork-request',
+        [\App\Http\Controllers\V2\PosterChangeRequestController::class, 'store']
+    )
+    ->name('v2.releases.artwork-request');
+
+
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/admin/poster-requests',
+        [\App\Http\Controllers\V2\PosterChangeRequestController::class, 'index']
+    )
+    ->name('v2.admin.poster-requests.index');
+
+
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/admin/poster-requests/{posterRequest}/approve',
+        [\App\Http\Controllers\V2\PosterChangeRequestController::class, 'approve']
+    )
+    ->name('v2.admin.poster-requests.approve');
+
+
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/admin/poster-requests/{posterRequest}/reject',
+        [\App\Http\Controllers\V2\PosterChangeRequestController::class, 'reject']
+    )
+    ->name('v2.admin.poster-requests.reject');
+
+
 Route::middleware(['auth', 'verified'])
     ->patch(
         '/releases/{release}/distribution',

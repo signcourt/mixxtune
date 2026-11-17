@@ -356,6 +356,25 @@ class ReleaseReviewController extends Controller
 
                 'release' => $release,
 
+                /* W195b: this release's pending poster change request (null if none). */
+                'posterRequest' => (function () use ($release) {
+                    $pr = \App\Models\Distribution\PosterChangeRequest::query()
+                        ->where('release_id', $release->id)
+                        ->where('status', 'pending')
+                        ->with('requester')
+                        ->orderByDesc('id')
+                        ->first();
+                    if (! $pr) {
+                        return null;
+                    }
+                    return [
+                        'id' => $pr->id,
+                        'proposed_path' => $pr->proposed_path,
+                        'requested_by' => $pr->requester?->name,
+                        'created_at' => $pr->created_at?->toDateTimeString(),
+                    ];
+                })(),
+
                 'submissionChecklist' =>
                     $validator->checklist(
                         $release
