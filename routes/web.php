@@ -1296,6 +1296,23 @@ Route::middleware(['auth', 'verified'])
     ->name('v2.release-tracks.download');
 
 
+/* W194: poster download (original quality) + change. */
+Route::middleware(['auth', 'verified'])
+    ->get(
+        '/releases/{release}/artwork/download',
+        [\App\Http\Controllers\V2\ReleaseTrackController::class, 'downloadArtwork']
+    )
+    ->name('v2.releases.artwork-download');
+
+
+Route::middleware(['auth', 'verified'])
+    ->post(
+        '/releases/{release}/artwork',
+        [\App\Http\Controllers\V2\ReleaseTrackController::class, 'updateArtwork']
+    )
+    ->name('v2.releases.artwork-update');
+
+
 Route::middleware(['auth', 'verified'])
     ->patch(
         '/releases/{release}/distribution',

@@ -490,6 +490,19 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
         router.post(`/mail/accounts/${account.id}/refresh`, {}, { preserveScroll: true, onFinish: () => setBusy(false) });
     };
 
+    /* W193: auto-refresh the inbox every 3s so new mail / OTP shows up live.
+       Only on inbox and only when the browser tab is visible. */
+    useEffect(() => {
+        if (!account || folder !== "inbox") return;
+        const accountId = account.id;
+        const tick = () => {
+            if (document.visibilityState !== "visible") return;
+            router.post(`/mail/accounts/${accountId}/refresh`, {}, { preserveScroll: true, preserveState: true });
+        };
+        const id = setInterval(tick, 3000);
+        return () => clearInterval(id);
+    }, [account?.id, folder]);
+
     /* W103: the earlier mail goes under the reply as a grey quote, as in Gmail */
     const who = (m) => (m.from_name ? `${m.from_name} <${m.from_email}>` : m.from_email);
     const quote = (m) => `<br><br><div>On ${esc(when(m.at, true))}, ${esc(who(m))} wrote:</div><blockquote style="margin:0 0 0 0.8ex;border-left:1px solid #ccc;padding-left:1ex">${m.html || textToHtml(m.text ?? "")}</blockquote>`;

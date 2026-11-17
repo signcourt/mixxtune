@@ -436,6 +436,101 @@ class ReleaseTrackController extends Controller
         );
     }
 
+    /* W194: download the poster in the SAME quality it was uploaded. */
+    public function downloadArtwork(
+        Request $request,
+        Release $release,
+        ReleaseAccessService $access
+    ) {
+        $access->authorizeView(
+            $request->user(),
+            $release
+        );
+
+        abort_unless(
+            $release->artwork_path
+            && Storage::disk('public')
+                ->exists($release->artwork_path),
+            404,
+            'Artwork file not found.'
+        );
+
+        $ext = pathinfo(
+            $release->artwork_path,
+            PATHINFO_EXTENSION
+        );
+        $base = $release->title
+            ? preg_replace('/[^A-Za-z0-9 _-]+/', '', $release->title)
+            : 'artwork';
+        $name = trim($base) !== ''
+            ? trim($base) . ($ext ? '.' . $ext : '')
+            : basename($release->artwork_path);
+
+        return Storage::disk('public')->download(
+            $release->artwork_path,
+            $name
+        );
+    }
+
+    /* W194: Super Admin / Admin changes the poster (square-only). */
+    public function updateArtwork(
+        Request $request,
+        Release $release,
+        PermissionService $permissions
+    ) {
+        $role = $permissions->role($request->user());
+        abort_unless(
+            in_array($role, ['super_admin', 'admin'], true),
+            403,
+            'You cannot change this artwork.'
+        );
+
+        /* W194d: poster must be square - 3000x3000, 1500x1500, or any width==height. */
+        $validated = $request->validate([
+            'artwork' => [
+                'required',
+                'image',
+                'mimes:jpeg,jpg,png',
+                'max:20480',
+                function ($attribute, $value, $fail) {
+                    $size = @getimagesize($value->getPathname());
+                    if ($size === false) {
+                        $fail('The poster could not be read as an image.');
+                        return;
+                    }
+                    [$w, $h] = $size;
+                    $ok = ($w === 3000 && $h === 3000)
+                        || ($w === 1500 && $h === 1500)
+                        || ($w === $h);
+                    if (! $ok) {
+                        $fail('The poster must be square - 3000x3000 or 1500x1500. Yours is ' . $w . 'x' . $h . '.');
+                    }
+                },
+            ],
+        ]);
+
+        $old = $release->artwork_path;
+
+        $path = $request
+            ->file('artwork')
+            ->store(
+                'releases/artwork',
+                'public'
+            );
+
+        $release->artwork_path = $path;
+        $release->save();
+
+        if ($old && $old !== $path) {
+            Storage::disk('public')->delete($old);
+        }
+
+        return back()->with(
+            'success',
+            'Artwork updated.'
+        );
+    }
+
     /*
      * W87 MIXXTUNE_BACKGROUND_WAV_UPLOAD
      * The WAV is sent as soon as it is picked; the owner fills the track

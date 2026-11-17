@@ -9,7 +9,6 @@ use App\Services\V2\MasterRevenueVisibilityService;
 use App\Services\V2\FinancialAnalyticsService;
 use App\Models\Core\Label;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -480,27 +479,6 @@ class AnalyticsController extends Controller
             $autoPreview = true;
         }
 
-        /*
-         * MIXXTUNE_ANALYTICS_CACHE_V1: the whole page is built from heavy
-         * aggregates over report_rows (hundreds of thousands of rows), run on
-         * every open. The numbers only change when a report import/publish
-         * happens, so we cache the finished props keyed by a data-version taken
-         * from report_imports (MAX(updated_at)+COUNT). A new import/publish
-         * changes that version, so the cache key changes and fresh numbers are
-         * computed automatically — no cache-busting needed in the import flow.
-         * Key also includes role, user and the exact filters, so no viewer ever
-         * sees another scope's or another filter's data. 1h is only a safety TTL.
-         */
-        $dataVersion = (string) (DB::table('report_imports')->max('updated_at') ?? '0')
-            . ':' . DB::table('report_imports')->count();
-        $cacheKey = 'analytics:v1:' . $role . ':' . (int) ($user->id ?? 0)
-            . ':' . $dataVersion
-            . ':' . md5(json_encode($filters) . ($preview ? '1' : '0'));
-
-        $props = Cache::remember($cacheKey, now()->addHour(), function () use (
-            $request, $permissions, $analytics, $revenueVisibility,
-            $financialAnalytics, $user, $role, $filters, $preview, $autoPreview
-        ) {
         $base = $analytics->scopedQuery(
             $user,
             $permissions,
@@ -949,7 +927,9 @@ class AnalyticsController extends Controller
                             : [],
                 ];
 
-        return [
+        return Inertia::render(
+            'V2/Analytics/Index',
+            [
                 'role' => $role,
 
                 'filters' => $filters,
@@ -1061,12 +1041,7 @@ class AnalyticsController extends Controller
                         $revenueVisibility,
                         $filters
                     ),
-            ];
-        });
-
-        return Inertia::render(
-            'V2/Analytics/Index',
-            $props
+            ]
         );
     }
 

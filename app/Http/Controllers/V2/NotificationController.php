@@ -30,6 +30,17 @@ class NotificationController extends Controller
 
         $category = $validated['category'] ?? 'primary';
 
+        /* W193: label/artist/staff see ONLY the manual super-admin broadcasts
+           (type like 'broadcast.%'); admin & super_admin see everything. */
+        $role = $permissions->role($request->user());
+        $ownerBroadcastOnly = ! in_array($role, ['super_admin', 'admin'], true);
+        $scope = function ($q) use ($ownerBroadcastOnly) {
+            if ($ownerBroadcastOnly) {
+                $q->where('type', 'like', 'broadcast.%');
+            }
+            return $q;
+        };
+
         $query = PanelNotification::query()
             ->where('user_id', $request->user()->id)
             ->whereNull('dismissed_at');
@@ -38,6 +49,8 @@ class NotificationController extends Controller
             'category',
             $category
         );
+
+        $scope($query);
 
         return Inertia::render(
             'V2/Notifications/Index',
@@ -52,54 +65,58 @@ class NotificationController extends Controller
                     ->withQueryString(),
 
                 'unreadCount' =>
-                    PanelNotification::query()
-                        ->where(
-                            'user_id',
-                            $request->user()->id
-                        )
-                        ->whereNull('dismissed_at')
-                        ->whereNull('read_at')
-                        ->count(),
+                    $scope(
+                        PanelNotification::query()
+                            ->where(
+                                'user_id',
+                                $request->user()->id
+                            )
+                            ->whereNull('dismissed_at')
+                            ->whereNull('read_at')
+                    )->count(),
 
                 'categoryCounts' => [
                     'primary' =>
-                        PanelNotification::query()
-                            ->where(
-                                'user_id',
-                                $request->user()->id
-                            )
-                            ->whereNull('dismissed_at')
-                            ->where(
-                                'category',
-                                'primary'
-                            )
-                            ->count(),
+                        $scope(
+                            PanelNotification::query()
+                                ->where(
+                                    'user_id',
+                                    $request->user()->id
+                                )
+                                ->whereNull('dismissed_at')
+                                ->where(
+                                    'category',
+                                    'primary'
+                                )
+                        )->count(),
 
                     'announcement' =>
-                        PanelNotification::query()
-                            ->where(
-                                'user_id',
-                                $request->user()->id
-                            )
-                            ->whereNull('dismissed_at')
-                            ->where(
-                                'category',
-                                'announcement'
-                            )
-                            ->count(),
+                        $scope(
+                            PanelNotification::query()
+                                ->where(
+                                    'user_id',
+                                    $request->user()->id
+                                )
+                                ->whereNull('dismissed_at')
+                                ->where(
+                                    'category',
+                                    'announcement'
+                                )
+                        )->count(),
 
                     'promotion' =>
-                        PanelNotification::query()
-                            ->where(
-                                'user_id',
-                                $request->user()->id
-                            )
-                            ->whereNull('dismissed_at')
-                            ->where(
-                                'category',
-                                'promotion'
-                            )
-                            ->count(),
+                        $scope(
+                            PanelNotification::query()
+                                ->where(
+                                    'user_id',
+                                    $request->user()->id
+                                )
+                                ->whereNull('dismissed_at')
+                                ->where(
+                                    'category',
+                                    'promotion'
+                                )
+                        )->count(),
                 ],
 
                 'activeCategory' => $category,

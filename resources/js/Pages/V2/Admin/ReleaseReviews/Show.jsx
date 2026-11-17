@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useRef, useState } from 'react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import PageMessages from '@/V2/Shared/Components/PageMessages';
 
@@ -316,17 +316,8 @@ export default function Show({
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="p-5 sm:p-6">
                         <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
-                            {release.artwork_path ? (
-                                <img
-                                    src={`/storage/${release.artwork_path}`}
-                                    alt={release.title}
-                                    className="h-32 w-32 shrink-0 rounded-2xl border border-slate-200 object-cover shadow-sm sm:h-36 sm:w-36"
-                                />
-                            ) : (
-                                <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-center text-xs font-semibold uppercase tracking-wide text-slate-400 sm:h-36 sm:w-36">
-                                    No Artwork
-                                </div>
-                            )}
+                            {/* W194: poster with hover icons - pencil (edit) + download */}
+                            <PosterBox release={release} canChange={canEditMetadata} />
 
                             <div className="min-w-0 flex-1">
                                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
@@ -614,6 +605,97 @@ export default function Show({
             </div>
             </EditLock.Provider>
         </PanelLayout>
+    );
+}
+
+function PosterBox({ release, canChange }) {
+    /* W194: icons appear ON the poster on hover - pencil (edit) + download. */
+    const fileRef = useRef(null);
+    const [busy, setBusy] = useState(false);
+
+    const pick = () => fileRef.current && fileRef.current.click();
+
+    const onFile = (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!file) return;
+        setBusy(true);
+        router.post(
+            `/releases/${release.id}/artwork`,
+            { artwork: file },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onFinish: () => setBusy(false),
+            }
+        );
+    };
+
+    const Pencil = (
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg>
+    );
+    const DownloadIcon = (
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <path d="M7 10l5 5 5-5" />
+            <path d="M12 15V3" />
+        </svg>
+    );
+
+    return (
+        <div className="shrink-0">
+            <div className="group relative h-32 w-32 sm:h-36 sm:w-36">
+                {release.artwork_path ? (
+                    <img
+                        src={`/storage/${release.artwork_path}`}
+                        alt={release.title}
+                        className="h-full w-full rounded-2xl border border-slate-200 object-cover shadow-sm"
+                    />
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-center text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        No Artwork
+                    </div>
+                )}
+
+                {(release.artwork_path || canChange) && (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 rounded-2xl bg-black/0 opacity-0 transition group-hover:bg-black/35 group-hover:opacity-100">
+                        {release.artwork_path && (
+                            <a
+                                href={`/releases/${release.id}/artwork/download`}
+                                title="Download poster"
+                                aria-label="Download poster"
+                                className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow hover:bg-white"
+                            >
+                                {DownloadIcon}
+                            </a>
+                        )}
+                        {canChange && (
+                            <button
+                                type="button"
+                                onClick={pick}
+                                disabled={busy}
+                                title={release.artwork_path ? 'Edit poster' : 'Add poster'}
+                                aria-label={release.artwork_path ? 'Edit poster' : 'Add poster'}
+                                className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow hover:bg-white disabled:opacity-50"
+                            >
+                                {Pencil}
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png"
+                className="hidden"
+                onChange={onFile}
+            />
+        </div>
     );
 }
 
