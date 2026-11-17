@@ -193,6 +193,14 @@ function PosterRequestModal({ request, onClose }) {
         });
     };
 
+    /* W195g: ready-made reasons; clicking one FILLS the textarea, owner still presses Confirm. */
+    const QUICK_REASONS = [
+        'Poster par logo/watermark hai - hata kar clean poster bhejo.',
+        'Poster par extra naam/text hai - clean poster bhejo.',
+        'Poster ki details release metadata se match nahi karti.',
+        'Poster low quality ya galat size ka hai - 3000x3000 square bhejo.',
+    ];
+
     const Row = ({ label, value }) => (
         <div className="flex justify-between gap-4 border-b border-slate-100 py-1.5 text-sm">
             <span className="font-semibold text-slate-500">{label}</span>
@@ -265,6 +273,23 @@ function PosterRequestModal({ request, onClose }) {
                 <div className="border-t border-slate-100 p-4 sm:p-5">
                     {mode === 'reject' ? (
                         <div className="space-y-3">
+                            <div>
+                                <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Quick reasons (tap to fill)</div>
+                                <div className="flex flex-wrap gap-2">
+                                    {QUICK_REASONS.map((q) => (
+                                        <button
+                                            key={q}
+                                            type="button"
+                                            onClick={() => setReason(q)}
+                                            disabled={busy}
+                                            title={q}
+                                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${reason === q ? 'border-red-400 bg-red-100 text-red-800' : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'}`}
+                                        >
+                                            {q.split(' - ')[0]}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                             <label className="block text-sm font-semibold text-slate-700">Reason for rejection (required)</label>
                             <textarea
                                 value={reason}
