@@ -259,6 +259,47 @@ class ReleaseReviewController extends Controller
             $counts[$st] = (int) ($grouped[$st] ?? 0);
         }
 
+        /* W195d: on the Changes Requested tab, also show pending poster change requests
+           (super-admin: all; admin: only their assigned labels). */
+        $posterRequests = [];
+        if (($filters['status'] ?? null) === 'changes_requested') {
+            $labelIds = $assignments->labelIds($request->user());
+            $prQuery = \App\Models\Distribution\PosterChangeRequest::query()
+                ->where('status', 'pending')
+                ->with(['release.artist', 'release.label', 'release.tracks', 'requester']);
+            if ($role !== 'super_admin') {
+                $prQuery->whereHas('release', function ($q) use ($labelIds) {
+                    $q->whereIn('label_id', $labelIds);
+                });
+            }
+            $posterRequests = $prQuery->orderByDesc('id')->get()->map(function ($r) {
+                return [
+                    'id' => $r->id,
+                    'release_id' => $r->release_id,
+                    'release_title' => $r->release?->title,
+                    'current_path' => $r->release?->artwork_path,
+                    'proposed_path' => $r->proposed_path,
+                    'requested_by' => $r->requester?->name,
+                    'created_at' => $r->created_at?->toDateTimeString(),
+                    /* W195e: full details for the View modal */
+                    'artist' => $r->release?->artist?->stage_name
+                        ?: $r->release?->primary_artist_name,
+                    'label' => $r->release?->label?->name,
+                    'upc' => $r->release?->upc,
+                    'release_type' => $r->release?->release_type,
+                    'language' => $r->release?->language,
+                    'genre' => $r->release?->primary_genre,
+                    /* W195f: credits from the first track, to match against the poster */
+                    'singer' => optional($r->release?->tracks?->first())->primary_artist_name
+                        ?: $r->release?->primary_artist_name,
+                    'featuring' => optional($r->release?->tracks?->first())->featuring_artist_name,
+                    'composer' => optional($r->release?->tracks?->first())->composer_name,
+                    'writer' => optional($r->release?->tracks?->first())->author_name,
+                    'music_director' => optional($r->release?->tracks?->first())->music_director_name,
+                ];
+            })->values();
+        }
+
         return Inertia::render(
             'V2/Admin/ReleaseReviews/Index',
             [
@@ -269,6 +310,7 @@ class ReleaseReviewController extends Controller
                     $query
                         ->paginate(25)
                         ->withQueryString(),
+                'posterRequests' => $posterRequests,
             ]
         );
     }

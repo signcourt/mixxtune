@@ -184,6 +184,12 @@ class PosterChangeRequestController extends Controller
 
         abort_unless($posterRequest->status === 'pending', 409, 'Already handled.');
 
+        /* W195e: a rejection reason is required and goes to the owner. */
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+        $reason = trim($validated['reason']);
+
         if ($posterRequest->proposed_path) {
             Storage::disk('public')->delete($posterRequest->proposed_path);
         }
@@ -199,7 +205,7 @@ class PosterChangeRequestController extends Controller
                 $posterRequest->requester,
                 'poster.change_rejected',
                 'Poster change rejected',
-                'Your poster change for "' . ($release?->title ?? 'a release') . '" was not approved.',
+                'Your poster change for "' . ($release?->title ?? 'a release') . '" was not approved. Reason: ' . $reason,
                 $release ? '/releases/' . $release->id : null
             );
         }
