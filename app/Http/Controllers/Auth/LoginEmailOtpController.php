@@ -127,6 +127,13 @@ class LoginEmailOtpController extends Controller
                 '/artist/dashboard',
         };
 
+        /* W197: honour a safe KYC intended URL (from the KYC reminder e-mail link). */
+        $intended = (string) $request->session()->get('url.intended', '');
+        $path = $intended !== '' ? parse_url($intended, PHP_URL_PATH) : null;
+        if (is_string($path) && ($path === '/kyc-profile' || str_starts_with($path, '/artist/kyc'))) {
+            $destination = $path;
+        }
+
         $request->session()->forget(
             'url.intended'
         );

@@ -6,15 +6,19 @@ import { useEffect, useRef, useState } from "react";
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 
 /* MIXXTUNE_KYC_REVIEW_V1 */
+/* W197: renamed to "KYC Management"; tab order All first; reminder on every un-verified tab. */
 
 const TABS = [
+    ["all", "All profiles"],
+    ["verified", "Verified"],
+    ["rejected", "Rejected"],
     ["submitted", "Needs review"],
     ["pending", "Not submitted"],
     ["missing", "No payout profile"],
-    ["verified", "Verified"],
-    ["rejected", "Rejected"],
-    ["all", "All profiles"],
 ];
+
+/* W197: tabs on which a KYC reminder can be sent (everything except the Verified tab). */
+const REMINDABLE_TABS = ["all", "rejected", "submitted", "pending", "missing"];
 
 const STATUS = {
     submitted: ["Needs review", "bg-amber-50 text-amber-800"],
@@ -47,13 +51,18 @@ export default function Index({ role = "admin", filters = {}, counts = {}, profi
 
     const remind = (ids) => {
         if (!ids.length) return;
-        if (!window.confirm(`Send a "complete your KYC" notice to ${ids.length} owner(s)?`)) return;
+        if (!window.confirm(`Send a "complete your KYC" reminder (e-mail + dashboard) to ${ids.length} owner(s)?`)) return;
         router.post("/admin/kyc/remind", { user_ids: ids }, { preserveScroll: true });
     };
 
+    /* W197: on the "all" tab, exclude already-verified rows from a bulk reminder. */
+    const remindableIds = rows
+        .filter((r) => (r.kyc_status ?? "pending") !== "verified")
+        .map((r) => r.user_id);
+
     return (
-        <PanelLayout role={role} title="KYC Reviews" subtitle="Check payout and tax details before payouts are allowed">
-            <Head title="KYC Reviews" />
+        <PanelLayout role={role} title="KYC Management" subtitle="Check payout and tax details before payouts are allowed">
+            <Head title="KYC Management" />
 
             {flash.success && (
                 <div className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
@@ -61,12 +70,13 @@ export default function Index({ role = "admin", filters = {}, counts = {}, profi
                 </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+                <Stat label="All profiles" value={counts.all} active={filters.status === "all"} onClick={() => go({ status: "all" })} />
+                <Stat label="Verified" value={counts.verified} tone="green" active={filters.status === "verified"} onClick={() => go({ status: "verified" })} />
+                <Stat label="Rejected" value={counts.rejected} tone="red" active={filters.status === "rejected"} onClick={() => go({ status: "rejected" })} />
                 <Stat label="Needs review" value={counts.submitted} tone="amber" active={filters.status === "submitted"} onClick={() => go({ status: "submitted" })} />
                 <Stat label="Not submitted yet" value={counts.pending} active={filters.status === "pending"} onClick={() => go({ status: "pending" })} />
                 <Stat label="No payout profile" value={counts.missing} tone={counts.missing ? "red" : ""} active={filters.status === "missing"} onClick={() => go({ status: "missing" })} />
-                <Stat label="Verified" value={counts.verified} tone="green" active={filters.status === "verified"} onClick={() => go({ status: "verified" })} />
-                <Stat label="Rejected" value={counts.rejected} active={filters.status === "rejected"} onClick={() => go({ status: "rejected" })} />
             </div>
 
             <section className="mt-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -98,13 +108,13 @@ export default function Index({ role = "admin", filters = {}, counts = {}, profi
                         <option value="label">Labels</option>
                         <option value="artist">Artists</option>
                     </select>
-                    {["pending", "missing"].includes(filters.status) && rows.length > 0 && (
+                    {REMINDABLE_TABS.includes(filters.status) && remindableIds.length > 0 && (
                         <button
                             type="button"
-                            onClick={() => remind(rows.map((r) => r.user_id))}
+                            onClick={() => remind(remindableIds)}
                             className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700"
                         >
-                            <Bell className="h-4 w-4" /> Remind all on this page ({rows.length})
+                            <Bell className="h-4 w-4" /> Remind all on this page ({remindableIds.length})
                         </button>
                     )}
                 </div>
@@ -133,7 +143,7 @@ export default function Index({ role = "admin", filters = {}, counts = {}, profi
                                     </div>
                                 </div>
                                 <div className="flex shrink-0 gap-2">
-                                    <button type="button" onClick={() => remind([u.user_id])} className="h-9 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700">Remind</button>
+                                    <button type="button" onClick={() => remind([u.user_id])} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><Bell className="h-3.5 w-3.5" /> Send reminder</button>
                                     {role === "super_admin" && (
                                         <a href={`/admin/users/${u.user_id}/edit`} className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white">Add bank + PAN</a>
                                     )}
@@ -299,8 +309,8 @@ function ProfileCard({ p, role, reasons, onRemind }) {
                             <History className="h-3.5 w-3.5" /> History
                         </button>
                         {p.kyc_status !== "verified" && (
-                            <button type="button" onClick={onRemind} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700">
-                                <Bell className="h-3.5 w-3.5" /> Remind owner
+                            <button type="button" onClick={onRemind} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 text-xs font-semibold text-violet-700 hover:bg-violet-100">
+                                <Bell className="h-3.5 w-3.5" /> Send reminder
                             </button>
                         )}
                     </div>

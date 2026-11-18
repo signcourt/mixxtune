@@ -10,6 +10,8 @@ use App\Services\V2\AuditLogService;
 use App\Services\V2\KycChecks;
 use App\Services\V2\PanelNotificationService;
 use App\Services\V2\PermissionService;
+use App\Mail\KycReminderMail;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -334,6 +336,23 @@ class KycReviewController extends Controller
                     : 'Please send us your PAN, bank account number, IFSC and address (reply to our e-mail or open a support ticket) so we can set up your payouts.',
                 isset($profiles[$u->id]) ? '/kyc-profile' : '/support/create?category=kyc'
             );
+
+            /* W197: also e-mail the owner a link to their KYC page. The /kyc-profile route is
+             * auth-guarded, so a logged-out click goes to login first, and Laravel stores
+             * /kyc-profile as the intended URL; after login the user lands there (see
+             * LoginEmailOtpController::verify, W197). */
+            if ($u->email) {
+                try {
+                    Mail::to($u->email)->send(new KycReminderMail(
+                        (string) ($u->name ?: ''),
+                        url('/kyc-profile'),
+                        isset($profiles[$u->id])
+                    ));
+                } catch (Throwable $e) {
+                    report($e);
+                }
+            }
+
             $sent++;
         }
 
