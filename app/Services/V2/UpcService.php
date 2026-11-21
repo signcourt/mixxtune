@@ -83,7 +83,11 @@ class UpcService
     ): Release {
         $code = $this->validate($code);
 
-        $duplicate = Release::query()
+        /* W200: a UPC still sitting on a TRASHED (soft-deleted) release also counts -
+         * the DB unique index counts trashed rows, so without withTrashed() this check
+         * passed and the insert/update then threw a 1062 duplicate (500) instead of a
+         * clean validation error. */
+        $duplicate = Release::withTrashed()
             ->where('upc', $code)
             ->where('id', '!=', $release->id)
             ->exists();
