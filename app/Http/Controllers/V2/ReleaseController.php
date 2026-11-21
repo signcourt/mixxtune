@@ -2913,33 +2913,48 @@ class ReleaseController extends Controller
 
     private function generateCatalogNumber(): string
     {
-        $latestId = (int) (
-            Release::query()->max('id') ?? 0
+        /*
+         * W199 MIXXTUNE_CATALOG_NUMBER_SAFE: the previous version used MAX(id)+1, which
+         * collided when id and catalog_number drifted apart, or when two release-create
+         * requests ran at the same time (a double submit) -> "Duplicate entry 'MTxxxxxx'"
+         * and a 500. Now the next number is based on BOTH the max id and the highest
+         * existing MT catalog number, with a tiny random jitter so concurrent requests
+         * pick different numbers, and we scan forward for the first free MT######.
+         */
+        $maxId = (int) (Release::query()->max('id') ?? 0);
+
+        /* highest numeric part of any existing MT###### catalog number */
+        $maxCatalog = (string) (
+            Release::query()
+                ->where('catalog_number', 'like', 'MT%')
+                ->max('catalog_number') ?? ''
         );
+        $maxCatalogNum = 0;
+        if (preg_match('/^MT(\\d+)$/', $maxCatalog, $m)) {
+            $maxCatalogNum = (int) $m[1];
+        }
 
-        $number = $latestId + 1;
+        $base = max($maxId, $maxCatalogNum);
 
-        do {
-            $catalogNumber =
-                'MT'.
-                str_pad(
-                    (string) $number,
-                    6,
-                    '0',
-                    STR_PAD_LEFT
-                );
+        /* small random jitter (0..9) so two simultaneous requests rarely start on the same number */
+        $number = $base + 1 + random_int(0, 9);
+
+        for ($tries = 0; $tries < 10000; $tries++) {
+            $catalogNumber = 'MT' . str_pad((string) $number, 6, '0', STR_PAD_LEFT);
 
             $exists = Release::query()
-                ->where(
-                    'catalog_number',
-                    $catalogNumber
-                )
+                ->where('catalog_number', $catalogNumber)
                 ->exists();
 
-            $number++;
-        } while ($exists);
+            if (! $exists) {
+                return $catalogNumber;
+            }
 
-        return $catalogNumber;
+            $number++;
+        }
+
+        /* extremely unlikely fallback: a guaranteed-unique suffix */
+        return 'MT' . str_pad((string) ($base + 1), 6, '0', STR_PAD_LEFT) . '-' . substr((string) Str::ulid(), -6);
     }
 
 }
