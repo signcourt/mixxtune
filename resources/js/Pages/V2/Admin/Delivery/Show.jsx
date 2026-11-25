@@ -3,6 +3,7 @@ import { Head, Link, router, usePage } from "@inertiajs/react";
 import { useEffect, useMemo, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import ReleaseGoLiveButton from "@/V2/Shared/Releases/ReleaseGoLiveButton"; /* W218 */
 
 const transitionMap = {
     pending: ["processing", "failed"],
@@ -241,6 +242,16 @@ export default function Show({
                     </div>
                 )}
 
+                {/* W218: one-click live - no need to walk every store through processing / delivered / live */}
+                {["approved", "processing", "delivered", "failed"].includes(String(release.status)) && (
+                    <section className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 className="text-base font-bold text-slate-900">Mark live in one click</h2>
+                            <p className="mt-1 text-sm text-slate-600">UPC {release.upc ? <b>{release.upc}</b> : <span className="font-semibold text-rose-700">not entered yet</span>} · every chosen store is marked live and the release turns Live. The store list below stays for the real delivery later.</p>
+                        </div>
+                        <ReleaseGoLiveButton release={release} role={role} />
+                    </section>
+                )}
                 {deliveries.length === 0 && readiness && (
                     <section className="rounded-2xl border border-violet-200 bg-violet-50/50 p-5">
                         <h2 className="text-base font-bold text-slate-900">Ready for stores?</h2>

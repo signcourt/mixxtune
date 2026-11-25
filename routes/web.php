@@ -2283,6 +2283,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     /* W210: takedown - Super Admin does it (OTP), a Manager requests it (Approvals) */
     Route::post('/admin/releases/{release}/takedown', [\App\Http\Controllers\V2\Admin\ReleaseTakedownController::class, 'takeDown'])->middleware('throttle:20,1,release-takedown')->name('v2.admin.releases.takedown');
     Route::post('/admin/releases/{release}/takedown-request', [\App\Http\Controllers\V2\Admin\ReleaseTakedownController::class, 'requestTakedown'])->middleware('throttle:20,1,release-takedown')->name('v2.admin.releases.takedown-request');
+    /* W218: one-click Live - Super Admin (or a Manager with "mark live") marks every store + the release live, one code */
+    Route::post('/admin/releases/{release}/go-live', [\App\Http\Controllers\V2\Admin\ReleaseGoLiveController::class, 'goLive'])->middleware('throttle:20,1,release-go-live')->name('v2.admin.releases.go-live');
     /* W211: WAV replacement - Super Admin replaces, Manager requests (Approvals), Super Admin listens + decides */
     Route::get('/admin/releases/{release}/audio-request-tracks', [\App\Http\Controllers\V2\Admin\AudioChangeController::class, 'tracks'])->name('v2.admin.audio-change.tracks');
     Route::post('/admin/tracks/{track}/audio-replace', [\App\Http\Controllers\V2\Admin\AudioChangeController::class, 'replace'])->middleware('throttle:20,1,audio-change')->name('v2.admin.audio-change.replace');

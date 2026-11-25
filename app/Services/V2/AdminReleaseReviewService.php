@@ -83,7 +83,7 @@ class AdminReleaseReviewService
             'releases.approve'
         );
 
-        return $this->workflow->transition(
+        $approved = $this->workflow->transition(
             $release,
             'approved',
             $user,
@@ -102,6 +102,25 @@ class AdminReleaseReviewService
                     request()?->userAgent(),
             ]
         );
+
+        /* W218: approved goes straight to Processing - the team enters UPC / ISRC and presses "Mark live" (no Start delivery step) */
+        try {
+            return $this->workflow->transition(
+                $approved,
+                'processing',
+                $user,
+                [
+                    'action' => 'auto_processing',
+                    'remarks' => 'Approved - in processing until Mixx Tune marks it live.',
+                    'ip_address' => request()?->ip(),
+                    'user_agent' => request()?->userAgent(),
+                ]
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $approved;
+        }
     }
 
     public function reject(

@@ -1,5 +1,6 @@
 import ReleaseDeleteButton from '@/V2/Shared/Releases/ReleaseDeleteButton';
 import ReleaseTakedownButton from '@/V2/Shared/Releases/ReleaseTakedownButton'; /* W210 */
+import ReleaseGoLiveButton from '@/V2/Shared/Releases/ReleaseGoLiveButton'; /* W218 */
 import ReleaseAudioButton from '@/V2/Shared/Releases/ReleaseAudioButton'; /* W211 */
 import {
     useEffect,
@@ -327,6 +328,7 @@ export default function Show({
 
                         {/* W120 MIXXTUNE_RELEASE_TRASH */}
                         {role === 'super_admin' && <ReleaseDeleteButton release={release} />}
+                        <ReleaseGoLiveButton release={release} role={role} />{/* W218 */}
                         <ReleaseTakedownButton release={release} role={role} />
                         <ReleaseAudioButton release={release} role={role} />
                     </div>
