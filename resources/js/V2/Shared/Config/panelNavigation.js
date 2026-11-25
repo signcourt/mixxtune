@@ -88,7 +88,7 @@ const releaseChildren = (
             },
             {
                 id: 'releases-draft',
-                label: 'My Drafts',
+                label: 'Drafts', /* W207: shows all drafts for Super Admin / Manager */
                 href: routes.releasesDraft,
                 queryStatus: 'draft',
             },

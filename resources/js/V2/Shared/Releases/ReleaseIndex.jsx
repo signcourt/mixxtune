@@ -193,7 +193,7 @@ export default function ReleaseIndex({
     /* MIXXTUNE_RELEASES_LIST_V2: clean header + one toolbar (status cards removed) */
     /* W63: the title follows the menu item (My Drafts, In Review ...) instead of always "All Releases" */
     const STATUS_TITLES = {
-        draft: role === 'artist' ? 'Drafts' : 'My Drafts',
+        draft: role === 'artist' ? 'Drafts' : role === 'super_admin' ? 'All Drafts' : role === 'admin' ? 'Team Drafts' : 'My Drafts', /* W207 */
         submitted: 'In Review',
         changes_requested: 'Changes Requested',
         approved: 'Approved',

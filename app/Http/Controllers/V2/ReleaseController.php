@@ -496,29 +496,34 @@ class ReleaseController extends Controller
          * another user's draft. Once submitted, the existing catalogue
          * and assignment visibility rules continue to apply.
          */
-        $query->where(
-            function ($builder) use ($request) {
-                $builder
-                    ->where(
-                        'status',
-                        '!=',
-                        'draft'
-                    )
-                    ->orWhere(
-                        function ($draft) use ($request) {
-                            $draft
-                                ->where(
-                                    'status',
-                                    'draft'
-                                )
-                                ->where(
-                                    'created_by',
-                                    $request->user()->id
-                                );
-                        }
-                    );
-            }
-        );
+        /* W207: Super Admin sees every draft, a Manager the drafts of his assigned
+         * labels/artists (scope applied above), so decisions can be taken from the
+         * Super Admin panel. Labels, artists and team members still see only their own. */
+        if (!in_array($role, ['admin', 'super_admin'], true)) {
+            $query->where(
+                function ($builder) use ($request) {
+                    $builder
+                        ->where(
+                            'status',
+                            '!=',
+                            'draft'
+                        )
+                        ->orWhere(
+                            function ($draft) use ($request) {
+                                $draft
+                                    ->where(
+                                        'status',
+                                        'draft'
+                                    )
+                                    ->where(
+                                        'created_by',
+                                        $request->user()->id
+                                    );
+                            }
+                        );
+                }
+            );
+        }
 
         /*
          * My Releases summary metadata.
