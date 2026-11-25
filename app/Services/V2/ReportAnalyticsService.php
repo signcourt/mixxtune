@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\DB;
 
 class ReportAnalyticsService
 {
+    /* W216: artist name of a report row - text from the DSP, else the mapped track / release in our catalogue */
+    private const W216_ARTIST = "COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), (SELECT w216t.primary_artist_name FROM tracks w216t WHERE w216t.id = report_rows.track_id), (SELECT w216r.primary_artist_name FROM releases w216r WHERE w216r.id = report_rows.release_id), 'Unknown Artist')";
+
     /* W213: when true, every collected_revenue the page shows is the owner's earning (label / artist view) */
     public static bool $ownerMoney = false;
 
@@ -943,12 +946,15 @@ class ReportAnalyticsService
     ): array {
         return (clone $query)
             ->where(function ($builder) {
+                /* W216: a row with no artist text but mapped to a track / release is named from the catalogue */
                 $builder
                     ->whereNotNull('track_artist')
-                    ->orWhereNotNull('album_artist');
+                    ->orWhereNotNull('album_artist')
+                    ->orWhereNotNull('track_id')
+                    ->orWhereNotNull('release_id');
             })
             ->selectRaw(
-                "MIN(COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), 'Unknown Artist')) as name"
+                "MIN(" . self::W216_ARTIST . ") as name"
             )
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
@@ -962,7 +968,7 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
-            ->groupByRaw($this->groupKey(["COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), 'Unknown Artist')"], true))
+            ->groupByRaw($this->groupKey([self::W216_ARTIST], true)) /* W216 */
             ->orderByDesc(self::$ownerMoney ? 'earnings' : 'collected_revenue')
             ->limit($limit)
             ->get()
@@ -1030,9 +1036,13 @@ class ReportAnalyticsService
         int $limit = 10
     ): array {
         return (clone $query)
-            ->whereNotNull('label_name')
-            ->where('label_name', '!=', '')
-            ->selectRaw('MIN(label_name) as label_name')
+            ->where(function ($builder) {
+                /* W216: mapped rows group by label_id (name variants collapse); unmapped rows keep their text */
+                $builder
+                    ->whereNotNull('label_id')
+                    ->orWhere(fn ($q) => $q->whereNotNull('label_name')->where('label_name', '!=', ''));
+            })
+            ->selectRaw("COALESCE(MIN((SELECT w216l.name FROM labels w216l WHERE w216l.id = report_rows.label_id)), MIN(NULLIF(label_name, '')), 'Unknown Label') as label_name")
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
             )
@@ -1045,7 +1055,7 @@ class ReportAnalyticsService
             ->selectRaw(
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
-            ->groupByRaw($this->groupKey(['label_name']))
+            ->groupByRaw($this->groupKey(["COALESCE(CAST(label_id AS CHAR), label_name)"], true)) /* W216 */
             ->orderByDesc(self::$ownerMoney ? 'earnings' : 'collected_revenue')
             ->limit($limit)
             ->get()
