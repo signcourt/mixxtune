@@ -222,6 +222,7 @@ export default function Index({
     growth = {},
     topPlatforms = [],
     topTracks = [],
+    moneyLabel = 'Gross Revenue', /* W213 */
     topArtists = [],
     topAlbums = [],
     topLabels = [],
@@ -424,7 +425,7 @@ export default function Index({
                     {!['label', 'artist'].includes(role) && (
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <Card
-                            title="Imported Gross Revenue"
+                            title={moneyLabel === 'Gross Revenue' ? 'Imported Gross Revenue' : 'Your earnings (from imported reports)'}
                             value={moneyFormat(
                                 summary.collected_revenue,
                                 primaryCurrency
@@ -1104,7 +1105,7 @@ export default function Index({
                             <SectionHeader
                                 icon={Users}
                                 title="Top Artists"
-                                subtitle="Highest imported gross revenue contributors"
+                                subtitle={moneyLabel === 'Gross Revenue' ? 'Highest imported gross revenue contributors' : 'Your highest-earning artists'}
                             />
 
                             <div className="mt-6">
@@ -1136,7 +1137,7 @@ export default function Index({
                             <SectionHeader
                                 icon={Layers3}
                                 title="Top Labels"
-                                subtitle="Imported gross revenue performance by label"
+                                subtitle={moneyLabel === 'Gross Revenue' ? 'Imported gross revenue performance by label' : 'Your earnings by label'}
                             />
 
                             <div className="mt-6">
@@ -1184,9 +1185,9 @@ export default function Index({
                                                     type="button"
                                                     onClick={() => toggleTrackSort('collected_revenue')}
                                                     className="ml-auto inline-flex items-center gap-1 font-semibold uppercase tracking-wide text-slate-500 transition hover:text-violet-700"
-                                                    title="Sort by imported gross revenue"
+                                                    title={`Sort by ${moneyLabel.toLowerCase()}`}
                                                 >
-                                                    Gross Revenue
+                                                    {moneyLabel}
                                                     <span aria-hidden="true">
                                                         {trackSortIndicator('collected_revenue')}
                                                     </span>

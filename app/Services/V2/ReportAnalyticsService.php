@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\DB;
 
 class ReportAnalyticsService
 {
+    /* W213: when true, every collected_revenue the page shows is the owner's earning (label / artist view) */
+    public static bool $ownerMoney = false;
+
     public function __construct(
         private readonly AdminAssignmentService $assignments
     ) {
@@ -581,8 +584,7 @@ class ReportAnalyticsService
                 'earnings' =>
                     (float) $row->earnings,
 
-                'collected_revenue' =>
-                    (float) $row->collected_revenue,
+                'collected_revenue' => (float) (self::$ownerMoney ? $row->earnings : $row->collected_revenue),
             ])
             ->all();
     }
@@ -810,7 +812,7 @@ class ReportAnalyticsService
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
             ->groupByRaw($this->storeKeySql())
-            ->orderByDesc('collected_revenue')
+            ->orderByDesc(self::$ownerMoney ? 'earnings' : 'collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
@@ -826,8 +828,7 @@ class ReportAnalyticsService
                 'earnings' =>
                     (float) $row->earnings,
 
-                'collected_revenue' =>
-                    (float) $row->collected_revenue,
+                'collected_revenue' => (float) (self::$ownerMoney ? $row->earnings : $row->collected_revenue),
             ])
             ->all();
     }
@@ -837,8 +838,6 @@ class ReportAnalyticsService
         int $limit = 8
     ): array {
         return (clone $query)
-            ->whereNotNull('country_code')
-            ->where('country_code', '!=', '')
             ->selectRaw('MIN(country_code) as country_code')
             ->selectRaw(
                 'COALESCE(SUM(streams), 0) as streams'
@@ -853,12 +852,11 @@ class ReportAnalyticsService
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
             ->groupByRaw($this->groupKey(['country_code']))
-            ->orderByDesc('collected_revenue')
+            ->orderByDesc(self::$ownerMoney ? 'earnings' : 'collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
-                'name' =>
-                    $row->country_code,
+                'name' => $row->country_code ?: 'Unknown',
 
                 'streams' =>
                     (float) $row->streams,
@@ -869,8 +867,7 @@ class ReportAnalyticsService
                 'earnings' =>
                     (float) $row->earnings,
 
-                'collected_revenue' =>
-                    (float) $row->collected_revenue,
+                'collected_revenue' => (float) (self::$ownerMoney ? $row->earnings : $row->collected_revenue),
             ])
             ->all();
     }
@@ -901,7 +898,7 @@ class ReportAnalyticsService
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
             ->groupByRaw($this->groupKey(['track_id', 'track_title', 'track_artist', 'album_title', 'album_artist', 'isrc']))
-            ->orderByDesc('collected_revenue');
+            ->orderByDesc(self::$ownerMoney ? 'earnings' : 'collected_revenue');
 
         if ($limit !== null) {
             $tracks->limit($limit);
@@ -935,8 +932,7 @@ class ReportAnalyticsService
                 'earnings' =>
                     (float) $row->earnings,
 
-                'collected_revenue' =>
-                    (float) $row->collected_revenue,
+                'collected_revenue' => (float) (self::$ownerMoney ? $row->earnings : $row->collected_revenue),
             ])
             ->all();
     }
@@ -967,7 +963,7 @@ class ReportAnalyticsService
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
             ->groupByRaw($this->groupKey(["COALESCE(NULLIF(track_artist, ''), NULLIF(album_artist, ''), 'Unknown Artist')"], true))
-            ->orderByDesc('collected_revenue')
+            ->orderByDesc(self::$ownerMoney ? 'earnings' : 'collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
@@ -975,7 +971,7 @@ class ReportAnalyticsService
                 'streams' => (float) $row->streams,
                 'sale_units' => (float) $row->sale_units,
                 'earnings' => (float) $row->earnings,
-                'collected_revenue' => (float) $row->collected_revenue,
+                'collected_revenue' => (float) (self::$ownerMoney ? $row->earnings : $row->collected_revenue),
             ])
             ->all();
     }
@@ -1001,7 +997,7 @@ class ReportAnalyticsService
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
             ->groupByRaw($this->groupKey(['album_title', 'album_artist', 'upc']))
-            ->orderByDesc('collected_revenue')
+            ->orderByDesc(self::$ownerMoney ? 'earnings' : 'collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
@@ -1024,8 +1020,7 @@ class ReportAnalyticsService
                 'earnings' =>
                     (float) $row->earnings,
 
-                'collected_revenue' =>
-                    (float) $row->collected_revenue,
+                'collected_revenue' => (float) (self::$ownerMoney ? $row->earnings : $row->collected_revenue),
             ])
             ->all();
     }
@@ -1051,7 +1046,7 @@ class ReportAnalyticsService
                 'COALESCE(SUM(collected_revenue), 0) as collected_revenue'
             )
             ->groupByRaw($this->groupKey(['label_name']))
-            ->orderByDesc('collected_revenue')
+            ->orderByDesc(self::$ownerMoney ? 'earnings' : 'collected_revenue')
             ->limit($limit)
             ->get()
             ->map(fn ($row) => [
@@ -1059,7 +1054,7 @@ class ReportAnalyticsService
                 'streams' => (float) $row->streams,
                 'sale_units' => (float) $row->sale_units,
                 'earnings' => (float) $row->earnings,
-                'collected_revenue' => (float) $row->collected_revenue,
+                'collected_revenue' => (float) (self::$ownerMoney ? $row->earnings : $row->collected_revenue),
             ])
             ->all();
     }

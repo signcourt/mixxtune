@@ -455,6 +455,8 @@ class AnalyticsController extends Controller
         );
 
         $role = $permissions->role($user);
+        /* W213: labels / artists see their own earning everywhere on this page */
+        \App\Services\V2\ReportAnalyticsService::$ownerMoney = in_array($role, ['label', 'artist'], true);
 
         $filters = $this->filters($request);
 
@@ -984,6 +986,7 @@ class AnalyticsController extends Controller
                             10
                         ),
 
+                'moneyLabel' => in_array($role, ['label', 'artist'], true) ? 'Your earnings' : 'Gross Revenue',
                 'topTracks' =>
                     // MIXXTUNE_COMPACT_TOP_TRACKS_V1: label/artist also get their own (scoped) top tracks;
                     // \$filtered is already limited to the viewer's catalogue.
