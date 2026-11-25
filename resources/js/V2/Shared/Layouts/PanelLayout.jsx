@@ -11,6 +11,7 @@ import HighlightNoticeBanner from "@/V2/Shared/Components/HighlightNoticeBanner"
 import DayNightSwitch from "@/V2/Shared/Components/DayNightSwitch";
 import OfficeLogoutConfirm from "@/V2/Shared/Office/OfficeLogoutConfirm";
 import IdleLogout from "@/V2/Shared/Components/IdleLogout";
+import PendingWorkPopup from "../Components/PendingWorkPopup"; /* W204b */
 
 export default function PanelLayout({
     role = null,
@@ -498,6 +499,7 @@ export default function PanelLayout({
                         <OfficeLogoutConfirm open={officeLogout} onCancel={() => setOfficeLogout(false)} />
                         {/* MIXXTUNE_NOTIFY_TARGETED_V1 */}
                         <HighlightNoticeBanner />
+                        <PendingWorkPopup /> {/* W204b: pending-work pop-up (Super Admin + Manager) */}
                         <MaintenanceExperience
                             maintenance={props.maintenance}
                             children={children}
