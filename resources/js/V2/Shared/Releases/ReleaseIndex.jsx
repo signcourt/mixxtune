@@ -106,6 +106,17 @@ export default function ReleaseIndex({
         setSelectedIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
     const allSelected = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
     const toggleAll = () => setSelectedIds(allSelected ? [] : rows.map((r) => r.id));
+    /* W219: bulk one-click live - one code for the whole selection */
+    const bulkLive = () => {
+        if (!selectedIds.length || bulkBusy) return;
+        if (!window.confirm(`Mark ${selectedIds.length} release(s) live in all stores? Releases without UPC, or not approved yet, are skipped and listed. A code is e-mailed to you.`)) return;
+        setBulkBusy(true);
+        router.post(
+            '/admin/releases/bulk-go-live',
+            { ids: selectedIds },
+            { preserveScroll: true, onFinish: () => setBulkBusy(false), onSuccess: () => setSelectedIds([]) },
+        );
+    };
     const bulkTrash = () => {
         if (!selectedIds.length || bulkBusy) return;
         setBulkBusy(true);
@@ -599,9 +610,18 @@ export default function ReleaseIndex({
                             <button
                                 type="button"
                                 disabled={bulkBusy || selectedIds.length === 0}
+                                onClick={bulkLive}
+                                title="Every ticked release goes live in all its stores - one e-mailed code (W219)"
+                                className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                Mark {selectedIds.length || ''} live
+                            </button>
+                            <button
+                                type="button"
+                                disabled={bulkBusy || selectedIds.length === 0}
                                 onClick={bulkTrash}
                                 title="One e-mailed code confirms the whole selection"
-                                className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <TrashIcon /> Move {selectedIds.length || ''} to Trash
                             </button>

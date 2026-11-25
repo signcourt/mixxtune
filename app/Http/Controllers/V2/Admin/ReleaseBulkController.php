@@ -51,6 +51,58 @@ class ReleaseBulkController extends Controller
         return $n.' release'.($n === 1 ? '' : 's');
     }
 
+    /** W219: selected releases -> live, one code (each one goes through the W218 one-click live) */
+    public function goLive(Request $request, PermissionService $permissions, \App\Services\V2\ReleaseGoLive $live): RedirectResponse
+    {
+        $this->superAdmin($request, $permissions);
+        $ids = $this->ids($request);
+
+        $releases = Release::query()->whereIn('id', $ids)->orderBy('id')->get();
+        $ok = [];
+        $skipped = [];
+        foreach ($releases as $release) {
+            $why = $live->blockers($release);
+            if ($why === []) {
+                $ok[] = $release;
+            } else {
+                $skipped[] = '"'.$release->title.'" ('.implode(' ', $why).')';
+            }
+        }
+        if (!$ok) {
+            return back()->with('error', 'None of the selected releases can be marked live. '.implode('; ', $skipped));
+        }
+
+        app(ActionOtpGuard::class)->require(
+            $request->user(),
+            $this->scope('go-live', array_map(fn ($r) => (int) $r->id, $ok)),
+            'mark '.$this->plural(count($ok)).' live in all stores'
+        );
+
+        $done = 0;
+        $failed = [];
+        foreach ($ok as $release) {
+            try {
+                $live->goLive($release->fresh(), $request->user(), 'Marked live by '.$request->user()->name.' (bulk one-click live).');
+                $done++;
+            } catch (ValidationException $e) {
+                $failed[] = '"'.$release->title.'" ('.implode(' ', Arr::flatten($e->errors())).')';
+            } catch (Throwable $e) {
+                report($e);
+                $failed[] = '"'.$release->title.'"';
+            }
+        }
+
+        $msg = $this->plural($done).' marked live - the owners got a bell.';
+        if ($skipped) {
+            $msg .= ' Skipped: '.implode('; ', $skipped).'.';
+        }
+        if ($failed) {
+            $msg .= ' Failed: '.implode(', ', $failed).'.';
+        }
+
+        return back()->with($done ? 'success' : 'error', $msg);
+    }
+
     /** selected live releases -> Trash */
     public function trash(Request $request, PermissionService $permissions, ReleaseTrash $trash): RedirectResponse
     {

@@ -2283,6 +2283,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     /* W210: takedown - Super Admin does it (OTP), a Manager requests it (Approvals) */
     Route::post('/admin/releases/{release}/takedown', [\App\Http\Controllers\V2\Admin\ReleaseTakedownController::class, 'takeDown'])->middleware('throttle:20,1,release-takedown')->name('v2.admin.releases.takedown');
     Route::post('/admin/releases/{release}/takedown-request', [\App\Http\Controllers\V2\Admin\ReleaseTakedownController::class, 'requestTakedown'])->middleware('throttle:20,1,release-takedown')->name('v2.admin.releases.takedown-request');
+    /* W219: bulk one-click Live (Super Admin, one code for the whole selection) */
+    Route::post('/admin/releases/bulk-go-live', [\App\Http\Controllers\V2\Admin\ReleaseBulkController::class, 'goLive'])->middleware('throttle:10,1,release-bulk')->name('v2.admin.releases.bulk-go-live');
     /* W218: one-click Live - Super Admin (or a Manager with "mark live") marks every store + the release live, one code */
     Route::post('/admin/releases/{release}/go-live', [\App\Http\Controllers\V2\Admin\ReleaseGoLiveController::class, 'goLive'])->middleware('throttle:20,1,release-go-live')->name('v2.admin.releases.go-live');
     /* W211: WAV replacement - Super Admin replaces, Manager requests (Approvals), Super Admin listens + decides */
