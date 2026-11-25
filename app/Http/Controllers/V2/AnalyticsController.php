@@ -995,10 +995,7 @@ class AnalyticsController extends Controller
                             null
                         ),
 
-                'topArtists' =>
-                    $isCompactAnalyticsRole
-                        ? []
-                        : $analytics->topArtists(
+                'topArtists' => /* W214: labels / artists see their own too */ $analytics->topArtists(
                             clone $filtered
                         ),
 
@@ -1009,10 +1006,7 @@ class AnalyticsController extends Controller
                         )
                         : [],
 
-                'topLabels' =>
-                    $isCompactAnalyticsRole
-                        ? []
-                        : $analytics->topLabels(
+                'topLabels' => /* W214: labels / artists see their own too */ $analytics->topLabels(
                             clone $filtered
                         ),
 
