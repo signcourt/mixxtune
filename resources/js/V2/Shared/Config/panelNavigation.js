@@ -122,6 +122,19 @@ const releaseChildren = (
                 href: routes.releasesRejected,
                 queryStatus: 'rejected',
             },
+            /* W217: takedowns (W210) - Manager requests wait here, Super Admin decides */
+            {
+                id: 'releases-takedown-requested',
+                label: 'Takedown Requested',
+                href: '/releases?status=takedown_requested',
+                queryStatus: 'takedown_requested',
+            },
+            {
+                id: 'releases-taken-down',
+                label: 'Taken Down',
+                href: '/releases?status=taken_down',
+                queryStatus: 'taken_down',
+            },
             /* W120 MIXXTUNE_RELEASE_TRASH */
             ...(role === 'super_admin' ? [{
                 id: 'releases-trash',
