@@ -87,10 +87,12 @@ class UpcService
          * the DB unique index counts trashed rows, so without withTrashed() this check
          * passed and the insert/update then threw a 1062 duplicate (500) instead of a
          * clean validation error. */
-        $duplicate = Release::withTrashed()
+        /* W205: fetch the holder so the message can say WHICH release has it */
+        $holder = Release::withTrashed()
             ->where('upc', $code)
             ->where('id', '!=', $release->id)
-            ->exists();
+            ->first(['id', 'title', 'status', 'deleted_at']);
+        $duplicate = $holder !== null;
 
         /* W58: replacing an existing UPC needs the e-mailed code and keeps the old one in the log */
         $old = (string) ($release->upc ?? '');
@@ -101,8 +103,7 @@ class UpcService
 
         if ($duplicate) {
             throw ValidationException::withMessages([
-                'upc' =>
-                    'This UPC is already assigned to another release.',
+                'upc' => self::duplicateMessage($holder),
             ]);
         }
 
@@ -178,6 +179,20 @@ class UpcService
 
             return $freshRelease;
         });
+    }
+
+    /* W205: e.g. This UPC is already on release #3705 "Lazy Boy" (in Trash since 24 Nov 2026). */
+    public static function duplicateMessage(Release $holder): string
+    {
+        $title = trim((string) $holder->title) !== '' ? ' "'.$holder->title.'"' : '';
+        if ($holder->deleted_at) {
+            return 'This UPC is already on release #'.$holder->id.$title.' (in Trash since '
+                .$holder->deleted_at->format('d M Y').'). A Super Admin can restore it or "Delete forever" '
+                .'from Admin > Trash, which frees the UPC.';
+        }
+
+        return 'This UPC is already on release #'.$holder->id.$title.' ('
+            .str_replace('_', ' ', (string) $holder->status).') - open /releases/'.$holder->id.' to check it.';
     }
 
     public function generate(

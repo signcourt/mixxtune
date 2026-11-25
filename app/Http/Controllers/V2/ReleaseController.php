@@ -1322,7 +1322,15 @@ class ReleaseController extends Controller
          * Release uses SoftDeletes. Related production records and files
          * are therefore not physically destroyed by this action.
          */
-        $release->delete();
+        /* W205: an owner-deleted draft goes to Trash like any other deletion, so the Super Admin
+         * sees it (restore / Delete forever, which frees its UPC). Before this it was soft-deleted
+         * silently and its UPC stayed stuck on an invisible row. */
+        try {
+            app(\App\Services\V2\ReleaseTrash::class)->trash($release, auth()->user(), 'Deleted by the owner from their panel');
+        } catch (\Throwable $e) {
+            report($e);
+            $release->delete();
+        }
 
         return back()->with(
             'success',
