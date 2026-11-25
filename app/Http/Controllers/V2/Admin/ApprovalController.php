@@ -68,6 +68,15 @@ class ApprovalController extends Controller
         if ($n !== 1) {
             return back()->withErrors(['approval' => 'This request was already decided.']);
         }
+        /* W210: a Manager's takedown request is carried out (approve) or declined (reject) right here */
+        $takedownMsg = null;
+        if (str_starts_with((string) $row->scope, 'release.takedown:')) {
+            try {
+                $takedownMsg = app(\App\Services\V2\ReleaseTakedown::class)->decideRequest($row, $request->user(), $data['decision'] === 'approve', $data['note'] ?? null);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $takedownMsg = 'Decided, but the takedown could not be carried out: '.implode(' ', \Illuminate\Support\Arr::flatten($e->errors()));
+            }
+        }
         FinanceAudit::log('approval.'.($data['decision'] === 'approve' ? 'approved' : 'rejected'), 'Second approval '.$data['decision'].'d: '.$row->what.'.', ['approval_id' => $row->id]);
         try {
             if ($req = \App\Models\User::query()->find($row->requested_by)) {
@@ -79,6 +88,9 @@ class ApprovalController extends Controller
             report($e);
         }
 
+        if ($takedownMsg !== null) {
+            return back()->with('success', $takedownMsg);
+        }
         return back()->with('success', $data['decision'] === 'approve' ? 'Approved - the other Super Admin can now do it (once, within '.MakerChecker::VALID_HOURS.' hours).' : 'Rejected.');
     }
 

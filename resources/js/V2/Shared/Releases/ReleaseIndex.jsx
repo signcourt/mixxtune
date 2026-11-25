@@ -1,4 +1,5 @@
 import ReleaseDeleteButton from '@/V2/Shared/Releases/ReleaseDeleteButton';
+import ReleaseTakedownButton from '@/V2/Shared/Releases/ReleaseTakedownButton'; /* W210 */
 import { Head, Link, router, usePage } from '@inertiajs/react';
 
 import {
@@ -982,6 +983,7 @@ function ReleaseRow({
                                 </Link>
                             )}
                             {superAdmin && !isDraft && <ReleaseDeleteButton release={release} compact />}
+                            {superAdmin && !isDraft && <ReleaseTakedownButton release={release} role="super_admin" compact />}
                             {isDraft && (
                                 <button type="button" onClick={deleteDraft} aria-label="Delete draft" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600">
                                     <TrashIcon />
@@ -1145,6 +1147,7 @@ function ReleaseRow({
 
                     {/* W120 MIXXTUNE_RELEASE_TRASH: Super Admin can delete any sent release (-> Trash) */}
                     {superAdmin && !isDraft && <ReleaseDeleteButton release={release} compact />}
+                    {superAdmin && !isDraft && <ReleaseTakedownButton release={release} role="super_admin" compact />}
 
                     {isDraft && (
                         <button

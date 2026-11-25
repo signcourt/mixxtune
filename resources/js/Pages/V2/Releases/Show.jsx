@@ -1,4 +1,5 @@
 import ReleaseDeleteButton from '@/V2/Shared/Releases/ReleaseDeleteButton';
+import ReleaseTakedownButton from '@/V2/Shared/Releases/ReleaseTakedownButton'; /* W210 */
 import {
     useEffect,
     useRef,
@@ -325,6 +326,7 @@ export default function Show({
 
                         {/* W120 MIXXTUNE_RELEASE_TRASH */}
                         {role === 'super_admin' && <ReleaseDeleteButton release={release} />}
+                        <ReleaseTakedownButton release={release} role={role} />
                     </div>
                 </div>
 

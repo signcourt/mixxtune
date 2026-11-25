@@ -2280,6 +2280,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/admin/releases/bulk-trash', [\App\Http\Controllers\V2\Admin\ReleaseBulkController::class, 'trash'])->middleware('throttle:10,1,release-bulk')->name('v2.admin.releases.bulk-trash');
     Route::post('/admin/release-trash/bulk/restore', [\App\Http\Controllers\V2\Admin\ReleaseBulkController::class, 'restore'])->middleware('throttle:10,1,release-bulk')->name('v2.admin.release-trash.bulk-restore');
     Route::post('/admin/release-trash/bulk/purge', [\App\Http\Controllers\V2\Admin\ReleaseBulkController::class, 'purge'])->middleware('throttle:10,1,release-bulk')->name('v2.admin.release-trash.bulk-purge');
+    /* W210: takedown - Super Admin does it (OTP), a Manager requests it (Approvals) */
+    Route::post('/admin/releases/{release}/takedown', [\App\Http\Controllers\V2\Admin\ReleaseTakedownController::class, 'takeDown'])->middleware('throttle:20,1,release-takedown')->name('v2.admin.releases.takedown');
+    Route::post('/admin/releases/{release}/takedown-request', [\App\Http\Controllers\V2\Admin\ReleaseTakedownController::class, 'requestTakedown'])->middleware('throttle:20,1,release-takedown')->name('v2.admin.releases.takedown-request');
 });
 
 /* W115 MIXXTUNE_RAZORPAY_PAYOUTS + MIXXTUNE_STAFF_SALARY (Super Admin only; checked in the controllers) */
