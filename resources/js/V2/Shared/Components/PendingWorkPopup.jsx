@@ -54,6 +54,25 @@ const writePref = (uid, patch) => {
     }
 };
 
+/* auto-open once per login (tab session) and not again within 4 hours - navigating between pages
+ * re-mounts the layout, which must NOT re-open it; a snooze timer or the button still can */
+const SHOWN_GAP = 4 * 60 * 60 * 1000;
+const sessionShown = (uid) => {
+    try {
+        return sessionStorage.getItem(storageKey(uid) + ":shown") === "1";
+    } catch (e) {
+        return false;
+    }
+};
+const markShown = (uid) => {
+    try {
+        sessionStorage.setItem(storageKey(uid) + ":shown", "1");
+    } catch (e) {
+        /* ignore */
+    }
+    writePref(uid, { shownAt: Date.now() });
+};
+
 const tomorrow9 = () => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -105,7 +124,11 @@ export default function PendingWorkPopup() {
         if (wait > 24 * 60 * 60 * 1000) return;
         timer.current = setTimeout(async () => {
             const d = await load();
-            if (d && d.total > 0 && readPref(uid).auto !== false) setOpen(true);
+            if (d && d.total > 0 && readPref(uid).auto !== false) {
+                writePref(uid, { until: 0 });
+                markShown(uid);
+                setOpen(true);
+            }
         }, wait);
     }, [load, uid]);
 
@@ -122,6 +145,8 @@ export default function PendingWorkPopup() {
                 scheduleReopen(pref.until);
                 return;
             }
+            if (sessionShown(uid) || (pref.shownAt && Date.now() - pref.shownAt < SHOWN_GAP)) return;
+            markShown(uid);
             setOpen(true);
         })();
         return () => {
