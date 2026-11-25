@@ -9,7 +9,7 @@ use App\Http\Controllers\Api\Core\ArtistController;
 use App\Http\Controllers\Api\Distribution\TrackSplitController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1') /* W203: brute-force limit on token login */;
 
 /* W115 MIXXTUNE_RAZORPAY_PAYOUTS: RazorpayX payout status (checked by signature, no login) */
 Route::post('/webhooks/razorpayx', \App\Http\Controllers\V2\RazorpayWebhookController::class)->middleware('throttle:600,1,rzp-webhook')->name('webhooks.razorpayx');
