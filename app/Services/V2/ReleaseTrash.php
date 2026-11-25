@@ -27,7 +27,7 @@ use Throwable;
  */
 class ReleaseTrash
 {
-    public const KEEP_DAYS = 90;
+    public const KEEP_DAYS = 30; /* W206: was 90 */
 
     private const MONEY = '/(royalt|revenue|report_row|ledger|statement|wallet|allocation|earning|payout|invoice|withdraw|recoup|adjust)/';
 
@@ -130,6 +130,9 @@ class ReleaseTrash
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
+            /* W206: a draft that never left the panel hands its codes back right now */
+            $this->freeDraftCodes($release, $trackIds, $statusBefore, (int) $id);
+
             FinanceAudit::log('release.trashed', 'Release "'.$release->title.'" ('.($release->upc ?: $release->catalog_number).') moved to Trash'.($reason ? ': '.$reason : '').'. Removed for good after '.self::KEEP_DAYS.' days unless restored.', ['release_id' => $release->id, 'status_before' => $statusBefore, 'tracks' => count($trackIds)]);
 
             return DB::table('release_trash')->find($id);
@@ -146,6 +149,8 @@ class ReleaseTrash
             $release = Release::withTrashed()->findOrFail($row->release_id);
             $snap = json_decode((string) $row->snapshot, true) ?: [];
             $release->restore();
+            /* W206: put the UPC / ISRCs back if nobody took them while it sat in the Trash */
+            $this->reattachFreedCodes($release, $snap, $by);
             $ids = array_map('intval', $snap['track_ids'] ?? []);
             if ($ids) {
                 Track::withTrashed()->whereIn('id', $ids)->update(['deleted_at' => null]);
@@ -160,6 +165,103 @@ class ReleaseTrash
 
             return $release->fresh();
         });
+    }
+
+    /*
+     * W206: when a release that was never submitted (status_before = draft) goes to the Trash, its UPC and
+     * its tracks' ISRCs are released immediately instead of waiting for the purge, so the owner can use
+     * them on a new upload. What was freed is kept in the trash snapshot for restore().
+     */
+    public function freeDraftCodes(Release $release, array $trackIds, string $statusBefore, int $trashId): void
+    {
+        if ($statusBefore !== 'draft') {
+            return;
+        }
+        $freed = ['upc' => null, 'isrc' => []];
+        $upc = (string) ($release->upc ?? '');
+        if ($upc !== '') {
+            $freed['upc'] = $upc;
+            DB::table('releases')->where('id', $release->id)->update(['upc' => null, 'upc_assigned_at' => null]);
+            if (Schema::hasTable('upc_codes')) {
+                DB::table('upc_codes')->where('code', $upc)->update([
+                    'status' => DB::raw("CASE WHEN batch_id IS NULL THEN 'released' ELSE 'available' END"),
+                    'release_id' => null,
+                    'notes' => 'Back in the list: draft "'.mb_substr((string) $release->title, 0, 120).'" was deleted before it was submitted.',
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+        if ($trackIds) {
+            $isrcs = DB::table('tracks')->whereIn('id', $trackIds)->whereNotNull('isrc')->where('isrc', '!=', '')->pluck('isrc', 'id');
+            foreach ($isrcs as $tid => $code) {
+                $freed['isrc'][(string) $tid] = (string) $code;
+            }
+            if ($isrcs->isNotEmpty()) {
+                DB::table('tracks')->whereIn('id', $isrcs->keys()->all())->update(['isrc' => null, 'isrc_assigned_at' => null]);
+                if (Schema::hasTable('isrc_codes')) {
+                    DB::table('isrc_codes')->whereIn('code', $isrcs->values()->all())->update([
+                        'status' => DB::raw("CASE WHEN batch_id IS NULL THEN 'released' ELSE 'available' END"),
+                        'track_id' => null,
+                        'notes' => 'Back in the list: draft "'.mb_substr((string) $release->title, 0, 120).'" was deleted before it was submitted.',
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        }
+        if ($freed['upc'] === null && !$freed['isrc']) {
+            return;
+        }
+        $row = DB::table('release_trash')->where('id', $trashId)->first();
+        $snap = $row ? (json_decode((string) $row->snapshot, true) ?: []) : [];
+        $snap['freed'] = $freed;
+        DB::table('release_trash')->where('id', $trashId)->update(['snapshot' => json_encode($snap), 'updated_at' => now()]);
+        if (Schema::hasTable('identifier_assignment_logs')) {
+            $log = fn (string $type, string $code, ?int $trackId) => DB::table('identifier_assignment_logs')->insert([
+                'public_id' => (string) \Illuminate\Support\Str::ulid(), 'identifier_type' => $type, 'identifier_code' => $code,
+                'action' => 'freed_on_trash', 'release_id' => $release->id, 'track_id' => $trackId, 'performed_by' => auth()->id(),
+                'notes' => 'W206: draft trashed before submit', 'ip_address' => request()?->ip(),
+                'user_agent' => mb_substr((string) request()?->userAgent(), 0, 255), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            if ($freed['upc']) { $log('upc', $freed['upc'], null); }
+            foreach ($freed['isrc'] as $tid => $code) { $log('isrc', $code, (int) $tid); }
+        }
+    }
+
+    /** W206: restore() counterpart - re-attach what freeDraftCodes() released, when still free */
+    public function reattachFreedCodes(Release $release, array $snap, User $by): void
+    {
+        $freed = $snap['freed'] ?? null;
+        if (!$freed) {
+            return;
+        }
+        $lost = [];
+        $upc = (string) ($freed['upc'] ?? '');
+        if ($upc !== '') {
+            $taken = Release::withTrashed()->where('upc', $upc)->where('id', '!=', $release->id)->exists();
+            if (!$taken) {
+                DB::table('releases')->where('id', $release->id)->update(['upc' => $upc, 'upc_assigned_at' => now()]);
+                if (Schema::hasTable('upc_codes')) {
+                    DB::table('upc_codes')->where('code', $upc)->update(['status' => 'assigned', 'release_id' => $release->id, 'updated_at' => now()]);
+                }
+            } else {
+                $lost[] = 'UPC '.$upc;
+            }
+        }
+        foreach (($freed['isrc'] ?? []) as $tid => $code) {
+            $code = (string) $code;
+            $taken = DB::table('tracks')->where('isrc', $code)->where('id', '!=', (int) $tid)->exists();
+            if (!$taken) {
+                DB::table('tracks')->where('id', (int) $tid)->update(['isrc' => $code, 'isrc_assigned_at' => now()]);
+                if (Schema::hasTable('isrc_codes')) {
+                    DB::table('isrc_codes')->where('code', $code)->update(['status' => 'assigned', 'track_id' => (int) $tid, 'updated_at' => now()]);
+                }
+            } else {
+                $lost[] = 'ISRC '.$code;
+            }
+        }
+        if ($lost) {
+            FinanceAudit::log('release.restored.codes_lost', 'Release "'.$release->title.'" restored, but these codes were used elsewhere meanwhile and were NOT re-attached: '.implode(', ', $lost).'. Assign new ones.', ['release_id' => $release->id]);
+        }
     }
 
     /** remove a trashed release for good; returns the title */
@@ -237,7 +339,7 @@ class ReleaseTrash
         return (string) $row->title;
     }
 
-    /** the daily clean-up: everything older than 90 days in the Trash */
+    /** the daily clean-up: everything older than KEEP_DAYS (W206: 30) days in the Trash */
     public function purgeDue(): array
     {
         $done = 0;
