@@ -24,6 +24,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        /* W201 MIXXTUNE_TRUSTED_HOSTS: only our own host names may reach the app (400 otherwise) */
+        $middleware->trustHosts(
+            at: fn () => \App\Support\TrustedHosts::patterns(),
+            subdomains: false
+        );
+
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             /* W128 MIXXTUNE_OFFICE_MONITOR: the desktop agent's own token */
