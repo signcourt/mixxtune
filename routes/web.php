@@ -2283,6 +2283,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     /* W210: takedown - Super Admin does it (OTP), a Manager requests it (Approvals) */
     Route::post('/admin/releases/{release}/takedown', [\App\Http\Controllers\V2\Admin\ReleaseTakedownController::class, 'takeDown'])->middleware('throttle:20,1,release-takedown')->name('v2.admin.releases.takedown');
     Route::post('/admin/releases/{release}/takedown-request', [\App\Http\Controllers\V2\Admin\ReleaseTakedownController::class, 'requestTakedown'])->middleware('throttle:20,1,release-takedown')->name('v2.admin.releases.takedown-request');
+    /* W211: WAV replacement - Super Admin replaces, Manager requests (Approvals), Super Admin listens + decides */
+    Route::get('/admin/releases/{release}/audio-request-tracks', [\App\Http\Controllers\V2\Admin\AudioChangeController::class, 'tracks'])->name('v2.admin.audio-change.tracks');
+    Route::post('/admin/tracks/{track}/audio-replace', [\App\Http\Controllers\V2\Admin\AudioChangeController::class, 'replace'])->middleware('throttle:20,1,audio-change')->name('v2.admin.audio-change.replace');
+    Route::post('/admin/tracks/{track}/audio-request', [\App\Http\Controllers\V2\Admin\AudioChangeController::class, 'request'])->middleware('throttle:20,1,audio-change')->name('v2.admin.audio-change.request');
+    Route::get('/admin/audio-requests/{row}/listen', [\App\Http\Controllers\V2\Admin\AudioChangeController::class, 'listen'])->whereNumber('row')->name('v2.admin.audio-change.listen');
 });
 
 /* W115 MIXXTUNE_RAZORPAY_PAYOUTS + MIXXTUNE_STAFF_SALARY (Super Admin only; checked in the controllers) */

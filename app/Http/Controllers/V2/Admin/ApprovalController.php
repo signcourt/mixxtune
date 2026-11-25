@@ -70,6 +70,15 @@ class ApprovalController extends Controller
         }
         /* W210: a Manager's takedown request is carried out (approve) or declined (reject) right here */
         $takedownMsg = null;
+        /* W211: a WAV change request is carried out / declined right here too */
+        if (str_starts_with((string) $row->scope, 'track.audio:')) {
+            try {
+                $takedownMsg = app(\App\Http\Controllers\V2\Admin\AudioChangeController::class)->decide($row, $request->user(), $data['decision'] === 'approve', $data['note'] ?? null);
+            } catch (\Throwable $e) {
+                report($e);
+                $takedownMsg = 'Decided, but the WAV could not be swapped: '.$e->getMessage();
+            }
+        }
         if (str_starts_with((string) $row->scope, 'release.takedown:')) {
             try {
                 $takedownMsg = app(\App\Services\V2\ReleaseTakedown::class)->decideRequest($row, $request->user(), $data['decision'] === 'approve', $data['note'] ?? null);

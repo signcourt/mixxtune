@@ -232,7 +232,7 @@ class PosterChangeRequestController extends Controller
                 ->get();
         }
 
-        return $supers->concat($admins)->unique('id');
+        return $supers; /* W211: Managers no longer review posters */
     }
 
     private function authorizeReview(
@@ -242,10 +242,14 @@ class PosterChangeRequestController extends Controller
         AdminAssignmentService $assignments
     ): void {
         $role = $permissions->role($request->user());
-        abort_unless(in_array($role, ['super_admin', 'admin'], true), 403);
+        /* W211: the final word on a poster is the Super Admin's - a Manager only requests */
+
+        abort_unless($role === 'super_admin', 403, 'Only a Super Admin can approve or reject a poster change.');
 
         if ($role === 'super_admin') {
+
             return;
+
         }
 
         // Admin may only act on requests for releases of their assigned labels.

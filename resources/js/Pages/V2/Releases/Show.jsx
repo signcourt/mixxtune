@@ -1,5 +1,6 @@
 import ReleaseDeleteButton from '@/V2/Shared/Releases/ReleaseDeleteButton';
 import ReleaseTakedownButton from '@/V2/Shared/Releases/ReleaseTakedownButton'; /* W210 */
+import ReleaseAudioButton from '@/V2/Shared/Releases/ReleaseAudioButton'; /* W211 */
 import {
     useEffect,
     useRef,
@@ -327,6 +328,7 @@ export default function Show({
                         {/* W120 MIXXTUNE_RELEASE_TRASH */}
                         {role === 'super_admin' && <ReleaseDeleteButton release={release} />}
                         <ReleaseTakedownButton release={release} role={role} />
+                        <ReleaseAudioButton release={release} role={role} />
                     </div>
                 </div>
 
@@ -596,7 +598,7 @@ function OwnerPoster({ release, role }) {
     const [file, setFile] = useState(null);
     const [preview, setPreview] = useState(null);
     const [busy, setBusy] = useState(false);
-    const canRequest = role !== 'super_admin' && role !== 'admin';
+    const canRequest = role !== 'super_admin'; /* W211: a Manager requests too - only the Super Admin changes it directly */
     const pending = Boolean(release.poster_change_pending);
     /* W195c: while pending, show the proposed (latest) poster, not the old one. */
     const url = artworkUrl(
