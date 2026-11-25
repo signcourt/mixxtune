@@ -495,11 +495,14 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
     useEffect(() => {
         if (!account || folder !== "inbox") return;
         const accountId = account.id;
+        /* W212: 3s x throttle 20/min tripped 429 after one minute. Now every 15s, never two at once. */
+        let inFlight = false;
         const tick = () => {
-            if (document.visibilityState !== "visible") return;
-            router.post(`/mail/accounts/${accountId}/refresh`, {}, { preserveScroll: true, preserveState: true });
+            if (document.visibilityState !== "visible" || inFlight) return;
+            inFlight = true;
+            router.post(`/mail/accounts/${accountId}/refresh`, {}, { preserveScroll: true, preserveState: true, onFinish: () => { inFlight = false; } });
         };
-        const id = setInterval(tick, 3000);
+        const id = setInterval(tick, 15000);
         return () => clearInterval(id);
     }, [account?.id, folder]);
 

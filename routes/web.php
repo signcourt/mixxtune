@@ -3369,7 +3369,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/mail', [\App\Http\Controllers\V2\MailController::class, 'index'])->name('v2.mail.index');
     Route::get('/mail/messages/{message}/html', [\App\Http\Controllers\V2\MailController::class, 'html'])->whereNumber('message')->name('v2.mail.html');
     Route::get('/mail/attachments/{attachment}', [\App\Http\Controllers\V2\MailController::class, 'attachment'])->whereNumber('attachment')->name('v2.mail.attachment');
-    Route::post('/mail/accounts/{account}/refresh', [\App\Http\Controllers\V2\MailController::class, 'refresh'])->whereNumber('account')->middleware('throttle:20,1')->name('v2.mail.refresh');
+    Route::post('/mail/accounts/{account}/refresh', [\App\Http\Controllers\V2\MailController::class, 'refresh'])->whereNumber('account')->middleware('throttle:40,1') /* W212 */->name('v2.mail.refresh');
     /* W110: star, drafts, address suggestions */
     Route::post('/mail/messages/{message}/star', [\App\Http\Controllers\V2\MailController::class, 'star'])->whereNumber('message')->middleware('throttle:120,1,mail-star')->name('v2.mail.star');
     Route::post('/mail/accounts/{account}/drafts', [\App\Http\Controllers\V2\MailController::class, 'saveDraft'])->whereNumber('account')->middleware('throttle:120,1,mail-draft')->name('v2.mail.drafts.save');
