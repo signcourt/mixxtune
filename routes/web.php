@@ -3432,3 +3432,8 @@ Route::any('v2/{path?}', function (\Illuminate\Http\Request $request, ?string $p
 
     return redirect($target.($query ? '?'.$query : ''), $request->isMethod('GET') || $request->isMethod('HEAD') ? 301 : 308);
 })->where('path', '.*')->name('legacy.v2-redirect');
+
+/* W204 MIXXTUNE_PENDING_WORK: JSON behind the dashboard "Pending work" pop-up (Super Admin + Manager) */
+Route::middleware(['auth', 'verified'])
+    ->get('/admin/pending-work', [\App\Http\Controllers\V2\Admin\PendingWorkController::class, 'index'])
+    ->name('v2.admin.pending-work');

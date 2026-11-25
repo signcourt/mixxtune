@@ -1,5 +1,6 @@
 import { Link, router, usePage } from "@inertiajs/react";
 import { useEffect, useRef, useState } from "react";
+import PendingWorkPopup from "../V2/Shared/Components/PendingWorkPopup"; /* W204 */
 
 const menuGroups = [
     {
@@ -324,7 +325,8 @@ export default function AdminLayout({ children, title = "Dashboard" }) {
                     </div>
                 </header>
 
-                <main className="p-5 lg:p-8">{children}</main>
+                <main className="p-5 lg:p-8">{children}
+                        <PendingWorkPopup /> {/* W204: pending-work pop-up (Super Admin + Manager) */}</main>
             </div>
         </div>
     );
