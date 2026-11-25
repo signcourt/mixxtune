@@ -65,7 +65,8 @@ export default function Index({ role = 'admin', requests = [] }) {
                                     {r.created_at && <div className="mt-0.5 text-xs text-slate-400">{r.created_at}</div>}
                                 </div>
 
-                                <div className="flex items-center gap-2">
+                                {role !== 'super_admin' && <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">Waiting for a Super Admin</span>}{/* W215 */}
+                                {role === 'super_admin' && <div className="flex items-center gap-2">
                                     <button
                                         type="button"
                                         onClick={() => act(r.id, 'approve')}
@@ -82,7 +83,7 @@ export default function Index({ role = 'admin', requests = [] }) {
                                     >
                                         Reject
                                     </button>
-                                </div>
+                                </div>}
                             </div>
                         </div>
                     ))}

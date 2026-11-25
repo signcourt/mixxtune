@@ -320,7 +320,7 @@ export default function Show({
                             {/* W194: poster with hover icons - pencil (edit) + download */}
                             <PosterBox release={release} canChange={canEditMetadata} />
                             {/* W195b: pending poster change request (label/artist) */}
-                            <PosterRequestReview posterRequest={posterRequest} />
+                            {role === 'super_admin' ? <PosterRequestReview posterRequest={posterRequest} /> : (posterRequest ? <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Poster change requested - waiting for a Super Admin</div> : null)}{/* W215 */}
 
                             <div className="min-w-0 flex-1">
                                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">

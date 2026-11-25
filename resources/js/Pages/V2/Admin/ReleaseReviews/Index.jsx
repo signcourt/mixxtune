@@ -336,7 +336,7 @@ export default function Index({ role = 'admin', releases = {}, counts = {}, filt
 
             <div className="space-y-5">
                 {/* W195d: pending poster change requests (label/artist) */}
-                <PosterRequestsPanel requests={posterRequests} />
+                {role === 'super_admin' && <PosterRequestsPanel requests={posterRequests} />}{/* W215: only the Super Admin decides (W211) */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
                     {TABS.map(([key, label]) => (
                         <button

@@ -130,7 +130,7 @@ class DeliveryManagementController extends Controller
         if ($status === 'store_failed') {
             $query->whereHas('storeDeliveries', fn ($d) => $d->where('status', 'failed'));
         } elseif ($status === 'store_takedown') {
-            $query->whereHas('storeDeliveries', fn ($d) => $d->whereIn('status', ['takedown_requested']));
+            $query->where(fn ($q) => $q->where('status', 'takedown_requested')->orWhereHas('storeDeliveries', fn ($d) => $d->whereIn('status', ['takedown_requested']))); /* W215 */
         } elseif ($status !== '' && $status !== 'all') {
             $query->where(
                 'status',
@@ -232,9 +232,14 @@ class DeliveryManagementController extends Controller
                         (clone $countQuery)
                             ->whereHas('storeDeliveries', fn ($d) => $d->where('status', 'failed'))
                             ->count(),
+                    /* W215: the "All" tile and Manager takedown requests (W210) */
+                    'all' =>
+                        (clone $countQuery)
+                            ->whereIn('status', ['approved', 'processing', 'delivered', 'live', 'failed', 'takedown_requested', 'taken_down'])
+                            ->count(),
                     'store_takedown' =>
                         (clone $countQuery)
-                            ->whereHas('storeDeliveries', fn ($d) => $d->where('status', 'takedown_requested'))
+                            ->where(fn ($q) => $q->where('status', 'takedown_requested')->orWhereHas('storeDeliveries', fn ($d) => $d->where('status', 'takedown_requested')))
                             ->count(),
                     'processing' =>
                         (clone $countQuery)

@@ -221,9 +221,17 @@ export default function ReleaseIndex({
         live: 'Live',
         rejected: 'Rejected',
         failed: 'Failed',
+        takedown_requested: 'Takedown Requested', /* W215 */
+        taken_down: 'Taken Down',
     };
     const STATUS_SUBTITLES = {
-        draft: 'Releases you started and have not sent for review yet. Only you can see your drafts.',
+        draft: role === 'super_admin'
+            ? 'Every draft in the system - open any of them to finish and send it for review. The owner sees only their own.' /* W215 */
+            : role === 'admin'
+                ? 'Drafts of your assigned labels and artists, plus your own.'
+                : 'Releases you started and have not sent for review yet. Only you can see your drafts.',
+        takedown_requested: 'A Manager asked for a takedown - the Super Admin decides it under Administration → Approvals.',
+        taken_down: 'Taken down from the stores - details, codes and earnings stay on the release.',
         submitted: 'Sent for review - waiting for the Mixx Tune team.',
         changes_requested: 'The team asked for changes - open, fix and send again.',
         rejected: 'Not accepted - open a release to see the reason.',
@@ -364,6 +372,8 @@ export default function ReleaseIndex({
                             {!ownerView && <option value="delivered">Delivered</option>}
                             <option value="live">Live</option>
                             {!ownerView && <option value="failed">Failed</option>}
+                            {!ownerView && <option value="takedown_requested">Takedown Requested</option>}{/* W215 */}
+                            {!ownerView && <option value="taken_down">Taken Down</option>}
                         </select>
 
 

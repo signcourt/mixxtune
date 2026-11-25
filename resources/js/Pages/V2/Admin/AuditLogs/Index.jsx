@@ -1,5 +1,13 @@
 import { Head, Link, router } from '@inertiajs/react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+/* W215: "2026-11-25T08:29:00.000000Z" -> "25 Nov 2026, 02:29 pm" (browser zone) */
+function fmtWhen(v) {
+    if (!v) return null;
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return String(v);
+    return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
 
 export default function Index({
     role = 'admin',
@@ -109,7 +117,7 @@ export default function Index({
                                 {(logs.data ?? []).map((log) => (
                                     <tr key={log.id}>
                                         <Cell>
-                                            {log.created_at}
+                                            {fmtWhen(log.created_at)}{/* W215 */}
                                         </Cell>
 
                                         <Cell>

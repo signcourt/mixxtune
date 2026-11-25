@@ -11,6 +11,14 @@ import {
 } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+/* W215: "2026-11-25T08:29:00.000000Z" -> "25 Nov 2026, 02:29 pm" (browser zone) */
+function fmtWhen(v) {
+    if (!v) return null;
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return String(v);
+    return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
 import BankChangeOtpPrompt from '@/V2/Shared/Components/BankChangeOtpPrompt'; // W196
 
 // MIXXTUNE_QUICK_EDIT_PERMISSION_OPTIONS_V1
@@ -2309,8 +2317,8 @@ export default function Index({
                                             </Cell>
 
                                             <Cell>
-                                                {user.last_login_at ??
-                                                    'Never'}
+                                                {fmtWhen(user.last_login_at) ??
+                                                    'Never'}{/* W215 */}
                                             </Cell>
 
                                             <Cell>
