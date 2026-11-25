@@ -2276,6 +2276,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/admin/releases/{release}/trash', [\App\Http\Controllers\V2\Admin\ReleaseTrashController::class, 'trash'])->middleware('throttle:30,1,release-trash')->name('v2.admin.releases.trash');
     Route::post('/admin/release-trash/{row}/restore', [\App\Http\Controllers\V2\Admin\ReleaseTrashController::class, 'restore'])->whereNumber('row')->middleware('throttle:30,1,release-restore')->name('v2.admin.release-trash.restore');
     Route::post('/admin/release-trash/{row}/purge', [\App\Http\Controllers\V2\Admin\ReleaseTrashController::class, 'purge'])->whereNumber('row')->middleware('throttle:30,1,release-purge')->name('v2.admin.release-trash.purge');
+    /* W208: bulk actions (Super Admin) - one confirmation code for the whole selection */
+    Route::post('/admin/releases/bulk-trash', [\App\Http\Controllers\V2\Admin\ReleaseBulkController::class, 'trash'])->middleware('throttle:10,1,release-bulk')->name('v2.admin.releases.bulk-trash');
+    Route::post('/admin/release-trash/bulk/restore', [\App\Http\Controllers\V2\Admin\ReleaseBulkController::class, 'restore'])->middleware('throttle:10,1,release-bulk')->name('v2.admin.release-trash.bulk-restore');
+    Route::post('/admin/release-trash/bulk/purge', [\App\Http\Controllers\V2\Admin\ReleaseBulkController::class, 'purge'])->middleware('throttle:10,1,release-bulk')->name('v2.admin.release-trash.bulk-purge');
 });
 
 /* W115 MIXXTUNE_RAZORPAY_PAYOUTS + MIXXTUNE_STAFF_SALARY (Super Admin only; checked in the controllers) */

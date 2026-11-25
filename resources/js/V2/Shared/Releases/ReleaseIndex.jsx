@@ -96,6 +96,24 @@ export default function ReleaseIndex({
     const advancedCount = ['label_id', 'artist', 'language', 'genre'].filter((key) => Boolean(filters[key])).length;
     const [advancedOpen, setAdvancedOpen] = useState(advancedCount > 0);
 
+    /* W208: bulk select + one-OTP "Move to Trash" (Super Admin) */
+    const bulkEnabled = role === 'super_admin';
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [bulkBusy, setBulkBusy] = useState(false);
+    const toggleSelected = (id) =>
+        setSelectedIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+    const allSelected = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
+    const toggleAll = () => setSelectedIds(allSelected ? [] : rows.map((r) => r.id));
+    const bulkTrash = () => {
+        if (!selectedIds.length || bulkBusy) return;
+        setBulkBusy(true);
+        router.post(
+            '/admin/releases/bulk-trash',
+            { ids: selectedIds },
+            { preserveScroll: true, onFinish: () => setBulkBusy(false), onSuccess: () => setSelectedIds([]) },
+        );
+    };
+
     
     /* W76: artists used "/releases", which does not exist (every filter change gave a 404) */
     const basePath = '/releases';
@@ -553,6 +571,30 @@ export default function ReleaseIndex({
                     </section>
                 ) : (
                     <>
+                    {/* W208: bulk action bar */}
+                    {bulkEnabled && rows.length > 0 && (
+                        <div className={`mb-3 flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-3 text-sm ${selectedIds.length ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
+                            <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800">
+                                <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={allSelected} onChange={toggleAll} />
+                                {allSelected ? 'Unselect all' : 'Select all on this page'}
+                            </label>
+                            <span className="text-slate-500">{selectedIds.length} selected</span>
+                            {selectedIds.length > 0 && (
+                                <button type="button" onClick={() => setSelectedIds([])} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                    Clear
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                disabled={bulkBusy || selectedIds.length === 0}
+                                onClick={bulkTrash}
+                                title="One e-mailed code confirms the whole selection"
+                                className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <TrashIcon /> Move {selectedIds.length || ''} to Trash
+                            </button>
+                        </div>
+                    )}
                     {/* MIXXTUNE_MOBILE_LIST_V1: phones get stacked cards instead of a wide table */}
                     <section className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:hidden">
                         {rows.map((release) => (
@@ -563,6 +605,9 @@ export default function ReleaseIndex({
                                 variant="card"
                                 ownerView={ownerView}
                                 superAdmin={role === 'super_admin'}
+                                                selectable={bulkEnabled}
+                                                selected={selectedIds.includes(release.id)}
+                                                onToggle={() => toggleSelected(release.id)}
                             />
                         ))}
                     </section>
@@ -572,6 +617,11 @@ export default function ReleaseIndex({
                             <table className="min-w-full divide-y divide-slate-200">
                                 <thead className="bg-slate-50">
                                     <tr className="text-left text-xs font-bold uppercase tracking-wider text-slate-500">
+                                        {bulkEnabled && (
+                                            <th className="w-10 px-4 py-3.5">
+                                                <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
+                                            </th>
+                                        )}
                                         <th className="px-5 py-3.5">Release</th>
                                         <th className="px-5 py-3.5">Label</th>
                                         <th className="px-5 py-3.5">Release date</th>
@@ -601,6 +651,9 @@ export default function ReleaseIndex({
                                                 }
                                                 ownerView={ownerView}
                                                 superAdmin={role === 'super_admin'}
+                                                selectable={bulkEnabled}
+                                                selected={selectedIds.includes(release.id)}
+                                                onToggle={() => toggleSelected(release.id)}
                                             />
                                         )
                                     )}
@@ -794,6 +847,9 @@ function ReleaseRow({
     variant = 'row',
     ownerView = false,
     superAdmin = false,
+    selectable = false, /* W208 */
+    selected = false,
+    onToggle = null,
 }) {
     const status =
         shownStatus(release.status, ownerView);
@@ -890,6 +946,9 @@ function ReleaseRow({
 
                 <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
+                    {selectable && (
+                        <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300" checked={selected} onChange={onToggle} aria-label={`Select ${release.title || 'release'}`} />
+                    )}
                         <Link href={viewPath} className="min-w-0 truncate text-[15px] font-bold text-slate-900">
                             {release.title || 'Untitled Release'}
                         </Link>
@@ -937,6 +996,11 @@ function ReleaseRow({
 
     return (
         <tr className="transition hover:bg-slate-50">
+            {selectable && (
+                <td className="w-10 px-4 py-3 align-top">
+                    <input type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300" checked={selected} onChange={onToggle} aria-label={`Select ${release.title || 'release'}`} />
+                </td>
+            )}
             <td className="px-5 py-3">
                 <div className="flex min-w-[300px] items-center gap-3.5">
                     <Link

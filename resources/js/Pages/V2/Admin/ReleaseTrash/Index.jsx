@@ -11,6 +11,17 @@ const STATUS = { draft: 'Draft', submitted: 'In Review', changes_requested: 'Cha
 export default function Index({ rows = [], keepDays = 90 }) {
     const [confirm, setConfirm] = useState(null);
     const [busy, setBusy] = useState(false);
+    /* W208: bulk select -> Restore / Delete forever (one code for the whole selection) */
+    const [sel, setSel] = useState([]);
+    const [confirmBulk, setConfirmBulk] = useState(false);
+    const toggle = (id) => setSel((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+    const allSel = rows.length > 0 && rows.every((r) => sel.includes(r.id));
+    const toggleAll = () => setSel(allSel ? [] : rows.map((r) => r.id));
+    const bulk = (url, after) => {
+        if (!sel.length || busy) return;
+        setBusy(true);
+        router.post(url, { ids: sel }, { preserveScroll: true, onFinish: () => setBusy(false), onSuccess: () => { setSel([]); if (after) after(); } });
+    };
     const post = (url, after) => {
         setBusy(true);
         router.post(url, {}, { preserveScroll: true, onFinish: () => setBusy(false), onSuccess: after });
@@ -26,6 +37,26 @@ export default function Index({ rows = [], keepDays = 90 }) {
                     the release, its tracks, credits, deliveries, catalogue rows, poster and audio files. A UPC / ISRC from the Code lists goes back to the list if the song never reached the stores.
                 </div>
 
+                {rows.length > 0 && (
+                    <div className={`flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-3 text-sm ${sel.length ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white'}`}>
+                        <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800">
+                            <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={allSel} onChange={toggleAll} />
+                            {allSel ? 'Unselect all' : 'Select all'}
+                        </label>
+                        <span className="text-slate-500">{sel.length} selected</span>
+                        {sel.length > 0 && (
+                            <button type="button" onClick={() => setSel([])} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Clear</button>
+                        )}
+                        <div className="ml-auto flex gap-2">
+                            <button type="button" disabled={busy || !sel.length} onClick={() => bulk('/admin/release-trash/bulk/restore')} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50">
+                                <RotateCcw className="h-4 w-4" /> Restore {sel.length || ''}
+                            </button>
+                            <button type="button" disabled={busy || !sel.length} onClick={() => setConfirmBulk(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50">
+                                <Trash2 className="h-4 w-4" /> Delete {sel.length || ''} forever
+                            </button>
+                        </div>
+                    </div>
+                )}
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     {rows.length === 0 ? (
                         <div className="px-5 py-14 text-center text-sm text-slate-500">The Trash is empty.</div>
@@ -33,6 +64,7 @@ export default function Index({ rows = [], keepDays = 90 }) {
                         <div className="divide-y divide-slate-100">
                             {rows.map((r) => (
                                 <div key={r.id} className="flex flex-col gap-4 p-4 md:flex-row md:items-center">
+                                    <input type="checkbox" className="h-4 w-4 shrink-0 rounded border-slate-300" checked={sel.includes(r.id)} onChange={() => toggle(r.id)} aria-label={`Select ${r.title || 'release'}`} />
                                     <div className="flex min-w-0 flex-1 items-start gap-3">
                                         {art(r.artwork_path) ? (
                                             <img src={art(r.artwork_path)} alt="" className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 object-cover opacity-80 grayscale" />
@@ -70,6 +102,23 @@ export default function Index({ rows = [], keepDays = 90 }) {
                 </div>
             </div>
 
+            {confirmBulk && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-label="Delete selected for good">
+                    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+                        <div className="text-base font-bold text-slate-900">Delete {sel.length} release{sel.length === 1 ? '' : 's'} for good?</div>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                            Everything of each selected release is removed - tracks, credits, deliveries, catalogue rows, poster and audio files. This cannot be undone.
+                            One confirmation code (e-mailed to you) covers the whole selection: enter it in the box that opens, then press this button again.
+                        </p>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <button type="button" onClick={() => setConfirmBulk(false)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                            <button type="button" disabled={busy} onClick={() => bulk('/admin/release-trash/bulk/purge', () => setConfirmBulk(false))} className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60">
+                                Delete {sel.length} forever
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {confirm && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-label="Delete for good">
                     <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
