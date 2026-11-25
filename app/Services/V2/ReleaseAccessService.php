@@ -283,8 +283,19 @@ class ReleaseAccessService
          * a direct release URL.
          */
         if ($release->status === 'draft') {
-            return (int) $release->created_by
-                === (int) $user->id;
+            /* W209: a Super Admin may open and edit every draft, a Manager the drafts of
+             * his assigned labels/artists (W207 lists them); everybody else only their own. */
+            if ((int) $release->created_by === (int) $user->id) {
+                return true;
+            }
+            if ($role === 'super_admin') {
+                return true;
+            }
+            if ($role === 'admin') {
+                return $this->adminCanAccess($user, $release);
+            }
+
+            return false;
         }
 
         if ($role === 'super_admin') {
