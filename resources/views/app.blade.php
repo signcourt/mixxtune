@@ -6,6 +6,17 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
         @php($__brand = app(\App\Services\V2\SystemSettingService::class)->branding())
+        {{-- W227: somebody in a distributor's tree gets that distributor's name and logo on the browser tab --}}
+        <?php
+            $__brand = app(\App\Services\V2\DistributorService::class)->brand($__brand, auth()->user());
+            $__w227 = !empty($__brand['distributor']);
+            if ($__w227) {
+                $__brand['favicon_url'] = !empty($__brand['logo_url']) ? $__brand['logo_url'] : 'data:,';
+            }
+        ?>
+        @if($__w227)
+        <meta name="mt-brand" content="{{ $__brand['name'] }}">
+        @endif
         {{-- W201: tab title + icon follow the brand, not the hard-coded app name --}}
         <title inertia>{{ $__brand['name'] ?? config('app.name', 'Laravel') }}</title>
         @if(!empty($__brand['favicon_url']))

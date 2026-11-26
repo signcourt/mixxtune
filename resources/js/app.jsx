@@ -14,7 +14,7 @@ import GlobalLoader from '@/V2/Shared/Components/GlobalLoader';
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
+    title: (title) => `${title} - ${(typeof document !== 'undefined' && document.querySelector('meta[name="mt-brand"]')?.content) || appName}`, /* W227 */
     resolve: (name) =>
         resolvePageComponent(
             `./Pages/${name}.jsx`,

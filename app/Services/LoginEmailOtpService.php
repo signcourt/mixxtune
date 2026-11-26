@@ -67,7 +67,8 @@ class LoginEmailOtpService
         Mail::to($user->email)->send(
             new LoginEmailOtpMail(
                 $otp,
-                $user->name ?: 'User'
+                $user->name ?: 'User',
+                \App\Services\V2\DistributorService::mailBrand($user) ?? 'MIXX TUNE' /* W227 */
             )
         );
     }

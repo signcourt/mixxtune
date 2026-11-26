@@ -170,6 +170,36 @@ class DistributorService
         return $d;
     }
 
+    /**
+     * W227: the brand name a mail to this person carries. A distributor's sub-labels (and staff in his tree)
+     * get the distributor's name; everybody else - the distributor himself too, he is Mixx Tune's customer -
+     * gets null, which means the normal Mixx Tune name.
+     */
+    public static function mailBrand($user): ?string
+    {
+        try {
+            if (!$user instanceof User || !self::ready()) {
+                return null;
+            }
+            self::forget(); /* a login made a moment ago may just have been hung under a distributor */
+            $svc = app(self::class);
+            $d = $svc->forUser($user);
+            if (!$d || (string) $d->status !== 'active' || $svc->isOwner($user, $d)) {
+                return null;
+            }
+            $name = trim((string) $d->brand_name);
+            if ($name === '') {
+                $name = trim((string) DB::table('labels')->where('id', $d->label_id)->value('name'));
+            }
+
+            return $name !== '' ? $name : null;
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+    }
+
     public static function forget(): void
     {
         self::$memo = [];

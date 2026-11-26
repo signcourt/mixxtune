@@ -2,11 +2,11 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>MIXX TUNE Login OTP</title>
+    <title>{{ $brand ?? 'MIXX TUNE' }} Login OTP</title>
 </head>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;">
     <div style="max-width:560px;margin:40px auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
-        <h2 style="margin:0 0 20px;">MIXX TUNE Login Verification</h2>
+        <h2 style="margin:0 0 20px;">{{ $brand ?? 'MIXX TUNE' }} Login Verification</h2>
 
         <p>Hello {{ $userName }},</p>
 
@@ -21,7 +21,7 @@
         <p>If you did not attempt to log in, you can ignore this email.</p>
 
         <p style="margin-top:30px;color:#64748b;font-size:13px;">
-            MIXX TUNE
+            {{ $brand ?? 'MIXX TUNE' }}
         </p>
     </div>
 </body>

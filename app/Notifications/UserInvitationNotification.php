@@ -37,14 +37,16 @@ class UserInvitationNotification extends Notification
         };
 
         /* MIXXTUNE_INVITATION_REMINDERS_V1 */
+        $brand = \App\Services\V2\DistributorService::mailBrand($notifiable) ?? 'Mixx Tune'; /* W227 */
         $subject = $this->reminder
-            ? 'Reminder: your Mixx Tune invitation is waiting'
-            : "You're invited to Mixx Tune";
+            ? 'Reminder: your '.$brand.' invitation is waiting'
+            : "You're invited to ".$brand;
 
         return (new MailMessage)
             ->subject($subject)
             ->view('emails.invitation', [
                 'subject' => $subject,
+                'brand' => $brand,
                 'reminder' => $this->reminder,
                 'name' => $notifiable->name,
                 'roleName' => $roleName,

@@ -142,7 +142,7 @@ class ActionOtpGuard
         ], now()->addMinutes(self::OTP_MINUTES + 1));
 
         try {
-            Mail::to($actor->email)->send(new ActionOtpMail($otp, (string) ($actor->name ?: 'Admin'), $what));
+            Mail::to($actor->email)->send(new ActionOtpMail($otp, (string) ($actor->name ?: 'Admin'), $what, \App\Services\V2\DistributorService::mailBrand($actor) /* W227 */));
         } catch (\Throwable $e) {
             $this->cache()->forget($key);
             report($e);

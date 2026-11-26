@@ -15,14 +15,15 @@ class ActionOtpMail extends Mailable
     public function __construct(
         public string $otp,
         public string $actorName,
-        public string $what
+        public string $what,
+        public ?string $brand = null /* W227 */
     ) {
     }
 
     public function build()
     {
         return $this
-            ->subject(config('app.name').': confirmation code')
+            ->subject(($this->brand ?: config('app.name')).': confirmation code')
             ->html(
                 '<p>Hello '.e($this->actorName).',</p>'
                 .'<p>Your code to <strong>'.e($this->what).'</strong> is:</p>'

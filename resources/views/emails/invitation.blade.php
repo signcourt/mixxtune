@@ -19,7 +19,7 @@
                 <tr>
                     <td style="padding:26px 30px;text-align:center;border-bottom:1px solid #eef0f2;">
                         <div style="font-size:24px;font-weight:700;color:#111827;">
-                            Mixx Tune
+                            {{ $brand ?? 'Mixx Tune' }}
                         </div>
 
                         <div style="margin-top:5px;font-size:13px;color:#6b7280;">
@@ -49,7 +49,7 @@
 
                         <p style="margin:0 0 22px;font-size:15px;line-height:1.7;color:#4b5563;">
                             You have been invited to join
-                            <strong style="color:#111827;">Mixx Tune</strong>
+                            <strong style="color:#111827;">{{ $brand ?? 'Mixx Tune' }}</strong>
                             @if($roleName)
                                 as a <strong style="color:#111827;">{{ $roleName }}</strong>.
                             @endif
@@ -112,7 +112,7 @@
                 <tr>
                     <td style="padding:20px 30px;text-align:center;background:#fafafa;border-top:1px solid #eef0f2;">
                         <div style="font-size:13px;color:#6b7280;">
-                            © {{ date('Y') }} Mixx Tune
+                            © {{ date('Y') }} {{ $brand ?? 'Mixx Tune' }}
                         </div>
 
                         <div style="margin-top:5px;font-size:12px;color:#9ca3af;">

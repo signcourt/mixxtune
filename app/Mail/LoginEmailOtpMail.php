@@ -14,14 +14,15 @@ class LoginEmailOtpMail extends Mailable
 
     public function __construct(
         public string $otp,
-        public string $userName
+        public string $userName,
+        public string $brand = 'MIXX TUNE' /* W227 */
     ) {
     }
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your MIXX TUNE Login OTP'
+            subject: 'Your '.$this->brand.' Login OTP'
         );
     }
 
