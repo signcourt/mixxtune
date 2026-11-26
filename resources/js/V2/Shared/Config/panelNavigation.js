@@ -273,6 +273,18 @@ const ownerNavigation = (
                 href: '/label/distributor/sub-labels',
             },
             {
+                id: 'distributor-payouts', /* W226 */
+                label: 'Sub-label Payouts',
+                icon: icons.royalties,
+                href: '/label/distributor/payouts',
+            },
+            {
+                id: 'sub-earnings', /* W226: only for a sub-label under a distributor (Sidebar filters it) */
+                label: 'My Earnings',
+                icon: icons.wallet,
+                href: '/label/my-earnings',
+            },
+            {
                 id: 'artists',
                 label: 'Artists',
                 icon: icons.artists,

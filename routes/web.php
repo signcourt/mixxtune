@@ -3470,5 +3470,11 @@ Route::middleware(['auth', 'role:label'])->prefix('label')->group(function () {
     Route::post('/distributor/sub-labels/{label}/resend', [\App\Http\Controllers\V2\DistributorSubLabelController::class, 'resend'])->whereNumber('label')->middleware('throttle:6,1,distributor-sublabels-mail')->name('v2.distributor.sub-labels.resend');
     /* W224: the distributor approves his sub-labels' releases before Mixx Tune reviews them */
     Route::get('/distributor/review', [\App\Http\Controllers\V2\DistributorReviewController::class, 'index'])->name('v2.distributor.review');
+    /* W226: money inside the tree - the distributor's payout register, the sub-label's own earnings */
+    Route::get('/distributor/payouts', [\App\Http\Controllers\V2\DistributorPayoutController::class, 'index'])->name('v2.distributor.payouts');
+    Route::post('/distributor/payouts', [\App\Http\Controllers\V2\DistributorPayoutController::class, 'store'])->middleware('throttle:30,1,distributor-payouts')->name('v2.distributor.payouts.store');
+    Route::post('/distributor/payouts/{payment}/cancel', [\App\Http\Controllers\V2\DistributorPayoutController::class, 'cancel'])->whereNumber('payment')->middleware('throttle:30,1,distributor-payouts')->name('v2.distributor.payouts.cancel');
+    Route::get('/my-earnings', [\App\Http\Controllers\V2\SubLabelEarningsController::class, 'index'])->name('v2.sub-label.earnings');
+    Route::get('/my-earnings/export', [\App\Http\Controllers\V2\SubLabelEarningsController::class, 'export'])->middleware('throttle:20,1,sub-label-earnings')->name('v2.sub-label.earnings.export');
     Route::post('/distributor/review/{review}', [\App\Http\Controllers\V2\DistributorReviewController::class, 'decide'])->whereNumber('review')->middleware('throttle:60,1,distributor-review')->name('v2.distributor.review.decide');
 });

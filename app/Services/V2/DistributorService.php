@@ -118,7 +118,8 @@ class DistributorService
                 return null;
             }
 
-            return ['id' => (int) $d->id, 'is_owner' => $this->isOwner($user, $d), 'status' => (string) $d->status];
+            return ['id' => (int) $d->id, 'is_owner' => $this->isOwner($user, $d), 'status' => (string) $d->status,
+                'is_sub' => app(DistributorMoneyService::class)->subContext($user) !== null]; /* W226 */
         } catch (\Throwable $e) {
             report($e);
 

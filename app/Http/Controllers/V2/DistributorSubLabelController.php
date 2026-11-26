@@ -196,6 +196,11 @@ class DistributorSubLabelController extends Controller
         $data = $request->validate(['percent' => ['required', 'numeric', 'min:0', 'max:100']]);
         $root = Label::query()->whereKey($d->label_id)->firstOrFail();
         $child = $this->child((int) $d->label_id, $label);
+        try { /* W226: months already reported keep the share they had */
+            app(\App\Services\V2\DistributorMoneyService::class)->freezeLabel((int) $d->id, (int) $d->label_id, (int) $child->id);
+        } catch (\Throwable $e) {
+            report($e);
+        }
         $shares->saveForLabel($root, $child, (float) $data['percent'], true, $request->user());
 
         return back()->with('success', 'Share of "'.$child->name.'" is now '.round((float) $data['percent'], 2).'%. It applies to reports published from now on.');

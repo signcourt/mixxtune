@@ -163,10 +163,20 @@ export default function Sidebar({
             /* W95 MIXXTUNE_PANEL_MAIL: "Mail" only for someone who has a mailbox (Super Admin always) */
             const mailAccounts = Number(page.props?.auth?.mail?.accounts ?? 0);
 
-            return permissionFilteredNavigation.filter(
+            /* W226: a distributor's sub-label is paid by the distributor - My Earnings instead of Wallet / Reports */
+            const w226Sub = Boolean(page.props?.distributor?.is_sub);
+
+            return permissionFilteredNavigation
+                .map((item) =>
+                    w226Sub && item.id === "financial" && Array.isArray(item.children)
+                        ? { ...item, children: item.children.filter((c) => !["financial-wallet", "financial-reports"].includes(c.id)) }
+                        : item,
+                )
+                .filter(
                     (item) =>
+                        (item.id !== "sub-earnings" || w226Sub) &&
                         (item.id !== "mail" || normalizedRole === "super_admin" || mailAccounts > 0) &&
-                        (!["distributor-brand", "distributor-sublabels" /* W223 */, "distributor-review" /* W224 */].includes(item.id) || Boolean(page.props?.distributor?.is_owner && page.props?.distributor?.status === "active")) && /* W221 */
+                        (!["distributor-brand", "distributor-sublabels" /* W223 */, "distributor-review" /* W224 */, "distributor-payouts" /* W226 */].includes(item.id) || Boolean(page.props?.distributor?.is_owner && page.props?.distributor?.status === "active")) && /* W221 */
                         ![
                             "notifications",
                             "settings",

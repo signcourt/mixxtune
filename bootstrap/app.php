@@ -21,6 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\EnforceMaintenanceMode::class,
             /* W129 MIXXTUNE_OFFICE_LOGIN: office staff stay inside My Office */
             \App\Http\Middleware\OfficeStaffOnly::class,
+            /* W226 MIXXTUNE_SUB_LABEL_MONEY: a distributor's sub-label uses My Earnings, not the wallet / report pages */
+            \App\Http\Middleware\SubLabelMoneyGuard::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 

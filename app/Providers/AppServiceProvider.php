@@ -32,5 +32,19 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\Finance\PayoutProfile::observe(\App\Observers\PayoutProfileBankObserver::class);
         /* MIXXTUNE_TWO_STEP_ACTIONS_V1 */
         \App\Models\Core\Label::observe(\App\Observers\LabelRateConfirmObserver::class);
+
+        /* W226: when a sub-label's share % is changed anywhere, months already reported keep the old % */
+        \App\Models\Finance\LabelRevenueShare::updating(function ($share) {
+            try {
+                if ((string) $share->beneficiary_type === 'label' && ($share->isDirty('revenue_share_percent') || $share->isDirty('is_active')) && $share->getOriginal('is_active')) {
+                    $d = \App\Services\V2\DistributorService::ready() ? \App\Models\Distributor::query()->where('label_id', $share->master_label_id)->first() : null;
+                    if ($d) {
+                        app(\App\Services\V2\DistributorMoneyService::class)->freezeLabel((int) $d->id, (int) $share->master_label_id, (int) $share->beneficiary_id, (float) $share->getOriginal('revenue_share_percent'));
+                    }
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
     }
 }
