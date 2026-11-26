@@ -135,6 +135,11 @@ class ReleaseWorkflowService
             "Release cannot move from {$oldStatus} to {$newStatus}."
         );
 
+        /* W228: a distributor tree may have a monthly release limit set by a Super Admin */
+        if ($newStatus === 'submitted') {
+            app(DistributorControlService::class)->assertCanSubmit($release, $user);
+        }
+
         return DB::transaction(function () use (
             $release,
             $oldStatus,

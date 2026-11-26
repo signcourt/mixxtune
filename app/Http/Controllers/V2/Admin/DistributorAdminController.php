@@ -60,9 +60,29 @@ class DistributorAdminController extends Controller
             ->map(fn ($l) => ['id' => (int) $l->id, 'name' => $l->name, 'owner' => $l->owner_name, 'email' => $l->owner_email])
             ->values();
 
+        /* W228: controls + figures of each tree */
+        $w228On = \App\Services\V2\DistributorControlService::ready();
+        $w228Figures = $w228On ? app(\App\Services\V2\DistributorControlService::class)->figures(array_map('intval', $labelIds)) : [];
+        $w228Month = [];
+        if ($labelIds) {
+            $w228Tree = [];
+            foreach ($labelIds as $w228Id) {
+                $w228Tree[(int) $w228Id] = (int) $w228Id;
+            }
+            foreach (DB::table('labels')->whereIn('parent_label_id', $labelIds)->whereNull('deleted_at')->get(['id', 'parent_label_id']) as $w228Child) {
+                $w228Tree[(int) $w228Child->id] = (int) $w228Child->parent_label_id;
+            }
+            foreach (DB::table('releases')->whereIn('label_id', array_keys($w228Tree))->whereNull('deleted_at')->where('submitted_at', '>=', now()->startOfMonth())->selectRaw('label_id, COUNT(*) c')->groupBy('label_id')->get() as $w228Row) {
+                $w228Root = $w228Tree[(int) $w228Row->label_id];
+                $w228Month[$w228Root] = ($w228Month[$w228Root] ?? 0) + (int) $w228Row->c;
+            }
+        }
+
         return Inertia::render('V2/Admin/Distributors/Index', [
             'role' => 'super_admin',
-            'distributors' => $rows->map(function (Distributor $d) use ($labels, $owners, $subs, $managers, $service) {
+            'managerOptions' => DB::table('users')->where('role', 'admin')->where('account_status', 'active')->orderBy('name')->get(['id', 'name'])->map(fn ($m) => ['id' => (int) $m->id, 'name' => $m->name])->values(),
+            'distributors' => $rows->map(function (Distributor $d) use ($labels, $owners, $subs, $managers, $service, $w228On, $w228Figures, $w228Month) {
+                $w228c = $w228On ? app(\App\Services\V2\DistributorControlService::class)->row((int) $d->id) : null;
                 $label = $labels->get($d->label_id);
                 $owner = $owners->get($d->user_id);
 
@@ -85,6 +105,13 @@ class DistributorAdminController extends Controller
                     'sub_labels' => (int) ($subs[$d->label_id] ?? 0),
                     'managers' => collect($managers->get($d->label_id, []))->pluck('name')->unique()->values()->all(),
                     'created_at' => optional($d->created_at)->toIso8601String(),
+                    'control' => $w228On ? [
+                        'tree_hold' => (bool) ($w228c->tree_hold ?? false), 'hold_reason' => $w228c->hold_reason ?? null, 'hold_at' => $w228c->hold_at ?? null,
+                        'max_sub_labels' => $w228c->max_sub_labels ?? null, 'max_monthly_releases' => $w228c->max_monthly_releases ?? null, 'notes' => $w228c->notes ?? null,
+                        'agreement_name' => $w228c->agreement_name ?? null, 'agreement_at' => $w228c->agreement_at ?? null,
+                    ] : null,
+                    'figures' => $w228Figures[(int) $d->label_id] ?? null,
+                    'month_releases' => (int) ($w228Month[(int) $d->label_id] ?? 0),
                 ];
             })->values(),
             'candidates' => $candidates,

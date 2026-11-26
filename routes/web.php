@@ -3459,6 +3459,12 @@ Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('super-admin
     Route::get('/distributors', [\App\Http\Controllers\V2\Admin\DistributorAdminController::class, 'index'])->name('v2.admin.distributors.index');
     Route::post('/distributors', [\App\Http\Controllers\V2\Admin\DistributorAdminController::class, 'store'])->middleware('throttle:20,1,distributors')->name('v2.admin.distributors.store');
     Route::post('/distributors/{distributor}', [\App\Http\Controllers\V2\Admin\DistributorAdminController::class, 'update'])->whereNumber('distributor')->middleware('throttle:30,1,distributors')->name('v2.admin.distributors.update');
+    /* W228: Super Admin's controls over one distributor */
+    Route::post('/distributors/{distributor}/limits', [\App\Http\Controllers\V2\Admin\DistributorControlController::class, 'limits'])->whereNumber('distributor')->middleware('throttle:30,1,distributors')->name('v2.admin.distributors.limits');
+    Route::post('/distributors/{distributor}/hold', [\App\Http\Controllers\V2\Admin\DistributorControlController::class, 'hold'])->whereNumber('distributor')->middleware('throttle:20,1,distributors')->name('v2.admin.distributors.hold');
+    Route::post('/distributors/{distributor}/manager', [\App\Http\Controllers\V2\Admin\DistributorControlController::class, 'manager'])->whereNumber('distributor')->middleware('throttle:30,1,distributors')->name('v2.admin.distributors.manager');
+    Route::post('/distributors/{distributor}/agreement', [\App\Http\Controllers\V2\Admin\DistributorControlController::class, 'agreement'])->whereNumber('distributor')->middleware('throttle:10,1,distributors')->name('v2.admin.distributors.agreement');
+    Route::get('/distributors/{distributor}/agreement', [\App\Http\Controllers\V2\Admin\DistributorControlController::class, 'agreementDownload'])->whereNumber('distributor')->name('v2.admin.distributors.agreement.download');
 });
 Route::middleware(['auth', 'role:label'])->prefix('label')->group(function () {
     Route::get('/distributor/brand', [\App\Http\Controllers\V2\DistributorBrandController::class, 'show'])->name('v2.distributor.brand');

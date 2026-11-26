@@ -82,6 +82,9 @@ class DistributorSubLabelController extends Controller
     public function store(Request $request, DistributorService $service, LabelRevenueShareService $shares): RedirectResponse
     {
         $d = $this->owner($request, $service);
+        if (\App\Services\V2\DistributorControlService::ready()) { /* W228: limit set by a Super Admin */
+            app(\App\Services\V2\DistributorControlService::class)->assertCanAddSubLabel($d);
+        }
 
         $data = $request->validate([
             'label_name' => ['required', 'string', 'min:2', 'max:150', 'regex:/^[^<>{}\\\\]+$/u'],
@@ -170,6 +173,12 @@ class DistributorSubLabelController extends Controller
 
             return [$user, $child];
         });
+
+        try { /* W228: the distributor's Manager is the Manager of the new sub-label too */
+            app(\App\Services\V2\DistributorControlService::class)->syncManagers($d);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $mailed = true;
         try {

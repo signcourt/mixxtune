@@ -23,6 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\OfficeStaffOnly::class,
             /* W226 MIXXTUNE_SUB_LABEL_MONEY: a distributor's sub-label uses My Earnings, not the wallet / report pages */
             \App\Http\Middleware\SubLabelMoneyGuard::class,
+            /* W228 MIXXTUNE_DISTRIBUTOR_TREE_HOLD: a distributor tree put on hold by a Super Admin cannot use the panel */
+            \App\Http\Middleware\DistributorTreeHold::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
