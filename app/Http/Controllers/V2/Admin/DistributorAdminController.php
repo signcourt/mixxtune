@@ -43,6 +43,7 @@ class DistributorAdminController extends Controller
         $managers = DB::table('admin_label_assignments')
             ->join('users', 'users.id', '=', 'admin_label_assignments.user_id')
             ->whereIn('admin_label_assignments.label_id', $labelIds)
+            ->where('users.role', 'admin') /* W223b */
             ->get(['admin_label_assignments.label_id', 'users.name'])
             ->groupBy('label_id');
 

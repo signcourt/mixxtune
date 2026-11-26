@@ -166,7 +166,7 @@ export default function Sidebar({
             return permissionFilteredNavigation.filter(
                     (item) =>
                         (item.id !== "mail" || normalizedRole === "super_admin" || mailAccounts > 0) &&
-                        (item.id !== "distributor-brand" || Boolean(page.props?.distributor?.is_owner && page.props?.distributor?.status === "active")) && /* W221 */
+                        (!["distributor-brand", "distributor-sublabels" /* W223 */].includes(item.id) || Boolean(page.props?.distributor?.is_owner && page.props?.distributor?.status === "active")) && /* W221 */
                         ![
                             "notifications",
                             "settings",

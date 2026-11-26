@@ -261,6 +261,12 @@ const ownerNavigation = (
                 href: '/label/distributor/brand',
             },
             {
+                id: 'distributor-sublabels', /* W223 */
+                label: 'Sub-labels',
+                icon: icons.artists,
+                href: '/label/distributor/sub-labels',
+            },
+            {
                 id: 'artists',
                 label: 'Artists',
                 icon: icons.artists,

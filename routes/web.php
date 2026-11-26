@@ -3463,4 +3463,9 @@ Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('super-admin
 Route::middleware(['auth', 'role:label'])->prefix('label')->group(function () {
     Route::get('/distributor/brand', [\App\Http\Controllers\V2\DistributorBrandController::class, 'show'])->name('v2.distributor.brand');
     Route::post('/distributor/brand', [\App\Http\Controllers\V2\DistributorBrandController::class, 'save'])->middleware('throttle:20,1,distributor-brand')->name('v2.distributor.brand.save');
+    /* W223: the distributor's sub-labels (own login + share) */
+    Route::get('/distributor/sub-labels', [\App\Http\Controllers\V2\DistributorSubLabelController::class, 'index'])->name('v2.distributor.sub-labels');
+    Route::post('/distributor/sub-labels', [\App\Http\Controllers\V2\DistributorSubLabelController::class, 'store'])->middleware('throttle:15,1,distributor-sublabels')->name('v2.distributor.sub-labels.store');
+    Route::post('/distributor/sub-labels/{label}/share', [\App\Http\Controllers\V2\DistributorSubLabelController::class, 'share'])->whereNumber('label')->middleware('throttle:20,1,distributor-sublabels')->name('v2.distributor.sub-labels.share');
+    Route::post('/distributor/sub-labels/{label}/resend', [\App\Http\Controllers\V2\DistributorSubLabelController::class, 'resend'])->whereNumber('label')->middleware('throttle:6,1,distributor-sublabels-mail')->name('v2.distributor.sub-labels.resend');
 });
