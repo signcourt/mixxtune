@@ -560,7 +560,10 @@ export default function Sidebar({
                             />
                         ) : (
                             <span className="text-sm font-bold text-violet-300">
-                                MT
+                                {/* W232: a distributor's panel shows his own initials */}
+                                {page.props?.brand?.distributor
+                                    ? (String(brandName || "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "•")
+                                    : "MT"}
                             </span>
                         )}
                     </div>

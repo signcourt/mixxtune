@@ -12,6 +12,7 @@ import DayNightSwitch from "@/V2/Shared/Components/DayNightSwitch";
 import OfficeLogoutConfirm from "@/V2/Shared/Office/OfficeLogoutConfirm";
 import IdleLogout from "@/V2/Shared/Components/IdleLogout";
 import PendingWorkPopup from "../Components/PendingWorkPopup"; /* W204b */
+import useTreeWording from "./useTreeWording"; /* W232 */
 
 export default function PanelLayout({
     role = null,
@@ -21,6 +22,8 @@ export default function PanelLayout({
     children,
 }) {
     const page = usePage();
+    /* W232: sub-label of a distributor - the distributor's name wherever a page says "Mixx Tune" */
+    useTreeWording(page.props?.distributor?.is_sub && page.props?.brand?.distributor ? page.props?.brand?.name : null);
     const props = page.props ?? {};
 
     const user = props.auth?.user ?? {};
