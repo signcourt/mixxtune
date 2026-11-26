@@ -3478,6 +3478,9 @@ Route::middleware(['auth', 'role:label'])->prefix('label')->group(function () {
     Route::get('/distributor/review', [\App\Http\Controllers\V2\DistributorReviewController::class, 'index'])->name('v2.distributor.review');
     /* W226: money inside the tree - the distributor's payout register, the sub-label's own earnings */
     Route::get('/distributor/payouts', [\App\Http\Controllers\V2\DistributorPayoutController::class, 'index'])->name('v2.distributor.payouts');
+    /* W229: the distributor's whole tree on one page + a notice to his sub-labels */
+    Route::get('/distributor/network', [\App\Http\Controllers\V2\DistributorNetworkController::class, 'index'])->name('v2.distributor.network');
+    Route::post('/distributor/network/notice', [\App\Http\Controllers\V2\DistributorNetworkController::class, 'notice'])->middleware('throttle:6,1,distributor-notice')->name('v2.distributor.network.notice');
     Route::post('/distributor/payouts', [\App\Http\Controllers\V2\DistributorPayoutController::class, 'store'])->middleware('throttle:30,1,distributor-payouts')->name('v2.distributor.payouts.store');
     Route::post('/distributor/payouts/{payment}/cancel', [\App\Http\Controllers\V2\DistributorPayoutController::class, 'cancel'])->whereNumber('payment')->middleware('throttle:30,1,distributor-payouts')->name('v2.distributor.payouts.cancel');
     Route::get('/my-earnings', [\App\Http\Controllers\V2\SubLabelEarningsController::class, 'index'])->name('v2.sub-label.earnings');

@@ -255,6 +255,12 @@ const ownerNavigation = (
     if (role === 'label') {
         items.push(
             {
+                id: 'distributor-network', /* W229 */
+                label: 'My Network',
+                icon: icons.dashboard,
+                href: '/label/distributor/network',
+            },
+            {
                 id: 'distributor-review', /* W224 */
                 label: 'Review',
                 icon: ClipboardList,
