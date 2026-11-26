@@ -158,7 +158,8 @@ export default function Login({
                 The old WordPress dashboard (backstagemixxtune.com) stays a separate site;
                 no login sharing, nothing is activated from here.
                 W125: right spelling (double x) and only the words "Old dashboard". */}
-            <div className="mt-6 rounded-lg border border-gray-200 px-4 py-3 text-center text-sm">
+            {/* W231: not on a distributor's own address */}
+            {!brand?.distributor && <div className="mt-6 rounded-lg border border-gray-200 px-4 py-3 text-center text-sm">
                 <a
                     href="https://backstagemixxtune.com/"
                     target="_blank"
@@ -167,7 +168,7 @@ export default function Login({
                 >
                     Old dashboard
                 </a>
-            </div>
+            </div>}{/* W231-end */}
         </GuestLayout>
     );
 }

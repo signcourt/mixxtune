@@ -98,7 +98,7 @@ class DistributorService
                 'name' => $name,
                 'subtitle' => trim((string) $d->dashboard_name),
                 'logo_url' => $logo ?: '',
-                'login_logo_url' => $logo ?: ($default['login_logo_url'] ?? ''),
+                'login_logo_url' => $logo ?: '', /* W231: never our logo on his pages - his name is shown instead */
                 'footer_text' => '',
                 'distributor' => true,
             ]);

@@ -6,10 +6,12 @@ export default function GuestLayout({
     const { brand = {} } = usePage().props;
 
     const brandName = brand?.name || "MIXX TUNE";
-    const logoUrl =
-        brand?.login_logo_url ||
-        brand?.logo_url ||
-        "/images/mixx-tune-login-logo.svg";
+    /* W231: on a distributor's pages only his own logo; without one, his name as text - never ours */
+    const logoUrl = brand?.distributor
+        ? (brand?.login_logo_url || brand?.logo_url || "")
+        : (brand?.login_logo_url ||
+          brand?.logo_url ||
+          "/images/mixx-tune-login-logo.svg");
 
     return (
         <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-8">
@@ -23,11 +25,16 @@ export default function GuestLayout({
                         href="/"
                         className="inline-flex items-center"
                     >
-                        <img
-                            src={logoUrl}
-                            alt={brandName}
-                            className="h-auto w-[250px] max-w-full"
-                        />
+                        {logoUrl ? (
+                            <img
+                                src={logoUrl}
+                                alt={brandName}
+                                className={brand?.distributor ? "h-auto max-h-[120px] w-auto max-w-[250px]" : "h-auto w-[250px] max-w-full"}
+                            />
+                        ) : (
+                            /* W231-name */
+                            <span className="text-center text-3xl font-bold tracking-tight text-slate-900">{brandName}</span>
+                        )}
                     </Link>
                 </div>
 

@@ -42,6 +42,11 @@ class DistributorHostGuard
             }
         }
 
+        /* W231: his address opens straight on the sign-in page (or his panel when signed in) - never our public home page */
+        if ($d && $request->isMethod('GET') && trim($request->path(), '/') === '') {
+            return redirect($request->user() ? '/label/dashboard' : '/login');
+        }
+
         return $next($request);
     }
 }
