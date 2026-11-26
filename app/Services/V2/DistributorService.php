@@ -52,6 +52,19 @@ class DistributorService
             }
         }
 
+        /* W225: staff of a label (team members) belong to that label's distributor too */
+        if (!$found) {
+            try {
+                $teamLabel = DB::table('label_team_members')->where('user_id', $uid)->where('status', 'active')->value('label_id');
+                if ($teamLabel) {
+                    $parent = DB::table('labels')->where('id', $teamLabel)->value('parent_label_id');
+                    $found = Distributor::query()->whereIn('label_id', array_values(array_filter([(int) $teamLabel, (int) $parent])))->first();
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         return self::$memo[$uid] = $found;
     }
 

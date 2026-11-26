@@ -31,40 +31,35 @@ class SuperAdminProfitController extends Controller
         /* W92: the big numbers count published reports only; reports still in review are shown apart */
         $query = $profit->withStage(clone $base, $filters['stage']);
 
+        /* W225: each block walks every report row - remembered per filter until report data changes */
+        $w225 = fn (string $part, callable $fn) => \Illuminate\Support\Facades\Cache::remember(
+            'w225:profit:'.$part.':'.sha1(json_encode($filters)).':'.\App\Support\ReportDataStamp::value(),
+            300,
+            $fn
+        );
+
         return inertia(
             'V2/Admin/Profit/Index',
             [
-                'summary' =>
-                    $profit->summary(
-                        clone $query
-                    ),
+                'summary' => $w225('summary', fn () => $profit->summary(clone $query)),
 
-                'breakdown' =>
-                    $profit->breakdown(
-                        clone $query
-                    ),
+                'breakdown' => $w225('breakdown', fn () => $profit->breakdown(clone $query)),
 
-                'monthly' =>
-                    $profit->monthly(
-                        clone $query
-                    ),
+                'monthly' => $w225('monthly', fn () => $profit->monthly(clone $query)),
 
                 'filters' =>
                     $filters,
 
                 'inReview' =>
                     $filters['stage'] === 'published'
-                        ? $profit->summary($profit->withStage(clone $base, 'review'))
+                        ? $w225('review', fn () => $profit->summary($profit->withStage(clone $base, 'review')))
                         : null,
 
-                'months' =>
-                    $profit->months(),
+                'months' => $w225('months', fn () => $profit->months()),
 
-                'platforms' =>
-                    $profit->platforms(),
+                'platforms' => $w225('platforms', fn () => $profit->platforms()),
 
-                'owners' =>
-                    $profit->owners(),
+                'owners' => $w225('owners', fn () => $profit->owners()),
             ]
         );
     }

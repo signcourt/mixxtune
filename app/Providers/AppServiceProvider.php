@@ -14,6 +14,9 @@ class AppServiceProvider extends ServiceProvider
     {
         /* W81 MIXXTUNE_PANEL_ACCESS: one copy per request (its lookups are cached inside) */
         $this->app->scoped(\App\Services\V2\PanelAccess::class);
+
+        /* W225: Analytics totals are remembered until report data changes (same numbers, much faster) */
+        $this->app->bind(\App\Services\V2\ReportAnalyticsService::class, \App\Services\V2\CachedReportAnalyticsService::class);
     }
 
     /**

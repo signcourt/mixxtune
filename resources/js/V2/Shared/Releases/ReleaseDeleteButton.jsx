@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 /*
  * W120 MIXXTUNE_RELEASE_TRASH: Super Admin "Delete release" (any status) -> Trash.
- * Nothing is removed at once: the release waits 90 days in Administration -> Trash.
+ * Nothing is removed at once: the release waits 30 days in Releases -> Trash. (W225)
  */
 export default function ReleaseDeleteButton({ release, compact = false }) {
     const [open, setOpen] = useState(false);
@@ -41,7 +41,7 @@ export default function ReleaseDeleteButton({ release, compact = false }) {
                                 <div className="text-base font-bold text-slate-900">Delete "{release.title || 'Untitled'}"?</div>
                                 <p className="mt-1 text-sm leading-6 text-slate-600">
                                     It moves to <b>Trash</b> and disappears from every list, the catalogue and the owner&apos;s panel.
-                                    You can restore it for 90 days; after that it is removed for good (tracks, files, everything).
+                                    You can restore it for 30 days; after that it is removed for good (tracks, files, everything).
                                 </p>
                             </div>
                         </div>

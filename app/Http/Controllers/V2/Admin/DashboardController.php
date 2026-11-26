@@ -88,8 +88,12 @@ class DashboardController extends Controller
         $revenueTrend = [];
 
         if ($role === 'super_admin') {
-            [$profitSummary, $revenueTrend] =
-                $this->profitWithTrend($profit);
+            /* W225: one pass over every published report row - remembered until report data changes */
+            [$profitSummary, $revenueTrend] = \Illuminate\Support\Facades\Cache::remember(
+                'w225:dash-profit:'.\App\Support\ReportDataStamp::value(),
+                300,
+                fn () => $this->profitWithTrend($profit)
+            );
         }
 
         $recentReleases =
@@ -295,6 +299,16 @@ class DashboardController extends Controller
             ->pluck('c', 'status')
             ->map(fn ($c) => (int) $c)
             ->all();
+
+        /* W225: releases still waiting for their distributor are not "in review" for Mixx Tune yet */
+        if (($statusCounts['submitted'] ?? 0) > 0 && \App\Services\V2\DistributorReleaseGate::ready()) {
+            try {
+                $w225Gated = (clone $releaseQuery)->where('status', 'submitted')->whereIn('id', \App\Services\V2\DistributorReleaseGate::pendingIdsQuery())->count();
+                $statusCounts['submitted'] = max(0, (int) $statusCounts['submitted'] - (int) $w225Gated);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
 
         $releaseCount = fn (string $status): int => (int) ($statusCounts[$status] ?? 0);
 
