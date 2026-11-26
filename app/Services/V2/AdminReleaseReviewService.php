@@ -65,6 +65,9 @@ class AdminReleaseReviewService
             'Only submitted releases can be approved.'
         );
 
+        /* W224: a Manager cannot approve past the distributor; a Super Admin can */
+        app(\App\Services\V2\DistributorReleaseGate::class)->staffApproves($release, $user);
+
         /*
          * Revalidate before approval so incomplete
          * data cannot bypass the submission engine.

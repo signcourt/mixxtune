@@ -52,7 +52,7 @@ final class PendingWorkService
                 fn () => DB::table('payout_profiles')->where('kyc_status', 'submitted')->count(), 'payout_profiles'),
 
             $this->item('releases', 'Releases to review', 'Submitted by labels / artists', '/admin/release-reviews', 'violet',
-                fn () => DB::table('releases')->whereNull('deleted_at')->where('status', 'submitted')->count(), 'releases'),
+                fn () => \App\Services\V2\DistributorReleaseGate::hide(DB::table('releases')->whereNull('deleted_at')->where('status', 'submitted'))->count() /* W224 */, 'releases'),
 
             $this->withdrawalItem(null),
 
@@ -102,7 +102,7 @@ final class PendingWorkService
 
         return [
             $this->item('releases', 'Releases to review', 'Submitted by your labels / artists', '/admin/release-reviews', 'violet',
-                fn () => tap(DB::table('releases')->whereNull('deleted_at')->where('status', 'submitted'), $releaseScope)->count(), 'releases'),
+                fn () => tap(\App\Services\V2\DistributorReleaseGate::hide(DB::table('releases')->whereNull('deleted_at')->where('status', 'submitted')), $releaseScope)->count(), 'releases'),
 
             $this->withdrawalItem($userIds),
 

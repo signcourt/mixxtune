@@ -80,6 +80,8 @@ class ReleaseReviewController extends Controller
         /* W63 MIXXTUNE_RELEASE_QUEUE_V2: label name + owner shown in the queue */
         $query = Release::query()
             ->whereNull('deleted_at')
+            /* W224: not in the queue while the distributor has not approved it */
+            ->when(\App\Services\V2\DistributorReleaseGate::ready(), fn ($q) => $q->whereNotIn('releases.id', \App\Services\V2\DistributorReleaseGate::pendingIdsQuery()))
             ->select('releases.*')
             ->addSelect([
                 'label_name' => DB::table('labels')->select('name')->whereColumn('labels.id', 'releases.label_id')->limit(1),
@@ -249,7 +251,7 @@ class ReleaseReviewController extends Controller
         }
 
         /* W63: one grouped query for the five cards (was five) */
-        $grouped = (clone $countsQuery)
+        $grouped = \App\Services\V2\DistributorReleaseGate::hide(clone $countsQuery)
             ->whereIn('status', $reviewStatuses)
             ->groupBy('status')
             ->pluck(DB::raw('count(*) as c'), 'status');

@@ -255,6 +255,12 @@ const ownerNavigation = (
     if (role === 'label') {
         items.push(
             {
+                id: 'distributor-review', /* W224 */
+                label: 'Review',
+                icon: ClipboardList,
+                href: '/label/distributor/review',
+            },
+            {
                 id: 'distributor-brand', /* W221: shown only to a distributor account owner (Sidebar filters it) */
                 label: 'My Brand',
                 icon: icons.labels,

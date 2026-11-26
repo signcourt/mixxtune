@@ -3468,4 +3468,7 @@ Route::middleware(['auth', 'role:label'])->prefix('label')->group(function () {
     Route::post('/distributor/sub-labels', [\App\Http\Controllers\V2\DistributorSubLabelController::class, 'store'])->middleware('throttle:15,1,distributor-sublabels')->name('v2.distributor.sub-labels.store');
     Route::post('/distributor/sub-labels/{label}/share', [\App\Http\Controllers\V2\DistributorSubLabelController::class, 'share'])->whereNumber('label')->middleware('throttle:20,1,distributor-sublabels')->name('v2.distributor.sub-labels.share');
     Route::post('/distributor/sub-labels/{label}/resend', [\App\Http\Controllers\V2\DistributorSubLabelController::class, 'resend'])->whereNumber('label')->middleware('throttle:6,1,distributor-sublabels-mail')->name('v2.distributor.sub-labels.resend');
+    /* W224: the distributor approves his sub-labels' releases before Mixx Tune reviews them */
+    Route::get('/distributor/review', [\App\Http\Controllers\V2\DistributorReviewController::class, 'index'])->name('v2.distributor.review');
+    Route::post('/distributor/review/{review}', [\App\Http\Controllers\V2\DistributorReviewController::class, 'decide'])->whereNumber('review')->middleware('throttle:60,1,distributor-review')->name('v2.distributor.review.decide');
 });

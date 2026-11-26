@@ -244,11 +244,13 @@ class ReleaseWorkflowService
             }
 
             match ($newStatus) {
+                /* W224: a sub-label's release waits for its distributor first; everything else is told to staff as before */
                 'submitted' =>
-                    $this->notifications
-                        ->releaseSubmitted(
-                            $freshRelease
-                        ),
+                    app(\App\Services\V2\DistributorReleaseGate::class)->submitted(
+                        $freshRelease,
+                        $user,
+                        fn () => $this->notifications->releaseSubmitted($freshRelease)
+                    ),
 
                 'approved' =>
                     $this->notifications
