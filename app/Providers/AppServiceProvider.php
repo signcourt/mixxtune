@@ -33,6 +33,9 @@ class AppServiceProvider extends ServiceProvider
         /* MIXXTUNE_TWO_STEP_ACTIONS_V1 */
         \App\Models\Core\Label::observe(\App\Observers\LabelRateConfirmObserver::class);
 
+        /* W230: a new / changed distributor changes the list of addresses we answer on */
+        \App\Models\Distributor::saved(fn () => \App\Support\DistributorHost::forgetCache());
+
         /* W226: when a sub-label's share % is changed anywhere, months already reported keep the old % */
         \App\Models\Finance\LabelRevenueShare::updating(function ($share) {
             try {

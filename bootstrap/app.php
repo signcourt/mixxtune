@@ -13,7 +13,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        /* W230 MIXXTUNE_DISTRIBUTOR_HOST: a distributor's own address gets its own session cookie */
+        $middleware->web(prepend: [
+            \App\Http\Middleware\DistributorHostContext::class,
+        ]);
+
         $middleware->web(append: [
+            /* W230: on a distributor's address only his own tree can be logged in */
+            \App\Http\Middleware\DistributorHostGuard::class,
             \App\Http\Middleware\EnsureAccountActive::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             /* W135 MIXXTUNE_IDLE_LOGOUT: sign out after idle, then e-mail OTP again */

@@ -42,6 +42,8 @@ class DistributorBrandController extends Controller
                 'logo_url' => $service->logoUrl($d),
                 'label_name' => $label->name ?? '',
                 'slug' => $d->slug,
+                'url' => 'https://'.\App\Support\DistributorHost::hostOf((string) $d->slug), /* W230 */
+                'url_ready' => (bool) $d->host_verified_at,
                 'sub_labels' => (int) DB::table('labels')->where('parent_label_id', $d->label_id)->whereNull('deleted_at')->count(),
             ],
         ]);

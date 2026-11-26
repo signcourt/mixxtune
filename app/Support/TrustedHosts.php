@@ -46,6 +46,11 @@ final class TrustedHosts
             }
         }
 
+        /* W230: <slug>.mixxtune.com of every active distributor */
+        foreach (DistributorHost::activeHosts() as $h) {
+            $hosts[] = $h;
+        }
+
         $hosts = array_values(array_unique($hosts));
 
         return array_map(

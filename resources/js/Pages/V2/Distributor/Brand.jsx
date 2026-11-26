@@ -42,6 +42,14 @@ export default function Brand({ role = 'label', distributor = {} }) {
         <PanelLayout role={role} title="My Brand" subtitle="The name and logo your accounts see in the panel">
             <Head title="My Brand" />
 
+            {distributor.url && (
+                <div className={`mb-5 rounded-2xl border px-5 py-4 text-sm ${distributor.url_ready ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                    {distributor.url_ready
+                        ? <>Your own address: <a href={distributor.url} className="font-mono font-semibold underline">{distributor.url.replace('https://', '')}</a>. Give it to your sub-labels - they log in there and see only your name and logo.</>
+                        : <>Your own address <span className="font-mono font-semibold">{distributor.url.replace('https://', '')}</span> is being set up. It works within a few minutes; until then use the normal address.</>}
+                </div>
+            )}
+
             <div className="grid gap-5 lg:grid-cols-3">
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
                     <h2 className="text-lg font-semibold text-slate-900">Panel brand</h2>

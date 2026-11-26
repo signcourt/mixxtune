@@ -219,6 +219,7 @@ export default function Index({ role = 'super_admin', distributors = [], candida
                                                 <div>
                                                     <div className="font-semibold text-slate-900">{d.brand_name || d.label_name}</div>
                                                     <div className="text-xs text-slate-500">Label: {d.label_name} · <span className="font-mono">{d.slug}</span></div>
+                                                    {d.url && <div className="text-xs">{d.url_ready ? <a href={d.url} target="_blank" rel="noreferrer" className="font-mono text-violet-700 hover:underline">{d.url.replace('https://', '')}</a> : <span className="font-mono text-slate-400">{d.url.replace('https://', '')} · address is being set up</span>}</div>}
                                                 </div>
                                             </div>
                                         </td>

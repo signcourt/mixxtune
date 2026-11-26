@@ -3,6 +3,47 @@
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 
+/*
+| W230 MIXXTUNE_DISTRIBUTOR_HOST
+| distributor:hosts                 -> prints the address of every active distributor, one per line
+| distributor:hosts --ready=a,b     -> marks which of them have a working certificate (set by the server script)
+*/
+Artisan::command('distributor:hosts {--ready=__none__}', function () {
+    if (!\App\Services\V2\DistributorService::ready()) {
+        return 0;
+    }
+    $rows = \Illuminate\Support\Facades\DB::table('distributors')->where('status', 'active')->orderBy('id')->get(['id', 'slug', 'host', 'host_verified_at']);
+    $ready = (string) $this->option('ready');
+    if ($ready === '__none__') {
+        foreach ($rows as $r) {
+            $h = \App\Support\DistributorHost::hostOf((string) $r->slug);
+            if (\App\Support\DistributorHost::slugFromHost($h) !== null) {
+                $this->line($h);
+            }
+        }
+
+        return 0;
+    }
+    $list = array_filter(array_map('trim', explode(',', strtolower($ready))));
+    $n = 0;
+    foreach ($rows as $r) {
+        $h = \App\Support\DistributorHost::hostOf((string) $r->slug);
+        $ok = in_array($h, $list, true);
+        if ($ok && (!$r->host_verified_at || $r->host !== $h)) {
+            \Illuminate\Support\Facades\DB::table('distributors')->where('id', $r->id)->update(['host' => $h, 'host_verified_at' => now(), 'updated_at' => now()]);
+            $n++;
+        } elseif (!$ok && $r->host_verified_at) {
+            \Illuminate\Support\Facades\DB::table('distributors')->where('id', $r->id)->update(['host_verified_at' => null, 'updated_at' => now()]);
+            $n++;
+        }
+    }
+    \App\Support\DistributorHost::forgetCache();
+    \App\Services\V2\DistributorService::forget();
+    $this->line('changed: '.$n);
+
+    return 0;
+})->purpose('Addresses of active distributors (used by the server script that sets up their certificates)');
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

@@ -25,7 +25,7 @@ class UserInvitationNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $acceptUrl =
-            rtrim(config('app.url'), '/')
+            rtrim(\App\Support\DistributorHost::urlFor($notifiable) ?? config('app.url'), '/') /* W230 */
             . '/invitation/'
             . urlencode($this->plainToken);
 

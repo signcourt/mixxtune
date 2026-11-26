@@ -84,7 +84,7 @@ class DistributorService
     public function brand(array $default, ?User $user): array
     {
         try {
-            $d = $this->forUser($user);
+            $d = $this->forUser($user) ?: \App\Support\DistributorHost::current(); /* W230: his own address shows his brand before login */
             if (!$d || (string) $d->status !== 'active') {
                 return $default;
             }
@@ -147,6 +147,7 @@ class DistributorService
 
         $base = \Illuminate\Support\Str::slug((string) $label->name) ?: 'distributor';
         $base = substr($base, 0, 36);
+        $base = preg_replace('/-stg$/', '', $base) ?: 'distributor'; /* W230: "-stg" is the mark of staging addresses */
         if (strlen($base) < 3 || in_array($base, ['www', 'mixxtune', 'admin', 'artist', 'label', 'home', 'staging', 'mail', 'api', 'app', 'panel', 'support'], true)) {
             $base = 'dist-'.$base;
         }

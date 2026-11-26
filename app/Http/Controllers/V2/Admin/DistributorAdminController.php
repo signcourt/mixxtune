@@ -92,6 +92,8 @@ class DistributorAdminController extends Controller
                     'label_name' => $label->name ?? '(label removed)',
                     'percent' => $label->revenue_share_percentage ?? ($label->royalty_share_percentage ?? null),
                     'slug' => $d->slug,
+                    'url' => 'https://'.\App\Support\DistributorHost::hostOf((string) $d->slug), /* W230 */
+                    'url_ready' => (bool) $d->host_verified_at,
                     'host' => $d->host,
                     'brand_name' => $d->brand_name,
                     'dashboard_name' => $d->dashboard_name,
@@ -124,7 +126,7 @@ class DistributorAdminController extends Controller
 
         $data = $request->validate([
             'label_id' => ['required', 'integer', Rule::exists('labels', 'id')->whereNull('deleted_at')->whereNull('parent_label_id')],
-            'slug' => ['required', 'string', 'min:3', 'max:40', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique('distributors', 'slug'), Rule::notIn(self::OUR_SLUGS)],
+            'slug' => ['required', 'string', 'min:3', 'max:40', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', 'not_regex:/-stg$/', Rule::unique('distributors', 'slug'), Rule::notIn(self::OUR_SLUGS)],
             'brand_name' => ['nullable', 'string', 'max:120'],
             'dashboard_name' => ['nullable', 'string', 'max:120'],
         ], [
@@ -165,7 +167,7 @@ class DistributorAdminController extends Controller
         $this->superAdmin($request);
 
         $data = $request->validate([
-            'slug' => ['sometimes', 'required', 'string', 'min:3', 'max:40', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique('distributors', 'slug')->ignore($distributor->id), Rule::notIn(self::OUR_SLUGS)],
+            'slug' => ['sometimes', 'required', 'string', 'min:3', 'max:40', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', 'not_regex:/-stg$/', Rule::unique('distributors', 'slug')->ignore($distributor->id), Rule::notIn(self::OUR_SLUGS)],
             'brand_name' => ['sometimes', 'nullable', 'string', 'max:120'],
             'dashboard_name' => ['sometimes', 'nullable', 'string', 'max:120'],
             'status' => ['sometimes', Rule::in(['active', 'suspended'])],
