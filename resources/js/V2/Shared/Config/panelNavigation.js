@@ -255,6 +255,12 @@ const ownerNavigation = (
     if (role === 'label') {
         items.push(
             {
+                id: 'distributor-brand', /* W221: shown only to a distributor account owner (Sidebar filters it) */
+                label: 'My Brand',
+                icon: icons.labels,
+                href: '/label/distributor/brand',
+            },
+            {
                 id: 'artists',
                 label: 'Artists',
                 icon: icons.artists,
@@ -367,6 +373,11 @@ const adminNavigation = (
                               label: 'Label Management',
                               href: routes.labelHierarchy,
                               permission: 'labels.view',
+                          },
+                          {
+                              id: 'account-distributors', /* W221 */
+                              label: 'Distributors',
+                              href: '/super-admin/distributors',
                           },
                       ]
                     : []),

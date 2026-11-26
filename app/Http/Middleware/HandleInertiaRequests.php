@@ -43,10 +43,15 @@ class HandleInertiaRequests extends Middleware
             \App\Services\V2\SystemSettingService::class
         )->branding();
 
+        /* W221: somebody in a distributor's tree sees that distributor's name / logo */
+        $branding = app(\App\Services\V2\DistributorService::class)->brand($branding, $request->user());
+
         return [
             ...parent::share($request),
 
             'brand' => $branding,
+
+            'distributor' => fn () => app(\App\Services\V2\DistributorService::class)->shared($request->user()), /* W221 */
 
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

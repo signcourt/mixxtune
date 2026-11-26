@@ -3453,3 +3453,14 @@ Route::any('v2/{path?}', function (\Illuminate\Http\Request $request, ?string $p
 Route::middleware(['auth', 'verified'])
     ->get('/admin/pending-work', [\App\Http\Controllers\V2\Admin\PendingWorkController::class, 'index'])
     ->name('v2.admin.pending-work');
+
+/* W221: Distributors - Super Admin makes / lists / switches them; the distributor edits his own brand */
+Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('super-admin')->group(function () {
+    Route::get('/distributors', [\App\Http\Controllers\V2\Admin\DistributorAdminController::class, 'index'])->name('v2.admin.distributors.index');
+    Route::post('/distributors', [\App\Http\Controllers\V2\Admin\DistributorAdminController::class, 'store'])->middleware('throttle:20,1,distributors')->name('v2.admin.distributors.store');
+    Route::post('/distributors/{distributor}', [\App\Http\Controllers\V2\Admin\DistributorAdminController::class, 'update'])->whereNumber('distributor')->middleware('throttle:30,1,distributors')->name('v2.admin.distributors.update');
+});
+Route::middleware(['auth', 'role:label'])->prefix('label')->group(function () {
+    Route::get('/distributor/brand', [\App\Http\Controllers\V2\DistributorBrandController::class, 'show'])->name('v2.distributor.brand');
+    Route::post('/distributor/brand', [\App\Http\Controllers\V2\DistributorBrandController::class, 'save'])->middleware('throttle:20,1,distributor-brand')->name('v2.distributor.brand.save');
+});
