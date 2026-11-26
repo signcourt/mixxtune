@@ -1640,6 +1640,19 @@ class UserManagementController extends Controller
                 ->update(['payout_cycle' => $cycle]);
         }
 
+        /* W222: account type "Distributor" in Create User = a label login that is made a distributor at once */
+        $w222Distributor = null;
+        if ($request->boolean('as_distributor') && (string) $user->role === 'label') {
+            try {
+                $w222Distributor = app(\App\Services\V2\DistributorService::class)->makeFromUser($user, $request->user());
+                if ($w222Distributor) {
+                    $audit->record('distributor.created', 'labels', "User {$user->email} created as a distributor (slug {$w222Distributor->slug}).", [], ['distributor_id' => $w222Distributor->id, 'slug' => $w222Distributor->slug], $w222Distributor, $request);
+                }
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
         if (
             (bool) $validated['send_invitation']
         ) {
@@ -1683,7 +1696,11 @@ class UserManagementController extends Controller
             )
             ->with(
                 'success',
-                'User created successfully.'
+                $request->boolean('as_distributor')
+                    ? ($w222Distributor
+                        ? 'Distributor created. He gets "My Brand" in his menu; see Accounts → Distributors.'
+                        : 'User created as a Label, but could not be made a distributor (no master label of his own). Use Accounts → Distributors → Make distributor.')
+                    : 'User created successfully.'
             );
     }
 

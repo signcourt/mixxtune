@@ -113,6 +113,49 @@ class DistributorService
         }
     }
 
+    /**
+     * W222: turn a freshly created label login into a distributor (called from Create User).
+     * Root label = his oldest master label. Returns null when he owns no master label.
+     */
+    public function makeFromUser(User $user, User $actor): ?Distributor
+    {
+        if (!self::ready() || (string) $user->role !== 'label') {
+            return null;
+        }
+        $existing = Distributor::query()->where('user_id', $user->id)->first();
+        if ($existing) {
+            return $existing;
+        }
+        $label = DB::table('labels')->where('user_id', $user->id)->whereNull('deleted_at')->whereNull('parent_label_id')->orderBy('id')->first();
+        if (!$label || Distributor::query()->where('label_id', $label->id)->exists()) {
+            return null;
+        }
+
+        $base = \Illuminate\Support\Str::slug((string) $label->name) ?: 'distributor';
+        $base = substr($base, 0, 36);
+        if (strlen($base) < 3 || in_array($base, ['www', 'mixxtune', 'admin', 'artist', 'label', 'home', 'staging', 'mail', 'api', 'app', 'panel', 'support'], true)) {
+            $base = 'dist-'.$base;
+        }
+        $slug = $base;
+        $n = 2;
+        while (Distributor::query()->where('slug', $slug)->exists()) {
+            $slug = $base.'-'.$n++;
+        }
+
+        $d = Distributor::query()->create([
+            'label_id' => (int) $label->id,
+            'user_id' => (int) $user->id,
+            'slug' => $slug,
+            'brand_name' => (string) $label->name,
+            'status' => 'active',
+            'created_by' => $actor->id,
+            'updated_by' => $actor->id,
+        ]);
+        self::forget();
+
+        return $d;
+    }
+
     public static function forget(): void
     {
         self::$memo = [];

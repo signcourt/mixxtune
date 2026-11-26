@@ -133,6 +133,7 @@ export default function Create({
         country: "India",
         state_code: "",
         role: initialRole,
+        as_distributor: false, /* W222: Distributor = a label account made a distributor at once */
         revenue_share_percentage: "",
         /* MIXXTUNE_PAYOUT_CYCLE_V1 (W185c): monthly | quarterly, default monthly */
         payout_cycle: "monthly",
@@ -271,22 +272,28 @@ export default function Create({
                         <div className="mt-3 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1" role="radiogroup" aria-label="Account type">
                             {[
                                 ["label", "Label"],
+                                ["distributor", "Distributor"],
                                 ["artist", "Artist"],
-                            ].map(([value, title]) => (
+                            ].map(([value, title]) => { const picked = value === "distributor" ? (data.role === "label" && data.as_distributor) : (data.role === value && !(value === "label" && data.as_distributor)); return (
                                 <button
                                     key={value}
                                     type="button"
                                     role="radio"
-                                    aria-checked={data.role === value}
-                                    onClick={() => applyRoleDefaults(value)}
-                                    className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${data.role === value ? "bg-white text-violet-700 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                                    aria-checked={picked}
+                                    onClick={() => { applyRoleDefaults(value === "distributor" ? "label" : value); setData("as_distributor", value === "distributor"); }}
+                                    className={`rounded-md px-4 py-1.5 text-sm font-semibold transition ${picked ? "bg-white text-violet-700 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
                                 >
                                     {title}
                                 </button>
-                            ))}
+                            ); })}
                         </div>
                     )}
                     {errors.role && <div className="mt-1 text-xs text-red-600">{errors.role}</div>}
+                    {data.role === "label" && data.as_distributor && (
+                        <div className="mt-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-800">
+                            <b>Distributor:</b> filled exactly like a Label (mail, access, his %). The <b>first label you add below</b> becomes his distributor account - he can rename his panel and upload his logo under "My Brand", and his sub-labels come under it. Create one new label for him here.
+                        </div>
+                    )}
 
                     <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <Field
@@ -579,7 +586,7 @@ export default function Create({
                     <div className="flex gap-2">
                         <Link href={backHref} className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</Link>
                         <button type="submit" disabled={processing} className="rounded-lg bg-violet-600 px-6 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50">
-                            {processing ? "Creating..." : isManagerForm ? "Create Manager" : data.role === "artist" ? "Create Artist" : "Create Label Account"}
+                            {processing ? "Creating..." : isManagerForm ? "Create Manager" : data.role === "artist" ? "Create Artist" : data.as_distributor ? "Create Distributor" : "Create Label Account"}
                         </button>
                     </div>
                 </div>
