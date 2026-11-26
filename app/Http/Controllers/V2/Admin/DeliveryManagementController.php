@@ -220,6 +220,7 @@ class DeliveryManagementController extends Controller
                 'filters' => [
                     'status' => $status,
                     'search' => $search,
+                    'per_page' => in_array((int) $request->query('per_page'), [50, 100], true) ? (int) $request->query('per_page') : 25, /* W220 */
                 ],
 
                 'counts' => [
@@ -285,7 +286,7 @@ class DeliveryManagementController extends Controller
                 'releases' =>
                     $query
                         ->orderByDesc('id')
-                        ->paginate(25)
+                        ->paginate(in_array((int) $request->query('per_page'), [50, 100], true) ? (int) $request->query('per_page') : 25) /* W220: more rows per page for bulk Mark live */
                         ->withQueryString(),
             ]
         );

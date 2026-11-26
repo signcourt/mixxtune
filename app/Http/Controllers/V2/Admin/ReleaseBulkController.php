@@ -78,6 +78,7 @@ class ReleaseBulkController extends Controller
             'mark '.$this->plural(count($ok)).' live in all stores'
         );
 
+        @set_time_limit(300); /* W220: up to 100 releases in one go */
         $done = 0;
         $failed = [];
         foreach ($ok as $release) {

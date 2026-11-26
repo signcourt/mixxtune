@@ -5,6 +5,9 @@ import {
 } from '@inertiajs/react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { useState } from 'react'; /* W220 */
+
+const W220_CAN_LIVE = ['approved', 'processing', 'delivered', 'failed'];
 
 const statusClasses = {
     processing:
@@ -32,6 +35,29 @@ export default function Index({
     const rows =
         releases.data ?? [];
 
+    /* W220: bulk "Mark live" - tick releases, one e-mailed code for all (Super Admin) */
+    const bulkEnabled = role === 'super_admin';
+    const liveRows = rows.filter((r) => W220_CAN_LIVE.includes(String(r.status)));
+    const [picked, setPicked] = useState([]);
+    const [bulkBusy, setBulkBusy] = useState(false);
+    const togglePicked = (id) => setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+    const allPicked = liveRows.length > 0 && liveRows.every((r) => picked.includes(r.id));
+    const toggleAllPicked = () => setPicked(allPicked ? [] : liveRows.map((r) => r.id));
+    const bulkLive = () => {
+        if (!picked.length || bulkBusy) return;
+        setBulkBusy(true);
+        router.post(
+            '/admin/releases/bulk-go-live',
+            { ids: picked },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setBulkBusy(false),
+                onSuccess: (page) => { if (!(page?.props?.errors && Object.keys(page.props.errors).length)) setPicked([]); },
+            }
+        );
+    };
+
     const openStatus = (
         status
     ) => {
@@ -41,6 +67,7 @@ export default function Index({
                 status,
                 search:
                     filters.search ?? '',
+                per_page: filters.per_page ?? 25,
             },
             {
                 preserveState: true,
@@ -168,10 +195,45 @@ export default function Index({
                         />
                     </div>
 
+                    {/* W220: bulk bar */}
+                    {bulkEnabled && liveRows.length > 0 && (
+                        <div className={`flex flex-wrap items-center gap-3 border-b px-5 py-3 text-sm ${picked.length ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+                            <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-800">
+                                <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={allPicked} onChange={toggleAllPicked} />
+                                {allPicked ? 'Unselect all' : 'Select all on this page'}
+                            </label>
+                            <span className="text-slate-500">{picked.length} selected</span>
+                            {picked.length > 0 && (
+                                <button type="button" onClick={() => setPicked([])} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Clear</button>
+                            )}
+                            <select
+                                value={filters.per_page ?? 25}
+                                onChange={(e) => { setPicked([]); router.get('/admin/distribution', { ...filters, per_page: e.target.value }, { preserveState: true }); }}
+                                className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
+                                aria-label="Rows per page"
+                            >
+                                {[25, 50, 100].map((n) => <option key={n} value={n}>{n} per page</option>)}
+                            </select>
+                            <span className="hidden text-xs text-slate-500 lg:inline">One e-mailed code marks every ticked release live in all its stores. No UPC = skipped and listed.</span>
+                            <button
+                                type="button"
+                                disabled={bulkBusy || picked.length === 0}
+                                onClick={bulkLive}
+                                className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {bulkBusy ? 'Working…' : `Mark ${picked.length || ''} live`}
+                            </button>
+                        </div>
+                    )}
                     <div className="overflow-x-auto">
                         <table className="min-w-full">
                             <thead className="bg-slate-50">
                                 <tr>
+                                    {bulkEnabled && (
+                                        <th className="w-10 px-5 py-4">
+                                            <input type="checkbox" aria-label="Select all on this page" className="h-4 w-4 rounded border-slate-300" checked={allPicked} onChange={toggleAllPicked} disabled={liveRows.length === 0} />
+                                        </th>
+                                    )}
                                     {[
                                         'Release',
                                         'Artist',
@@ -211,6 +273,13 @@ export default function Index({
                                                     release.id
                                                 }
                                             >
+                                                {bulkEnabled && (
+                                                    <td className="w-10 px-5 py-4">
+                                                        {W220_CAN_LIVE.includes(String(release.status)) && (
+                                                            <input type="checkbox" aria-label={`Select ${release.title}`} className="h-4 w-4 rounded border-slate-300" checked={picked.includes(release.id)} onChange={() => togglePicked(release.id)} />
+                                                        )}
+                                                    </td>
+                                                )}
                                                 <td className="px-5 py-4">
                                                     <div className="font-semibold text-slate-900">
                                                         {
@@ -283,7 +352,7 @@ export default function Index({
                                 ) : (
                                     <tr>
                                         <td
-                                            colSpan="7"
+                                            colSpan="8"
                                             className="px-5 py-16 text-center text-sm text-slate-500"
                                         >
                                             No distribution
