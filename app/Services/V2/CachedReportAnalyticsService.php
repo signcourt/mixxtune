@@ -5,7 +5,6 @@ namespace App\Services\V2;
 use App\Support\ReportDataStamp;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 
 /**
  * W225 - the Analytics totals are the same until report data changes, so each one is remembered.
@@ -30,20 +29,15 @@ class CachedReportAnalyticsService extends ReportAnalyticsService
                     return $compute(); /* something we cannot fingerprint safely */
                 }
             }
-            $key = 'w225:an:'.sha1(json_encode($parts, JSON_PARTIAL_OUTPUT_ON_ERROR));
+            $key = 'an:'.sha1(json_encode($parts, JSON_PARTIAL_OUTPUT_ON_ERROR));
         } catch (\Throwable $e) {
             report($e);
 
             return $compute();
         }
 
-        try {
-            return Cache::remember($key, self::TTL, $compute);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return $compute();
-        }
+        /* W225b: kept as one serialized string and rebuilt exactly (arrays, objects, collections) */
+        return ReportDataStamp::remember($key, self::TTL, $compute);
     }
 
     public function summary(...$a): array { return $this->remember(__FUNCTION__, $a, fn () => parent::summary(...$a)); }

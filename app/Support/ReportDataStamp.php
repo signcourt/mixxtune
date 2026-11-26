@@ -14,6 +14,56 @@ class ReportDataStamp
 {
     private static ?string $memo = null;
 
+    /**
+     * W225b - remember any value EXACTLY as it was computed (objects and collections included).
+     * This Laravel version refuses to rebuild objects it reads back from the cache store, so the value is
+     * kept as one serialized string and rebuilt here. A value that cannot be rebuilt is simply recomputed.
+     */
+    public static function remember(string $key, int $seconds, callable $compute)
+    {
+        $key = 'w225b:'.$key;
+        try {
+            $packed = Cache::get($key);
+            if (is_string($packed) && $packed !== '') {
+                $raw = base64_decode($packed, true);
+                if ($raw !== false) {
+                    $box = @unserialize($raw);
+                    if (is_array($box) && array_key_exists('v', $box) && !self::broken($box['v'])) {
+                        return $box['v'];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        $value = $compute();
+
+        try {
+            Cache::put($key, base64_encode(serialize(['v' => $value])), $seconds);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return $value;
+    }
+
+    private static function broken($value): bool
+    {
+        if ($value instanceof \__PHP_Incomplete_Class) {
+            return true;
+        }
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if ($item instanceof \__PHP_Incomplete_Class) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function value(): string
     {
         if (self::$memo !== null) {

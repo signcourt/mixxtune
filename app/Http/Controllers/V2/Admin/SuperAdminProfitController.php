@@ -32,8 +32,8 @@ class SuperAdminProfitController extends Controller
         $query = $profit->withStage(clone $base, $filters['stage']);
 
         /* W225: each block walks every report row - remembered per filter until report data changes */
-        $w225 = fn (string $part, callable $fn) => \Illuminate\Support\Facades\Cache::remember(
-            'w225:profit:'.$part.':'.sha1(json_encode($filters)).':'.\App\Support\ReportDataStamp::value(),
+        $w225 = fn (string $part, callable $fn) => \App\Support\ReportDataStamp::remember( /* W225b */
+            'profit:'.$part.':'.sha1(json_encode($filters)).':'.\App\Support\ReportDataStamp::value(),
             300,
             $fn
         );

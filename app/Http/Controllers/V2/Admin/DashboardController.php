@@ -89,8 +89,8 @@ class DashboardController extends Controller
 
         if ($role === 'super_admin') {
             /* W225: one pass over every published report row - remembered until report data changes */
-            [$profitSummary, $revenueTrend] = \Illuminate\Support\Facades\Cache::remember(
-                'w225:dash-profit:'.\App\Support\ReportDataStamp::value(),
+            [$profitSummary, $revenueTrend] = \App\Support\ReportDataStamp::remember( /* W225b */
+                'dash-profit:'.\App\Support\ReportDataStamp::value(),
                 300,
                 fn () => $this->profitWithTrend($profit)
             );
