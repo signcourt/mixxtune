@@ -23,9 +23,9 @@
         <link rel="icon" href="{{ $__brand['favicon_url'] }}">
         @endif
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+        <!-- Fonts: W235 - Figtree comes from our own /fonts folder (see resources/css/app.css) -->
+        <link rel="preload" href="/fonts/figtree/figtree-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+        <link rel="preload" href="/fonts/figtree/figtree-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
 
         <!-- W90: night mode is set before the page paints (no white flash) -->
         <script>try{if(localStorage.getItem('mt-theme')==='night'){document.documentElement.classList.add('mt-night')}}catch(e){}</script>
