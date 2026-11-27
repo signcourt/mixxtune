@@ -154,6 +154,10 @@ export default function SubLabels({ role = 'label', master = {}, subLabels = [] 
                                         <td className="px-5 py-4">
                                             <div className="flex flex-wrap gap-2">
                                                 {editing !== s.id && <button type="button" onClick={() => { setEditing(s.id); setNewPercent(s.percent ?? ''); }} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Change share</button>}
+                                                {/* W237: look at this sub-label's panel (view only) */}
+                                                {s.owner_status === 'active' && (
+                                                    <button type="button" onClick={() => router.post(`/label/distributor/sub-labels/${s.id}/view`, {}, { preserveScroll: true })} className="rounded-lg border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-50">View panel</button>
+                                                )}
                                                 {s.owner_email && s.invitation !== 'accepted' && s.invitation !== 'not_required' && (
                                                     <button type="button" onClick={() => router.post(`/label/distributor/sub-labels/${s.id}/resend`, {}, { preserveScroll: true })} className="rounded-lg border border-violet-300 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50">Send invitation again</button>
                                                 )}

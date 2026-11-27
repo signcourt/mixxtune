@@ -37,6 +37,12 @@ class UserImpersonationController extends Controller
         );
 
         abort_if(
+            $request->session()->has('distributor_view_user_id'), /* W237 */
+            422,
+            'A sub-label view is open. Close it first.'
+        );
+
+        abort_if(
             $user->id === $request->user()->id,
             422,
             'You cannot impersonate your own account.'

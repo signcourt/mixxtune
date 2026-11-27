@@ -3484,6 +3484,9 @@ Route::middleware(['auth', 'role:label'])->prefix('label')->group(function () {
     Route::get('/distributor/payouts', [\App\Http\Controllers\V2\DistributorPayoutController::class, 'index'])->name('v2.distributor.payouts');
     /* W229: the distributor's whole tree on one page + a notice to his sub-labels */
     Route::get('/distributor/network', [\App\Http\Controllers\V2\DistributorNetworkController::class, 'index'])->name('v2.distributor.network');
+    /* W237: the distributor opens a sub-label's panel (view only) and comes back */
+    Route::post('/distributor/sub-labels/{label}/view', [\App\Http\Controllers\V2\DistributorViewController::class, 'start'])->whereNumber('label')->middleware('throttle:20,1,distributor-view')->name('v2.distributor.view.start');
+    Route::post('/distributor/view/stop', [\App\Http\Controllers\V2\DistributorViewController::class, 'stop'])->name('v2.distributor.view.stop');
     /* W234: the distributor's own support desk for his sub-labels */
     Route::get('/distributor/tickets', [\App\Http\Controllers\V2\DistributorTicketController::class, 'index'])->name('v2.distributor.tickets');
     Route::get('/distributor/tickets/{ticket}', [\App\Http\Controllers\V2\DistributorTicketController::class, 'show'])->whereNumber('ticket')->name('v2.distributor.tickets.show');

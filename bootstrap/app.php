@@ -32,6 +32,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SubLabelMoneyGuard::class,
             /* W228 MIXXTUNE_DISTRIBUTOR_TREE_HOLD: a distributor tree put on hold by a Super Admin cannot use the panel */
             \App\Http\Middleware\DistributorTreeHold::class,
+            /* W237 MIXXTUNE_DISTRIBUTOR_VIEW: a distributor looking at a sub-label's panel cannot change anything */
+            \App\Http\Middleware\DistributorViewOnly::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 

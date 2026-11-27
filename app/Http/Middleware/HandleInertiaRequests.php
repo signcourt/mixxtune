@@ -63,6 +63,10 @@ class HandleInertiaRequests extends Middleware
                 /* W119: the "sent for review" page after Submit (N6) */
                 'submitted' => fn () => (bool) $request->session()->get('submitted'),
             ],
+            /* W237: a distributor has one of his sub-labels' panels open (view only) */
+            'distributorView' => fn () => $request->hasSession() && $request->session()->has('distributor_view_user_id')
+                ? ['active' => true, 'owner' => (string) $request->session()->get('distributor_view_name')]
+                : null,
             'impersonation' => fn () => [
                 'active' => $request->session()->has(
                     'impersonator_user_id'

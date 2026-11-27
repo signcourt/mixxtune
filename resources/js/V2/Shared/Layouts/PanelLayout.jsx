@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import Sidebar from "@/V2/Shared/Navigation/Sidebar";
 import ImpersonationBanner from "@/V2/Shared/Components/ImpersonationBanner";
+import DistributorViewBanner from "@/V2/Shared/Components/DistributorViewBanner"; /* W237 */
 import MaintenanceExperience from "@/V2/Shared/Maintenance/MaintenanceExperience";
 import BankChangeOtpPrompt from "@/V2/Shared/Components/BankChangeOtpPrompt";
 import ApprovalNotice from "@/V2/Shared/Components/ApprovalNotice";
@@ -142,6 +143,7 @@ export default function PanelLayout({
             )}
 
             <ImpersonationBanner />
+            <DistributorViewBanner />
 
             <div className="v2-panel-density min-h-screen bg-slate-100 text-slate-900">
                 <Sidebar
