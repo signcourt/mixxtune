@@ -246,7 +246,12 @@ class SupportTicketController extends Controller
         $staff = SupportDesk::isStaff($user);
 
         abort_unless((int) $message->support_ticket_id === (int) $ticket->id, 404);
-        abort_unless($staff || ((int) $ticket->user_id === (int) $user->id && !$message->is_internal), 403);
+        abort_unless(
+            $staff
+            || ((int) $ticket->user_id === (int) $user->id && !$message->is_internal)
+            || (!$message->is_internal && \App\Services\V2\DistributorTickets::canSee($user, $ticket)), /* W234 */
+            403
+        );
 
         $file = ($message->attachments ?? [])[$index] ?? null;
         abort_unless(is_array($file) && !empty($file['path']), 404);

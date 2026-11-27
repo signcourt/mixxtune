@@ -176,7 +176,7 @@ export default function Sidebar({
                     (item) =>
                         (item.id !== "sub-earnings" || w226Sub) &&
                         (item.id !== "mail" || normalizedRole === "super_admin" || mailAccounts > 0) &&
-                        (!["distributor-brand", "distributor-sublabels" /* W223 */, "distributor-review" /* W224 */, "distributor-payouts" /* W226 */, "distributor-network" /* W229 */].includes(item.id) || Boolean(page.props?.distributor?.is_owner && page.props?.distributor?.status === "active")) && /* W221 */
+                        (!["distributor-brand", "distributor-sublabels" /* W223 */, "distributor-review" /* W224 */, "distributor-payouts" /* W226 */, "distributor-network" /* W229 */, "distributor-tickets" /* W234 */].includes(item.id) || Boolean(page.props?.distributor?.is_owner && page.props?.distributor?.status === "active")) && /* W221 */
                         ![
                             "notifications",
                             "settings",

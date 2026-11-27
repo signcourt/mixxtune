@@ -143,6 +143,25 @@ class SupportDesk
     public function notifyStaff(SupportTicket $ticket, string $type, string $title, ?int $exceptUserId = null): void
     {
         try {
+            /* W234 MIXXTUNE_DISTRIBUTOR_TICKETS: a sub-label's ticket belongs to its distributor */
+            if (! $ticket->assigned_admin_id) {
+                $dist = DistributorTickets::ofUser((int) $ticket->user_id);
+                $owner = $dist ? User::query()->find($dist->user_id) : null;
+                if ($owner) {
+                    if (! $exceptUserId || (int) $owner->id !== $exceptUserId) {
+                        $this->notifications->send(
+                            $owner,
+                            $type,
+                            $title === 'New support ticket' ? 'New ticket from a sub-label' : $title,
+                            "{$ticket->ticket_number}: {$ticket->subject}",
+                            "/label/distributor/tickets/{$ticket->id}"
+                        );
+                    }
+
+                    return;
+                }
+            }
+
             $staff = $ticket->assigned_admin_id
                 ? User::query()->whereKey($ticket->assigned_admin_id)->get()
                 : User::query()->whereIn('role', ['admin', 'super_admin'])->where('account_status', 'active')->get();

@@ -3484,6 +3484,10 @@ Route::middleware(['auth', 'role:label'])->prefix('label')->group(function () {
     Route::get('/distributor/payouts', [\App\Http\Controllers\V2\DistributorPayoutController::class, 'index'])->name('v2.distributor.payouts');
     /* W229: the distributor's whole tree on one page + a notice to his sub-labels */
     Route::get('/distributor/network', [\App\Http\Controllers\V2\DistributorNetworkController::class, 'index'])->name('v2.distributor.network');
+    /* W234: the distributor's own support desk for his sub-labels */
+    Route::get('/distributor/tickets', [\App\Http\Controllers\V2\DistributorTicketController::class, 'index'])->name('v2.distributor.tickets');
+    Route::get('/distributor/tickets/{ticket}', [\App\Http\Controllers\V2\DistributorTicketController::class, 'show'])->whereNumber('ticket')->name('v2.distributor.tickets.show');
+    Route::post('/distributor/tickets/{ticket}/reply', [\App\Http\Controllers\V2\DistributorTicketController::class, 'reply'])->whereNumber('ticket')->middleware('throttle:30,1,distributor-tickets')->name('v2.distributor.tickets.reply');
     Route::post('/distributor/network/notice', [\App\Http\Controllers\V2\DistributorNetworkController::class, 'notice'])->middleware('throttle:6,1,distributor-notice')->name('v2.distributor.network.notice');
     Route::post('/distributor/payouts', [\App\Http\Controllers\V2\DistributorPayoutController::class, 'store'])->middleware('throttle:30,1,distributor-payouts')->name('v2.distributor.payouts.store');
     Route::post('/distributor/payouts/{payment}/cancel', [\App\Http\Controllers\V2\DistributorPayoutController::class, 'cancel'])->whereNumber('payment')->middleware('throttle:30,1,distributor-payouts')->name('v2.distributor.payouts.cancel');

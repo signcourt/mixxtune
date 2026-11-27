@@ -261,6 +261,12 @@ const ownerNavigation = (
                 href: '/label/distributor/network',
             },
             {
+                id: 'distributor-tickets', /* W234 */
+                label: 'Sub-label Tickets',
+                icon: icons.support,
+                href: '/label/distributor/tickets',
+            },
+            {
                 id: 'distributor-review', /* W224 */
                 label: 'Review',
                 icon: ClipboardList,
