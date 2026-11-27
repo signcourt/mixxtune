@@ -362,13 +362,18 @@ class DashboardController extends Controller
 
         $growth = $analytics->growthSummary($monthly);
 
-        $reportedTracks = (int) (clone $analyticsQuery)
+        /* W236 dash-tracks: remembered until report data changes (key = the exact scoped query, so nobody gets another account's number) */
+        $w236Tracks = (clone $analyticsQuery)
             ->toBase()
             ->reorder()
             ->whereNotNull('isrc')
             ->where('isrc', '!=', '')
-            ->distinct()
-            ->count('isrc');
+            ->distinct();
+        $reportedTracks = (int) \App\Support\ReportDataStamp::remember(
+            'dash-tracks:'.sha1(json_encode([$w236Tracks->toSql(), $w236Tracks->getBindings(), \App\Support\ReportDataStamp::value()])),
+            900,
+            fn () => (int) (clone $w236Tracks)->count('isrc')
+        );
 
         if ($role !== 'super_admin') {
             $revenueTrend = collect($monthly)
@@ -432,7 +437,13 @@ class DashboardController extends Controller
                         : null,
                     /* W92: profit of reports still in review - shown apart, not counted */
                     'profit_in_review' => $role === 'super_admin'
-                        ? (float) ($profit->summary($profit->withStage($profit->baseQuery(), 'review'))['super_admin_profit'] ?? 0)
+                        ? (float) \App\Support\ReportDataStamp::remember( /* W236 dash-review */
+                            'dash-profit-review:'.\App\Support\ReportDataStamp::value(),
+                            300,
+                            fn () => round((float) $profit->withStage($profit->baseQuery(), 'review')
+                                ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(collected_revenue, 0) < 0 THEN 0 ELSE ROUND(COALESCE(collected_revenue, 0), 8) - ROUND(COALESCE(earnings, 0), 8) END), 0) as p')
+                                ->value('p'), 8)
+                        )
                         : null,
                     'sale_units' => (float) ($analyticsSummary['sale_units'] ?? 0),
                 ],

@@ -487,12 +487,11 @@ class AnalyticsController extends Controller
             $preview
         );
 
-        $months = (clone $base)
+        $months = $this->w236Pluck((clone $base)
             ->whereNotNull('reporting_month')
             ->where('reporting_month', '!=', '')
             ->distinct()
-            ->orderByDesc('reporting_month')
-            ->pluck('reporting_month')
+            ->orderByDesc('reporting_month'), 'reporting_month') /* W236 */
             ->values();
 
         /*
@@ -515,36 +514,32 @@ class AnalyticsController extends Controller
                 (string) $months->first();
         }
 
-        $platforms = (clone $base)
+        $platforms = $this->w236Pluck((clone $base)
             ->whereNotNull('platform')
             ->where('platform', '!=', '')
             ->distinct()
-            ->orderBy('platform')
-            ->pluck('platform')
+            ->orderBy('platform'), 'platform') /* W236 */
             ->values();
 
-        $saleTypeOptions = (clone $base)
+        $saleTypeOptions = $this->w236Pluck((clone $base)
             ->whereNotNull('sale_type')
             ->where('sale_type', '!=', '')
             ->distinct()
-            ->orderBy('sale_type')
-            ->pluck('sale_type')
+            ->orderBy('sale_type'), 'sale_type') /* W236 */
             ->values();
 
-        $countries = (clone $base)
+        $countries = $this->w236Pluck((clone $base)
             ->whereNotNull('country_code')
             ->where('country_code', '!=', '')
             ->distinct()
-            ->orderBy('country_code')
-            ->pluck('country_code')
+            ->orderBy('country_code'), 'country_code') /* W236 */
             ->values();
 
-        $cmsOptions = (clone $base)
+        $cmsOptions = $this->w236Pluck((clone $base)
             ->whereNotNull('cms')
             ->where('cms', '!=', '')
             ->distinct()
-            ->orderBy('cms')
-            ->pluck('cms')
+            ->orderBy('cms'), 'cms') /* W236 */
             ->values();
 
         $filtered = $analytics->applyFilters(
@@ -561,19 +556,17 @@ class AnalyticsController extends Controller
          * hierarchy selectors from exposing accounts
          * outside the authenticated security scope.
          */
-        $visibleLabelIds = (clone $base)
+        $visibleLabelIds = $this->w236Pluck((clone $base)
             ->whereNotNull('label_id')
-            ->distinct()
-            ->pluck('label_id')
+            ->distinct(), 'label_id') /* W236 */
             ->map(
                 fn ($id) => (int) $id
             )
             ->values();
 
-        $visibleArtistIds = (clone $base)
+        $visibleArtistIds = $this->w236Pluck((clone $base)
             ->whereNotNull('artist_id')
-            ->distinct()
-            ->pluck('artist_id')
+            ->distinct(), 'artist_id') /* W236 */
             ->map(
                 fn ($id) => (int) $id
             )
@@ -870,7 +863,8 @@ class AnalyticsController extends Controller
                 $filters
             );
 
-        $financialData =
+        /* W236: the payable figures (7 heavy questions, ~4.5 s for a Super Admin) are remembered until statements or report data change */
+        $w236Financial = fn () =>
             $isCompactAnalyticsRole
                 ? [
                     'summary' => [],
@@ -928,6 +922,27 @@ class AnalyticsController extends Controller
                             )
                             : [],
                 ];
+
+        if ($isCompactAnalyticsRole) {
+            $financialData = $w236Financial();
+        } else {
+            try {
+                $w236Key = 'an-fin:'.sha1(json_encode([
+                    $role,
+                    $financialStatements->toSql(),
+                    $financialStatements->getBindings(),
+                    $filters,
+                    \App\Support\ReportDataStamp::value(),
+                    $this->w236RoyaltyStamp(),
+                ], JSON_PARTIAL_OUTPUT_ON_ERROR));
+            } catch (\Throwable $e) {
+                report($e);
+                $w236Key = null;
+            }
+            $financialData = $w236Key
+                ? \App\Support\ReportDataStamp::remember($w236Key, 900, $w236Financial)
+                : $w236Financial();
+        }
 
         return Inertia::render(
             'V2/Analytics/Index',
@@ -1044,6 +1059,37 @@ class AnalyticsController extends Controller
 
 
     /* MIXXTUNE_ANALYTICS_V2: reports that are read but not yet published */
+    /* W236: a filter list (months, platforms, countries...) - the same until report data changes; key = the exact scoped query */
+    private function w236Pluck($query, string $column): \Illuminate\Support\Collection
+    {
+        try {
+            $key = 'an-opt:'.sha1(json_encode([$column, $query->toSql(), $query->getBindings(), \App\Support\ReportDataStamp::value()], JSON_PARTIAL_OUTPUT_ON_ERROR));
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $query->pluck($column);
+        }
+
+        return collect(\App\Support\ReportDataStamp::remember($key, 900, fn () => $query->pluck($column)->all()));
+    }
+
+    /* W236: fingerprint of the royalty statements - the payable figures change only when this changes */
+    private function w236RoyaltyStamp(): string
+    {
+        try {
+            return (string) \Illuminate\Support\Facades\Cache::remember('w236:royalty-stamp', 20, function () {
+                $st = DB::table('royalty_statements')->selectRaw('COUNT(*) c, COALESCE(MAX(id), 0) m, MAX(updated_at) u')->first();
+                $al = DB::table('royalty_allocations')->selectRaw('COUNT(*) c, COALESCE(MAX(id), 0) m')->first();
+
+                return substr(sha1(json_encode([$st, $al])), 0, 16);
+            });
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 'x'.microtime(true); /* no remembering rather than a wrong number */
+        }
+    }
+
     private function unpublishedImports(): array
     {
         if (! \Illuminate\Support\Facades\Schema::hasColumn('report_imports', 'financial_status')) {
