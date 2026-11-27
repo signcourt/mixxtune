@@ -3453,6 +3453,10 @@ Route::any('v2/{path?}', function (\Illuminate\Http\Request $request, ?string $p
 Route::middleware(['auth', 'verified'])
     ->get('/admin/pending-work', [\App\Http\Controllers\V2\Admin\PendingWorkController::class, 'index'])
     ->name('v2.admin.pending-work');
+/* W233: the Super Admin's on/off switch for that pop-up */
+Route::middleware(['auth', 'verified', 'throttle:20,1'])
+    ->post('/admin/pending-work/setting', [\App\Http\Controllers\V2\Admin\PendingWorkController::class, 'setting'])
+    ->name('v2.admin.pending-work.setting');
 
 /* W221: Distributors - Super Admin makes / lists / switches them; the distributor edits his own brand */
 Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('super-admin')->group(function () {

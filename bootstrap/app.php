@@ -90,6 +90,34 @@ return Application::configure(basePath: dirname(__DIR__))
                 );
             }
 
+            /* W233 MIXXTUNE_WRONG_PANEL: a signed-in user who opens another panel's page lands on his own dashboard, not on a bare 403 */
+            if (
+                $response->getStatusCode() === 403
+                && $request->isMethod('GET')
+                && ! $request->expectsJson()
+                && ! $request->is('api/*')
+                && $request->hasSession()
+                && $request->user()
+            ) {
+                $panels = [
+                    'super_admin' => 'super-admin',
+                    'admin' => 'admin',
+                    'label' => 'label',
+                    'artist' => 'artist',
+                ];
+                $mine = $panels[$request->user()->role] ?? null;
+                $first = explode('/', trim($request->path(), '/'))[0];
+                /* a Super Admin also works on /admin/... pages - a 403 there stays a 403 */
+                $own = $mine === 'super-admin' ? ['super-admin', 'admin'] : [$mine];
+
+                if ($mine && ! in_array($first, $own, true) && in_array($first, $panels, true)) {
+                    return redirect('/'.$mine.'/dashboard')->with(
+                        'panel_notice',
+                        'That page belongs to a different panel, so your own dashboard was opened instead.'
+                    );
+                }
+            }
+
             return $response;
         });
     })

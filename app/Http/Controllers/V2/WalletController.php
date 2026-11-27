@@ -316,6 +316,10 @@ class WalletController extends Controller
                         ->where('user_id', $financialOwner->id)
                         ->value('kyc_status') === 'verified',
 
+                /* W233 MIXXTUNE_WALLET_INLINE_REQUEST (W198): what the card needs to take the request right there */
+                'payoutRequest' =>
+                    $this->w233PayoutRequest($financialOwner, $wallet, $withdrawalService),
+
                 'minimumWithdrawal' =>
                     $minimumWithdrawal,
 
@@ -369,6 +373,58 @@ class WalletController extends Controller
      * name, owner (staff view), paging ("tx_page"). Before: raw ISO dates,
      * raw type codes, no paging links, no owner on the staff page.
      */
+    /* W233 (W198): bank ending, payout cycle, the open request and the last paid one - plain values only */
+    private function w233PayoutRequest($owner, $wallet, WithdrawalService $service): array
+    {
+        $out = ['bank_last4' => null, 'bank_name' => null, 'cycle' => null, 'active' => null, 'active_count' => 0, 'last_paid' => null];
+
+        try {
+            $profile = \App\Models\Finance\PayoutProfile::query()->where('user_id', $owner->id)->first();
+            $number = $profile ? preg_replace('/\s+/', '', (string) $profile->bank_account_number) : '';
+            if ($number !== '' && ! empty($profile->ifsc_code)) {
+                $out['bank_last4'] = substr($number, -4);
+                $out['bank_name'] = $profile->bank_name ? (string) $profile->bank_name : null;
+            }
+
+            $out['cycle'] = $service->cycleEligibilityFor($owner);
+
+            $open = \App\Models\Finance\WithdrawalRequest::query()
+                ->where('wallet_id', $wallet->id)
+                ->whereIn('status', ['pending', 'approved', 'processing'])
+                ->orderByDesc('id');
+            $out['active_count'] = (clone $open)->count();
+            $w = $open->first();
+            if ($w) {
+                $timing = $service->payoutTimingMessage($w->requested_at);
+                $out['active'] = [
+                    'reference' => (string) $w->withdrawal_number,
+                    'amount' => round((float) $w->amount, 2),
+                    'status' => (string) $w->status,
+                    'requested_on' => $w->requested_at ? $w->requested_at->timezone('Asia/Kolkata')->format('j M Y') : null,
+                    'message' => $w->status === 'pending' ? ($timing['message'] ?? null) : null,
+                ];
+            }
+
+            $p = \App\Models\Finance\WithdrawalRequest::query()
+                ->where('wallet_id', $wallet->id)
+                ->where('status', 'paid')
+                ->orderByDesc('paid_at')
+                ->orderByDesc('id')
+                ->first();
+            if ($p) {
+                $out['last_paid'] = [
+                    'reference' => (string) $p->withdrawal_number,
+                    'amount' => round((float) $p->amount, 2),
+                    'paid_on' => $p->paid_at ? $p->paid_at->timezone('Asia/Kolkata')->format('j M Y') : null,
+                ];
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return $out;
+    }
+
     private function history($query, bool $staff, ?string $role = null)
     {
         $labels = [

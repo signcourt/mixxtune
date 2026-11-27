@@ -124,7 +124,7 @@ export default function PendingWorkPopup() {
         if (wait > 24 * 60 * 60 * 1000) return;
         timer.current = setTimeout(async () => {
             const d = await load();
-            if (d && d.total > 0 && readPref(uid).auto !== false) {
+            if (d && d.total > 0 && d.popup_enabled !== false /* W233 global-off-1 */ && readPref(uid).auto !== false) {
                 writePref(uid, { until: 0 });
                 markShown(uid);
                 setOpen(true);
@@ -139,6 +139,7 @@ export default function PendingWorkPopup() {
         (async () => {
             const d = await load();
             if (!alive || !d || d.total === 0) return;
+            if (d.popup_enabled === false) return; /* W233 global-off-2: switched off for everyone by a Super Admin */
             const pref = readPref(uid);
             if (pref.auto === false) return;
             if (pref.until && pref.until > Date.now()) {
@@ -178,6 +179,23 @@ export default function PendingWorkPopup() {
     const toggleAuto = () => {
         writePref(uid, { auto: !autoOn });
         setData((d) => (d ? { ...d } : d)); // re-render
+    };
+
+    /* W233 switch: Super Admin's on/off for everybody */
+    const globalOn = data?.popup_enabled !== false;
+    const [switching, setSwitching] = useState(false);
+    const toggleGlobal = async () => {
+        if (switching) return;
+        setSwitching(true);
+        try {
+            const r = await axios.post("/admin/pending-work/setting", { enabled: !globalOn }, { headers: { Accept: "application/json" } });
+            setData((d) => (d ? { ...d, popup_enabled: r.data?.popup_enabled !== false } : d));
+        } catch (e) {
+            setToast("Could not change the setting. Try again.");
+            setTimeout(() => setToast(""), 4000);
+        } finally {
+            setSwitching(false);
+        }
     };
 
     const items = data?.items ?? [];
@@ -291,6 +309,19 @@ export default function PendingWorkPopup() {
                                 Show on login
                             </label>
                         </div>
+                        {/* W233 row */}
+                        {data?.can_switch ? (
+                            <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-white px-5 py-2.5 text-[11px] text-slate-600">
+                                <span>
+                                    Automatic pop-up for every Super Admin and Manager: <b className={globalOn ? "text-emerald-700" : "text-rose-700"}>{globalOn ? "ON" : "OFF"}</b>
+                                </span>
+                                <button type="button" onClick={toggleGlobal} disabled={switching} className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 hover:bg-slate-100 disabled:opacity-50">
+                                    {switching ? "Saving…" : globalOn ? "Turn off for everyone" : "Turn on for everyone"}
+                                </button>
+                            </div>
+                        ) : !globalOn ? (
+                            <div className="border-t border-slate-100 bg-white px-5 py-2.5 text-[11px] text-slate-500">The automatic pop-up is switched off by a Super Admin. The Pending work button still opens it.</div>
+                        ) : null}
                     </div>
                 </div>
             )}

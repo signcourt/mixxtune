@@ -3,6 +3,7 @@ import { ChevronDown, Download, History, ReceiptText, Search, WalletCards, X } f
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import WalletPaymentRequest, { WalletRequestStatus } from "@/V2/Shared/Components/WalletPaymentRequest"; /* W233 (W198) */
 
 /* MIXXTUNE_WALLET_V2 (W44) - W70: the 4 small cards (on the way / in withdrawal / lifetime / paid out) removed */
 
@@ -13,6 +14,7 @@ export default function Index({
     minimumWithdrawal = 0,
     withdrawalEnabled = true,
     kycVerified = true,
+    payoutRequest = null, /* W233 (W198) */
     owners = null,
     ownerSearch = "",
     advances = [],
@@ -74,11 +76,10 @@ export default function Index({
 
                         {!staff && (
                             <div className="lg:text-right">
+                                <WalletRequestStatus info={payoutRequest} money={money} />
                                 {canRequest ? (
                                     kycVerified ? (
-                                        <Link href="/withdrawals" className="inline-flex h-12 items-center justify-center rounded-xl bg-violet-600 px-6 text-[15px] font-semibold text-white shadow-sm hover:bg-violet-700">
-                                            Request my payment
-                                        </Link>
+                                        <WalletPaymentRequest info={payoutRequest} available={available} minimum={minimum} money={money} />
                                     ) : (
                                         <div className="space-y-2">
                                             <Link href={kycUrl} className="inline-flex h-12 items-center justify-center rounded-xl bg-violet-600 px-6 text-[15px] font-semibold text-white shadow-sm hover:bg-violet-700">

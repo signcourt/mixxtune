@@ -502,6 +502,12 @@ export default function PanelLayout({
                         <OfficeLogoutConfirm open={officeLogout} onCancel={() => setOfficeLogout(false)} />
                         {/* MIXXTUNE_NOTIFY_TARGETED_V1 */}
                         <HighlightNoticeBanner />
+                        {/* W233: one-time notice from the server (e.g. "that page belongs to a different panel") */}
+                        {page.props?.flash?.panel_notice ? (
+                            <div className="mx-4 mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-900 sm:mx-6" role="status">
+                                {page.props.flash.panel_notice}
+                            </div>
+                        ) : null}
                         <PendingWorkPopup /> {/* W204b: pending-work pop-up (Super Admin + Manager) */}
                         <MaintenanceExperience
                             maintenance={props.maintenance}
