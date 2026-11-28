@@ -123,11 +123,17 @@ class ReportController extends Controller
             $permissions
         );
 
-        $months = (clone $base)
+        /* W243 MIXXTUNE_REPORTS_LIST_REMEMBERED: the key carries the report-data stamp and this viewer's exact circle
+           (the SQL and its values), so a new import / publish / % change or another viewer never gets these numbers */
+        $w243Key = 'reports-index:'.\App\Support\ReportDataStamp::value().':'.sha1($base->toSql().'|'.json_encode($base->getBindings()));
+
+        /* W243 months */
+        $months = collect(\App\Support\ReportDataStamp::remember($w243Key.':months', 3600, fn () => (clone $base)
             ->whereNotNull('reporting_month')
             ->distinct()
             ->orderByDesc('reporting_month')
-            ->pluck('reporting_month');
+            ->pluck('reporting_month')
+            ->all()));
 
 
 
@@ -140,7 +146,7 @@ class ReportController extends Controller
          *
          * Never use global report_rows totals here.
          */
-        $automaticReports =
+        $automaticReports = collect(\App\Support\ReportDataStamp::remember($w243Key.':cards', 3600, fn () => /* W243 cards open */
             (clone $base)
                 ->whereNotNull('reporting_month')
                 ->where('reporting_month', '!=', '')
@@ -261,7 +267,8 @@ class ReportController extends Controller
                         ];
                     }
                 )
-                ->values();
+                ->values()
+                ->all())); /* W243 cards close */
 
 
         /*
@@ -269,19 +276,21 @@ class ReportController extends Controller
          * only from labels/artists already visible in
          * the scoped base query.
          */
-        $visibleLabelIds = (clone $base)
+        $visibleLabelIds = collect(\App\Support\ReportDataStamp::remember($w243Key.':labels', 3600, fn () => (clone $base) /* W243 label ids */
             ->whereNotNull('label_id')
             ->distinct()
             ->pluck('label_id')
             ->map(fn ($id) => (int) $id)
-            ->values();
+            ->values()
+            ->all()));
 
-        $visibleArtistIds = (clone $base)
+        $visibleArtistIds = collect(\App\Support\ReportDataStamp::remember($w243Key.':artists', 3600, fn () => (clone $base) /* W243 artist ids */
             ->whereNotNull('artist_id')
             ->distinct()
             ->pluck('artist_id')
             ->map(fn ($id) => (int) $id)
-            ->values();
+            ->values()
+            ->all()));
 
         $visibleLabels = $visibleLabelIds->isEmpty()
             ? collect()
