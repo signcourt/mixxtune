@@ -18,7 +18,7 @@ final class DistributorHost
     public const BASE = 'mixxtune.com';
 
     /** names that are ours and can never be a distributor address */
-    private const OURS = ['www', 'mixxtune', 'admin', 'artist', 'label', 'home', 'staging', 'mail', 'api', 'app', 'panel', 'support', 'ftp', 'smtp', 'imap', 'pop', 'webmail', 'cpanel', 'ns1', 'ns2', 'autodiscover', 'autoconfig'];
+    private const OURS = ['share', /* W238 */ 'www', 'mixxtune', 'admin', 'artist', 'label', 'home', 'staging', 'mail', 'api', 'app', 'panel', 'support', 'ftp', 'smtp', 'imap', 'pop', 'webmail', 'cpanel', 'ns1', 'ns2', 'autodiscover', 'autoconfig'];
 
     public static function suffix(): string
     {

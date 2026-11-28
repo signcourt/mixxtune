@@ -21,10 +21,22 @@ Artisan::command('distributor:hosts {--ready=__none__}', function () {
                 $this->line($h);
             }
         }
+        $this->line(\App\Services\V2\ReleaseShareService::shareHost()); /* W238 share-host-list */
 
         return 0;
     }
     $list = array_filter(array_map('trim', explode(',', strtolower($ready))));
+    /* W238 share-host-ready: links go to share.mixxtune.com only once its certificate works */
+    try {
+        $shareReady = in_array(\App\Services\V2\ReleaseShareService::shareHost(), $list, true);
+        $settings = app(\App\Services\V2\SystemSettingService::class);
+        if ((bool) $settings->get('share.host_ready', false) !== $shareReady) {
+            $settings->set('share.host_ready', $shareReady, 'share', 'boolean');
+            $this->line('share address ready: '.($shareReady ? 'yes' : 'no'));
+        }
+    } catch (\Throwable $e) {
+        report($e);
+    }
     $n = 0;
     foreach ($rows as $r) {
         $h = \App\Support\DistributorHost::hostOf((string) $r->slug);

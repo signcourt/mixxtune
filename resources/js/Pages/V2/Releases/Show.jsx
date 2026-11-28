@@ -317,6 +317,16 @@ export default function Show({
                             </Link>
                         )}
 
+                        {/* W238: public listen page, store links, share picture */}
+                        {['live', 'delivered'].includes(release.status) && (
+                            <Link
+                                href={`/releases/${release.id}/promo`}
+                                className="inline-flex rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
+                            >
+                                Promo kit
+                            </Link>
+                        )}
+
                         {!release.editable && release.admin_edit && (
                             <Link
                                 href={`/releases/${release.id}/edit`}

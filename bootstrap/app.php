@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
         /* W230 MIXXTUNE_DISTRIBUTOR_HOST: a distributor's own address gets its own session cookie */
         $middleware->web(prepend: [
             \App\Http\Middleware\DistributorHostContext::class,
+            /* W238 MIXXTUNE_PROMO_KIT: share.mixxtune.com serves public listen pages only */
+            \App\Http\Middleware\ShareHostOnly::class,
         ]);
 
         $middleware->web(append: [

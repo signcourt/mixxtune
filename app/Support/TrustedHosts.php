@@ -46,6 +46,9 @@ final class TrustedHosts
             }
         }
 
+        /* W238: the public listen pages */
+        $hosts[] = \App\Services\V2\ReleaseShareService::shareHost();
+
         /* W230: <slug>.mixxtune.com of every active distributor */
         foreach (DistributorHost::activeHosts() as $h) {
             $hosts[] = $h;

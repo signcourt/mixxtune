@@ -23,7 +23,7 @@ use Inertia\Response;
  */
 class DistributorAdminController extends Controller
 {
-    private const OUR_SLUGS = ['www', 'mixxtune', 'admin', 'artist', 'label', 'home', 'staging', 'mail', 'api', 'app', 'panel', 'support'];
+    private const OUR_SLUGS = ['share', /* W238 */ 'www', 'mixxtune', 'admin', 'artist', 'label', 'home', 'staging', 'mail', 'api', 'app', 'panel', 'support'];
 
     private function superAdmin(Request $request): void
     {

@@ -3498,3 +3498,16 @@ Route::middleware(['auth', 'role:label'])->prefix('label')->group(function () {
     Route::get('/my-earnings/export', [\App\Http\Controllers\V2\SubLabelEarningsController::class, 'export'])->middleware('throttle:20,1,sub-label-earnings')->name('v2.sub-label.earnings.export');
     Route::post('/distributor/review/{review}', [\App\Http\Controllers\V2\DistributorReviewController::class, 'decide'])->whereNumber('review')->middleware('throttle:60,1,distributor-review')->name('v2.distributor.review.decide');
 });
+
+
+/* W238 MIXXTUNE_PROMO_KIT: the public listen page of a live release (no login) */
+Route::get('/r/{code}', [\App\Http\Controllers\V2\PublicShareController::class, 'show'])
+    ->where('code', '[a-z0-9]{8,16}')->middleware('throttle:120,1')->name('v2.share.show');
+Route::get('/r/{code}/poster', [\App\Http\Controllers\V2\PublicShareController::class, 'poster'])
+    ->where('code', '[a-z0-9]{8,16}')->middleware('throttle:240,1')->name('v2.share.poster');
+/* W238: the owner's "Promo kit" screen of a release */
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/releases/{release}/promo', [\App\Http\Controllers\V2\ReleasePromoController::class, 'show'])->whereNumber('release')->name('v2.releases.promo');
+    Route::get('/releases/{release}/promo/poster', [\App\Http\Controllers\V2\ReleasePromoController::class, 'poster'])->whereNumber('release')->name('v2.releases.promo.poster');
+    Route::post('/releases/{release}/promo', [\App\Http\Controllers\V2\ReleasePromoController::class, 'save'])->whereNumber('release')->middleware('throttle:30,1,release-promo')->name('v2.releases.promo.save');
+});
