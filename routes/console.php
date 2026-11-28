@@ -144,7 +144,7 @@ Schedule::command('office:idle-check')
 
 
 /* W239 MIXXTUNE_LIVE_LINKS_AGENT: every hour - find the store links of releases whose release date has come */
-Artisan::command('promo:agent {--limit=8}', function () {
+Artisan::command('promo:agent {--limit=8} {--older=25}', function () {
     if (! \App\Services\V2\ReleaseLinkAgent::ready()) {
         $this->line('not set up');
 
@@ -168,6 +168,22 @@ Artisan::command('promo:agent {--limit=8}', function () {
         sleep(2);
     }
     $this->line('looked at: '.$n);
+
+    /* W245 MIXXTUNE_AGENT_OLDER_SONGS: then a batch of older live songs - nobody is told about those */
+    if ($agent->backfill()) {
+        $m = 0;
+        foreach ($agent->backlog(max(1, min(60, (int) $this->option('older')))) as $release) {
+            try {
+                $this->line('older #'.$release->id.' '.$release->title.': '.$agent->check($release, false, true));
+            } catch (\Throwable $e) {
+                report($e);
+                $this->line('older #'.$release->id.' failed: '.$e->getMessage());
+            }
+            $m++;
+            sleep(3);
+        }
+        $this->line('older songs looked at: '.$m);
+    }
 
     return 0;
 })->purpose('Live Links Agent: store links for releases that just went live');

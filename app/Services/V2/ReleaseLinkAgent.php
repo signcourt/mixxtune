@@ -29,6 +29,13 @@ class ReleaseLinkAgent
     public const RETRY_HOURS = 6;
     public const GIVE_UP_DAYS = 21;
 
+    /* W245 MIXXTUNE_AGENT_OLDER_SONGS: the older live catalogue is worked through a little every hour */
+    public const BACKLOG_RETRY_DAYS = 7;   /* an older song with nothing found is looked at again after a week */
+    public const YOUTUBE_DAY_CAP = 80;     /* Google's free allowance is about 100 searches a day */
+    public const YOUTUBE_BACKLOG_CAP = 50; /* older songs stop here, so songs released today always have searches left */
+
+    private bool $youtubeSkipped = false;
+
     public function __construct(private readonly SystemSettingService $settings, private readonly ReleaseShareService $share)
     {
     }
@@ -45,6 +52,71 @@ class ReleaseLinkAgent
     public function enabled(): bool
     {
         return (bool) $this->settings->get('promo_agent.enabled', false);
+    }
+
+    /** W245: also work through the songs released before the agent was switched on (switch on the agent's screen) */
+    public function backfill(): bool
+    {
+        return (bool) $this->settings->get('promo_agent.backfill', false);
+    }
+
+    /** sources that have a key and are not being refused right now */
+    private function working(): array
+    {
+        return array_keys(array_diff_key(array_filter($this->sources()), $this->problems()));
+    }
+
+    private function backlogQuery()
+    {
+        $before = max($this->since(), now('Asia/Kolkata')->subDays(self::GIVE_UP_DAYS)->toDateString());
+
+        return Release::query()
+            ->leftJoin('release_link_agent as a', 'a.release_id', '=', 'releases.id')
+            ->whereNull('releases.deleted_at')
+            ->whereIn('releases.status', ReleaseShareService::LIVE)
+            ->whereNotNull('releases.digital_release_date')
+            ->whereDate('releases.digital_release_date', '<', $before);
+    }
+
+    /** older live songs to look at in this run: never looked first (newest release first), then the ones to try again */
+    public function backlog(int $limit = 25)
+    {
+        $working = $this->working();
+        $late = array_values(array_intersect(['spotify', 'youtube'], $working));
+
+        return $this->backlogQuery()
+            ->where(function ($q) use ($late) {
+                $q->whereNull('a.id')
+                    ->orWhere(fn ($w) => $w->where('a.status', 'searching')->where('a.last_checked_at', '<', now()->subDays(self::BACKLOG_RETRY_DAYS)))
+                    ->orWhere(fn ($w) => $w->where('a.status', 'partial')->where('a.last_checked_at', '<', now()->subHours(24)));
+                /* a store that started answering later (a new key, Spotify Premium): finished songs get that one link too */
+                foreach ($late as $key) {
+                    $q->orWhere(fn ($w) => $w->where('a.status', 'found')->where('a.last_checked_at', '<', now()->subDays(self::BACKLOG_RETRY_DAYS))
+                        ->where(fn ($l) => $l->whereNull('a.links')->orWhere('a.links', 'not like', '%"'.$key.'"%')));
+                }
+            })
+            ->orderByRaw('a.id is null desc')
+            ->orderBy('a.last_checked_at')
+            ->orderByDesc('releases.digital_release_date')
+            ->orderByDesc('releases.id')
+            ->limit($limit)
+            ->get(['releases.*']);
+    }
+
+    /** [older live songs in all, of them looked at, of them with links] */
+    public function backlogProgress(): array
+    {
+        try {
+            $all = (clone $this->backlogQuery())->count();
+            $looked = (clone $this->backlogQuery())->whereNotNull('a.id')->count();
+            $found = (clone $this->backlogQuery())->whereIn('a.status', ['found', 'partial'])->count();
+
+            return ['all' => $all, 'looked' => $looked, 'found' => $found];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return ['all' => 0, 'looked' => 0, 'found' => 0];
+        }
     }
 
     /** releases with a release date before this day are left alone (no flood of old songs on day one) */
@@ -222,14 +294,16 @@ class ReleaseLinkAgent
     }
 
     /** YouTube has no code lookup: accept only an auto-generated "<artist> - Topic" video whose title is exactly ours */
-    private function youtube(string $title, string $artist): ?string
+    private function youtube(string $title, string $artist, int $cap = self::YOUTUBE_DAY_CAP): ?string
     {
         $key = $this->secret('promo_agent.youtube_key');
         if ($key === '' || $title === '') {
             return null;
         }
         $dayKey = 'w239:youtube-count:'.now()->toDateString();
-        if ((int) Cache::get($dayKey, 0) >= 80) {
+        if ((int) Cache::get($dayKey, 0) >= $cap) {
+            $this->youtubeSkipped = true; /* W245: not searched today - this is not "not found" */
+
             return null; /* Google's free daily allowance is about 100 searches */
         }
         Cache::put($dayKey, (int) Cache::get($dayKey, 0) + 1, 90000);
@@ -248,8 +322,9 @@ class ReleaseLinkAgent
     }
 
     /** look once for one release; returns a short human line about what happened */
-    public function check(Release $release, bool $notify = true): string
+    public function check(Release $release, bool $notify = true, bool $older = false): string
     {
+        $this->youtubeSkipped = false;
         $row = DB::table('release_link_agent')->where('release_id', $release->id)->first();
         $links = $row && $row->links ? (array) json_decode((string) $row->links, true) : [];
 
@@ -268,7 +343,7 @@ class ReleaseLinkAgent
         if ($sources['spotify'] && empty($links['spotify']) && ($url = $this->spotify($isrc, $album))) {
             $links['spotify'] = $url;
         }
-        if ($sources['youtube'] && empty($links['youtube']) && ! $album && ($id = $this->youtube((string) ($tracks->first()->title ?? $release->title), (string) $release->primary_artist_name))) {
+        if ($sources['youtube'] && empty($links['youtube']) && ! $album && ($id = $this->youtube((string) ($tracks->first()->title ?? $release->title), (string) $release->primary_artist_name, $older ? self::YOUTUBE_BACKLOG_CAP : self::YOUTUBE_DAY_CAP))) {
             $links['youtube'] = 'https://www.youtube.com/watch?v='.$id;
             $links['youtube_music'] = 'https://music.youtube.com/watch?v='.$id;
         }
@@ -279,12 +354,18 @@ class ReleaseLinkAgent
             }
         }
 
-        $wanted = array_keys(array_filter($sources));
+        /* W245: a store that refuses us (Spotify without Premium) is not "still looking" - only stores that answer count */
+        $wanted = $this->working();
+        if ($album) {
+            $wanted = array_values(array_diff($wanted, ['youtube'])); /* YouTube is searched for singles only */
+        }
         $missing = array_values(array_diff($wanted, array_keys($links)));
         $days = $release->digital_release_date ? (int) floor(abs((strtotime(now('Asia/Kolkata')->toDateString()) - strtotime($release->digital_release_date->toDateString())) / 86400)) : 0;
         $status = ! $links ? 'searching' : ($missing ? 'partial' : 'found');
         if ($status !== 'found' && $days >= self::GIVE_UP_DAYS) {
-            $status = $links ? 'found' : 'gave_up';
+            /* W245: an older song is finished once it has links; with nothing found it stays "looking" (tried again weekly)
+               while older songs are switched on. A YouTube search that had no allowance left today is tried again tomorrow. */
+            $status = $links ? ($this->youtubeSkipped && in_array('youtube', $missing, true) ? 'partial' : 'found') : ($this->backfill() ? 'searching' : 'gave_up');
         }
         $note = ($links ? 'Found: '.implode(', ', array_map(fn ($k) => ReleaseShareService::STORES[$k], array_keys($links))).'.' : 'Nothing found yet.')
             .($missing && $status !== 'found' ? ' Still looking for: '.implode(', ', array_map(fn ($k) => ReleaseShareService::STORES[$k] ?? $k, $missing)).'.' : '')

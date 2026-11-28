@@ -84,6 +84,7 @@ class PromoAgentController extends Controller
             'can_manage' => $role === 'super_admin',
             'rows' => $rows,
             'waiting' => $ready && $this->agent->enabled() ? $this->agent->due(50)->count() : 0,
+            'older' => ['on' => $this->agent->backfill()] + ($ready ? $this->agent->backlogProgress() : ['all' => 0, 'looked' => 0, 'found' => 0]), /* W245 */
         ]);
     }
 
@@ -99,6 +100,17 @@ class PromoAgentController extends Controller
         $audit->record('promo_agent.switched', 'settings', 'Live Links Agent switched '.($on ? 'on' : 'off').'.', [], ['enabled' => $on], null, $request);
 
         return back()->with('success', $on ? 'The agent is on. It looks every hour.' : 'The agent is off.');
+    }
+
+    /** W245: older live songs on / off */
+    public function older(Request $request, SystemSettingService $settings, AuditLogService $audit): RedirectResponse
+    {
+        $this->staff($request, true);
+        $on = $request->boolean('enabled');
+        $settings->set('promo_agent.backfill', $on, 'promo_agent', 'boolean', $request->user()->id);
+        $audit->record('promo_agent.older_switched', 'settings', 'Live Links Agent: older songs switched '.($on ? 'on' : 'off').'.', [], ['backfill' => $on], null, $request);
+
+        return back()->with('success', $on ? 'Older songs are on. About 25 are looked at every hour; their owners are not messaged.' : 'Older songs are off.');
     }
 
     public function keys(Request $request, AuditLogService $audit): RedirectResponse

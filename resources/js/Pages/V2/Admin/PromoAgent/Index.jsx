@@ -12,7 +12,7 @@ const STATUS = {
 };
 const SOURCE_NAMES = { apple_music: "Apple Music", deezer: "Deezer", spotify: "Spotify", youtube: "YouTube + YouTube Music" };
 
-export default function PromoAgentIndex({ role = "super_admin", ready = true, enabled = false, since = "", sources = {}, problems = {} /* W240 */, can_manage = false, rows = null, waiting = 0 }) {
+export default function PromoAgentIndex({ role = "super_admin", ready = true, enabled = false, since = "", sources = {}, problems = {} /* W240 */, can_manage = false, rows = null, waiting = 0, older = { on: false, all: 0, looked: 0, found: 0 } /* W245 */ }) {
     const { flash = {}, errors = {} } = usePage().props;
     const keys = useForm({ spotify_id: "", spotify_secret: "", youtube_key: "" });
     const list = rows?.data ?? [];
@@ -46,6 +46,20 @@ export default function PromoAgentIndex({ role = "super_admin", ready = true, en
                         {can_manage && (
                             <button type="button" onClick={() => router.post("/admin/promo-agent/toggle", { enabled: !enabled }, { preserveScroll: true })} className={`h-11 rounded-xl px-5 text-sm font-bold text-white ${enabled ? "bg-slate-700 hover:bg-slate-800" : "bg-violet-600 hover:bg-violet-700"}`}>
                                 {enabled ? "Switch off" : "Switch on"}
+                            </button>
+                        )}
+                    </div>
+
+                    {/* W245: the older live catalogue */}
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="min-w-0 flex-1 text-xs text-slate-600">
+                            <span className="text-sm font-bold text-slate-900">Older songs: {older.on ? "ON" : "OFF"}</span>
+                            <div className="mt-1">Songs that were live before the agent was switched on. About 25 are looked at every hour, newest first. A song is finished once its links are found and its promo page is on; a song with nothing found stays "Looking" and is tried again every week. Owners of older songs are not messaged.</div>
+                            <div className="mt-1 font-semibold text-slate-700">{older.looked} of {older.all} older songs looked at · {older.found} with links</div>
+                        </div>
+                        {can_manage && (
+                            <button type="button" disabled={!enabled && !older.on} onClick={() => router.post("/admin/promo-agent/older", { enabled: !older.on }, { preserveScroll: true })} className={`h-10 rounded-xl px-4 text-sm font-bold text-white disabled:opacity-50 ${older.on ? "bg-slate-700 hover:bg-slate-800" : "bg-violet-600 hover:bg-violet-700"}`}>
+                                {older.on ? "Stop older songs" : "Do older songs too"}
                             </button>
                         )}
                     </div>

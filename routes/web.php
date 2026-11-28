@@ -3518,6 +3518,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin/promo-agent')->group(func
     Route::get('/', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'index'])->name('v2.admin.promo-agent');
     Route::post('/toggle', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'toggle'])->middleware('throttle:20,1')->name('v2.admin.promo-agent.toggle');
     Route::post('/keys', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'keys'])->middleware('throttle:20,1')->name('v2.admin.promo-agent.keys');
+    Route::post('/older', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'older'])->middleware('throttle:20,1')->name('v2.admin.promo-agent.older'); /* W245 */
     Route::post('/{release}/check', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'check'])->whereNumber('release')->middleware('throttle:30,1,promo-agent-check')->name('v2.admin.promo-agent.check');
     Route::post('/{release}/sent', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'sent'])->whereNumber('release')->name('v2.admin.promo-agent.sent');
 });
