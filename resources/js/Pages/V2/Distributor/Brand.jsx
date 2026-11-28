@@ -4,6 +4,9 @@ import { useRef, useState } from 'react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 
 /* W221 - the distributor's own brand: panel name, small line under it, logo. Plain values only. */
+/* W242_SWATCH: the colour themes a distributor can pick ('' = the standard purple) */
+const W242_THEMES = [['', 'Purple', '#7c3aed'], ['blue', 'Blue', '#2563eb'], ['emerald', 'Green', '#059669'], ['rose', 'Rose', '#e11d48'], ['orange', 'Orange', '#ea580c'], ['teal', 'Teal', '#0d9488']];
+
 export default function Brand({ role = 'label', distributor = {} }) {
     const { errors = {} } = usePage().props;
     const [name, setName] = useState(distributor.brand_name || distributor.label_name || '');
@@ -12,6 +15,12 @@ export default function Brand({ role = 'label', distributor = {} }) {
     const [preview, setPreview] = useState(distributor.logo_url || '');
     const [remove, setRemove] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [theme, setTheme] = useState(distributor.theme || '');
+    const pickTheme = (key) => {
+        setTheme(key);
+        /* show it at once on this screen; it is kept only after "Save brand" */
+        try { if (key) { document.body.setAttribute('data-mt-accent', key); } else { document.body.removeAttribute('data-mt-accent'); } } catch (e) { /* preview only */ }
+    };
     const [localErr, setLocalErr] = useState('');
     const fileRef = useRef(null);
 
@@ -30,7 +39,7 @@ export default function Brand({ role = 'label', distributor = {} }) {
     const save = () => {
         if (busy || name.trim().length < 2) return;
         setBusy(true);
-        router.post('/label/distributor/brand', { brand_name: name, dashboard_name: sub, logo: file, remove_logo: remove ? 1 : 0 }, {
+        router.post('/label/distributor/brand', { brand_name: name, dashboard_name: sub, logo: file, theme, remove_logo: remove ? 1 : 0 }, {
             forceFormData: true,
             preserveScroll: true,
             onFinish: () => setBusy(false),
@@ -79,6 +88,20 @@ export default function Brand({ role = 'label', distributor = {} }) {
                         </div>
                         <p className="mt-2 text-xs text-slate-500">Square PNG / JPG / WEBP, up to 3 MB. 512 × 512 px looks best.</p>
                         {(localErr || errors.logo) && <p className="mt-1 text-xs font-semibold text-rose-600">{localErr || errors.logo}</p>}
+                    </div>
+
+                    <div className="mt-5">
+                        <div className="text-sm font-semibold text-slate-700">Colour theme</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {W242_THEMES.filter(([key]) => key === '' || (distributor.themes || []).includes(key)).map(([key, label, hex]) => (
+                                <button key={key || 'purple'} type="button" onClick={() => pickTheme(key)} aria-pressed={theme === key} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold ${theme === key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>
+                                    <span className="h-5 w-5 rounded-full border border-white/60" style={{ background: hex }} />
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500">Buttons, links and highlights of the panel take this colour for you and for every sub-label under you.</p>
+                        {errors.theme && <p className="mt-1 text-xs font-semibold text-rose-600">{errors.theme}</p>}
                     </div>
 
                     <div className="mt-6 flex justify-end">

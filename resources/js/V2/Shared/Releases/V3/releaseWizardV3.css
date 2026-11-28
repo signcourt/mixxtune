@@ -17,7 +17,7 @@
     align-self: start;
     min-height: calc(100vh - 150px);
     overflow: hidden;
-    border: 1px solid #ddd6fe;
+    border: 1px solid rgb(var(--mt-a-200, 221 214 254));
     border-radius: 26px;
     background:
         linear-gradient(
@@ -27,7 +27,7 @@
             #f7f5ff 100%
         );
     box-shadow:
-        0 22px 60px rgba(76, 29, 149, 0.08);
+        0 22px 60px rgb(var(--mt-a-900, 76 29 149) / 0.08);
 }
 
 .mixx-v3-mascot-stage {
@@ -37,11 +37,11 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    border-bottom: 1px solid #ede9fe;
+    border-bottom: 1px solid rgb(var(--mt-a-100, 237 233 254));
     background:
         radial-gradient(
             circle at 50% 42%,
-            rgba(196, 181, 253, 0.42),
+            rgb(var(--mt-a-300, 196 181 253) / 0.42),
             transparent 62%
         );
 }
@@ -54,7 +54,7 @@
     background:
         radial-gradient(
             circle,
-            rgba(139, 92, 246, 0.22),
+            rgb(var(--mt-a-500, 139 92 246) / 0.22),
             transparent 68%
         );
     filter: blur(8px);
@@ -70,16 +70,16 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    border: 1px dashed rgba(124, 58, 237, 0.28);
+    border: 1px dashed rgb(var(--mt-a-600, 124 58 237) / 0.28);
     border-radius: 38% 38% 28% 28%;
     background:
         linear-gradient(
             145deg,
             rgba(255, 255, 255, 0.98),
-            rgba(237, 233, 254, 0.92)
+            rgb(var(--mt-a-100, 237 233 254) / 0.92)
         );
     box-shadow:
-        0 28px 55px rgba(76, 29, 149, 0.16);
+        0 28px 55px rgb(var(--mt-a-900, 76 29 149) / 0.16);
     transform-origin: 50% 100%;
     animation:
         mixx-v3-character-enter 520ms
@@ -94,7 +94,7 @@
     line-height: 1;
     filter:
         drop-shadow(
-            0 10px 18px rgba(91, 33, 182, 0.18)
+            0 10px 18px rgb(var(--mt-a-800, 91 33 182) / 0.18)
         );
 }
 
@@ -107,7 +107,7 @@
 
 .mixx-v3-mascot-placeholder-text {
     margin-top: 5px;
-    color: #7c3aed;
+    color: rgb(var(--mt-a-600, 124 58 237));
     font-size: 12px;
     font-weight: 700;
 }
@@ -117,7 +117,7 @@
     inset: 0;
     z-index: 3;
     pointer-events: none;
-    color: #7c3aed;
+    color: rgb(var(--mt-a-600, 124 58 237));
     font-weight: 900;
 }
 
@@ -162,7 +162,7 @@
 }
 
 .mixx-v3-step-line-active {
-    border-color: #8b5cf6;
+    border-color: rgb(var(--mt-a-500, 139 92 246));
 }
 
 .mixx-v3-step-button {
@@ -185,8 +185,8 @@
 }
 
 .mixx-v3-step-button:not(:disabled):hover {
-    border-color: #ddd6fe;
-    background: rgba(245, 243, 255, 0.72);
+    border-color: rgb(var(--mt-a-200, 221 214 254));
+    background: rgb(var(--mt-a-50, 245 243 255) / 0.72);
     transform: translateX(2px);
 }
 
@@ -196,15 +196,15 @@
 }
 
 .mixx-v3-step-active {
-    border-color: #a78bfa;
+    border-color: rgb(var(--mt-a-400, 167 139 250));
     background:
         linear-gradient(
             135deg,
-            rgba(245, 243, 255, 0.98),
-            rgba(237, 233, 254, 0.88)
+            rgb(var(--mt-a-50, 245 243 255) / 0.98),
+            rgb(var(--mt-a-100, 237 233 254) / 0.88)
         );
     box-shadow:
-        0 14px 30px rgba(91, 33, 182, 0.1);
+        0 14px 30px rgb(var(--mt-a-800, 91 33 182) / 0.1);
 }
 
 .mixx-v3-step-number {
@@ -227,18 +227,18 @@
     background:
         linear-gradient(
             135deg,
-            #7c3aed,
+            rgb(var(--mt-a-600, 124 58 237)),
             #4f46e5
         );
     color: #ffffff;
     box-shadow:
-        0 9px 22px rgba(124, 58, 237, 0.28);
+        0 9px 22px rgb(var(--mt-a-600, 124 58 237) / 0.28);
 }
 
 .mixx-v3-step-complete .mixx-v3-step-number {
-    border-color: #8b5cf6;
-    background: #f5f3ff;
-    color: #6d28d9;
+    border-color: rgb(var(--mt-a-500, 139 92 246));
+    background: rgb(var(--mt-a-50, 245 243 255));
+    color: rgb(var(--mt-a-700, 109 40 217));
 }
 
 .mixx-v3-step-copy {
@@ -254,7 +254,7 @@
 }
 
 .mixx-v3-step-active .mixx-v3-step-copy strong {
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
 }
 
 .mixx-v3-step-copy small {

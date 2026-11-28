@@ -40,6 +40,8 @@ class DistributorBrandController extends Controller
                 'brand_name' => $d->brand_name,
                 'dashboard_name' => $d->dashboard_name,
                 'logo_url' => $service->logoUrl($d),
+                'theme' => (string) ($d->theme ?? ''), /* W242 */
+                'themes' => DistributorService::THEMES,
                 'label_name' => $label->name ?? '',
                 'slug' => $d->slug,
                 'url' => 'https://'.\App\Support\DistributorHost::hostOf((string) $d->slug), /* W230 */
@@ -58,6 +60,7 @@ class DistributorBrandController extends Controller
             'dashboard_name' => ['nullable', 'string', 'max:60', 'regex:/^[^<>{}\\\\]*$/u'],
             'logo' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:3072'],
             'remove_logo' => ['nullable', 'boolean'],
+            'theme' => ['nullable', 'string', 'in:'.implode(',', DistributorService::THEMES)], /* W242 */
         ], [
             'brand_name.regex' => 'Plain text only.',
             'dashboard_name.regex' => 'Plain text only.',
@@ -68,6 +71,9 @@ class DistributorBrandController extends Controller
         $old = $d->only(['brand_name', 'dashboard_name', 'logo_path']);
         $d->brand_name = trim($data['brand_name']);
         $d->dashboard_name = trim((string) ($data['dashboard_name'] ?? '')) ?: null;
+        if (\Illuminate\Support\Facades\Schema::hasColumn('distributors', 'theme')) { /* W242 theme saved */
+            $d->theme = ! empty($data['theme']) ? (string) $data['theme'] : null;
+        }
 
         if ($request->hasFile('logo')) {
             $png = $this->cleanPng($request->file('logo')->getRealPath());

@@ -81,6 +81,9 @@ class DistributorService
     }
 
     /** the brand array every page gets: the distributor's own for his tree, ours for everybody else */
+    /** W242 MIXXTUNE_ACCENT_THEMES: colour themes a distributor can pick (empty = our own purple) */
+    public const THEMES = ['blue', 'emerald', 'rose', 'orange', 'teal'];
+
     public function brand(array $default, ?User $user): array
     {
         try {
@@ -101,6 +104,7 @@ class DistributorService
                 'login_logo_url' => $logo ?: '', /* W231: never our logo on his pages - his name is shown instead */
                 'footer_text' => '',
                 'distributor' => true,
+                'accent' => in_array((string) ($d->theme ?? ''), self::THEMES, true) ? (string) $d->theme : '', /* W242 */
             ]);
         } catch (\Throwable $e) {
             report($e);

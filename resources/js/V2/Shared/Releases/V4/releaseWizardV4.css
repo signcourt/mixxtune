@@ -17,7 +17,7 @@
     border-radius: 999px;
     background: #f3efff;
     padding: 6px 14px;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 12px;
     font-weight: 800;
 }
@@ -45,14 +45,14 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
-    border: 1px solid #ddd6fe;
+    border: 1px solid rgb(var(--mt-a-200, 221 214 254));
     border-radius: 12px;
     background: #ffffff;
     padding: 0 20px;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 14px;
     font-weight: 800;
-    box-shadow: 0 8px 20px rgba(76, 29, 149, 0.05);
+    box-shadow: 0 8px 20px rgb(var(--mt-a-900, 76 29 149) / 0.05);
     transition:
         transform 180ms ease,
         box-shadow 180ms ease,
@@ -61,7 +61,7 @@
 
 .mixx-v4-save-button:hover {
     background: #faf7ff;
-    box-shadow: 0 12px 26px rgba(76, 29, 149, 0.1);
+    box-shadow: 0 12px 26px rgb(var(--mt-a-900, 76 29 149) / 0.1);
     transform: translateY(-1px);
 }
 
@@ -79,7 +79,7 @@
 .mixx-v4-help-card {
     position: sticky;
     top: 24px;
-    border: 1px solid #ddd6fe;
+    border: 1px solid rgb(var(--mt-a-200, 221 214 254));
     border-radius: 22px;
     background:
         linear-gradient(
@@ -89,7 +89,7 @@
         );
     padding: 22px;
     box-shadow:
-        0 18px 44px rgba(91, 33, 182, 0.08);
+        0 18px 44px rgb(var(--mt-a-800, 91 33 182) / 0.08);
 }
 
 .mixx-v4-help-icon {
@@ -102,18 +102,18 @@
     background:
         linear-gradient(
             135deg,
-            #7c3aed,
+            rgb(var(--mt-a-600, 124 58 237)),
             #4f46e5
         );
     color: #ffffff;
     font-size: 18px;
     box-shadow:
-        0 10px 22px rgba(124, 58, 237, 0.25);
+        0 10px 22px rgb(var(--mt-a-600, 124 58 237) / 0.25);
 }
 
 .mixx-v4-help-card h3 {
     margin-top: 18px;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 18px;
     font-weight: 900;
 }
@@ -128,7 +128,7 @@
 .mixx-v4-help-divider {
     height: 1px;
     margin: 20px 0;
-    background: #ede9fe;
+    background: rgb(var(--mt-a-100, 237 233 254));
 }
 
 .mixx-v4-help-label {
@@ -157,7 +157,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 999px;
-    background: #6d28d9;
+    background: rgb(var(--mt-a-700, 109 40 217));
     color: #ffffff;
     font-size: 10px;
     font-weight: 900;
@@ -285,21 +285,21 @@
 }
 
 .mixx-v4-release-type-card:hover {
-    border-color: #c4b5fd;
+    border-color: rgb(var(--mt-a-300, 196 181 253));
     background: #faf8ff;
     transform: translateY(-1px);
 }
 
 .mixx-v4-release-type-selected {
-    border-color: #8b5cf6;
+    border-color: rgb(var(--mt-a-500, 139 92 246));
     background:
         linear-gradient(
             145deg,
-            #f5f3ff,
+            rgb(var(--mt-a-50, 245 243 255)),
             #ffffff
         );
     box-shadow:
-        0 12px 25px rgba(124, 58, 237, 0.12);
+        0 12px 25px rgb(var(--mt-a-600, 124 58 237) / 0.12);
 }
 
 .mixx-v4-release-type-icon {
@@ -311,7 +311,7 @@
     justify-content: center;
     border-radius: 12px;
     background: #f1efff;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 18px;
     font-weight: 900;
 }
@@ -343,7 +343,7 @@
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    border: 1px solid #ddd6fe;
+    border: 1px solid rgb(var(--mt-a-200, 221 214 254));
     border-radius: 999px;
     color: #ffffff;
     font-size: 10px;
@@ -351,8 +351,8 @@
 
 .mixx-v4-release-type-selected
 .mixx-v4-release-type-check {
-    border-color: #7c3aed;
-    background: #7c3aed;
+    border-color: rgb(var(--mt-a-600, 124 58 237));
+    background: rgb(var(--mt-a-600, 124 58 237));
 }
 
 .mixx-v4-artist-section,
@@ -427,12 +427,12 @@
     justify-content: center;
     overflow: hidden;
     margin-top: 18px;
-    border: 2px dashed #c4b5fd;
+    border: 2px dashed rgb(var(--mt-a-300, 196 181 253));
     border-radius: 20px;
     background:
         radial-gradient(
             circle at 50% 35%,
-            rgba(221, 214, 254, 0.65),
+            rgb(var(--mt-a-200, 221 214 254) / 0.65),
             rgba(250, 248, 255, 0.85)
         );
     padding: 18px;
@@ -444,8 +444,8 @@
 }
 
 .mixx-v4-artwork-uploader:hover {
-    border-color: #7c3aed;
-    background: #f5f3ff;
+    border-color: rgb(var(--mt-a-600, 124 58 237));
+    background: rgb(var(--mt-a-50, 245 243 255));
     transform: translateY(-1px);
 }
 
@@ -469,7 +469,7 @@
 
 .mixx-v4-artwork-rules span::before {
     margin-right: 7px;
-    color: #7c3aed;
+    color: rgb(var(--mt-a-600, 124 58 237));
     content: '✓';
     font-weight: 900;
 }
@@ -497,9 +497,9 @@
 .mixx-v4-release-details input:focus,
 .mixx-v4-release-details select:focus,
 .mixx-v4-release-details textarea:focus {
-    border-color: #8b5cf6;
+    border-color: rgb(var(--mt-a-500, 139 92 246));
     box-shadow:
-        0 0 0 4px rgba(139, 92, 246, 0.1);
+        0 0 0 4px rgb(var(--mt-a-500, 139 92 246) / 0.1);
 }
 
 @media (max-width: 1450px) {
@@ -581,7 +581,7 @@
 .mixx-v4-footer-save {
     border: 1px solid #d8d4e8;
     background: #ffffff;
-    color: #5b21b6;
+    color: rgb(var(--mt-a-800, 91 33 182));
 }
 
 .mixx-v4-footer-next,
@@ -591,12 +591,12 @@
     background:
         linear-gradient(
             135deg,
-            #6d28d9,
+            rgb(var(--mt-a-700, 109 40 217)),
             #4f46e5
         );
     color: #ffffff;
     box-shadow:
-        0 14px 28px rgba(91, 33, 182, 0.24);
+        0 14px 28px rgb(var(--mt-a-800, 91 33 182) / 0.24);
 }
 
 .mixx-v4-footer-publish {
@@ -613,7 +613,7 @@
 .mixx-v4-footer-next:hover:not(:disabled),
 .mixx-v4-footer-publish:hover:not(:disabled) {
     box-shadow:
-        0 18px 34px rgba(91, 33, 182, 0.32);
+        0 18px 34px rgb(var(--mt-a-800, 91 33 182) / 0.32);
 }
 
 .mixx-v4-footer-back:disabled,
@@ -683,11 +683,11 @@
     min-height: 46px;
     align-items: center;
     justify-content: center;
-    border: 1px solid #8b5cf6;
+    border: 1px solid rgb(var(--mt-a-500, 139 92 246));
     border-radius: 13px;
     background: #ffffff;
     padding: 0 18px;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 13px;
     font-weight: 900;
     transition:
@@ -697,9 +697,9 @@
 }
 
 .mixx-v4-add-track-button:hover {
-    background: #f5f3ff;
+    background: rgb(var(--mt-a-50, 245 243 255));
     box-shadow:
-        0 12px 24px rgba(124, 58, 237, 0.12);
+        0 12px 24px rgb(var(--mt-a-600, 124 58 237) / 0.12);
     transform: translateY(-1px);
 }
 
@@ -767,7 +767,7 @@
     background:
         radial-gradient(
             circle at 50% 38%,
-            rgba(221, 214, 254, 0.7),
+            rgb(var(--mt-a-200, 221 214 254) / 0.7),
             rgba(251, 250, 255, 0.96) 68%
         );
     padding: 28px;
@@ -780,10 +780,10 @@
 }
 
 .mixx-v4-track-upload-zone:hover {
-    border-color: #7c3aed;
+    border-color: rgb(var(--mt-a-600, 124 58 237));
     background: #f7f4ff;
     box-shadow:
-        0 18px 38px rgba(124, 58, 237, 0.11);
+        0 18px 38px rgb(var(--mt-a-600, 124 58 237) / 0.11);
     transform: translateY(-2px);
 }
 
@@ -797,14 +797,14 @@
     background:
         linear-gradient(
             135deg,
-            #7c3aed,
+            rgb(var(--mt-a-600, 124 58 237)),
             #4f46e5
         );
     color: #ffffff;
     font-size: 32px;
     font-weight: 900;
     box-shadow:
-        0 18px 38px rgba(91, 33, 182, 0.27);
+        0 18px 38px rgb(var(--mt-a-800, 91 33 182) / 0.27);
     animation:
         mixx-v4-upload-icon-float
         2.5s ease-in-out infinite;
@@ -825,7 +825,7 @@
     .mixx-v4-track-upload-icon
 ) {
     margin-top: 7px;
-    color: #7c3aed;
+    color: rgb(var(--mt-a-600, 124 58 237));
     font-size: 12px;
     font-weight: 700;
 }
@@ -869,7 +869,7 @@
     background:
         linear-gradient(
             135deg,
-            #6d28d9,
+            rgb(var(--mt-a-700, 109 40 217)),
             #4f46e5
         );
     padding: 0 24px;
@@ -877,12 +877,12 @@
     font-size: 13px;
     font-weight: 900;
     box-shadow:
-        0 15px 30px rgba(91, 33, 182, 0.25);
+        0 15px 30px rgb(var(--mt-a-800, 91 33 182) / 0.25);
 }
 
 .mixx-v4-track-submit-button:hover:not(:disabled) {
     box-shadow:
-        0 19px 38px rgba(91, 33, 182, 0.34);
+        0 19px 38px rgb(var(--mt-a-800, 91 33 182) / 0.34);
     transform: translateY(-1px);
 }
 
@@ -919,9 +919,9 @@
 }
 
 .mixx-v4-track-row:hover {
-    border-color: #c4b5fd;
+    border-color: rgb(var(--mt-a-300, 196 181 253));
     box-shadow:
-        0 12px 28px rgba(91, 33, 182, 0.08);
+        0 12px 28px rgb(var(--mt-a-800, 91 33 182) / 0.08);
     transform: translateY(-1px);
 }
 
@@ -934,7 +934,7 @@
     justify-content: center;
     border-radius: 14px;
     background: #f0edff;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
 }
 
 .mixx-v4-track-number span {
@@ -964,9 +964,9 @@
 }
 
 .mixx-v4-track-action-button {
-    border: 1px solid #ddd6fe;
+    border: 1px solid rgb(var(--mt-a-200, 221 214 254));
     background: #ffffff;
-    color: #5b21b6;
+    color: rgb(var(--mt-a-800, 91 33 182));
 }
 
 .mixx-v4-track-delete-button {
@@ -987,9 +987,9 @@
 .mixx-v4-track-manager input:focus,
 .mixx-v4-track-manager select:focus,
 .mixx-v4-track-manager textarea:focus {
-    border-color: #8b5cf6;
+    border-color: rgb(var(--mt-a-500, 139 92 246));
     box-shadow:
-        0 0 0 4px rgba(139, 92, 246, 0.1);
+        0 0 0 4px rgb(var(--mt-a-500, 139 92 246) / 0.1);
 }
 
 @keyframes mixx-v4-upload-icon-float {
@@ -1133,9 +1133,9 @@
 
 .mixx-reference-input:focus,
 .mixx-reference-textarea:focus {
-    border-color: #8b5cf6;
+    border-color: rgb(var(--mt-a-500, 139 92 246));
     box-shadow:
-        0 0 0 3px rgba(139, 92, 246, 0.11);
+        0 0 0 3px rgb(var(--mt-a-500, 139 92 246) / 0.11);
 }
 
 .mixx-reference-input::placeholder,
@@ -1172,21 +1172,21 @@
 }
 
 .mixx-reference-release-type-active {
-    border-color: #8b5cf6;
+    border-color: rgb(var(--mt-a-500, 139 92 246));
     background:
         linear-gradient(
             135deg,
             #fbf9ff,
             #f8f5ff
         );
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     box-shadow:
-        0 0 0 1px rgba(139, 92, 246, 0.12);
+        0 0 0 1px rgb(var(--mt-a-500, 139 92 246) / 0.12);
 }
 
 .mixx-reference-radio,
 .mixx-reference-release-icon {
-    color: #7c3aed;
+    color: rgb(var(--mt-a-600, 124 58 237));
     font-size: 16px;
 }
 
@@ -1237,7 +1237,7 @@
     background:
         linear-gradient(
             135deg,
-            #7c3aed,
+            rgb(var(--mt-a-600, 124 58 237)),
             #4f46e5
         );
 }
@@ -1268,7 +1268,7 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    border: 2px dashed #a78bfa;
+    border: 2px dashed rgb(var(--mt-a-400, 167 139 250));
     border-radius: 11px;
     background:
         linear-gradient(
@@ -1284,12 +1284,12 @@
 }
 
 .mixx-reference-cover-upload:hover {
-    border-color: #6d28d9;
+    border-color: rgb(var(--mt-a-700, 109 40 217));
     background: #f8f5ff;
 }
 
 .mixx-reference-cover-icon {
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 44px;
     font-weight: 400;
 }
@@ -1317,7 +1317,7 @@
     border-radius: 7px;
     background: #ffffff;
     padding: 0 15px;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 11px;
     font-weight: 800;
 }
@@ -1362,7 +1362,7 @@
 
 .mixx-reference-advanced summary {
     cursor: pointer;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 12px;
     font-weight: 800;
 }
@@ -1412,7 +1412,7 @@ summary {
     background:
         radial-gradient(
             circle at 50% 20%,
-            rgba(124, 58, 237, 0.28),
+            rgb(var(--mt-a-600, 124 58 237) / 0.28),
             transparent 48%
         ),
         rgba(15, 23, 42, 0.78);
@@ -1456,7 +1456,7 @@ summary {
     left: -70px;
     width: 260px;
     height: 260px;
-    background: #c4b5fd;
+    background: rgb(var(--mt-a-300, 196 181 253));
 }
 
 .mixx-v5-upload-light-two {
@@ -1478,12 +1478,12 @@ summary {
     background:
         radial-gradient(
             circle at 50% 38%,
-            rgba(196, 181, 253, 0.72),
-            rgba(245, 243, 255, 0.94) 62%,
+            rgb(var(--mt-a-300, 196 181 253) / 0.72),
+            rgb(var(--mt-a-50, 245 243 255) / 0.94) 62%,
             #ffffff 100%
         );
     box-shadow:
-        inset 0 0 40px rgba(124, 58, 237, 0.08);
+        inset 0 0 40px rgb(var(--mt-a-600, 124 58 237) / 0.08);
 }
 
 .mixx-v5-upload-headphones {
@@ -1492,15 +1492,15 @@ summary {
     height: 124px;
     align-items: center;
     justify-content: center;
-    border: 12px solid #6d28d9;
+    border: 12px solid rgb(var(--mt-a-700, 109 40 217));
     border-bottom-color: transparent;
     border-radius: 999px;
     background: #ffffff;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 38px;
     font-weight: 900;
     box-shadow:
-        0 24px 48px rgba(91, 33, 182, 0.22);
+        0 24px 48px rgb(var(--mt-a-800, 91 33 182) / 0.22);
     animation:
         mixx-v5-headphones
         2.4s ease-in-out infinite;
@@ -1527,8 +1527,8 @@ summary {
     background:
         repeating-linear-gradient(
             90deg,
-            #6d28d9 0 3px,
-            #a78bfa 3px 6px
+            rgb(var(--mt-a-700, 109 40 217)) 0 3px,
+            rgb(var(--mt-a-400, 167 139 250)) 3px 6px
         );
 }
 
@@ -1548,7 +1548,7 @@ summary {
 .mixx-v5-upload-notes {
     position: absolute;
     inset: 0;
-    color: #7c3aed;
+    color: rgb(var(--mt-a-600, 124 58 237));
     font-size: 23px;
     font-weight: 900;
     pointer-events: none;
@@ -1591,9 +1591,9 @@ summary {
     min-height: 29px;
     align-items: center;
     border-radius: 999px;
-    background: #ede9fe;
+    background: rgb(var(--mt-a-100, 237 233 254));
     padding: 0 13px;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 10px;
     font-weight: 900;
     letter-spacing: 0.08em;
@@ -1629,7 +1629,7 @@ summary {
 }
 
 .mixx-v5-upload-progress-row strong {
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 18px;
     font-weight: 950;
 }
@@ -1652,9 +1652,9 @@ summary {
     background:
         linear-gradient(
             90deg,
-            #7c3aed,
+            rgb(var(--mt-a-600, 124 58 237)),
             #6366f1,
-            #8b5cf6
+            rgb(var(--mt-a-500, 139 92 246))
         );
     transition: width 260ms ease;
 }
@@ -1822,7 +1822,7 @@ summary {
 .mixx-v4-cover-eyebrow {
     display: block;
     margin-bottom: 5px;
-    color: #8b5cf6;
+    color: rgb(var(--mt-a-500, 139 92 246));
     font-size: 9px;
     font-weight: 900;
     letter-spacing: 0.12em;
@@ -1842,11 +1842,11 @@ summary {
 
 .mixx-v4-cover-size-badge {
     flex: 0 0 auto;
-    border: 1px solid #ddd6fe;
+    border: 1px solid rgb(var(--mt-a-200, 221 214 254));
     border-radius: 999px;
-    background: #f5f3ff;
+    background: rgb(var(--mt-a-50, 245 243 255));
     padding: 5px 8px;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 9px;
     font-weight: 900;
 }
@@ -1870,7 +1870,7 @@ summary {
     width: 100%;
     aspect-ratio: 1 / 1;
     overflow: hidden;
-    border: 2px dashed #c4b5fd;
+    border: 2px dashed rgb(var(--mt-a-300, 196 181 253));
     border-radius: 16px;
     background: #faf8ff;
 }
@@ -1885,7 +1885,7 @@ summary {
 }
 
 .mixx-v4-cover-upload:hover .mixx-v4-cover-empty {
-    border-color: #7c3aed;
+    border-color: rgb(var(--mt-a-600, 124 58 237));
     background: #f7f3ff;
 }
 
@@ -1897,8 +1897,8 @@ summary {
     justify-content: center;
     margin-bottom: 10px;
     border-radius: 999px;
-    background: #ede9fe;
-    color: #6d28d9;
+    background: rgb(var(--mt-a-100, 237 233 254));
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 24px;
     font-weight: 700;
 }
@@ -1921,7 +1921,7 @@ summary {
     border-radius: 8px;
     background: #ffffff;
     padding: 8px 14px;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 10px;
     font-weight: 900;
     pointer-events: none;
@@ -1972,8 +1972,8 @@ summary {
     align-items: center;
     justify-content: center;
     border-radius: 999px;
-    background: #ede9fe;
-    color: #6d28d9;
+    background: rgb(var(--mt-a-100, 237 233 254));
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 9px;
     font-weight: 900;
 }
@@ -2034,7 +2034,7 @@ summary {
 .mixx-v4-cover-upload:focus-visible {
     border-radius: 16px;
     box-shadow:
-        0 0 0 3px rgba(124, 58, 237, 0.16);
+        0 0 0 3px rgb(var(--mt-a-600, 124 58 237) / 0.16);
 }
 
 .mixx-v4-cover-browse {
@@ -2046,7 +2046,7 @@ summary {
     border-radius: 8px;
     background: #ffffff;
     padding: 8px 14px;
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
     font-size: 10px;
     font-weight: 900;
 }
@@ -2121,8 +2121,8 @@ summary {
     display: grid;
     place-items: center;
     border-radius: 18px;
-    background: #f5f3ff;
-    color: #7c3aed;
+    background: rgb(var(--mt-a-50, 245 243 255));
+    color: rgb(var(--mt-a-600, 124 58 237));
     font-size: 25px;
     margin-bottom: 16px;
 }
@@ -2259,7 +2259,7 @@ summary {
 .mixx-v6-modal-eyebrow {
     display: block;
     margin-bottom: 5px;
-    color: #7c3aed;
+    color: rgb(var(--mt-a-600, 124 58 237));
     font-size: 9px;
     font-weight: 900;
     letter-spacing: .15em;
@@ -2319,11 +2319,11 @@ summary {
 }
 
 .mixx-v6-modal-steps .active {
-    color: #6d28d9;
+    color: rgb(var(--mt-a-700, 109 40 217));
 }
 
 .mixx-v6-modal-steps .active span {
-    background: #7c3aed;
+    background: rgb(var(--mt-a-600, 124 58 237));
     color: #fff;
 }
 
@@ -2361,7 +2361,7 @@ summary {
 }
 
 .mixx-v6-upload-box:hover {
-    border-color: #8b5cf6;
+    border-color: rgb(var(--mt-a-500, 139 92 246));
     background: #faf7ff;
 }
 
@@ -2372,11 +2372,11 @@ summary {
     place-items: center;
     margin-bottom: 18px;
     border-radius: 20px;
-    background: #7c3aed;
+    background: rgb(var(--mt-a-600, 124 58 237));
     color: #fff;
     font-size: 31px;
     box-shadow:
-        0 13px 30px rgba(124,58,237,.24);
+        0 13px 30px rgb(var(--mt-a-600, 124 58 237) / .24);
 }
 
 .mixx-v6-upload-box h3 {
@@ -2454,11 +2454,11 @@ summary {
 }
 
 .mixx-v6-primary-button {
-    border: 1px solid #6d28d9;
-    background: #7c3aed;
+    border: 1px solid rgb(var(--mt-a-700, 109 40 217));
+    background: rgb(var(--mt-a-600, 124 58 237));
     color: #fff;
     box-shadow:
-        0 8px 20px rgba(124,58,237,.16);
+        0 8px 20px rgb(var(--mt-a-600, 124 58 237) / .16);
 }
 
 .mixx-v6-primary-button:disabled {
@@ -2498,7 +2498,7 @@ summary {
     place-items: center;
     border-radius: 8px;
     background: #f3e8ff;
-    color: #7c3aed;
+    color: rgb(var(--mt-a-600, 124 58 237));
     font-size: 9px;
     font-weight: 900;
 }

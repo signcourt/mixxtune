@@ -11,7 +11,7 @@ class Distributor extends Model
 
     protected $fillable = [
         'label_id', 'user_id', 'slug', 'host', 'host_verified_at', 'brand_name', 'dashboard_name',
-        'logo_path', 'status', 'created_by', 'updated_by',
+        'logo_path', 'theme', 'status', 'created_by', 'updated_by',
     ];
 
     protected $casts = ['host_verified_at' => 'datetime'];
