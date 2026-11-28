@@ -3521,3 +3521,14 @@ Route::middleware(['auth', 'verified'])->prefix('admin/promo-agent')->group(func
     Route::post('/{release}/check', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'check'])->whereNumber('release')->middleware('throttle:30,1,promo-agent-check')->name('v2.admin.promo-agent.check');
     Route::post('/{release}/sent', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'sent'])->whereNumber('release')->name('v2.admin.promo-agent.sent');
 });
+
+/* W241 MIXXTUNE_PROMOTION: the Promotion menu (roles and circles are checked in the controller) */
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/promotion/promo-kit', [\App\Http\Controllers\V2\PromotionController::class, 'promoKit'])->name('v2.promotion.promo-kit');
+    Route::get('/promotion/services', [\App\Http\Controllers\V2\PromotionController::class, 'services'])->name('v2.promotion.services');
+    Route::post('/promotion/services/request', [\App\Http\Controllers\V2\PromotionController::class, 'send'])->middleware('throttle:10,1,promotion-request')->name('v2.promotion.services.request');
+    Route::get('/admin/promotion/requests', [\App\Http\Controllers\V2\PromotionController::class, 'requests'])->name('v2.admin.promotion.requests');
+    Route::post('/admin/promotion/requests/{promotionRequest}', [\App\Http\Controllers\V2\PromotionController::class, 'reply'])->whereNumber('promotionRequest')->middleware('throttle:60,1')->name('v2.admin.promotion.requests.reply');
+    Route::get('/admin/promotion/packages', [\App\Http\Controllers\V2\PromotionController::class, 'packages'])->name('v2.admin.promotion.packages');
+    Route::post('/admin/promotion/packages', [\App\Http\Controllers\V2\PromotionController::class, 'savePackage'])->middleware('throttle:60,1')->name('v2.admin.promotion.packages.save');
+});

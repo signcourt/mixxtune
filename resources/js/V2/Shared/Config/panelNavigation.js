@@ -26,6 +26,7 @@ import {
     UserCog,
     Briefcase,
     Clock,
+    Megaphone,
 } from 'lucide-react';
 
 import {
@@ -240,6 +241,24 @@ const ownerNavigation = (
                     label: 'Reports',
                     href: routes.reports,
                     permission: 'reports.view',
+                },
+            ],
+        },
+        {
+            id: 'promotion', /* W241 */
+            label: 'Promotion',
+            icon: Megaphone,
+            children: [
+                {
+                    id: 'promotion-promo-kit',
+                    label: 'Promo kit',
+                    href: '/promotion/promo-kit',
+                    permission: 'releases.view',
+                },
+                {
+                    id: 'promotion-services',
+                    label: 'Promotion services',
+                    href: '/promotion/services',
                 },
             ],
         },
@@ -510,6 +529,33 @@ const adminNavigation = (
                               permission: 'catalogue.view',
                           },
                       ],
+        },
+        {
+            id: 'promotion', /* W241 */
+            label: 'Promotion',
+            icon: Megaphone,
+            children: [
+                {
+                    id: 'promotion-promo-kit',
+                    label: 'Promo kit',
+                    href: '/promotion/promo-kit',
+                    permission: 'releases.view',
+                },
+                {
+                    id: 'promotion-requests',
+                    label: 'Promotion requests',
+                    href: '/admin/promotion/requests',
+                },
+                ...(role === 'super_admin'
+                    ? [
+                          {
+                              id: 'promotion-packages',
+                              label: 'Promotion packages',
+                              href: '/admin/promotion/packages',
+                          },
+                      ]
+                    : []),
+            ],
         },
         {
             id: 'financial',
