@@ -940,7 +940,7 @@ class AnalyticsController extends Controller
                 $w236Key = null;
             }
             $financialData = $w236Key
-                ? \App\Support\ReportDataStamp::remember($w236Key, 900, $w236Financial)
+                ? \App\Support\ReportDataStamp::remember($w236Key, 21600 /* W240 */, $w236Financial)
                 : $w236Financial();
         }
 
@@ -1070,7 +1070,7 @@ class AnalyticsController extends Controller
             return $query->pluck($column);
         }
 
-        return collect(\App\Support\ReportDataStamp::remember($key, 900, fn () => $query->pluck($column)->all()));
+        return collect(\App\Support\ReportDataStamp::remember($key, 21600 /* W240 opt */, fn () => $query->pluck($column)->all()));
     }
 
     /* W236: fingerprint of the royalty statements - the payable figures change only when this changes */

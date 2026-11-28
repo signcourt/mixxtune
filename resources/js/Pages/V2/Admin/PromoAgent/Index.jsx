@@ -12,7 +12,7 @@ const STATUS = {
 };
 const SOURCE_NAMES = { apple_music: "Apple Music", deezer: "Deezer", spotify: "Spotify", youtube: "YouTube + YouTube Music" };
 
-export default function PromoAgentIndex({ role = "super_admin", ready = true, enabled = false, since = "", sources = {}, can_manage = false, rows = null, waiting = 0 }) {
+export default function PromoAgentIndex({ role = "super_admin", ready = true, enabled = false, since = "", sources = {}, problems = {} /* W240 */, can_manage = false, rows = null, waiting = 0 }) {
     const { flash = {}, errors = {} } = usePage().props;
     const keys = useForm({ spotify_id: "", spotify_secret: "", youtube_key: "" });
     const list = rows?.data ?? [];
@@ -52,12 +52,16 @@ export default function PromoAgentIndex({ role = "super_admin", ready = true, en
 
                     <div className="mt-4 flex flex-wrap gap-2">
                         {Object.keys(SOURCE_NAMES).map((k) => (
-                            <span key={k} className={`rounded-full px-3 py-1 text-xs font-semibold ${sources[k] ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
-                                {SOURCE_NAMES[k]}: {sources[k] ? "working" : "needs a key"}
+                            <span key={k} className={`rounded-full px-3 py-1 text-xs font-semibold ${problems[k] ? "bg-amber-100 text-amber-900" : sources[k] ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
+                                {SOURCE_NAMES[k]}: {problems[k] ? "key saved, but refused" : sources[k] ? "working" : "needs a key"}
                             </span>
                         ))}
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">JioSaavn, Gaana, Wynk, Amazon Music, Instagram: typed by hand in the Promo kit</span>
                     </div>
+                    {/* W240 problem lines */}
+                    {Object.values(problems).map((line) => (
+                        <div key={line} className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">{line}</div>
+                    ))}
                 </section>
 
                 {can_manage && (

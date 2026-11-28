@@ -175,3 +175,34 @@ Artisan::command('promo:agent {--limit=8}', function () {
 Schedule::command('promo:agent')
     ->hourlyAt(17)
     ->withoutOverlapping(30);
+
+
+/* W240 MIXXTUNE_WARM: open the Super Admin dashboard and Analytics from the inside, so their totals are ready before a person asks */
+Artisan::command('perf:warm', function () {
+    $user = \App\Models\User::query()->where('role', 'super_admin')->where('account_status', 'active')->orderBy('id')->first();
+    if (! $user) {
+        $this->line('no super admin');
+
+        return 0;
+    }
+    config(['session.driver' => 'array']);
+    $host = parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'localhost';
+    foreach (['/super-admin/dashboard', '/analytics'] as $path) {
+        try {
+            auth()->guard('web')->setUser($user);
+            $t = microtime(true);
+            $request = \Illuminate\Http\Request::create('https://'.$host.$path, 'GET');
+            $response = app(\Illuminate\Contracts\Http\Kernel::class)->handle($request);
+            $this->line($path.' '.$response->getStatusCode().' '.round((microtime(true) - $t) * 1000).'ms');
+        } catch (\Throwable $e) {
+            report($e);
+            $this->line($path.' failed: '.$e->getMessage());
+        }
+    }
+
+    return 0;
+})->purpose('Warm the heavy dashboard / analytics totals');
+
+Schedule::command('perf:warm')
+    ->everyTenMinutes()
+    ->withoutOverlapping(8);

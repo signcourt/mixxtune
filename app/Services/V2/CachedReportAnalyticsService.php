@@ -17,7 +17,7 @@ use Illuminate\Support\Collection;
  */
 class CachedReportAnalyticsService extends ReportAnalyticsService
 {
-    private const TTL = 900; /* seconds - a safety net; the fingerprint already drops stale entries */
+    private const TTL = 21600; /* W240: 6 hours (was 15 minutes - the page went cold four times an hour) */ /* seconds - a safety net; the fingerprint already drops stale entries */
 
     /* W226: figures that are money of the account */
     private const W226_MONEY = ['earnings', 'collected_revenue', 'current_earnings', 'previous_earnings', 'earnings_change'];

@@ -91,7 +91,7 @@ class DashboardController extends Controller
             /* W225: one pass over every published report row - remembered until report data changes */
             [$profitSummary, $revenueTrend] = \App\Support\ReportDataStamp::remember( /* W225b */
                 'dash-profit:'.\App\Support\ReportDataStamp::value(),
-                300,
+                3600, /* W240 a */
                 fn () => $this->profitWithTrend($profit)
             );
         }
@@ -371,7 +371,7 @@ class DashboardController extends Controller
             ->distinct();
         $reportedTracks = (int) \App\Support\ReportDataStamp::remember(
             'dash-tracks:'.sha1(json_encode([$w236Tracks->toSql(), $w236Tracks->getBindings(), \App\Support\ReportDataStamp::value()])),
-            900,
+            3600, /* W240 c */
             fn () => (int) (clone $w236Tracks)->count('isrc')
         );
 
@@ -439,7 +439,7 @@ class DashboardController extends Controller
                     'profit_in_review' => $role === 'super_admin'
                         ? (float) \App\Support\ReportDataStamp::remember( /* W236 dash-review */
                             'dash-profit-review:'.\App\Support\ReportDataStamp::value(),
-                            300,
+                            3600, /* W240 b */
                             fn () => round((float) $profit->withStage($profit->baseQuery(), 'review')
                                 ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(collected_revenue, 0) < 0 THEN 0 ELSE ROUND(COALESCE(collected_revenue, 0), 8) - ROUND(COALESCE(earnings, 0), 8) END), 0) as p')
                                 ->value('p'), 8)

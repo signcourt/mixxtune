@@ -80,6 +80,7 @@ class PromoAgentController extends Controller
             'enabled' => $this->agent->enabled(),
             'since' => $this->agent->since(),
             'sources' => $sources,
+            'problems' => $this->agent->problems(), /* W240 */
             'can_manage' => $role === 'super_admin',
             'rows' => $rows,
             'waiting' => $ready && $this->agent->enabled() ? $this->agent->due(50)->count() : 0,

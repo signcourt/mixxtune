@@ -79,6 +79,18 @@ class ReleaseLinkAgent
         ];
     }
 
+    /** W240: a source that has its key but is being refused - [source => plain reason] */
+    public function problems(): array
+    {
+        $out = [];
+        $spotify = $this->sources()['spotify'] ? (string) Cache::get('w239:spotify-problem', '') : '';
+        if ($spotify !== '') {
+            $out['spotify'] = $spotify;
+        }
+
+        return $out;
+    }
+
     /** releases the hourly run should look at now */
     public function due(int $limit = 8)
     {
@@ -163,6 +175,10 @@ class ReleaseLinkAgent
             try {
                 $res = Http::timeout(15)->asForm()->withBasicAuth($id, $secret)->post('https://accounts.spotify.com/api/token', ['grant_type' => 'client_credentials']);
 
+                if (! $res->successful()) {
+                    Cache::put('w239:spotify-problem', 'Spotify does not accept the saved keys (HTTP '.$res->status().'). Check the Client ID and Client Secret.', 21600);
+                }
+
                 return $res->successful() ? (string) ($res->json('access_token') ?? '') : '';
             } catch (\Throwable $e) {
                 return '';
@@ -176,7 +192,23 @@ class ReleaseLinkAgent
         if (! $token) {
             return null;
         }
-        $d = $this->get('https://api.spotify.com/v1/search', ['q' => 'isrc:'.$isrc, 'type' => 'track', 'limit' => 5], ['Authorization' => 'Bearer '.$token]);
+        /* W240: remember why Spotify refuses (shown on the agent's screen) instead of silently finding nothing */
+        $d = null;
+        try {
+            $res = Http::timeout(15)->withToken($token)->acceptJson()->get('https://api.spotify.com/v1/search', ['q' => 'isrc:'.$isrc, 'type' => 'track', 'limit' => 5]);
+            if ($res->successful()) {
+                $d = (array) $res->json();
+                Cache::forget('w239:spotify-problem');
+            } else {
+                $body = (string) $res->body();
+                $why = stripos($body, 'premium') !== false
+                    ? 'Spotify refuses: the account that owns the app needs an active Premium subscription.'
+                    : 'Spotify refuses the request (HTTP '.$res->status().').';
+                Cache::put('w239:spotify-problem', $why, 21600);
+            }
+        } catch (\Throwable $e) {
+            $d = null;
+        }
         foreach ((array) ($d['tracks']['items'] ?? []) as $item) {
             if (strtoupper((string) ($item['external_ids']['isrc'] ?? '')) !== $isrc) {
                 continue;
