@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, Link2, Loader2, Music2, Search,
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /* IPRS Phase 2: statement detail + map each work to a catalogue track.
    Mapping stores the work number on the track, so future statements auto-map. */
@@ -60,8 +61,8 @@ function MapPanel({ upload, work }) {
         });
     };
 
-    const unmap = () => {
-        if (!window.confirm("Remove this mapping? The work will become unmatched again.")) return;
+    const unmap = async () => {
+        if (!(await uiConfirm("Remove this mapping? The work will become unmatched again."))) return;
         setBusy(true);
         router.post(`/admin/iprs/uploads/${upload.public_id}/unmap`, { work_int_no: work.work_int_no }, {
             preserveScroll: true,
@@ -173,8 +174,8 @@ export default function Show({ role = "admin", upload = {}, works = [] }) {
         filter === "all" ? true : filter === "matched" ? w.mapping_status === "matched" : w.mapping_status !== "matched"
     );
 
-    const doPublish = () => {
-        if (!window.confirm("Publish mapped royalty to the owners' wallets? Each owner is credited at their royalty rate.")) return;
+    const doPublish = async () => {
+        if (!(await uiConfirm("Publish mapped royalty to the owners' wallets? Each owner is credited at their royalty rate."))) return;
         setPublishing(true);
         router.post(`/admin/iprs/uploads/${upload.public_id}/publish`, {}, {
             preserveScroll: true,

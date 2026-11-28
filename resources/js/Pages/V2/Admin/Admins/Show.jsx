@@ -3,6 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import PageMessages from '@/V2/Shared/Components/PageMessages';
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * W60 MIXXTUNE_MANAGER_ASSIGN_V2
@@ -30,10 +31,10 @@ export default function Show({ role = 'super_admin', admin, artists = [], labels
     const da = diff('artist_ids', before.artists);
     const changed = dl.added + dl.removed + da.added + da.removed > 0;
 
-    const submit = () => {
+    const submit = async () => {
         if (!changed) return;
         const msg = `Save for ${admin.name}?\n\nLabels: +${dl.added} / -${dl.removed}\nArtists: +${da.added} / -${da.removed}`;
-        if (!window.confirm(msg)) return;
+        if (!(await uiConfirm(msg))) return;
         form.patch(`/admin/admins/${admin.id}/assignments`, { preserveScroll: true });
     };
 

@@ -1,6 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { uiConfirm, uiPrompt } from '@/ui/dialog';
 
 const money = (value, currency = 'INR') =>
     new Intl.NumberFormat('en-IN', {
@@ -65,42 +66,42 @@ export default function WithdrawalsIndex({
         });
     };
 
-    const approveWithdrawal = (id) => {
-        if (!confirm('Is withdrawal ko approve karna hai?')) return;
+    const approveWithdrawal = async (id) => {
+        if (!(await uiConfirm('Is withdrawal ko approve karna hai?'))) return;
 
         router.post(`/withdrawals/${id}/approve`, {}, {
             preserveScroll: true,
         });
     };
 
-    const markProcessing = (id) => {
-        if (!confirm('Is withdrawal ko processing me bhejna hai?')) return;
+    const markProcessing = async (id) => {
+        if (!(await uiConfirm('Is withdrawal ko processing me bhejna hai?'))) return;
 
         router.post(`/withdrawals/${id}/processing`, {}, {
             preserveScroll: true,
         });
     };
 
-    const rejectWithdrawal = (id) => {
-        const note = prompt('Rejection note likhiye (optional):') ?? '';
+    const rejectWithdrawal = async (id) => {
+        const note = (await uiPrompt('Rejection note likhiye (optional):')) ?? '';
 
         router.post(`/withdrawals/${id}/reject`, { note }, {
             preserveScroll: true,
         });
     };
 
-    const markPaid = (id, currentMethod = '') => {
-        const payment_reference = prompt(
+    const markPaid = async (id, currentMethod = '') => {
+        const payment_reference = (await uiPrompt(
             'Payment reference / UTR number likhiye:'
-        );
+        ));
 
         if (!payment_reference) return;
 
         const payment_method =
-            prompt(
+            (await uiPrompt(
                 'Payment method:',
                 currentMethod || 'bank_transfer'
-            ) || currentMethod || 'bank_transfer';
+            )) || currentMethod || 'bank_transfer';
 
         router.post(
             `/withdrawals/${id}/paid`,

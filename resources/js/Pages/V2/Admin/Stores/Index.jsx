@@ -9,6 +9,7 @@ import {
     useState,
 } from 'react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 const emptyStore = {
     name: '',
@@ -130,8 +131,8 @@ export default function Index({
     const { flash = {}, errors: pageErrors = {} } = usePage().props;
     const [busyId, setBusyId] = useState(null);
 
-    const toggleStore = (store) => {
-        if (store.is_active && !window.confirm(`Switch off "${store.name}"? New releases will not be sent to it.`)) {
+    const toggleStore = async (store) => {
+        if (store.is_active && !(await uiConfirm(`Switch off "${store.name}"? New releases will not be sent to it.`))) {
             return;
         }
         setBusyId(store.id);
@@ -145,11 +146,11 @@ export default function Index({
         );
     };
 
-    const deleteStore = (store) => {
+    const deleteStore = async (store) => {
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 `Delete "${store.name}"?`
-            )
+            ))
         ) {
             return;
         }

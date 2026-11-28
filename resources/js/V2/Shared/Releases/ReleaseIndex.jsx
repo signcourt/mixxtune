@@ -12,6 +12,7 @@ import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import StatusBadge from '@/V2/Shared/Components/StatusBadge';
 import EmptyState from '@/V2/Shared/Components/EmptyState';
 import PageMessages from '@/V2/Shared/Components/PageMessages';
+import { uiConfirm } from '@/ui/dialog';
 
 const formatDate = (value) => {
     if (!value) {
@@ -107,9 +108,9 @@ export default function ReleaseIndex({
     const allSelected = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
     const toggleAll = () => setSelectedIds(allSelected ? [] : rows.map((r) => r.id));
     /* W219: bulk one-click live - one code for the whole selection */
-    const bulkLive = () => {
+    const bulkLive = async () => {
         if (!selectedIds.length || bulkBusy) return;
-        if (!window.confirm(`Mark ${selectedIds.length} release(s) live in all stores? Releases without UPC, or not approved yet, are skipped and listed. A code is e-mailed to you.`)) return;
+        if (!(await uiConfirm(`Mark ${selectedIds.length} release(s) live in all stores? Releases without UPC, or not approved yet, are skipped and listed. A code is e-mailed to you.`))) return;
         setBulkBusy(true);
         router.post(
             '/admin/releases/bulk-go-live',
@@ -728,15 +729,15 @@ function ReleaseCard({
         ? `${basePath}/${release.id}/edit`
         : `${basePath}/${release.id}`;
 
-    const deleteDraft = () => {
+    const deleteDraft = async () => {
         if (!isDraft) {
             return;
         }
 
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 `Delete draft "${release.title || 'Untitled Release'}"?\n\nThis action will remove the draft from My Releases.`
-            )
+            ))
         ) {
             return;
         }
@@ -928,15 +929,15 @@ function ReleaseRow({
     const editPath =
         `${basePath}/${release.id}/edit`;
 
-    const deleteDraft = () => {
+    const deleteDraft = async () => {
         if (!isDraft) {
             return;
         }
 
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 `Delete draft "${release.title || 'Untitled Release'}"?\n\nThis action will remove the draft from My Releases.`
-            )
+            ))
         ) {
             return;
         }

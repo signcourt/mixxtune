@@ -1,6 +1,7 @@
 import { Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { COUNTRIES } from '@/V2/Shared/Releases/Steps/TerritoryStep';
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * W64 MIXXTUNE_REVIEW_V2: a summary card on top with the Submit button,
@@ -190,7 +191,7 @@ export default function ReviewStep({
 
     const { checks, allPassed, selectedStores, effectiveSelectedStores, isArtistAccount } = reviewChecks({ release, artist, label, distributionStores });
 
-    const submitForReview = () => {
+    const submitForReview = async () => {
         if (!release?.id || submitting) {
             return;
         }
@@ -203,9 +204,9 @@ export default function ReviewStep({
         }
 
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 'Submit this release for review? Editing will be locked after submission.'
-            )
+            ))
         ) {
             return;
         }

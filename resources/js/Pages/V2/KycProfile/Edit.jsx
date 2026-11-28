@@ -1,6 +1,7 @@
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { BadgeCheck, Landmark, Lock, MapPin, ReceiptText, ShieldCheck, Unlock } from 'lucide-react';
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * W80 MIXXTUNE_KYC_EDIT_LOCK
@@ -97,8 +98,8 @@ export default function Edit({ role, profile, editState = { can_edit: false, sta
         submit: false,
     });
 
-    const save = (submit) => {
-        if (submit && !window.confirm('Send your KYC and bank details for verification? After this they are locked until our team checks them.')) {
+    const save = async (submit) => {
+        if (submit && !(await uiConfirm('Send your KYC and bank details for verification? After this they are locked until our team checks them.'))) {
             return;
         }
         form.transform((d) => ({ ...d, submit }));

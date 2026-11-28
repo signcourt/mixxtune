@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, ShieldCheck, UserCheck } from "lucide-reac
 import { useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * W118 MIXXTUNE_MAKER_CHECKER
@@ -17,8 +18,8 @@ const STATUS = {
 
 function Row({ r }) {
     const [note, setNote] = useState("");
-    const decide = (decision) =>
-        window.confirm(`${decision === "approve" ? "Approve" : "Reject"}: ${r.what}?`) && router.post(`/admin/approvals/${r.id}`, { decision, note }, { preserveScroll: true });
+    const decide = async (decision) =>
+        (await uiConfirm(`${decision === "approve" ? "Approve" : "Reject"}: ${r.what}?`)) && router.post(`/admin/approvals/${r.id}`, { decision, note }, { preserveScroll: true });
     const [label, cls] = r.expired ? ["Approval ran out", "bg-slate-100 text-slate-500"] : STATUS[r.status] ?? [r.status, "bg-slate-100 text-slate-600"];
 
     return (
@@ -92,7 +93,7 @@ export default function Index({ on = false, superAdmins = 1, validHours = 24, ro
                     <button
                         type="button"
                         disabled={!on && superAdmins < 2}
-                        onClick={() => window.confirm(on ? "Switch Second approval OFF? (the other Super Admin must approve this too)" : "Switch Second approval ON?") && router.post("/admin/approvals/switch", { on: on ? 0 : 1 }, { preserveScroll: true })}
+                        onClick={async () => (await uiConfirm(on ? "Switch Second approval OFF? (the other Super Admin must approve this too)" : "Switch Second approval ON?")) && router.post("/admin/approvals/switch", { on: on ? 0 : 1 }, { preserveScroll: true })}
                         className={`h-11 rounded-xl px-5 text-sm font-bold disabled:opacity-40 ${on ? "border border-slate-300 bg-white text-slate-700" : "bg-emerald-600 text-white"}`}
                     >
                         {on ? "Switch OFF" : "Switch ON"}

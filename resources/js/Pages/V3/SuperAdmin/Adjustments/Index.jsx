@@ -4,6 +4,7 @@ import { ArrowDownCircle, ArrowUpCircle, CheckCircle2, Download, History, Loader
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /* MIXXTUNE_ADJUSTMENTS_V2 */
 
@@ -230,9 +231,9 @@ function AdjustModal({ onClose }) {
     const after = owner ? (data.direction === "credit" ? owner.available + amount : owner.available - amount) : null;
     const tooMuch = owner && data.direction === "debit" && amount > owner.available;
 
-    const submit = (e) => {
+    const submit = async (e) => {
         e.preventDefault();
-        if (!window.confirm(`${data.direction === "credit" ? "Add" : "Deduct"} ${money(amount)} ${data.direction === "credit" ? "to" : "from"} ${owner?.name}'s wallet?\nAn e-mailed code is needed next.`)) return;
+        if (!(await uiConfirm(`${data.direction === "credit" ? "Add" : "Deduct"} ${money(amount)} ${data.direction === "credit" ? "to" : "from"} ${owner?.name}'s wallet?\nAn e-mailed code is needed next.`))) return;
         post("/super-admin/finance/adjustments", { preserveScroll: true, onSuccess: onClose });
     };
 

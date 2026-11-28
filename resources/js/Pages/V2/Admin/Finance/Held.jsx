@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Search, Wallet, X } fr
 import { useMemo, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * W163: one screen for ALL held revenue.
@@ -37,8 +38,8 @@ export default function Held({ role = "admin", owners = [], summary = {} }) {
         return scored.map((s) => s.o);
     }, [owners, q]);
 
-    const releaseDigital = (o) => {
-        if (!window.confirm(`Release ${money(o.digital_total)} of import-held revenue to ${o.name}'s wallet?`)) return;
+    const releaseDigital = async (o) => {
+        if (!(await uiConfirm(`Release ${money(o.digital_total)} of import-held revenue to ${o.name}'s wallet?`))) return;
         setBusy(`d:${o.owner_type}:${o.owner_id}`);
         router.post("/admin/finance/held/release-owner", { owner_type: o.owner_type, owner_id: o.owner_id }, {
             preserveScroll: true,
@@ -47,8 +48,8 @@ export default function Held({ role = "admin", owners = [], summary = {} }) {
         });
     };
 
-    const releaseIprs = (o) => {
-        if (!window.confirm(`Release ${money(o.iprs_total)} of IPRS-held revenue to ${o.name}'s wallet?`)) return;
+    const releaseIprs = async (o) => {
+        if (!(await uiConfirm(`Release ${money(o.iprs_total)} of IPRS-held revenue to ${o.name}'s wallet?`))) return;
         setBusy(`i:${o.owner_type}:${o.owner_id}`);
         router.post("/admin/iprs/held/release", { owner_type: o.owner_type, owner_id: o.owner_id }, {
             preserveScroll: true,

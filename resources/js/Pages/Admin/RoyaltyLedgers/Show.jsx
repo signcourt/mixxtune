@@ -1,5 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 const money = (value, currency = 'INR') =>
     new Intl.NumberFormat('en-IN', {
@@ -31,24 +32,24 @@ export default function RoyaltyLedgerShow({
         ? '/super-admin/royalty-ledgers'
         : '/admin/royalty-ledgers';
 
-    const approveLedger = () => {
-        if (!confirm('Is royalty ledger ko approve karna hai?')) return;
+    const approveLedger = async () => {
+        if (!(await uiConfirm('Is royalty ledger ko approve karna hai?'))) return;
 
         router.post(`${ledgerBaseUrl}/${ledger.id}/approve`, {}, {
             preserveScroll: true,
         });
     };
 
-    const creditWallet = () => {
-        if (!confirm('Approved royalty ko wallet me credit karna hai?')) return;
+    const creditWallet = async () => {
+        if (!(await uiConfirm('Approved royalty ko wallet me credit karna hai?'))) return;
 
         router.post(`${ledgerBaseUrl}/${ledger.id}/credit-wallet`, {}, {
             preserveScroll: true,
         });
     };
 
-    const cancelLedger = () => {
-        if (!confirm('Is royalty ledger ko cancel karna hai?')) return;
+    const cancelLedger = async () => {
+        if (!(await uiConfirm('Is royalty ledger ko cancel karna hai?'))) return;
 
         router.post(`${ledgerBaseUrl}/${ledger.id}/cancel`, {}, {
             preserveScroll: true,

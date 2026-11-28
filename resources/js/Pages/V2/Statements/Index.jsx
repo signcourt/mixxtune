@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 import StatementEmailPanel from "@/V2/Admin/StatementEmailPanel";
+import { uiConfirm } from '@/ui/dialog';
 
 /* MIXXTUNE_STATEMENTS_V2 (W43) */
 
@@ -61,11 +62,11 @@ export default function Index({ role = "artist", statements = {}, filters = {}, 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
-    const act = (s, kind) => {
+    const act = async (s, kind) => {
         const text = kind === "approve"
             ? `Approve ${monthName(s.statement_month)} for ${s.owner_name}?\n${money(s.net_payable, s.currency)} goes to the owner's PENDING wallet balance.\nAn e-mailed code is needed next.`
             : `Make ${money(s.net_payable, s.currency)} of ${s.owner_name} AVAILABLE to withdraw?\nAn e-mailed code is needed next.`;
-        if (!window.confirm(text)) return;
+        if (!(await uiConfirm(text))) return;
         setBusy(`${kind}${s.id}`);
         router.post(`/admin/finance/statements/${s.id}/${kind}`, {}, { preserveScroll: true, onFinish: () => setBusy(null) });
     };

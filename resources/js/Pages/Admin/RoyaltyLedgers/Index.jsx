@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 const money = (value, currency = 'INR') =>
     new Intl.NumberFormat('en-IN', {
@@ -81,16 +82,16 @@ export default function RoyaltyLedgers({
     const canManageRightsBatch =
         isSuperAdmin && activeRightsImport.length > 0;
 
-    const runRightsBatchAction = (action) => {
+    const runRightsBatchAction = async (action) => {
         if (!canManageRightsBatch) return;
 
         const isCredit = action === 'credit-wallet';
 
-        const confirmed = window.confirm(
+        const confirmed = (await uiConfirm(
             isCredit
                 ? 'Credit all eligible approved ledgers in this exact Rights import batch to wallets? This action posts real wallet transactions.'
                 : 'Approve all eligible draft/posted ledgers in this exact Rights import batch?'
-        );
+        ));
 
         if (!confirmed) return;
 

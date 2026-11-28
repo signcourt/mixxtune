@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 export default function AdminManagement({
     admins,
@@ -34,8 +35,8 @@ export default function AdminManagement({
         );
     };
 
-    const deleteAdmin = (admin) => {
-        if (!window.confirm(`Delete ${admin.name}?`)) {
+    const deleteAdmin = async (admin) => {
+        if (!(await uiConfirm(`Delete ${admin.name}?`))) {
             return;
         }
 

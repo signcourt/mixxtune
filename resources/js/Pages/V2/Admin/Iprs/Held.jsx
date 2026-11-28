@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Send, Wallet } from "l
 import { useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /* IPRS held payments: owners with no active user yet. Release credits their wallet. */
 
@@ -16,10 +17,10 @@ export default function Held({ role = "admin", owners = [], total_held = 0 }) {
 
     const releasable = owners.filter((o) => o.user_active).length;
 
-    const release = (owner) => {
+    const release = async (owner) => {
         const body = owner ? { owner_type: owner.owner_type, owner_id: owner.owner_id } : {};
         const key = owner ? `${owner.owner_type}:${owner.owner_id}` : "all";
-        if (!window.confirm(owner ? `Release ${money(owner.total_held)} to ${owner.name}'s wallet?` : "Release all eligible held payments to owners' wallets?")) return;
+        if (!(await uiConfirm(owner ? `Release ${money(owner.total_held)} to ${owner.name}'s wallet?` : "Release all eligible held payments to owners' wallets?"))) return;
         setBusy(key);
         router.post("/admin/iprs/held/release", body, {
             preserveScroll: true,

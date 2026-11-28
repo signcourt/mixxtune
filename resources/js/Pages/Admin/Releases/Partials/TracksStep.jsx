@@ -1,5 +1,6 @@
 import { router, useForm } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
+import { uiConfirm } from '@/ui/dialog';
 
 const inputClass =
     'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100';
@@ -152,8 +153,8 @@ export default function TracksStep({
         });
     };
 
-    const removeTrack = (track) => {
-        if (!window.confirm(`Delete "${track.title}"?`)) {
+    const removeTrack = async (track) => {
+        if (!(await uiConfirm(`Delete "${track.title}"?`))) {
             return;
         }
 

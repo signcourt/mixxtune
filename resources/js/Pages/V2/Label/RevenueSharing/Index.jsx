@@ -8,6 +8,7 @@ import {
 } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 function ShareRow({
     item,
@@ -101,14 +102,14 @@ function ShareRow({
         );
     };
 
-    const remove = () => {
+    const remove = async () => {
         if (!item.share_id) {
             return;
         }
 
-        const confirmed = window.confirm(
+        const confirmed = (await uiConfirm(
             `Remove ${item.name} from Revenue Sharing? This will not delete the account.`
-        );
+        ));
 
         if (!confirmed) {
             return;

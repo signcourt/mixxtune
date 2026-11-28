@@ -1,10 +1,11 @@
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 export default function RevenueImportShow({ revenueImport, columnSettings = null }) {
-    const processReport = () => {
-        if (!window.confirm('Start processing this revenue report?')) {
+    const processReport = async () => {
+        if (!(await uiConfirm('Start processing this revenue report?'))) {
             return;
         }
 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * MIXXTUNE_OWNER_STATEMENT_V1
@@ -151,7 +152,7 @@ export default function StatementEmailPanel() {
     };
 
     const sendAll = async () => {
-        if (!window.confirm(`E-mail ${data.counts.to_send} statement(s) for ${data.month_label} to their owners?`)) {
+        if (!(await uiConfirm(`E-mail ${data.counts.to_send} statement(s) for ${data.month_label} to their owners?`))) {
             return;
         }
 
@@ -183,7 +184,7 @@ export default function StatementEmailPanel() {
     };
 
     const resend = async (row) => {
-        if (!window.confirm(`Send the ${data.month_label} statement for ${row.title} again to ${row.email}?`)) {
+        if (!(await uiConfirm(`Send the ${data.month_label} statement for ${row.title} again to ${row.email}?`))) {
             return;
         }
 

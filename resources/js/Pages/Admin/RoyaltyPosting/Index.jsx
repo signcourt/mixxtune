@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 export default function RoyaltyPosting({
     previewRows = [],
@@ -46,8 +47,8 @@ export default function RoyaltyPosting({
         });
     };
 
-    const generateLedger = () => {
-        if (!confirm('Selected preview rows ko royalty ledger me post karna hai?')) {
+    const generateLedger = async () => {
+        if (!(await uiConfirm('Selected preview rows ko royalty ledger me post karna hai?'))) {
             return;
         }
 

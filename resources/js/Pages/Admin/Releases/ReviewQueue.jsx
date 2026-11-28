@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 const badgeStyles = {
     submitted: 'bg-blue-50 text-blue-700 ring-blue-200',
@@ -63,8 +64,8 @@ export default function ReviewQueue({
         applyFilters();
     };
 
-    const approve = (release) => {
-        if (!window.confirm(`Approve "${release.title}"?`)) {
+    const approve = async (release) => {
+        if (!(await uiConfirm(`Approve "${release.title}"?`))) {
             return;
         }
 

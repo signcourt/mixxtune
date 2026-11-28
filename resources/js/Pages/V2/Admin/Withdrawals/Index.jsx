@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Download, FileText, Landmark, Loader2, Sea
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /* MIXXTUNE_WITHDRAWALS_V2 */
 
@@ -198,8 +199,8 @@ function WithdrawalCard({ w, razorpay = {} }) {
     const actionable = ["pending", "approved", "processing"].includes(w.status) && !rzRunning;
     const canRazorpay = razorpay.can && razorpay.ready && ["pending", "approved"].includes(w.status) && w.ready;
 
-    const send = (method, url, payload, confirmText) => {
-        if (confirmText && !window.confirm(confirmText)) return;
+    const send = async (method, url, payload, confirmText) => {
+        if (confirmText && !(await uiConfirm(confirmText))) return;
         setBusy(true);
         setError("");
         const opts = {

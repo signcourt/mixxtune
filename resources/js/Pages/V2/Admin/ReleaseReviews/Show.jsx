@@ -2,6 +2,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { createContext, useContext, useRef, useState } from 'react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import PageMessages from '@/V2/Shared/Components/PageMessages';
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * W63 MIXXTUNE_RELEASE_REVIEW_V2: messages + the checklist (approve
@@ -146,8 +147,8 @@ export default function Show({
     const actionErrors = Object.entries(errors).filter(([k]) => k.includes('.'));
     const checklistErrors = Object.entries(submissionChecklist?.errors ?? {});
 
-    const action = (endpoint, payload = {}, question = null) => {
-        if (question && !window.confirm(question)) return;
+    const action = async (endpoint, payload = {}, question = null) => {
+        if (question && !(await uiConfirm(question))) return;
         setProcessing(true);
 
         router.post(endpoint, payload, {

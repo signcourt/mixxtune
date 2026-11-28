@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import PageMessages from '@/V2/Shared/Components/PageMessages';
+import { uiConfirm } from '@/ui/dialog';
 import BankChangeOtpPrompt from '@/V2/Shared/Components/BankChangeOtpPrompt'; // W196
 
 /*
@@ -24,15 +25,15 @@ export default function Index({ role = 'super_admin', admins = {}, filters = {},
     const go = (extra = {}) =>
         router.get('/admin/admins', { q, status: filters.status || '', ...extra }, { preserveState: true, replace: true, preserveScroll: true });
 
-    const toggle = (a) => {
+    const toggle = async (a) => {
         const next = a.account_status === 'active' ? 'suspend' : 'activate';
-        if (!window.confirm(`${next === 'suspend' ? 'Suspend' : 'Activate'} ${a.name}? ${next === 'suspend' ? 'They are logged out at once and lose access to their labels.' : ''}`)) return;
+        if (!(await uiConfirm(`${next === 'suspend' ? 'Suspend' : 'Activate'} ${a.name}? ${next === 'suspend' ? 'They are logged out at once and lose access to their labels.' : ''}`))) return;
         setBusy(a.id);
         router.post(`/admin/users/${a.id}/toggle-status`, {}, { preserveScroll: true, onFinish: () => setBusy(null) });
     };
 
-    const loginAs = (a) => {
-        if (!window.confirm(`Open the panel as ${a.name}? Everything you do is logged under your name.`)) return;
+    const loginAs = async (a) => {
+        if (!(await uiConfirm(`Open the panel as ${a.name}? Everything you do is logged under your name.`))) return;
         router.post(`/admin/users/${a.id}/impersonate`);
     };
 

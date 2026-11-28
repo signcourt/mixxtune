@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ExternalLink, Lock, Pl
 import { useMemo, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * W121 MIXXTUNE_WEBSITE_HOMEPAGE + MIXXTUNE_WEBSITE_JOIN
@@ -105,8 +106,8 @@ export default function Homepage({ content, types = Object.keys(TYPE_NAMES), loc
         setSelId(id);
     };
 
-    const publish = () => {
-        if (!window.confirm("Publish these changes to the homepage now?")) return;
+    const publish = async () => {
+        if (!(await uiConfirm("Publish these changes to the homepage now?"))) return;
         const payload = {
             ...state,
             stores: state.stores.split(",").map((s) => s.trim()).filter(Boolean),
@@ -309,7 +310,7 @@ export default function Homepage({ content, types = Object.keys(TYPE_NAMES), loc
                                                     Required
                                                 </button>
                                                 <Toggle on={f.show} label={`Show ${f.label} on the form`} onChange={(v) => setField(f.id, "show", v)} />
-                                                <button type="button" onClick={() => window.confirm(`Remove the question "${f.label}"?`) && remove(f.id)} aria-label={`Remove ${f.label}`} className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-700">
+                                                <button type="button" onClick={async () => (await uiConfirm(`Remove the question "${f.label}"?`)) && remove(f.id)} aria-label={`Remove ${f.label}`} className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-700">
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </>

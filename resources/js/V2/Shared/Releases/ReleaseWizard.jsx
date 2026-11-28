@@ -13,6 +13,7 @@ import ReleaseDetailsStep from '@/V2/Shared/Releases/Steps/ReleaseDetailsStep';
 import TrackManager, { trackMissingLabels } from '@/V2/Shared/Releases/Steps/TrackManager';
 import TerritoryStep from '@/V2/Shared/Releases/Steps/TerritoryStep';
 import ReviewStep, { reviewChecks } from '@/V2/Shared/Releases/Steps/ReviewStep';
+import { uiConfirm } from '@/ui/dialog';
 
 
 const RELEASES_BASE_PATH =
@@ -522,7 +523,7 @@ export default function ReleaseWizard({
         );
     };
 
-    const submitForReview = () => {
+    const submitForReview = async () => {
         /* W119: the top-bar Submit follows the same checklist as the one beside the review */
         if (release?.id && !reviewChecks({ release, artist, label, distributionStores }).allPassed) {
             window.alert('Complete all items of the checklist before submitting.');
@@ -541,9 +542,9 @@ export default function ReleaseWizard({
         }
 
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 'Submit this release for review? Editing will be locked after submission.'
-            )
+            ))
         ) {
             return;
         }

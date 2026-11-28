@@ -4,6 +4,7 @@ import { AlertTriangle, Bell, CheckCircle2, Eye, History, Loader2, Search, Shiel
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /* MIXXTUNE_KYC_REVIEW_V1 */
 /* W197: renamed to "KYC Management"; tab order All first; reminder on every un-verified tab. */
@@ -49,9 +50,9 @@ export default function Index({ role = "admin", filters = {}, counts = {}, profi
     const page = filters.status === "missing" ? missing : profiles;
     const rows = page?.data ?? [];
 
-    const remind = (ids) => {
+    const remind = async (ids) => {
         if (!ids.length) return;
-        if (!window.confirm(`Send a "complete your KYC" reminder (e-mail + dashboard) to ${ids.length} owner(s)?`)) return;
+        if (!(await uiConfirm(`Send a "complete your KYC" reminder (e-mail + dashboard) to ${ids.length} owner(s)?`))) return;
         router.post("/admin/kyc/remind", { user_ids: ids }, { preserveScroll: true });
     };
 

@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, Percent, Trash2,
 import { useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /* IPRS Publishing Royalty - Phase 1: upload & parse IPRS statement files. */
 
@@ -81,8 +82,8 @@ export default function Uploads({ role = "admin", uploads = {} }) {
         });
     };
 
-    const remove = (u) => {
-        if (busyId || !window.confirm(`Delete "${u.file_name}" and its ${u.total_lines} line(s)?`)) return;
+    const remove = async (u) => {
+        if (busyId || !(await uiConfirm(`Delete "${u.file_name}" and its ${u.total_lines} line(s)?`))) return;
         setBusyId(u.id);
         router.delete(`/admin/iprs/uploads/${u.public_id}`, { preserveScroll: true, onFinish: () => setBusyId(null) });
     };

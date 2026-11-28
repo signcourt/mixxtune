@@ -6,6 +6,7 @@ import {
 } from '@inertiajs/react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 export default function Edit({
     role = 'label',
@@ -71,15 +72,15 @@ export default function Edit({
         );
     };
 
-    const postAction = (
+    const postAction = async (
         action,
         confirmation
     ) => {
         if (
             confirmation
-            && !window.confirm(
+            && !(await uiConfirm(
                 confirmation
-            )
+            ))
         ) {
             return;
         }

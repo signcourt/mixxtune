@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 const csrfToken = () =>
     document
@@ -295,8 +296,8 @@ export default function Index({
                                 selectedTracks.length ===
                                     0
                             }
-                            onClick={() =>
-                                window.confirm(`Generate ISRC for ${selectedTracks.length} selected item(s)? A code is permanent once given.`) &&
+                            onClick={async () =>
+                                (await uiConfirm(`Generate ISRC for ${selectedTracks.length} selected item(s)? A code is permanent once given.`)) &&
                                 
                                 runAction(
                                     '/admin/identifiers/isrc/bulk-generate',
@@ -496,8 +497,8 @@ export default function Index({
                             <button
                                 type="button"
                                 disabled={isOld || busy || selectedReleases.length === 0}
-                                onClick={() =>
-                                    window.confirm(`Give the next ${selectedReleases.length} free UPC(s) from the list to the selected release(s)? A UPC is permanent once given.`) &&
+                                onClick={async () =>
+                                    (await uiConfirm(`Give the next ${selectedReleases.length} free UPC(s) from the list to the selected release(s)? A UPC is permanent once given.`)) &&
                                     runAction('/admin/identifiers/upc/bulk-generate', { release_ids: selectedReleases })
                                 }
                                 className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
@@ -629,9 +630,9 @@ export default function Index({
                                                         <button
                                                             type="button"
                                                             disabled={busy || isOld}
-                                                            onClick={() => {
+                                                            onClick={async () => {
                                                                 if (upcFree > 0) {
-                                                                    if (window.confirm(`Give the next free UPC from the list (${codeLists?.upc?.next}) to "${release.title}"? A UPC is permanent once given.`)) {
+                                                                    if ((await uiConfirm(`Give the next free UPC from the list (${codeLists?.upc?.next}) to "${release.title}"? A UPC is permanent once given.`))) {
                                                                         runAction(`/admin/releases/${release.id}/upc/generate`);
                                                                     }
                                                                     return;

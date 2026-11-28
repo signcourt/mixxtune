@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 const EMPTY_FORM = {
     email: '',
@@ -380,11 +381,11 @@ export default function Index({
         );
     };
 
-    const removeMember = (member) => {
+    const removeMember = async (member) => {
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 `Remove access for ${member.name || member.email}?`
-            )
+            ))
         ) {
             return;
         }

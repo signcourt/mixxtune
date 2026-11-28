@@ -1,17 +1,18 @@
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Head, Link, router } from '@inertiajs/react';
+import { uiConfirm } from '@/ui/dialog';
 
 export default function ArtistsIndex({ artists = [] }) {
-    const deleteArtist = (artist) => {
-        if (!window.confirm(`Delete ${artist.name}?`)) {
+    const deleteArtist = async (artist) => {
+        if (!(await uiConfirm(`Delete ${artist.name}?`))) {
             return;
         }
 
         router.delete(`/artists/${artist.id}`);
     };
 
-    const resendInvitation = (artist) => {
-        if (!window.confirm(`Resend invitation to ${artist.email}?`)) {
+    const resendInvitation = async (artist) => {
+        if (!(await uiConfirm(`Resend invitation to ${artist.email}?`))) {
             return;
         }
 

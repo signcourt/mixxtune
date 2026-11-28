@@ -13,6 +13,7 @@ import {
 
 import TrackUploadOverlay from '@/V2/Shared/Releases/V5/Tracks/TrackUploadOverlay';
 import NameSuggestInput from '@/V2/Shared/Releases/NameSuggestInput';
+import { uiConfirm } from '@/ui/dialog';
 
 const ARTIST_CONTEXT =
     typeof window !== 'undefined'
@@ -961,11 +962,11 @@ export default function TrackManager({
         });
     };
 
-    const deleteTrack = (track) => {
+    const deleteTrack = async (track) => {
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 `Delete "${track.title}"?`
-            )
+            ))
         ) {
             return;
         }

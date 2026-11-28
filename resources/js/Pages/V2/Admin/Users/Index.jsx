@@ -11,6 +11,7 @@ import {
 } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm } from '@/ui/dialog';
 /* W215: "2026-11-25T08:29:00.000000Z" -> "25 Nov 2026, 02:29 pm" (browser zone) */
 function fmtWhen(v) {
     if (!v) return null;
@@ -490,16 +491,16 @@ export default function Index({
         };
     }, [search]);
 
-    const toggleStatus = (user) => {
+    const toggleStatus = async (user) => {
         const action =
             user.account_status === 'active'
                 ? 'suspend'
                 : 'activate';
 
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 `Are you sure you want to ${action} ${user.name}?`
-            )
+            ))
         ) {
             return;
         }
@@ -513,11 +514,11 @@ export default function Index({
         );
     };
 
-    const resendInvitation = (user) => {
+    const resendInvitation = async (user) => {
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 `Generate a new invitation for ${user.email}?`
-            )
+            ))
         ) {
             return;
         }
@@ -2060,11 +2061,11 @@ export default function Index({
 
                         <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                                 if (
-                                    window.confirm(
+                                    (await uiConfirm(
                                         'Send the reminders that are due now?\n\nEach reminder has a fresh 7-day link; older links stop working.'
-                                    )
+                                    ))
                                 ) {
                                     router.post(
                                         '/admin/users/invitation-reminders',
@@ -2359,11 +2360,11 @@ export default function Index({
                                                             'active' && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => {
+                                                            onClick={async () => {
                                                                 if (
-                                                                    window.confirm(
+                                                                    (await uiConfirm(
                                                                         `Open the panel as ${user.name}?`
-                                                                    )
+                                                                    ))
                                                                 ) {
                                                                     router.post(
                                                                         `/admin/users/${user.id}/impersonate`

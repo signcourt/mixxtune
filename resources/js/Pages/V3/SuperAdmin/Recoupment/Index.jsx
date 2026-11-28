@@ -4,6 +4,7 @@ import { BadgeIndianRupee, Ban, CheckCircle2, Download, FileText, History, Loade
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /* MIXXTUNE_RECOUPMENT_V2 */
 
@@ -82,8 +83,8 @@ export default function Index({ plans = {}, summary = {}, filters = {} }) {
     };
 
     // Delete a plan that never recovered anything (OTP-gated server-side).
-    const del = (p) => {
-        if (!window.confirm(`Delete plan ${p.plan_number} for ${p.user?.email || "this owner"}?\n\nThis permanently removes the plan and its costs. Only possible because nothing was recovered yet.`)) return;
+    const del = async (p) => {
+        if (!(await uiConfirm(`Delete plan ${p.plan_number} for ${p.user?.email || "this owner"}?\n\nThis permanently removes the plan and its costs. Only possible because nothing was recovered yet.`))) return;
         setLoadingId(p.id);
         router.post(`/super-admin/finance/recoupment/${p.id}/delete`, {}, {
             preserveScroll: true,
@@ -410,9 +411,9 @@ function NewPlanModal({ onClose }) {
     const amount = Number(data.initial_amount || 0);
     const blocked = !!picked?.open_plan;
 
-    const submit = (e) => {
+    const submit = async (e) => {
         e.preventDefault();
-        if (amount > 0 && !window.confirm(`Recover ${money(amount)} from ${picked?.name}'s future royalties?\nAn e-mailed code is needed next.`)) return;
+        if (amount > 0 && !(await uiConfirm(`Recover ${money(amount)} from ${picked?.name}'s future royalties?\nAn e-mailed code is needed next.`))) return;
         post("/super-admin/finance/recoupment", { preserveScroll: true, onSuccess: onClose });
     };
 
@@ -630,9 +631,9 @@ function AddCost({ plan, onDone, onCancel }) {
     });
     const amount = Number(data.amount || 0);
 
-    const submit = (e) => {
+    const submit = async (e) => {
         e.preventDefault();
-        if (data.is_recoverable && !window.confirm(`Add ${money(amount)} to recover from ${owner(plan)}?\nAn e-mailed code is needed next.`)) return;
+        if (data.is_recoverable && !(await uiConfirm(`Add ${money(amount)} to recover from ${owner(plan)}?\nAn e-mailed code is needed next.`))) return;
         post(`/super-admin/finance/recoupment/${plan.id}/expenses`, { preserveScroll: true, preserveState: true, onSuccess: onDone });
     };
 

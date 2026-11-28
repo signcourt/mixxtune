@@ -13,6 +13,7 @@ import PageMessages from '@/V2/Shared/Components/PageMessages';
 import LabelOwnershipPanel from '@/V2/Admin/LabelOwnershipPanel';
 import LabelOwnershipBulkImport from '@/V2/Admin/LabelOwnershipBulkImport';
 import LabelRateHistory from '@/V2/Admin/LabelRateHistory';
+import { uiConfirm } from '@/ui/dialog';
 
 export default function Index({
     role = 'admin',
@@ -126,7 +127,7 @@ export default function Index({
         );
     };
 
-    const runBulkAction = () => {
+    const runBulkAction = async () => {
         if (selectedLabelIds.length === 0) {
             window.alert(
                 'Select at least one label.'
@@ -199,9 +200,9 @@ export default function Index({
             'Apply Bulk Action';
 
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 `${actionName} for ${selectedLabelIds.length} selected label(s)?`
-            )
+            ))
         ) {
             return;
         }
@@ -861,9 +862,9 @@ export default function Index({
                                                             ? '1'
                                                             : '0'
                                                     }
-                                                    onChange={(event) => {
+                                                    onChange={async (event) => {
                                                         /* W59: this changes every label and artist of the same owner */
-                                                        if (!window.confirm(`${event.target.value === '1' ? 'Allow' : 'Stop'} withdrawals for the owner of "${label.name}"? This applies to all labels and artists of that owner.`)) {
+                                                        if (!(await uiConfirm(`${event.target.value === '1' ? 'Allow' : 'Stop'} withdrawals for the owner of "${label.name}"? This applies to all labels and artists of that owner.`))) {
                                                             event.target.value = label.can_withdraw ? '1' : '0';
                                                             return;
                                                         }

@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Copy, KeyRound, Landmark, PlugZap, Refresh
 import { useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * W115 MIXXTUNE_RAZORPAY_PAYOUTS
@@ -243,8 +244,8 @@ export default function Index({ settings = {}, webhookUrl = "", stagingSite = fa
                                                 {["creating", "error"].includes(p.status) && !p.razorpay_id && (
                                                     <button
                                                         type="button"
-                                                        onClick={() =>
-                                                            window.confirm(`Close ${p.what} (${inr(p.amount)}) as NOT paid?\n\nThe panel first asks Razorpay; it closes only if Razorpay has no such payout.`) &&
+                                                        onClick={async () =>
+                                                            (await uiConfirm(`Close ${p.what} (${inr(p.amount)}) as NOT paid?\n\nThe panel first asks Razorpay; it closes only if Razorpay has no such payout.`)) &&
                                                             router.post(`/admin/razorpay/payouts/${p.id}/close`, {}, { preserveScroll: true })
                                                         }
                                                         className="mt-1 block w-full whitespace-nowrap text-right text-[11px] font-semibold text-red-600 underline"

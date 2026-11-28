@@ -4,6 +4,7 @@ import ArtistLayout from '@/Layouts/ArtistLayout';
 import TracksStep from '@/Pages/Admin/Releases/Partials/TracksStep';
 import DistributionStep from '@/Pages/Artist/Releases/Partials/DistributionStep';
 import ReviewStep from '@/Pages/Artist/Releases/Partials/ReviewStep';
+import { uiConfirm } from '@/ui/dialog';
 
 const steps = [
     { id: 1, label: 'Release Details' },
@@ -140,15 +141,15 @@ export default function Create({
         setCurrentStep((step) => Math.max(step - 1, 1));
     };
 
-    const submitForReview = () => {
+    const submitForReview = async () => {
         if (!release?.id || submitting) {
             return;
         }
 
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 'Submit this release for review? You will not be able to edit it after submission.'
-            )
+            ))
         ) {
             return;
         }

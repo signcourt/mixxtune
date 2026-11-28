@@ -2,6 +2,7 @@ import {
     router,
     usePage,
 } from '@inertiajs/react';
+import { uiConfirm } from '@/ui/dialog';
 
 export default function ImpersonationBanner() {
     const {
@@ -13,10 +14,10 @@ export default function ImpersonationBanner() {
         return null;
     }
 
-    const stopImpersonation = () => {
-        const confirmed = window.confirm(
+    const stopImpersonation = async () => {
+        const confirmed = (await uiConfirm(
             'Return to the Super Admin account?'
-        );
+        ));
 
         if (!confirmed) {
             return;

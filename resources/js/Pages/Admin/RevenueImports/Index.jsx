@@ -1,6 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 export default function RevenueImports({
     imports,
@@ -27,8 +28,8 @@ export default function RevenueImports({
         );
     };
 
-    const deleteImport = (item) => {
-        if (!window.confirm(`Delete ${item.original_filename}?`)) {
+    const deleteImport = async (item) => {
+        if (!(await uiConfirm(`Delete ${item.original_filename}?`))) {
             return;
         }
 

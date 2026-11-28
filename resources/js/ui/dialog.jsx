@@ -46,6 +46,11 @@ export function uiConfirm(message, opts = {}) {
     return _push({ type: 'confirm', message: String(message ?? ''), ...opts });
 }
 
+/* W244: stands in for the browser's prompt(): resolves to the typed text, or null when cancelled */
+export function uiPrompt(message, defaultValue = '', opts = {}) {
+    return _push({ type: 'prompt', message: String(message ?? ''), defaultValue: String(defaultValue ?? ''), ...opts });
+}
+
 /* Install the window.alert override once. window.confirm is left native until every
    call site has moved to uiConfirm (a Promise can't stand in for confirm's boolean). */
 if (typeof window !== 'undefined' && !window.__mtDialogsInstalled) {
@@ -59,6 +64,7 @@ if (typeof window !== 'undefined' && !window.__mtDialogsInstalled) {
     }
     window.uiAlert = uiAlert;
     window.uiConfirm = uiConfirm;
+    window.uiPrompt = uiPrompt;
 }
 
 export function DialogHost() {
@@ -72,12 +78,26 @@ export function DialogHost() {
     }, []);
 
     const current = items[0];
+    const [typed, setTyped] = useState('');
+
+    useEffect(() => {
+        setTyped(current?.type === 'prompt' ? current.defaultValue : '');
+        if (current?.type === 'prompt') {
+            /* the suggested text is selected, so typing replaces it (as the browser's own box did) */
+            setTimeout(() => {
+                const el = document.querySelector('.mt-dialog-overlay input');
+                if (el) { el.focus(); el.select(); }
+            }, 0);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [current?.id]);
 
     useEffect(() => {
         if (!current) return;
         const onKey = (e) => {
-            if (e.key === 'Escape') close(current, current.type === 'confirm' ? false : undefined);
-            if (e.key === 'Enter') close(current, current.type === 'confirm' ? true : undefined);
+            if (e.key === 'Escape') { e.preventDefault(); close(current, cancelValue(current)); }
+            /* Enter on a button is that button's own click; Enter in the text box sends what was typed */
+            if (e.key === 'Enter' && current.type !== 'prompt' && !(e.target && e.target.tagName === 'BUTTON')) { e.preventDefault(); close(current, current.type === 'confirm' ? true : undefined); }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
@@ -102,31 +122,41 @@ export function DialogHost() {
         }
     };
 
-    const isConfirm = current.type === 'confirm';
-    const title = current.title || (isConfirm ? 'Please confirm' : 'Mixx Tune');
+    const isPrompt = current.type === 'prompt';
+    const isConfirm = current.type === 'confirm' || isPrompt;
+    const title = current.title || (isPrompt ? 'Please type' : isConfirm ? 'Please confirm' : (typeof document !== 'undefined' && document.querySelector('meta[name="mt-brand"]')?.getAttribute('content')) || 'Mixx Tune');
 
     return (
         <div
             className="mt-dialog-overlay"
             style={T.OVERLAY}
             onMouseDown={(e) => {
-                if (e.target === e.currentTarget) close(current, isConfirm ? false : undefined);
+                if (e.target === e.currentTarget) close(current, cancelValue(current));
             }}
         >
             <div style={T.CARD} role="dialog" aria-modal="true">
                 <div style={T.TITLE}>{title}</div>
                 <div style={T.MESSAGE}>{current.message}</div>
+                {isPrompt && (
+                    <input
+                        autoFocus
+                        value={typed}
+                        onChange={(e) => setTyped(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); close(current, typed); } }}
+                        style={T.INPUT}
+                    />
+                )}
                 <div style={T.ACTIONS}>
                     {isConfirm && (
-                        <button type="button" style={T.BTN_CANCEL} onClick={() => close(current, false)}>
+                        <button type="button" style={T.BTN_CANCEL} onClick={() => close(current, cancelValue(current))}>
                             {current.cancelText}
                         </button>
                     )}
                     <button
                         type="button"
-                        autoFocus
+                        autoFocus={!isPrompt}
                         style={{ ...T.BTN_OK, ...(current.danger ? T.BTN_DANGER : {}) }}
-                        onClick={() => close(current, isConfirm ? true : undefined)}
+                        onClick={() => close(current, isPrompt ? typed : isConfirm ? true : undefined)}
                     >
                         {current.okText}
                     </button>
@@ -134,6 +164,10 @@ export function DialogHost() {
             </div>
         </div>
     );
+}
+
+function cancelValue(dialog) {
+    return dialog.type === 'prompt' ? null : dialog.type === 'confirm' ? false : undefined;
 }
 
 /* Inline styles (never depend on a page CSS class being in the build), in two palettes that
@@ -181,6 +215,17 @@ function palette(isNight) {
         color: isNight ? '#cbd5e1' : '#334155',
         whiteSpace: 'pre-line',
     };
+    const INPUT = {
+        width: '100%',
+        marginTop: '12px',
+        padding: '10px 12px',
+        fontSize: '14px',
+        borderRadius: '10px',
+        border: isNight ? '1px solid #475569' : '1px solid #cbd5e1',
+        background: isNight ? '#0f172a' : '#ffffff',
+        color: isNight ? '#f1f5f9' : '#0f172a',
+        boxSizing: 'border-box',
+    };
     const ACTIONS = { display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' };
     return {
         OVERLAY,
@@ -188,7 +233,9 @@ function palette(isNight) {
         TITLE,
         MESSAGE,
         ACTIONS,
-        BTN_OK: { ...BTN_BASE, background: isNight ? '#8b5cf6' : '#7c3aed', color: '#ffffff' },
+        INPUT,
+        /* W244: the main button follows a distributor's colour theme (same purple without one) */
+        BTN_OK: { ...BTN_BASE, background: isNight ? 'rgb(var(--mt-a-500, 139 92 246))' : 'rgb(var(--mt-a-600, 124 58 237))', color: '#ffffff' },
         BTN_DANGER: { background: isNight ? '#f43f5e' : '#e11d48', color: '#ffffff' },
         BTN_CANCEL: {
             ...BTN_BASE,

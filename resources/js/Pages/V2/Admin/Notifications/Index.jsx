@@ -18,6 +18,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /* MIXXTUNE_NOTIFY_TARGETED_V1 */
 
@@ -233,10 +234,10 @@ export default function Index({ countries = [], states = [], roleCounts = {}, re
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [debouncedAudience]);
 
-    const submit = (e) => {
+    const submit = async (e) => {
         e.preventDefault();
         const count = preview?.count ?? 0;
-        if (!window.confirm(`Send "${data.title || "this notification"}" to ${count} ${count === 1 ? "person" : "people"} (${preview?.label || data.target_type})?`)) {
+        if (!(await uiConfirm(`Send "${data.title || "this notification"}" to ${count} ${count === 1 ? "person" : "people"} (${preview?.label || data.target_type})?`))) {
             return;
         }
         post("/admin/notification-management", {

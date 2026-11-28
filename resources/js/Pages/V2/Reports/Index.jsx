@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 const defaultColumns = [
     'Reporting Month',
@@ -1049,9 +1050,9 @@ export default function ReportsIndex({
     const deleteRequestedReport =
         async (report) => {
             if (
-                !window.confirm(
+                !(await uiConfirm(
                     'Delete this requested report?'
-                )
+                ))
             ) {
                 return;
             }

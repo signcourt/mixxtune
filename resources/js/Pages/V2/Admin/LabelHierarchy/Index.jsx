@@ -25,6 +25,7 @@ import {
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import PageMessages from '@/V2/Shared/Components/PageMessages';
+import { uiConfirm } from '@/ui/dialog';
 
 const normalizeId = (value) =>
     value === null ||
@@ -241,8 +242,8 @@ function TreeNode({ node, open, toggle, highlight, onAdd, onEdit, master = null 
     const isRoot = node.parent_label_id === null;
     const dim = highlight && !highlight(node);
 
-    const remove = () => {
-        if (!window.confirm(`Delete sub-label "${node.name}"?\n\nOnly an empty sub-label (no releases, artists or revenue) can be deleted.`)) return;
+    const remove = async () => {
+        if (!(await uiConfirm(`Delete sub-label "${node.name}"?\n\nOnly an empty sub-label (no releases, artists or revenue) can be deleted.`))) return;
         router.delete(`/super-admin/label-hierarchy/${node.id}`, { preserveScroll: true });
     };
 

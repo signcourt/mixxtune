@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Trash2, Zap } from "lu
 import { useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * W115 MIXXTUNE_STAFF_SALARY
@@ -102,8 +103,8 @@ export default function Run({ run = {}, items = [], razorpayReady = false, live 
     const toPayTotal = toPay.reduce((a, i) => a + Number(i.net || 0), 0);
     const bad = errors.razorpay || errors.item || errors.run || errors.utr || errors.deductions;
 
-    const pay = () => {
-        if (!window.confirm(`Send ${toPay.length} salary payment(s), ${inr(toPayTotal)} in total, by NEFT through Razorpay${live ? "" : " (TEST mode)"}?\n\nThe money leaves the RazorpayX account right away.`)) return;
+    const pay = async () => {
+        if (!(await uiConfirm(`Send ${toPay.length} salary payment(s), ${inr(toPayTotal)} in total, by NEFT through Razorpay${live ? "" : " (TEST mode)"}?\n\nThe money leaves the RazorpayX account right away.`))) return;
         setBusy(true);
         router.post(`/admin/salaries/${run.id}/pay`, {}, { preserveScroll: true, onFinish: () => setBusy(false) });
     };
@@ -190,7 +191,7 @@ export default function Run({ run = {}, items = [], razorpayReady = false, live 
             </section>
 
             {draft && (
-                <button type="button" onClick={() => window.confirm(`Delete the draft sheet of ${run.label}?`) && router.delete(`/admin/salaries/${run.id}`)} className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600">
+                <button type="button" onClick={async () => (await uiConfirm(`Delete the draft sheet of ${run.label}?`)) && router.delete(`/admin/salaries/${run.id}`)} className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600">
                     <Trash2 className="h-3.5 w-3.5" /> Delete this draft sheet
                 </button>
             )}

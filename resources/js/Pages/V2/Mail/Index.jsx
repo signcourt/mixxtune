@@ -6,6 +6,7 @@ import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 import AddressInput from "@/V2/Shared/Mail/AddressInput";
 import { MailButtons, MoreFolders, ScheduleMenu, untilText } from "@/V2/Shared/Mail/MailActionsUi";
 import { EMOJI, Editor, esc, shrinkImage, textToHtml, Toolbar, useRich } from "@/V2/Shared/Mail/RichEditor";
+import { uiConfirm } from '@/ui/dialog';
 
 /*
  * W95 MIXXTUNE_PANEL_MAIL
@@ -746,10 +747,10 @@ export default function MailIndex({ role = "admin", accounts = [], current = nul
                                         {open.scheduled?.error && <span className="block text-xs text-red-700">Last try failed: {open.scheduled.error} - trying again.</span>}
                                     </span>
                                     <span className="ml-auto flex gap-2">
-                                        <button type="button" onClick={() => window.confirm("Send this mail now?") && router.post(`/mail/scheduled/${open.id}/now`, {}, { preserveScroll: true })} className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white">
+                                        <button type="button" onClick={async () => (await uiConfirm("Send this mail now?")) && router.post(`/mail/scheduled/${open.id}/now`, {}, { preserveScroll: true })} className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white">
                                             Send now
                                         </button>
-                                        <button type="button" onClick={() => window.confirm(`Do not send it - put it back in Drafts?${open.scheduled?.files?.length ? " Attachments added in the Write window are not kept in drafts." : ""}`) && router.post(`/mail/scheduled/${open.id}/cancel`, {}, { preserveScroll: true })} className="rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-semibold text-sky-900">
+                                        <button type="button" onClick={async () => (await uiConfirm(`Do not send it - put it back in Drafts?${open.scheduled?.files?.length ? " Attachments added in the Write window are not kept in drafts." : ""}`)) && router.post(`/mail/scheduled/${open.id}/cancel`, {}, { preserveScroll: true })} className="rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-semibold text-sky-900">
                                             Cancel send
                                         </button>
                                     </span>

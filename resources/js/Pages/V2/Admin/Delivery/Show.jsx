@@ -3,6 +3,7 @@ import { Head, Link, router, usePage } from "@inertiajs/react";
 import { useEffect, useMemo, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 import ReleaseGoLiveButton from "@/V2/Shared/Releases/ReleaseGoLiveButton"; /* W218 */
 
 const transitionMap = {
@@ -64,8 +65,8 @@ export default function Show({
     const [actionRef, setActionRef] = useState("");
     const [starting, setStarting] = useState(false);
     const fmt = (v) => (v ? new Date(v).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—");
-    const startDelivery = () => {
-        if (!window.confirm("Start delivery for this release? Store records are created" + (readiness?.notes?.length ? " and: " + readiness.notes.join(" ") : "."))) return;
+    const startDelivery = async () => {
+        if (!(await uiConfirm("Start delivery for this release? Store records are created" + (readiness?.notes?.length ? " and: " + readiness.notes.join(" ") : ".")))) return;
         setStarting(true);
         router.post(`/admin/distribution/${release.id}/initialise`, {}, { preserveScroll: true, onFinish: () => setStarting(false) });
     };

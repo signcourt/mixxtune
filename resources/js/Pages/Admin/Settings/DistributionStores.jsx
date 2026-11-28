@@ -1,6 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 const inputClass =
     'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100';
@@ -110,8 +111,8 @@ export default function DistributionStores({ stores = [] }) {
         );
     };
 
-    const deleteStore = (store) => {
-        if (!window.confirm(`Delete "${store.name}"?`)) {
+    const deleteStore = async (store) => {
+        if (!(await uiConfirm(`Delete "${store.name}"?`))) {
             return;
         }
 

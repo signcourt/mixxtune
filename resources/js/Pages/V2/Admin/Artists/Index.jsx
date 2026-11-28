@@ -5,6 +5,7 @@ import {
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
 import PageMessages from '@/V2/Shared/Components/PageMessages';
+import { uiConfirm } from '@/ui/dialog';
 
 export default function Index({
     role = 'admin',
@@ -201,11 +202,11 @@ export default function Index({
                                                 <button
                                                     type="button"
                                                     title="Delete"
-                                                    onClick={() => {
+                                                    onClick={async () => {
                                                         if (
-                                                            window.confirm(
+                                                            (await uiConfirm(
                                                                 `Delete ${artist.stage_name}?`
-                                                            )
+                                                            ))
                                                         ) {
                                                             router.delete(
                                                                 `/admin/artists/${artist.id}`,

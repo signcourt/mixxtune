@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2, Send } from "lucide-react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 import { FilePicker, Message, StatusPill } from "@/V2/Shared/Support/supportUi";
+import { uiConfirm } from '@/ui/dialog';
 
 /* MIXXTUNE_SUPPORT_DESK_V1 */
 
@@ -19,8 +20,8 @@ export default function Show({ role = "artist", ticket, messages = [] }) {
         post(`/support/${ticket.id}/reply`, { forceFormData: true, preserveScroll: true, onSuccess: () => reset() });
     };
 
-    const act = (what) => {
-        if (what === "close" && !window.confirm("Close this ticket? Use this when your problem is solved.")) return;
+    const act = async (what) => {
+        if (what === "close" && !(await uiConfirm("Close this ticket? Use this when your problem is solved."))) return;
         router.post(`/support/${ticket.id}/${what}`, {}, { preserveScroll: true });
     };
 

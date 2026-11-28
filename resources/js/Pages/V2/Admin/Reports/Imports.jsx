@@ -3,6 +3,7 @@ import { CheckCircle2, Download, Eye, Loader2, Pencil, RefreshCw, Trash2, Upload
 import { useEffect, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /* MIXXTUNE_REPORT_IMPORTS_V2 (W47) */
 
@@ -79,9 +80,9 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
         setData("report_file", file ?? null);
     };
 
-    const submit = (e) => {
+    const submit = async (e) => {
         e.preventDefault();
-        if (sameMonth.length && !window.confirm(`${monthName(data.reporting_month)} already has ${sameMonth.length} report(s). Upload this one too?\n(Exact duplicate rows are skipped automatically.)`)) return;
+        if (sameMonth.length && !(await uiConfirm(`${monthName(data.reporting_month)} already has ${sameMonth.length} report(s). Upload this one too?\n(Exact duplicate rows are skipped automatically.)`))) return;
         post("/admin/reports/imports", { forceFormData: true, preserveScroll: true, onSuccess: () => { setData("report_file", null); const f = document.getElementById("report-file"); if (f) f.value = ""; } });
     };
 
@@ -98,14 +99,14 @@ export default function Imports({ role = "admin", imports = {}, uploadLimitMb = 
         });
     };
 
-    const remove = (i) => {
-        if (busy || !window.confirm(`Delete "${i.original_filename}" and its ${num(i.imported_rows)} rows?\n\nOnly possible while nothing from it is in wallets.`)) return;
+    const remove = async (i) => {
+        if (busy || !(await uiConfirm(`Delete "${i.original_filename}" and its ${num(i.imported_rows)} rows?\n\nOnly possible while nothing from it is in wallets.`))) return;
         setBusy(true);
         router.delete(`/admin/reports/imports/${i.id}`, { preserveScroll: true, onFinish: () => setBusy(false) });
     };
 
-    const redetect = (i) => {
-        if (busy || !window.confirm(`Check the ${num(i.unmapped_rows_count)} unmapped row(s) of ${i.original_filename} against the latest catalogue again?\n\nMapped rows are not changed. Nothing is credited or published.`)) return;
+    const redetect = async (i) => {
+        if (busy || !(await uiConfirm(`Check the ${num(i.unmapped_rows_count)} unmapped row(s) of ${i.original_filename} against the latest catalogue again?\n\nMapped rows are not changed. Nothing is credited or published.`))) return;
         setBusy(true);
         router.post(`/admin/reports/imports/${i.id}/re-detect-unmapped`, {}, { preserveScroll: true, preserveState: true, onFinish: () => setBusy(false) });
     };

@@ -9,6 +9,7 @@ import {
 import { useState } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 const statusStyles = {
     pending:
@@ -623,11 +624,11 @@ export default function Index({
                                                     item.owner_user_id && (
                                                         <ActionButton
                                                             busy={actionId === item.id}
-                                                            onClick={() => {
+                                                            onClick={async () => {
                                                                 if (
-                                                                    window.confirm(
+                                                                    (await uiConfirm(
                                                                         `Release ${money(item.net_payable, item.currency)} to the linked owner's wallet? This cannot be undone.`
-                                                                    )
+                                                                    ))
                                                                 ) {
                                                                     run(
                                                                         `/admin/finance/holds/${item.unclaimed_hold_id}/release`,

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 import SignatureDesigner, { defaultDesign, normalizeDesign, renderSignature } from "@/V2/Shared/Mail/SignatureDesigner";
+import { uiPrompt } from '@/ui/dialog';
 
 /*
  * W95 MIXXTUNE_PANEL_MAIL
@@ -208,8 +209,8 @@ export default function MailAccounts({ role = "super_admin", accounts = [], peop
         setBusy(a.id);
         router.post(`/admin/mail-accounts/${a.id}/test`, {}, { preserveScroll: true, onFinish: () => setBusy(null) });
     };
-    const remove = (a) => {
-        const typed = window.prompt(`Remove ${a.address} from the panel?\nThe mailbox and its mail stay at Hostinger.\n\nType the address to confirm:`);
+    const remove = async (a) => {
+        const typed = (await uiPrompt(`Remove ${a.address} from the panel?\nThe mailbox and its mail stay at Hostinger.\n\nType the address to confirm:`));
         if (typed === null) return;
         router.post(`/admin/mail-accounts/${a.id}/delete`, { confirm: typed.trim().toLowerCase() }, { preserveScroll: true });
     };

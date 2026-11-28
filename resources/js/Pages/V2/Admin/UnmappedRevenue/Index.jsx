@@ -11,6 +11,7 @@ import {
 } from 'react';
 
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm, uiPrompt } from '@/ui/dialog';
 
 const money = (value) =>
     new Intl.NumberFormat('en-IN', {
@@ -657,7 +658,7 @@ export default function Index({
     const [applyingMapping, setApplyingMapping] =
         useState(false);
 
-    const applyMappingWorkbook = () => {
+    const applyMappingWorkbook = async () => {
         if (!mappingFile) {
             window.alert(
                 'Please choose the validated Excel mapping file.'
@@ -688,11 +689,11 @@ export default function Index({
             Number(mappingPreview.valid_rows || 0);
 
         const confirmed =
-            window.confirm(
+            (await uiConfirm(
                 `Apply ${validCount.toLocaleString()} validated ISRC mapping(s)?\n\n` +
                 'This will save persistent ISRC rules and map matching review-pending report rows.\n\n' +
                 'Wallets will NOT be credited and revenue will NOT be published.'
-            );
+            ));
 
         if (!confirmed) {
             return;
@@ -751,7 +752,7 @@ export default function Index({
         );
     };
 
-    const autoResolve = () => {
+    const autoResolve = async () => {
         if (!reportImportId) {
             window.alert(
                 'Open Unmapped Revenue from a specific report before using Auto Resolve.'
@@ -760,9 +761,9 @@ export default function Index({
         }
 
         const confirmed =
-            window.confirm(
+            (await uiConfirm(
                 `Auto Resolve currently unmapped ISRCs for Report Import #${reportImportId}?\n\nOnly unique exact existing-label matches with a valid revenue rate will be accepted.\n\nA permanent ISRC rule will be saved for every accepted match.\n\nDuplicate, missing and missing-rate labels will remain unmapped.\n\nWallets will NOT be credited and the report will NOT be published.`
-            );
+            ));
 
         if (!confirmed) {
             return;
@@ -786,14 +787,14 @@ export default function Index({
         );
     };
 
-    const applyAllRules = () => {
+    const applyAllRules = async () => {
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 /* MIXXTUNE_UNMAPPED_APPLY_SCOPED_V1 */
                 reportImportId
                     ? `Apply saved ISRC rules to the unmapped rows of report #${reportImportId} only?`
                     : 'Apply saved ISRC rules to the unmapped rows of ALL reports that are still under review?'
-            )
+            ))
         ) {
             return;
         }
@@ -872,15 +873,18 @@ export default function Index({
 <form
     method="POST"
     action="/super-admin/unmapped-revenue/auto-resolve"
-    onSubmit={(event) => {
-        const ok = window.confirm(
+    onSubmit={async (event) => {
+        /* W244: the form is held, asked about in the panel's own box, then sent */
+        event.preventDefault();
+        const w244Form = event.currentTarget;
+        const ok = (await uiConfirm(
             'Run Auto Resolve in background for this report?\n\n' +
             'Only safe unresolved ISRCs will be processed.\n' +
             'Wallets will NOT be credited and the report will NOT be published.'
-        );
+        ));
 
-        if (!ok) {
-            event.preventDefault();
+        if (ok) {
+            w244Form.submit();
         }
     }}
     className="inline"
@@ -2088,7 +2092,7 @@ function RevenueRow({
         );
     };
 
-    const createAndMapLabel = () => {
+    const createAndMapLabel = async () => {
         const labelName =
             String(
                 row.report_label || ''
@@ -2108,10 +2112,10 @@ function RevenueRow({
          * an explicit Revenue Rate.
          */
         const rateInput =
-            window.prompt(
+            (await uiPrompt(
                 `Revenue Rate (%) for "${labelName}"\n\nExample: Enter 80 for 80%.`,
                 '80'
-            );
+            ));
 
         if (rateInput === null) {
             return;
@@ -2138,13 +2142,13 @@ function RevenueRow({
         }
 
         const confirmed =
-            window.confirm(
+            (await uiConfirm(
                 `Create label "${labelName}"?\n\n` +
                 `Revenue Rate: ${revenueRate}%\n` +
                 `Clicked ISRC: ${row.isrc || '—'}\n\n` +
                 `ALL currently unmapped ISRCs under this exact Report Label will be permanently mapped.\n\n` +
                 `Wallet will NOT be credited and the report will NOT be published.`
-            );
+            ));
 
         if (!confirmed) {
             return;

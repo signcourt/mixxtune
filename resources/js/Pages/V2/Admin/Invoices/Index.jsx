@@ -3,6 +3,7 @@ import { CheckCircle2, Download, FileText, Loader2, Search, Wand2 } from "lucide
 import { useEffect, useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
+import { uiConfirm } from '@/ui/dialog';
 
 /* MIXXTUNE_INVOICES_V2 */
 
@@ -47,9 +48,9 @@ export default function Index({ role = "admin", tab = "ready", counts = {}, stat
         window.location = `/admin/invoices/bulk-download?${params.toString()}`;
     };
 
-    const bulkRelease = () => {
+    const bulkRelease = async () => {
         if (pickedIds.length === 0) { window.alert("Tick at least one payout invoice to release."); return; }
-        if (!window.confirm(`Release payment for ${pickedIds.length} selected payout invoice(s)? This sends the money via the payout gateway.`)) return;
+        if (!(await uiConfirm(`Release payment for ${pickedIds.length} selected payout invoice(s)? This sends the money via the payout gateway.`))) return;
         setBusy("release");
         router.post("/admin/invoices/bulk-release", { invoice_ids: pickedIds }, {
             preserveScroll: true,
@@ -74,9 +75,9 @@ export default function Index({ role = "admin", tab = "ready", counts = {}, stat
         router.post(`${URL}/statements/${id}/generate`, { notify_owner: notify }, { preserveScroll: true, onFinish: () => setBusy(null) });
     };
 
-    const makeAll = () => {
+    const makeAll = async () => {
         const n = counts.missing ?? 0;
-        if (!window.confirm(`Make invoices for ${n > 200 ? "the first 200 of " : ""}${n} statement(s)${filters.month ? " of the chosen month" : ""}?`)) return;
+        if (!(await uiConfirm(`Make invoices for ${n > 200 ? "the first 200 of " : ""}${n} statement(s)${filters.month ? " of the chosen month" : ""}?`))) return;
         setBusy("all");
         router.post(`${URL}/generate-missing`, { search: filters.search, month: filters.month, notify_owner: notify }, { preserveScroll: true, onFinish: () => setBusy(null) });
     };

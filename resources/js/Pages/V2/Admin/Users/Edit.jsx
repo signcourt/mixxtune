@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
 import AgreementPanel from "@/V2/Shared/Components/AgreementPanel";
+import { uiConfirm, uiPrompt } from '@/ui/dialog';
 
 
 export default function Edit({
@@ -293,11 +294,11 @@ export default function Edit({
         });
     };
 
-    const resetPassword = () => {
+    const resetPassword = async () => {
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 `Generate a temporary password for ${managedUser.email}?`,
-            )
+            ))
         ) {
             return;
         }
@@ -337,11 +338,11 @@ export default function Edit({
         );
     };
 
-    const resendInvitation = () => {
+    const resendInvitation = async () => {
         if (
-            !window.confirm(
+            !(await uiConfirm(
                 `Generate a new invitation for ${managedUser.email}?`,
-            )
+            ))
         ) {
             return;
         }
@@ -365,7 +366,7 @@ export default function Edit({
 
             window.alert(`${label} copied.`);
         } catch {
-            window.prompt(`Copy ${label}:`, text);
+            (await uiPrompt(`Copy ${label}:`, text));
         }
     };
 
@@ -1461,8 +1462,8 @@ function KycLockPanel({ userId, lock }) {
         });
     };
 
-    const lockAgain = () => {
-        if (!window.confirm("Lock KYC again? The owner will not be able to change it.")) return;
+    const lockAgain = async () => {
+        if (!(await uiConfirm("Lock KYC again? The owner will not be able to change it."))) return;
         router.post(`/admin/users/${userId}/kyc-unlock/revoke`, {}, { preserveScroll: true });
     };
 

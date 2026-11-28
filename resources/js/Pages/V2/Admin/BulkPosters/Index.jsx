@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 /* MIXXTUNE_BULK_POSTERS_V1 */
 
@@ -99,7 +100,7 @@ export default function Index({ counts = {}, limits = {} }) {
 
         if (!ready.length || busy) return;
 
-        if (!window.confirm(`Save ${ready.length} poster(s)${replace ? ' (existing posters will be replaced)' : ''}?`)) {
+        if (!(await uiConfirm(`Save ${ready.length} poster(s)${replace ? ' (existing posters will be replaced)' : ''}?`))) {
             return;
         }
 

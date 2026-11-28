@@ -4,6 +4,7 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import TracksStep from './Partials/TracksStep';
 import DistributionStep from './Partials/DistributionStep';
 import ReviewStep from './Partials/ReviewStep';
+import { uiConfirm } from '@/ui/dialog';
 
 const steps = [
     { id: 1, label: 'Release Details' },
@@ -94,8 +95,8 @@ export default function Edit({
         setCurrentStep((step) => Math.max(step - 1, 1));
     };
 
-    const submitForReview = () => {
-        if (!window.confirm('Submit this release for review?')) {
+    const submitForReview = async () => {
+        if (!(await uiConfirm('Submit this release for review?'))) {
             return;
         }
 

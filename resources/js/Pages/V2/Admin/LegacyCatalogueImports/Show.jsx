@@ -8,6 +8,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import PanelLayout from '@/V2/Shared/Layouts/PanelLayout';
+import { uiConfirm } from '@/ui/dialog';
 
 const statusStyle = {
     ready: 'bg-emerald-50 text-emerald-700',
@@ -262,11 +263,11 @@ export default function Show({
 
                         <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                                 if (
-                                    window.confirm(
+                                    (await uiConfirm(
                                         'Create missing catalogue-only Labels and Artists? No releases or tracks will be imported.'
-                                    )
+                                    ))
                                 ) {
                                     post('approve', `/super-admin/legacy-catalogue-imports/${catalogueImport.id}/approve-entities`);
                                 }
@@ -322,18 +323,18 @@ export default function Show({
                                 Number(catalogueImport.blocked_rows ?? 0) > 0 ||
                                 Number(catalogueImport.imported_rows ?? 0) > 0
                             }
-                            onClick={() => {
-                                const first = window.confirm(
+                            onClick={async () => {
+                                const first = (await uiConfirm(
                                     `FINAL LIVE IMPORT\n\nFile: ${catalogueImport.original_filename}\nRows: ${catalogueImport.total_rows ?? 0}\nWarnings: ${catalogueImport.warning_rows ?? 0}\nBlocked: ${catalogueImport.blocked_rows ?? 0}\n\nThis will permanently create catalogue releases and tracks.\n\nContinue?`
-                                );
+                                ));
 
                                 if (!first) {
                                     return;
                                 }
 
-                                const second = window.confirm(
+                                const second = (await uiConfirm(
                                     'FINAL CONFIRMATION\n\nThis import will be committed to the live catalogue.\n\nLegacy audio will NOT be attached.\nMissing UPC/ISRC values will remain missing.\n\nImport now?'
-                                );
+                                ));
 
                                 if (!second) {
                                     return;
