@@ -26,6 +26,7 @@ class ReleaseShareService
         'amazon_music' => 'Amazon Music',
         'wynk' => 'Wynk Music',
         'instagram' => 'Instagram',
+        'deezer' => 'Deezer', /* W239 */
     ];
 
     public const LIVE = ['live', 'delivered'];
@@ -103,6 +104,20 @@ class ReleaseShareService
     public function autoLinks(int $releaseId): array
     {
         $out = [];
+        /* W239 agent-links: what the Live Links Agent found by ISRC / UPC comes first */
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('release_link_agent')) {
+                $found = DB::table('release_link_agent')->where('release_id', $releaseId)->value('links');
+                foreach ((array) json_decode((string) $found, true) as $key => $url) {
+                    $clean = $this->cleanUrl($url);
+                    if (isset(self::STORES[$key]) && $clean) {
+                        $out[$key] = $clean;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
         try {
             $rows = DB::table('release_store_deliveries as d')
                 ->join('distribution_stores as s', 's.id', '=', 'd.distribution_store_id')

@@ -141,3 +141,37 @@ Schedule::command('office:reminders')
 Schedule::command('office:idle-check')
     ->everyFiveMinutes()
     ->withoutOverlapping(10);
+
+
+/* W239 MIXXTUNE_LIVE_LINKS_AGENT: every hour - find the store links of releases whose release date has come */
+Artisan::command('promo:agent {--limit=8}', function () {
+    if (! \App\Services\V2\ReleaseLinkAgent::ready()) {
+        $this->line('not set up');
+
+        return 0;
+    }
+    $agent = app(\App\Services\V2\ReleaseLinkAgent::class);
+    if (! $agent->enabled()) {
+        $this->line('switched off');
+
+        return 0;
+    }
+    $n = 0;
+    foreach ($agent->due(max(1, min(20, (int) $this->option('limit')))) as $release) {
+        try {
+            $this->line('#'.$release->id.' '.$release->title.': '.$agent->check($release));
+        } catch (\Throwable $e) {
+            report($e);
+            $this->line('#'.$release->id.' failed: '.$e->getMessage());
+        }
+        $n++;
+        sleep(2);
+    }
+    $this->line('looked at: '.$n);
+
+    return 0;
+})->purpose('Live Links Agent: store links for releases that just went live');
+
+Schedule::command('promo:agent')
+    ->hourlyAt(17)
+    ->withoutOverlapping(30);

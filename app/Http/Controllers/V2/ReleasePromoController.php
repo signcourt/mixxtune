@@ -39,6 +39,7 @@ class ReleasePromoController extends Controller
                 'has_poster' => $share->hasPoster($release),
                 'poster_url' => '/releases/'.$release->id.'/promo/poster',
             ],
+            'can_find' => in_array($permissions->role($request->user()), ['super_admin', 'admin'], true) && \App\Services\V2\ReleaseLinkAgent::ready(), /* W239 */
             'ready' => ReleaseShareService::ready(),
             'eligible' => $share->eligible($release),
             'brand_name' => $share->brandName($release),

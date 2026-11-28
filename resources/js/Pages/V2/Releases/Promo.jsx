@@ -1,4 +1,4 @@
-import { Head, Link, useForm, usePage } from "@inertiajs/react";
+import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import { useRef, useState } from "react";
 
 import PanelLayout from "@/V2/Shared/Layouts/PanelLayout";
@@ -30,8 +30,10 @@ function wrap(ctx, text, maxWidth, maxLines) {
     return lines;
 }
 
-export default function Promo({ role = "label", release, ready = true, eligible = false, brand_name = "", page = null, stores = [] }) {
-    const flash = usePage().props?.flash ?? {};
+export default function Promo({ role = "label", release, ready = true, eligible = false, brand_name = "", page = null, stores = [], can_find = false }) {
+    const w239Props = usePage().props ?? {};
+    const flash = w239Props.flash ?? {};
+    const w239Errors = w239Props.errors ?? {};
     const startLinks = {};
     stores.forEach((s) => { startLinks[s.key] = s.url || ""; });
     const form = useForm({ enabled: page ? !!page.enabled : true, links: startLinks });
@@ -132,7 +134,7 @@ export default function Promo({ role = "label", release, ready = true, eligible 
                 <Link href={`/releases/${release.id}`} className="inline-block text-sm font-semibold text-violet-700">← Back to the release</Link>
 
                 {flash.success && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{flash.success}</div>}
-                {form.errors.promo && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{form.errors.promo}</div>}
+                {(form.errors.promo || w239Errors.check) && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{form.errors.promo || w239Errors.check}</div>}
 
                 {!ready || !eligible ? (
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
@@ -189,7 +191,13 @@ export default function Promo({ role = "label", release, ready = true, eligible 
                             </section>
 
                             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                                <div className="text-base font-bold text-slate-900">Store links</div>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="text-base font-bold text-slate-900">Store links</div>
+                                    {/* W239: staff can make the Live Links Agent look right now */}
+                                    {can_find && (
+                                        <button type="button" onClick={() => router.post(`/admin/promo-agent/${release.id}/check`, {}, { preserveScroll: true })} className="rounded-lg border border-violet-300 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-50">Find store links now</button>
+                                    )}
+                                </div>
                                 <div className="text-xs text-slate-500">Open the song in each store, copy the address and paste it here. A store with no link gets no button.</div>
                                 <div className="mt-3 space-y-3">
                                     {stores.map((s) => (
@@ -204,7 +212,7 @@ export default function Promo({ role = "label", release, ready = true, eligible 
                                                 placeholder={s.auto_url ? s.auto_url : "https://…"}
                                                 className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm text-slate-900"
                                             />
-                                            {s.auto_url && !form.data.links[s.key] && <div className="mt-1 break-all text-[11px] text-emerald-700">Already known from delivery, used automatically: {s.auto_url}</div>}
+                                            {s.auto_url && !form.data.links[s.key] && <div className="mt-1 break-all text-[11px] text-emerald-700">Found automatically and used: {s.auto_url}</div>}
                                         </div>
                                     ))}
                                 </div>

@@ -466,6 +466,11 @@ const adminNavigation = (
                     href: routes.stores,
                     permission: 'stores.view',
                 },
+                {
+                    id: 'distribution-live-links', /* W239 */
+                    label: 'Live Links Agent',
+                    href: '/admin/promo-agent',
+                },
             ],
         },
         {

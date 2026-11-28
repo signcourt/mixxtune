@@ -3511,3 +3511,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/releases/{release}/promo/poster', [\App\Http\Controllers\V2\ReleasePromoController::class, 'poster'])->whereNumber('release')->name('v2.releases.promo.poster');
     Route::post('/releases/{release}/promo', [\App\Http\Controllers\V2\ReleasePromoController::class, 'save'])->whereNumber('release')->middleware('throttle:30,1,release-promo')->name('v2.releases.promo.save');
 });
+
+
+/* W239 MIXXTUNE_LIVE_LINKS_AGENT: staff screen of the agent (role checked in the controller) */
+Route::middleware(['auth', 'verified'])->prefix('admin/promo-agent')->group(function () {
+    Route::get('/', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'index'])->name('v2.admin.promo-agent');
+    Route::post('/toggle', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'toggle'])->middleware('throttle:20,1')->name('v2.admin.promo-agent.toggle');
+    Route::post('/keys', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'keys'])->middleware('throttle:20,1')->name('v2.admin.promo-agent.keys');
+    Route::post('/{release}/check', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'check'])->whereNumber('release')->middleware('throttle:30,1,promo-agent-check')->name('v2.admin.promo-agent.check');
+    Route::post('/{release}/sent', [\App\Http\Controllers\V2\Admin\PromoAgentController::class, 'sent'])->whereNumber('release')->name('v2.admin.promo-agent.sent');
+});

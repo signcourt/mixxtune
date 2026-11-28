@@ -28,3 +28,4 @@ h1 { margin: 12px 0 0; font-size: 26px; line-height: 1.2; font-weight: 700; over
 .sh:hover, .sh:focus-visible { background: rgba(255, 255, 255, .1); }
 footer { margin-top: 18px; font-size: 12px; color: #8f88b5; }
 a:focus-visible { outline: 3px solid #c4b5fd; outline-offset: 2px; }
+.store-deezer { border-left: 6px solid #a238ff; }
